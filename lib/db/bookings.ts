@@ -21,10 +21,6 @@ export interface AvailabilityQuery {
   unitTypeId?: string
 }
 
-export interface AvailableUnit extends Unit {
-  available: boolean
-}
-
 /**
  * Units free for the whole range.
  *
@@ -112,6 +108,7 @@ export async function createWalkInBooking(
     id: `booking-${Date.now()}-${unit.id}`,
     reference: nextReference(),
     unitId: unit.id,
+    unitRef: unit.ref,
     range: input.range,
     status: created.status as 'confirmed',
     guestName: input.guestName,

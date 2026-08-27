@@ -7,24 +7,31 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import type { Unit } from '@/lib/db/inventory'
 import type { PropertyConfig } from '@/lib/domain/config'
+import { formatStayDate } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 import { priceStay } from '@/lib/domain/pricing/stay'
+import { cn } from '@/lib/utils'
 
 import { createWalkInBookingAction, type WalkInBookingState } from './actions'
 
 /**
  * The walk-in booking form (capability B2).
  *
- * The only client island on this screen. It exists so the price updates as
- * staff type — a booking clerk reading a total back to a guest should not wait
- * on a round trip per keystroke.
+ * Composition, per design.md §Components "Portal forms": ONE summary card, not
+ * a stack of sibling cards — sections divide with hairlines and take the
+ * data-surface header voice (caption uppercase mute). Fields are sized to
+ * their content: a two-digit guest count does not get a full row. The price
+ * sits beside the form as the signature `booking-summary-card`, sticky, with
+ * tabular figures, carrying the screen's one primary CTA.
  *
- * Pricing runs here AND on the server. That is deliberate, not duplication:
- * `priceStay` is a pure function with no server dependencies, so the same code
- * gives an instant preview here and the authoritative figure in the action. The
- * submitted total is never trusted — see actions.ts.
+ * The only client island on the screen. It exists so the price updates as
+ * staff type — a clerk reading a total back to a guest should not wait on a
+ * round trip per keystroke. Pricing runs here AND on the server; that is not
+ * duplication, `priceStay` is one pure function used in both places, and the
+ * submitted total is never trusted (see actions.ts).
  */
 
 interface BookingFormProps {
@@ -46,6 +53,7 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
   const [lateCheckOutHours, setLateCheckOutHours] = useState(0)
 
   const selectedUnit = units.find((unit) => unit.id === unitId)
+  const totalGuests = chargeableGuests + exemptGuests
 
   const quote = selectedUnit
     ? priceStay(
@@ -63,29 +71,45 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
     : null
 
   if (state.status === 'created' && state.created) {
+    const { created } = state
+
     return (
-      <Card surface="summary" className="max-w-[560px]">
-        <Badge tone="positive">Confirmed</Badge>
-        <p className="mt-lg text-display-xs text-foreground">{state.created.reference}</p>
-        <p className="mt-xs text-body-md text-copy">
-          Booking created and paid. Give the guest the reference above.
+      <Card surface="summary" className="max-w-[520px]">
+        <div className="flex items-start justify-between gap-lg">
+          <div>
+            <p className="text-caption tracking-wide text-muted-foreground uppercase">
+              Booking created
+            </p>
+            <p className="mt-xs text-display-sm text-foreground">{created.reference}</p>
+          </div>
+          <Badge tone="positive">Confirmed</Badge>
+        </div>
+
+        <p className="mt-sm text-body-md text-copy">
+          {created.unitRef} · {formatStayDate(created.checkIn)} → {formatStayDate(created.checkOut)}
         </p>
 
         <dl className="mt-lg border-t border-divider pt-lg">
           <div className="flex items-baseline justify-between gap-lg">
             <dt className="text-body-md text-copy">Paid</dt>
-            <dd className="text-body-md-strong text-foreground">
-              BND {formatCents(state.created.total)}
+            <dd className="text-body-md-strong text-foreground tabular-nums">
+              BND {formatCents(created.total)}
             </dd>
           </div>
           <div className="mt-sm flex items-baseline justify-between gap-lg">
             <dt className="text-body-md text-copy">Security deposit collected</dt>
-            <dd className="text-body-md-strong text-foreground">
-              BND {formatCents(state.created.securityDeposit)}
+            <dd className="text-body-md-strong text-foreground tabular-nums">
+              BND {formatCents(created.securityDeposit)}
             </dd>
           </div>
         </dl>
 
+        <p className="mt-lg text-body-sm text-muted-foreground">
+          Give the guest the reference above — it is what they quote at the gate.
+        </p>
+
+        {/* A full reload on purpose: it clears the action state and re-renders
+            the availability counts for the next booking. */}
         <Button asChild variant="tertiary" className="mt-lg">
           <a href="/portal/bookings/new">Take another booking</a>
         </Button>
@@ -94,45 +118,43 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
   }
 
   return (
-    <form action={formAction} className="grid gap-xl lg:grid-cols-[1fr_380px] lg:items-start">
+    <form
+      action={formAction}
+      className="grid gap-xl lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start"
+    >
       <input type="hidden" name="checkIn" value={checkIn} />
       <input type="hidden" name="checkOut" value={checkOut} />
       <input type="hidden" name="unitTypeId" value={selectedUnit?.unitTypeId ?? ''} />
       <input type="hidden" name="earlyCheckInHours" value={0} />
 
-      <div className="grid gap-xl">
-        <Card surface="summary">
-          <h2 className="text-display-xs text-foreground">Unit</h2>
-
-          <div className="mt-lg grid gap-sm">
-            <Label htmlFor="unitId">Available units ({units.length})</Label>
-            <select
+      <Card surface="summary">
+        <section>
+          <SectionHeading>Unit</SectionHeading>
+          <div className="mt-md grid gap-sm">
+            <Label htmlFor="unitId">{units.length} free for these dates</Label>
+            <NativeSelect
+              className="max-w-[360px]"
               id="unitId"
               name="unitId"
               value={unitId}
               onChange={(event) => setUnitId(event.target.value)}
-              className="h-control w-full rounded-md border border-border bg-card px-lg text-body-md text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {units.map((unit) => (
                 <option key={unit.id} value={unit.id}>
                   {unit.ref} — {unit.unitTypeName}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
             <FieldError message={state.fieldErrors?.unitId} />
           </div>
-        </Card>
+        </section>
 
-        <Card surface="summary">
-          <h2 className="text-display-xs text-foreground">Guests</h2>
-          <p className="mt-xs text-body-sm text-muted-foreground">
-            Guests aged {config.paxExemptAgeMax} and under are not counted towards occupancy.
-          </p>
-
-          <div className="mt-lg grid gap-lg sm:grid-cols-2">
+        <section className="mt-xl border-t border-divider pt-xl">
+          <SectionHeading>Guests</SectionHeading>
+          <div className="mt-md flex flex-wrap gap-lg">
             <NumberField
               id="chargeableGuests"
-              label={`Guests over ${config.paxExemptAgeMax}`}
+              label={`Over ${config.paxExemptAgeMax}`}
               value={chargeableGuests}
               min={1}
               onChange={setChargeableGuests}
@@ -140,19 +162,21 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
             />
             <NumberField
               id="exemptGuests"
-              label={`Guests aged ${config.paxExemptAgeMax} and under`}
+              label={`Aged ${config.paxExemptAgeMax} and under`}
               value={exemptGuests}
               min={0}
               onChange={setExemptGuests}
               error={state.fieldErrors?.exemptGuests}
             />
           </div>
-        </Card>
+          <p className="mt-sm text-body-sm text-muted-foreground">
+            Guests aged {config.paxExemptAgeMax} and under are not counted towards occupancy.
+          </p>
+        </section>
 
-        <Card surface="summary">
-          <h2 className="text-display-xs text-foreground">Extras</h2>
-
-          <div className="mt-lg grid gap-lg sm:grid-cols-2">
+        <section className="mt-xl border-t border-divider pt-xl">
+          <SectionHeading>Extras</SectionHeading>
+          <div className="mt-md flex flex-wrap gap-lg">
             <NumberField
               id="sofaBeds"
               label="Sofa beds"
@@ -163,99 +187,117 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
             />
             <NumberField
               id="lateCheckOutHours"
-              label="Late check-out (hours)"
+              label="Late check-out, hours"
               value={lateCheckOutHours}
               min={0}
               onChange={setLateCheckOutHours}
               error={state.fieldErrors?.lateCheckOutHours}
             />
           </div>
-
           {config.standardCheckInTime === null && (
-            <p className="mt-lg border-t border-divider pt-lg text-body-sm text-muted-foreground">
+            <p className="mt-sm text-body-sm text-muted-foreground">
               Early check-in is not offered yet — the standard check-in time is still to be
               confirmed with the client (prd.md §18 N6).
             </p>
           )}
-        </Card>
+        </section>
 
-        <Card surface="summary">
-          <h2 className="text-display-xs text-foreground">Guest details</h2>
-
-          <div className="mt-lg grid gap-lg">
+        <section className="mt-xl border-t border-divider pt-xl">
+          <SectionHeading>Guest</SectionHeading>
+          <div className="mt-md grid gap-lg">
             <TextField
               id="guestName"
               label="Name"
               autoComplete="name"
+              className="max-w-[420px]"
               error={state.fieldErrors?.guestName}
             />
-            <div className="grid gap-lg sm:grid-cols-2">
+            <div className="flex flex-wrap gap-lg">
               <TextField
                 id="guestPhone"
                 label="Phone"
                 type="tel"
                 autoComplete="tel"
+                className="w-[220px]"
                 error={state.fieldErrors?.guestPhone}
               />
               <TextField
                 id="vehicleRegistration"
-                label="Vehicle registration (optional)"
+                label="Vehicle reg (optional)"
+                className="w-[220px]"
                 error={state.fieldErrors?.vehicleRegistration}
               />
             </div>
           </div>
+        </section>
+      </Card>
+
+      <div className="lg:sticky lg:top-xl">
+        <Card surface="summary">
+          <p className="text-caption tracking-wide text-muted-foreground uppercase">
+            Booking summary
+          </p>
+          <p className="mt-sm text-body-md-strong text-foreground">
+            {formatStayDate(checkIn)} → {formatStayDate(checkOut)}
+          </p>
+          <p className="mt-xxs text-body-sm text-muted-foreground">
+            {quote?.ok ? `${quote.nights} ${quote.nights === 1 ? 'night' : 'nights'} · ` : ''}
+            {selectedUnit?.ref ?? 'no unit'} · {totalGuests}{' '}
+            {totalGuests === 1 ? 'guest' : 'guests'}
+          </p>
+
+          {quote?.ok ? (
+            <>
+              <dl className="mt-lg divide-y divide-divider border-t border-divider">
+                {quote.lines.map((line) => (
+                  <div
+                    key={`${line.type}-${line.description}`}
+                    className="flex items-baseline justify-between gap-lg py-sm"
+                  >
+                    <dt className="text-body-sm text-copy">{line.description}</dt>
+                    <dd className="text-body-sm-strong text-foreground tabular-nums">
+                      {formatCents(line.amount)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+
+              <div className="flex items-baseline justify-between gap-lg border-t border-divider pt-md">
+                <span className="text-body-md-strong text-foreground">Total</span>
+                <span className="text-display-xs text-foreground tabular-nums">
+                  BND {formatCents(quote.total)}
+                </span>
+              </div>
+
+              <p className="mt-lg rounded-md bg-muted p-md text-body-sm text-copy">
+                Plus BND {formatCents(quote.securityDeposit)} refundable security deposit, collected
+                on arrival.
+              </p>
+            </>
+          ) : (
+            <p className="mt-lg rounded-md bg-negative-tint p-md text-body-sm text-negative-deep">
+              {quote?.ok === false ? quote.error.message : 'Choose a unit to see the price.'}
+            </p>
+          )}
+
+          <Button type="submit" className="mt-lg w-full" disabled={isPending || !quote?.ok}>
+            {isPending ? 'Creating…' : 'Create & take payment'}
+          </Button>
+
+          {state.status === 'error' && state.message && (
+            <p role="alert" className="mt-md text-body-sm text-negative-deep">
+              {state.message}
+            </p>
+          )}
         </Card>
       </div>
-
-      <Card surface="summary" className="lg:sticky lg:top-xl">
-        <h2 className="text-display-xs text-foreground">Price</h2>
-
-        {quote?.ok ? (
-          <>
-            <dl className="mt-lg">
-              {quote.lines.map((line) => (
-                <div
-                  key={`${line.type}-${line.description}`}
-                  className="flex items-baseline justify-between gap-lg border-b border-divider py-sm"
-                >
-                  <dt className="text-body-sm text-copy">{line.description}</dt>
-                  <dd className="text-body-sm-strong text-foreground tabular-nums">
-                    {formatCents(line.amount)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-
-            <div className="mt-lg flex items-baseline justify-between gap-lg">
-              <span className="text-body-md-strong text-foreground">Total</span>
-              <span className="text-display-xs text-foreground tabular-nums">
-                BND {formatCents(quote.total)}
-              </span>
-            </div>
-
-            <p className="mt-sm text-body-sm text-muted-foreground">
-              Plus BND {formatCents(quote.securityDeposit)} refundable security deposit, collected
-              on arrival.
-            </p>
-
-            <Button type="submit" className="mt-xl w-full" disabled={isPending}>
-              {isPending ? 'Creating…' : 'Create & take payment'}
-            </Button>
-          </>
-        ) : (
-          <p className="mt-lg text-body-sm text-negative-deep">
-            {quote?.ok === false ? quote.error.message : 'Choose a unit to see the price.'}
-          </p>
-        )}
-
-        {state.status === 'error' && state.message && (
-          <p role="alert" className="mt-lg text-body-sm text-negative-deep">
-            {state.message}
-          </p>
-        )}
-      </Card>
     </form>
   )
+}
+
+/** The data-surface header voice, reused as the form's section headers. */
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return <h2 className="text-caption tracking-wide text-muted-foreground uppercase">{children}</h2>
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -277,7 +319,7 @@ interface NumberFieldProps {
 
 function NumberField({ id, label, value, min, onChange, error }: NumberFieldProps) {
   return (
-    <div className="grid gap-sm">
+    <div className="grid w-[168px] gap-sm">
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
@@ -287,6 +329,7 @@ function NumberField({ id, label, value, min, onChange, error }: NumberFieldProp
         min={min}
         value={value}
         aria-invalid={error ? true : undefined}
+        className="tabular-nums"
         onChange={(event) => onChange(Math.max(min, Number(event.target.value) || 0))}
       />
       <FieldError message={error} />
@@ -299,12 +342,13 @@ interface TextFieldProps {
   label: string
   type?: string
   autoComplete?: string
+  className?: string
   error?: string
 }
 
-function TextField({ id, label, type = 'text', autoComplete, error }: TextFieldProps) {
+function TextField({ id, label, type = 'text', autoComplete, className, error }: TextFieldProps) {
   return (
-    <div className="grid gap-sm">
+    <div className={cn('grid gap-sm', className)}>
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}

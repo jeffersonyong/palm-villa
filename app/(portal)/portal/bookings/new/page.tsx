@@ -2,8 +2,9 @@ import type { Metadata } from 'next'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { countAvailableByType, findAvailableUnits } from '@/lib/db/bookings'
 import { getUnitCounts } from '@/lib/db/inventory'
 import { palmVillaConfig } from '@/lib/domain/config'
@@ -64,21 +65,17 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   const totalByType = await getUnitCounts()
 
   return (
-    <>
+    <div className="max-w-[1120px]">
       <header>
         <h1 className="text-display-sm text-foreground">New booking</h1>
-        <p className="mt-xs max-w-[68ch] text-body-md text-copy">
-          Walk-in only: the guest is here and pays now. Advance bookings that hold a unit without
-          payment are out of scope for v1 (prd.md §9.4).
+        <p className="mt-xs text-body-md text-copy">
+          Walk-in only — the guest is here and pays now (prd.md §9.4).
         </p>
       </header>
 
       <Card surface="summary" className="mt-xl">
-        <form
-          method="get"
-          className="grid gap-lg sm:grid-cols-[repeat(3,minmax(0,1fr))_auto] sm:items-end"
-        >
-          <div className="grid gap-sm">
+        <form method="get" className="flex flex-wrap items-end gap-lg">
+          <div className="grid w-[164px] gap-sm">
             <Label htmlFor="from">Check-in</Label>
             <Input
               id="from"
@@ -90,7 +87,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
             />
           </div>
 
-          <div className="grid gap-sm">
+          <div className="grid w-[164px] gap-sm">
             <Label htmlFor="to">Check-out</Label>
             <Input
               id="to"
@@ -104,19 +101,19 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
 
           <div className="grid gap-sm">
             <Label htmlFor="type">Unit type</Label>
-            <select
+            <NativeSelect
+              className="w-[264px]"
               id="type"
               name="type"
               defaultValue={unitTypeId ?? ''}
-              className="h-control w-full rounded-md border border-border bg-card px-lg text-body-md text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <option value="">Any type</option>
               {config.unitTypes.map((type) => (
                 <option key={type.id} value={type.id}>
-                  {type.name} — from BND {formatCents(type.baseRatePerNight)}
+                  {type.name} — BND {formatCents(type.baseRatePerNight)}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
 
           <Button type="submit" variant="tertiary">
@@ -125,16 +122,24 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
         </form>
 
         {hasDates && (
-          <ul className="mt-lg flex flex-wrap gap-x-xl gap-y-sm border-t border-divider pt-lg">
-            {config.unitTypes.map((type) => (
-              <li key={type.id} className="text-body-sm text-copy">
-                <span className="text-body-sm-strong text-foreground">
-                  {availableByType[type.id] ?? 0}
-                </span>{' '}
-                of {totalByType[type.id] ?? 0} {type.name} free
-              </li>
-            ))}
-          </ul>
+          <dl className="mt-lg grid grid-cols-2 gap-lg border-t border-divider pt-lg sm:grid-cols-4">
+            {config.unitTypes.map((type) => {
+              const free = availableByType[type.id] ?? 0
+              const total = totalByType[type.id] ?? 0
+
+              return (
+                <div key={type.id}>
+                  <dt className="text-caption tracking-wide text-muted-foreground uppercase">
+                    {type.name}
+                  </dt>
+                  <dd className="mt-xs text-display-xs text-foreground tabular-nums">
+                    {free}
+                    <span className="text-body-sm text-muted-foreground"> of {total} free</span>
+                  </dd>
+                </div>
+              )
+            })}
+          </dl>
         )}
       </Card>
 
@@ -163,6 +168,6 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
           />
         )}
       </section>
-    </>
+    </div>
   )
 }

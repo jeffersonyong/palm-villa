@@ -48,6 +48,8 @@ export interface WalkInBookingState {
   created?: {
     reference: string
     unitRef: string
+    checkIn: string
+    checkOut: string
     total: number
     securityDeposit: number
   }
@@ -124,7 +126,9 @@ export async function createWalkInBookingAction(
     status: 'created',
     created: {
       reference: result.booking.reference,
-      unitRef: result.booking.unitId,
+      unitRef: result.booking.unitRef,
+      checkIn: result.booking.range.start,
+      checkOut: result.booking.range.end,
       total: result.booking.total,
       securityDeposit: result.booking.securityDeposit,
     },

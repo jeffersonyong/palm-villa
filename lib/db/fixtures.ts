@@ -40,6 +40,8 @@ export interface BookingFixture {
   /** Human-readable payment reference, `PV-` + 4 digits (architecture.md §6.1). */
   reference: string
   unitId: string
+  /** Denormalised for display; the schema slice joins instead. */
+  unitRef: string
   range: DateRange
   status: 'confirmed'
   guestName: string

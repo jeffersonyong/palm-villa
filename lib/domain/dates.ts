@@ -73,6 +73,21 @@ export function nightsBetween(checkIn: StayDate, checkOut: StayDate): number {
   return Math.round((end - start) / MILLISECONDS_PER_DAY)
 }
 
+/**
+ * Formats a stay date for display, e.g. `Fri 12 Sep`.
+ *
+ * UTC is deliberate: stay dates are calendar dates, so formatting through any
+ * real timezone risks shifting the day the guest was told.
+ */
+export function formatStayDate(date: StayDate): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  }).format(new Date(`${parseStayDate(date)}T00:00:00Z`))
+}
+
 /** Adds a number of days to a stay date, returning a new stay date. */
 export function addDays(date: StayDate, days: number): StayDate {
   const shifted = new Date(
