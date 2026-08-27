@@ -9,6 +9,7 @@ import Link from 'next/link'
  */
 const navItems = [
   { href: '/portal' as const, label: 'Overview' },
+  { href: '/portal/bookings/new' as const, label: 'New booking' },
   { href: '/' as const, label: 'Public site' },
   { href: '/field' as const, label: 'Field screens' },
 ]

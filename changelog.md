@@ -6,6 +6,29 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-27 — walk-in booking
+
+### Added
+- **Domain core** in `lib/domain/` — the pricing engine, booking state machine, money, stay-date and booking-line primitives, as pure functions with no database and no UI. [architecture.md §2](docs/architecture.md) names the pricing engine and state machine as the two modules where test coverage is mandatory rather than pragmatic; both are covered, 81 tests in total. Stay pricing implements [prd.md §8.2](docs/prd.md) line for line. Day-pass pricing implements the §8.1 [A] rule (per-person by band, then the cheapest applicable bundle combination) and is shaped but unused, since the day-pass flow is Phase 2.
+- **Walk-in booking form** at `/portal/bookings/new` — capability **B2**. Dates are URL state so availability is server-rendered and a set of dates can be kept in a tab or shared; only the price panel is a client island, so the total updates as staff type without a round trip per keystroke. Pricing runs in both places deliberately — `priceStay` is pure, so the same function gives the instant preview and the authoritative figure — and **no submitted total is ever trusted**: the server re-prices from the inputs.
+- **`lib/db/`** — the query layer boundary from [architecture.md §2](docs/architecture.md), with fixture bodies. **`lib/auth/require-permission.ts`** — the §4 gate, called at the top of the action. It permits everything in development and fails closed in production, so the auth slice fills in one function instead of hunting for unguarded mutations.
+- **Version control.** `git init` had never been run, so CLAUDE.md's branch-and-PR etiquette had nothing to apply to. Adds `.gitattributes` pinning LF, since Prettier writes LF and a Windows checkout would otherwise normalise to CRLF and fail `format:check` on untouched files.
+- shadcn Input, Label and Select, re-skinned to design.md — hairline not shadow (elevation level 1), 40px control height matching Button, `touch` variant for the field surface's ≥48px target.
+
+### Decided
+- **Open questions are modelled, not resolved.** Every [O] item from [prd.md §18](docs/prd.md) that touches pricing is a field in `lib/domain/config.ts` carrying a `TODO(client)` that names the question it answers. `grep -r "TODO(client)" lib/domain` is the list for Jason. This follows the pattern §7.2 already sanctions — a pending decision is a settings change, not a code change — and CLAUDE.md's rule that a gap in the PRD is a question for the client rather than a silent design decision. Two are load-bearing:
+  - **N2** (is stated max pax a hard cap, or the threshold above which BND 7/person applies) is a `paxPolicy` flag. **Both readings are implemented and both are tested**, because §8.2 states both and resolves neither. Nine guests in an 8-cap 3-bedroom either books at BND 414 or is refused outright, depending on the answer.
+  - **N6** (standard check-in time) leaves early check-in *unsellable* rather than charging hours against an undefined baseline. The form says so on screen.
+- **The security deposit is never a booking line.** [prd.md §11](docs/prd.md) makes it a refundable liability, not revenue; folding it into the total would misstate both the price and the deposit ledger. It is returned alongside and rendered as "plus BND 100".
+- **Day-pass bundle ties break towards fewer receipt rows.** 4 adults + 4 children costs BND 50 both as two 2+2 bundles and as a 2+1 plus a 2+2 plus a loose child. The guest pays the same, so the tie-break is chosen for legibility rather than left to depend on config ordering.
+- **Native `<input type="date">`, no date-picker library.** design.md specifies no calendar component, so building one would be unsanctioned styling. Recorded as a gap in [design.md §Components](docs/design.md): it is adequate for a clerk entering two known dates, and **not** adequate for the public availability calendar (A1), which needs specifying before it is built.
+- **Zod and Vitest added to the approved stack**, with reasoning, in [architecture.md §1](docs/architecture.md).
+
+### Open
+- **G1 is not delivered by this slice, and nothing currently enforces it.** "Double booking is structurally impossible" is a written commitment (scope-of-capabilities.md) that lives entirely in the GiST exclusion constraint of [architecture.md §5.2](docs/architecture.md). The fixture layer refuses overlapping ranges so the form behaves correctly on screen, but that is application logic — it loses a genuine race, which is precisely when the guarantee matters. Both `lib/db/fixtures.ts` and `lib/domain/availability.ts` say so prominently. The half-open `[start, end)` semantics used here match the constraint exactly, so checkout day and next check-in day are legal on the same unit — verified in the browser.
+- **`lib/db/` is fixture-backed and resets on restart.** The schema slice replaces it. That slice needs a Postgres, which means the personal Supabase dev project — [architecture.md §1.1](docs/architecture.md) puts this platform on personal accounts, so it is not the client's to create.
+- Unit reference formats (`3B-01`) and the 2-bedroom unit count (**N1**) are invented for the fixture and must not survive into the seed script.
+
 ## 2026-08-27
 
 ### Changed

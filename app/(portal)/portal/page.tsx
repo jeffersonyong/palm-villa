@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,7 +30,9 @@ export default function PortalOverviewPage() {
             <span className="font-mono"> (portal) </span> group renders.
           </p>
         </div>
-        <Button>New booking</Button>
+        <Button asChild>
+          <Link href="/portal/bookings/new">New booking</Link>
+        </Button>
       </header>
 
       <section
