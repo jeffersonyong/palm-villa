@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 export const metadata: Metadata = {
@@ -13,8 +14,8 @@ export const metadata: Metadata = {
  * Token proof sheet.
  *
  * Two kinds of utility appear here on purpose:
- *  - the *raw* palette (`bg-ink`, `bg-primary-pale`) in the swatch grids, which
- *    must not change with the theme — they are showing the brand values;
+ *  - the *raw* palette (`bg-ink`, `bg-brand`) in the swatch grids, which must
+ *    not change with the theme — they are showing the brand values;
  *  - the *semantic* roles everywhere else, which flip with the theme.
  * Nothing is styled with a literal hex or pixel value, so a token that stops
  * resolving shows up immediately. Toggle the theme to check both.
@@ -29,62 +30,60 @@ type Swatch = {
 
 const brandColors: Swatch[] = [
   {
-    token: 'primary',
+    token: 'brand',
     hex: '#2fc9c0',
-    swatch: 'bg-primary',
-    note: 'Sole accent. Primary CTA only, both themes.',
+    swatch: 'bg-brand',
+    note: 'Dark-theme primary fill; logo dot. Never a band and never text.',
   },
   {
-    token: 'primary-deep',
+    token: 'brand-deep',
     hex: '#0e6b64',
-    swatch: 'bg-primary-deep',
-    note: 'Readable aqua: text on pale aqua.',
+    swatch: 'bg-brand-deep',
+    note: 'Light-theme primary fill, and the only aqua that carries text.',
   },
   {
-    token: 'primary-active',
+    token: 'brand-active',
     hex: '#7fe3dc',
-    swatch: 'bg-primary-active',
-    note: 'Hover / pressed.',
+    swatch: 'bg-brand-active',
+    note: 'Dark-theme brand text.',
   },
   {
-    token: 'primary-neutral',
-    hex: '#a9e8e3',
-    swatch: 'bg-primary-neutral',
-    note: 'Quiet aqua fill.',
-  },
-  {
-    token: 'primary-pale',
+    token: 'brand-pale',
     hex: '#dff5f3',
-    swatch: 'bg-primary-pale',
-    note: 'Light-theme aqua surfaces.',
+    swatch: 'bg-brand-pale',
+    note: 'Selection highlight; checked-in badge ground.',
   },
-  { token: 'on-primary', hex: '#16181b', swatch: 'bg-on-primary', note: 'Text on aqua surfaces.' },
 ]
 
 const inkColors: Swatch[] = [
   {
     token: 'ink',
-    hex: '#16181b',
+    hex: '#131417',
     swatch: 'bg-ink',
-    note: 'Light-theme headings. Dark-theme page ground.',
+    note: 'Headings, dark surfaces. Never a button fill.',
   },
   {
     token: 'ink-deep',
-    hex: '#1f2225',
+    hex: '#1d2025',
     swatch: 'bg-ink-deep',
     note: 'Lighter than ink — dark-theme card surface.',
   },
-  { token: 'body', hex: '#41474c', swatch: 'bg-body', note: 'Light-theme body copy.' },
-  { token: 'mute', hex: '#626b71', swatch: 'bg-mute', note: 'Caption scale. Clears AA on ground.' },
+  { token: 'body', hex: '#45494f', swatch: 'bg-body', note: 'Light-theme body copy.' },
+  {
+    token: 'mute',
+    hex: '#6a7076',
+    swatch: 'bg-mute',
+    note: 'Captions and micro-labels. Clears AA on ground.',
+  },
 ]
 
 const surfaceColors: Swatch[] = [
-  { token: 'canvas', hex: '#ffffff', swatch: 'bg-canvas', note: 'Light-theme cards.' },
+  { token: 'canvas', hex: '#ffffff', swatch: 'bg-canvas', note: 'The working surface.' },
   {
     token: 'canvas-soft',
-    hex: '#f4f5f6',
+    hex: '#f7f7f8',
     swatch: 'bg-canvas-soft',
-    note: 'Cool near-white. Light ground; dark-theme body copy.',
+    note: 'Faint gray: portal ground, inset panels, table headers.',
   },
 ]
 
@@ -103,7 +102,7 @@ const semanticColors: Swatch[] = [
   },
   {
     token: 'positive-tint',
-    hex: '#dcf3e4',
+    hex: '#e2f5e9',
     swatch: 'bg-positive-tint',
     note: 'Positive chip ground.',
   },
@@ -111,7 +110,7 @@ const semanticColors: Swatch[] = [
   { token: 'warning-deep', hex: '#92400e', swatch: 'bg-warning-deep', note: 'Warning chip text.' },
   {
     token: 'warning-tint',
-    hex: '#fdf2d6',
+    hex: '#fdf3d9',
     swatch: 'bg-warning-tint',
     note: 'Warning chip ground.',
   },
@@ -124,7 +123,7 @@ const semanticColors: Swatch[] = [
   },
   {
     token: 'negative-tint',
-    hex: '#fbe7e8',
+    hex: '#fbe9ea',
     swatch: 'bg-negative-tint',
     note: 'Negative chip ground.',
   },
@@ -143,36 +142,38 @@ const roles: { role: string; swatch: string; light: string; dark: string }[] = [
     light: 'mute',
     dark: 'mute lightened',
   },
-  { role: 'border', swatch: 'bg-border', light: 'ink 10%', dark: 'white 12%' },
-  { role: 'divider', swatch: 'bg-divider', light: 'ink 6%', dark: 'white 8%' },
-  { role: 'accent', swatch: 'bg-accent', light: 'primary-pale', dark: 'primary 20% on ink-deep' },
+  { role: 'primary', swatch: 'bg-primary', light: 'brand-deep', dark: 'brand' },
+  { role: 'border', swatch: 'bg-border', light: 'ink 12%', dark: 'white 14%' },
+  { role: 'divider', swatch: 'bg-divider', light: 'ink 7%', dark: 'white 9%' },
+  { role: 'accent', swatch: 'bg-accent', light: 'brand-pale', dark: 'brand 20% on ink-deep' },
   { role: 'invert-surface', swatch: 'bg-invert-surface', light: 'ink', dark: 'canvas-soft' },
   { role: 'footer-surface', swatch: 'bg-footer-surface', light: 'ink', dark: 'raised ink' },
 ]
 
 const displayType = [
-  { token: 'display-xl', spec: '52 / 600', cls: 'text-display-xl' },
-  { token: 'display-lg', spec: '40 / 600', cls: 'text-display-lg' },
-  { token: 'display-md', spec: '32 / 600', cls: 'text-display-md' },
-  { token: 'display-sm', spec: '24 / 600', cls: 'text-display-sm' },
-  { token: 'display-xs', spec: '20 / 600', cls: 'text-display-xs' },
+  { token: 'display-xl', spec: '44 / 600', cls: 'text-display-xl' },
+  { token: 'display-lg', spec: '34 / 600', cls: 'text-display-lg' },
+  { token: 'display-md', spec: '28 / 600', cls: 'text-display-md' },
+  { token: 'display-sm', spec: '22 / 600', cls: 'text-display-sm' },
+  { token: 'display-xs', spec: '17 / 600', cls: 'text-display-xs' },
 ]
 
 const bodyType = [
-  { token: 'body-lg', spec: '18 / 400', cls: 'text-body-lg' },
-  { token: 'body-md', spec: '15 / 400', cls: 'text-body-md' },
-  { token: 'body-md-strong', spec: '15 / 500', cls: 'text-body-md-strong' },
+  { token: 'body-lg', spec: '16 / 400', cls: 'text-body-lg' },
+  { token: 'body-md', spec: '14 / 400', cls: 'text-body-md' },
+  { token: 'body-md-strong', spec: '14 / 500', cls: 'text-body-md-strong' },
   { token: 'body-sm', spec: '13 / 400', cls: 'text-body-sm' },
   { token: 'body-sm-strong', spec: '13 / 500', cls: 'text-body-sm-strong' },
   { token: 'caption', spec: '12 / 400', cls: 'text-caption' },
-  { token: 'button-md', spec: '14 / 500', cls: 'text-button-md' },
+  { token: 'micro', spec: '11 / 500 · caps', cls: 'micro-label' },
+  { token: 'button-md', spec: '13 / 500', cls: 'text-button-md' },
 ]
 
 const radii = [
   { token: 'sm', px: '4px', cls: 'rounded-sm' },
-  { token: 'md', px: '8px', cls: 'rounded-md' },
-  { token: 'lg', px: '12px', cls: 'rounded-lg' },
-  { token: 'xl', px: '16px', cls: 'rounded-xl' },
+  { token: 'md', px: '6px', cls: 'rounded-md' },
+  { token: 'lg', px: '10px', cls: 'rounded-lg' },
+  { token: 'xl', px: '14px', cls: 'rounded-xl' },
   { token: 'pill', px: '9999px', cls: 'rounded-pill' },
 ]
 
@@ -190,12 +191,12 @@ const spacingSteps = [
 function SwatchGrid({ title, items }: { title: string; items: Swatch[] }) {
   return (
     <div>
-      <h3 className="text-body-md-strong text-foreground">{title}</h3>
+      <h3 className="micro-label text-muted-foreground">{title}</h3>
       <ul className="mt-md grid gap-md sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => (
           <li
             key={item.token}
-            className="flex items-center gap-md rounded-lg border border-divider bg-card p-md"
+            className="flex items-center gap-md rounded-lg border border-border bg-card p-md"
           >
             <span
               aria-hidden
@@ -229,8 +230,8 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <section aria-labelledby={id} className={`px-xl py-3xl ${className}`}>
-      <div className="mx-auto w-full max-w-[1200px]">
+    <section aria-labelledby={id} className={`border-t border-divider px-xl py-3xl ${className}`}>
+      <div className="mx-auto w-full max-w-[1120px]">
         <h2 id={id} className="text-display-md text-foreground">
           {title}
         </h2>
@@ -244,9 +245,9 @@ function Section({
 export default function TokensPage() {
   return (
     <>
-      <section className="bg-background px-xl py-3xl">
-        <div className="mx-auto w-full max-w-[1200px]">
-          <p className="text-body-sm-strong text-muted-foreground">docs/design.md</p>
+      <section className="bg-card px-xl py-3xl">
+        <div className="mx-auto w-full max-w-[1120px]">
+          <p className="micro-label text-muted-foreground">docs/design.md</p>
           <h1 className="mt-sm text-display-md text-foreground sm:text-display-lg">
             Token proof sheet
           </h1>
@@ -268,48 +269,36 @@ export default function TokensPage() {
         title="Theme-aware roles"
         lead="What application code should actually use. Each role resolves through light-dark(), so a single class carries both themes."
       >
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full min-w-[560px] border-collapse text-left">
             <thead>
-              <tr className="bg-muted">
-                <th
-                  scope="col"
-                  className="px-md py-sm text-caption text-muted-foreground uppercase"
-                >
+              <tr className="border-b border-border bg-muted">
+                <th scope="col" className="px-lg py-sm micro-label text-muted-foreground">
                   Swatch
                 </th>
-                <th
-                  scope="col"
-                  className="px-md py-sm text-caption text-muted-foreground uppercase"
-                >
+                <th scope="col" className="px-lg py-sm micro-label text-muted-foreground">
                   Role
                 </th>
-                <th
-                  scope="col"
-                  className="px-md py-sm text-caption text-muted-foreground uppercase"
-                >
+                <th scope="col" className="px-lg py-sm micro-label text-muted-foreground">
                   Light
                 </th>
-                <th
-                  scope="col"
-                  className="px-md py-sm text-caption text-muted-foreground uppercase"
-                >
+                <th scope="col" className="px-lg py-sm micro-label text-muted-foreground">
                   Dark
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-divider">
               {roles.map((item) => (
-                <tr key={item.role} className="border-b border-divider">
-                  <td className="px-md py-sm">
+                <tr key={item.role}>
+                  <td className="px-lg py-sm">
                     <span
                       aria-hidden
                       className={`block size-8 rounded-sm border border-divider ${item.swatch}`}
                     />
                   </td>
-                  <td className="px-md py-sm text-body-sm-strong text-foreground">{item.role}</td>
-                  <td className="px-md py-sm text-body-sm text-copy">{item.light}</td>
-                  <td className="px-md py-sm text-body-sm text-copy">{item.dark}</td>
+                  <td className="px-lg py-sm text-body-sm-strong text-foreground">{item.role}</td>
+                  <td className="px-lg py-sm text-body-sm text-copy">{item.light}</td>
+                  <td className="px-lg py-sm text-body-sm text-copy">{item.dark}</td>
                 </tr>
               ))}
             </tbody>
@@ -334,12 +323,12 @@ export default function TokensPage() {
       <Section
         id="type-display"
         title="Display type"
-        lead="One family, Inter. Hierarchy is size, weight and tracking — nothing exceeds 52px, and only the public hero uses that."
+        lead="One family, Inter. Hierarchy is size, weight and tracking — nothing exceeds 44px, and only the public hero uses that."
       >
         <ul className="space-y-lg">
           {displayType.map((item) => (
             <li key={item.token} className="border-b border-divider pb-lg last:border-b-0">
-              <p className="text-caption text-muted-foreground uppercase">
+              <p className="micro-label text-muted-foreground">
                 {item.token} · {item.spec}
               </p>
               <p className={`mt-xs overflow-hidden text-foreground ${item.cls}`}>Palm Villa</p>
@@ -351,13 +340,13 @@ export default function TokensPage() {
       <Section
         id="type-body"
         title="Body type"
-        lead="The range the entire portal and field surface live in."
+        lead="The range the entire portal and field surface live in. `micro` is the labelling voice — table headers, form sections, stats."
         className="bg-background"
       >
         <ul className="space-y-md">
           {bodyType.map((item) => (
-            <li key={item.token} className="rounded-lg border border-divider bg-card p-lg">
-              <p className="text-caption text-muted-foreground uppercase">
+            <li key={item.token} className="rounded-lg border border-border bg-card p-lg">
+              <p className="micro-label text-muted-foreground">
                 {item.token} · {item.spec}
               </p>
               <p className={`mt-xs text-copy ${item.cls}`}>
@@ -371,15 +360,18 @@ export default function TokensPage() {
       <Section
         id="geometry"
         title="Radii and spacing"
-        lead="8px for controls, 12px for cards, 16px for overlays. Pills are badges only. Spacing runs on a 4px base."
+        lead="6px for controls, 10px for cards, 14px for overlays. Pills are badges only. Spacing runs on a 4px base."
       >
         <div className="grid gap-xl lg:grid-cols-2">
           <div>
-            <h3 className="text-body-md-strong text-foreground">Radii</h3>
+            <h3 className="micro-label text-muted-foreground">Radii</h3>
             <ul className="mt-md flex flex-wrap gap-lg">
               {radii.map((item) => (
                 <li key={item.token} className="text-center">
-                  <span aria-hidden className={`block size-16 bg-accent ${item.cls}`} />
+                  <span
+                    aria-hidden
+                    className={`block size-16 border border-border bg-muted ${item.cls}`}
+                  />
                   <span className="mt-xs block text-body-sm-strong text-foreground">
                     {item.token}
                   </span>
@@ -389,7 +381,7 @@ export default function TokensPage() {
             </ul>
           </div>
           <div>
-            <h3 className="text-body-md-strong text-foreground">Spacing</h3>
+            <h3 className="micro-label text-muted-foreground">Spacing</h3>
             <ul className="mt-md space-y-sm">
               {spacingSteps.map((item) => (
                 <li key={item.token} className="flex items-center gap-md">
@@ -406,12 +398,12 @@ export default function TokensPage() {
       <Section
         id="components"
         title="Components"
-        lead="shadcn/ui primitives reading the roles: one aqua primary, tinted status chips, card surfaces that invert with the theme."
+        lead="shadcn/ui primitives reading the roles: ink actions, tinted status chips, one hairline card idiom."
         className="bg-background"
       >
         <div className="space-y-xl">
           <div>
-            <h3 className="text-body-md-strong text-foreground">Buttons</h3>
+            <h3 className="micro-label text-muted-foreground">Buttons</h3>
             <div className="mt-md flex flex-wrap items-center gap-sm">
               <Button>Book now</Button>
               <Button variant="secondary">Change dates</Button>
@@ -423,7 +415,15 @@ export default function TokensPage() {
           </div>
 
           <div>
-            <h3 className="text-body-md-strong text-foreground">Status badges</h3>
+            <h3 className="micro-label text-muted-foreground">Inputs</h3>
+            <div className="mt-md flex max-w-[420px] flex-col gap-sm">
+              <Input placeholder="Guest name" />
+              <Input type="date" defaultValue="2026-09-12" className="w-[164px]" />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="micro-label text-muted-foreground">Status badges</h3>
             <div className="mt-md flex flex-wrap items-center gap-sm">
               <Badge tone="positive">Confirmed</Badge>
               <Badge tone="warning">Awaiting payment</Badge>
@@ -434,31 +434,27 @@ export default function TokensPage() {
           </div>
 
           <div>
-            <h3 className="text-body-md-strong text-foreground">Card surfaces</h3>
+            <h3 className="micro-label text-muted-foreground">Card surfaces</h3>
             <div className="mt-md grid gap-lg md:grid-cols-2 lg:grid-cols-3">
               <Card>
-                <p className="text-body-md-strong">card-content</p>
-                <p className="mt-xs text-body-sm opacity-80">The portal default.</p>
+                <p className="text-body-md-strong">content</p>
+                <p className="mt-xs text-body-sm opacity-80">Hairline card — the default.</p>
               </Card>
-              <Card surface="muted">
-                <p className="text-body-md-strong">card-feature-muted</p>
-                <p className="mt-xs text-body-sm opacity-80">Public feature grids.</p>
-              </Card>
-              <Card surface="aqua">
-                <p className="text-body-md-strong">card-feature-aqua</p>
+              <Card surface="raised">
+                <p className="text-body-md-strong">raised</p>
                 <p className="mt-xs text-body-sm opacity-80">
-                  Public feature grids, used sparingly.
+                  Hairline + shadow-card, for the gray ground.
                 </p>
+              </Card>
+              <Card surface="inset">
+                <p className="text-body-md-strong">inset</p>
+                <p className="mt-xs text-body-sm opacity-80">The faint gray panel inside a card.</p>
               </Card>
               <Card surface="dark">
-                <p className="text-body-md-strong">card-feature-dark</p>
+                <p className="text-body-md-strong">dark</p>
                 <p className="mt-xs text-body-sm opacity-80">
-                  Polarity flip — always the opposite of the current ground.
+                  The promotional polarity flip — public only, at most twice a page.
                 </p>
-              </Card>
-              <Card surface="summary">
-                <p className="text-body-md-strong">booking-summary-card</p>
-                <p className="mt-xs text-body-sm opacity-80">Neutral hairline.</p>
               </Card>
             </div>
           </div>

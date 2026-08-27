@@ -3,18 +3,25 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 /**
- * Card surfaces per design.md. Surface contrast is the elevation system —
- * shadows belong to overlays only, so no card variant carries one.
+ * Card surfaces per design.md v1.0 — one card idiom: white, 10px, hairline.
+ * `shadow-card` is separation on the near-white ground, never emphasis.
+ *
+ * - `content`: hairline card, the default everywhere.
+ * - `raised`: hairline + `shadow-card` — cards on the gray portal ground and
+ *   the public booking summary.
+ * - `inset`: the faint gray panel *inside* a card (fine print, deposit notes,
+ *   grouped stats) at the control radius.
+ * - `dark`: the public site's promotional polarity flip, at most twice a page.
+ *
+ * There are no tinted feature cards — colour is not a card treatment.
  */
-const cardVariants = cva('rounded-lg p-xl text-body-md', {
+const cardVariants = cva('text-body-md', {
   variants: {
     surface: {
-      content: 'bg-card text-card-foreground',
-      muted: 'bg-muted text-foreground',
-      aqua: 'bg-accent text-accent-foreground',
-      dark: 'bg-invert-surface text-invert-foreground',
-      /** The signature interactive card: white with a neutral hairline. */
-      summary: 'border border-border bg-card text-card-foreground',
+      content: 'rounded-lg border border-border bg-card p-lg text-card-foreground',
+      raised: 'rounded-lg border border-border bg-card p-lg text-card-foreground shadow-card',
+      inset: 'rounded-md bg-muted p-md text-foreground',
+      dark: 'rounded-lg bg-invert-surface p-xl text-invert-foreground',
     },
   },
   defaultVariants: {

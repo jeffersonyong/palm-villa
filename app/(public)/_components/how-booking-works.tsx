@@ -1,24 +1,22 @@
 import { bookingSteps, pricingCopy } from '../_content/landing'
 
 /**
- * The page's one aqua band (design.md `content-band-aqua`) — it breaks the
- * gray/white alternation at the deepest point of the scroll. Sanctioned only
- * because no primary CTA lives here: aqua buttons never sit on aqua ground,
- * and the pale tint stays firmly below CTA level so scarcity keeps making the
- * buttons in the neighbouring bands read.
- *
- * The step circles are a polarity flip against the tinted ground — ink with a
- * light numeral. Dark keeps its own construction (raised ink-deep circle, aqua
- * numeral); a straight `invert-surface` there would put a near-white disc on
- * the band, which is the glare the footer role exists to avoid.
+ * The page's one tinted band (design.md `section-tinted`) — a faint gray
+ * pause in the white scroll, drawn in with hairlines top and bottom. The
+ * step markers are hairline tiles, not coloured discs; colour has no job
+ * here.
  */
 export function HowBookingWorks() {
   return (
-    <section aria-labelledby="how-heading" className="bg-accent px-xl py-3xl">
-      <div className="mx-auto w-full max-w-[1200px]">
+    <section
+      aria-labelledby="how-heading"
+      className="border-t border-divider bg-background px-xl py-3xl"
+    >
+      <div className="mx-auto w-full max-w-[1120px]">
+        <p className="micro-label text-muted-foreground">How it works</p>
         <h2
           id="how-heading"
-          className="font-display text-display-md text-foreground sm:text-display-lg"
+          className="mt-md font-display text-display-md text-foreground sm:text-display-lg"
         >
           Booking is simple
         </h2>
@@ -26,11 +24,11 @@ export function HowBookingWorks() {
         <ol className="mt-2xl grid gap-xl md:grid-cols-3">
           {bookingSteps.map((step, index) => (
             <li key={step.title}>
-              <span className="flex size-8 items-center justify-center rounded-full bg-invert-surface text-body-sm-strong text-invert-foreground dark:bg-card dark:text-accent-foreground">
+              <span className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-body-sm-strong text-foreground shadow-card">
                 {index + 1}
               </span>
               <h3 className="mt-lg text-display-xs text-foreground">{step.title}</h3>
-              <p className="mt-sm text-body-md text-copy">{step.description}</p>
+              <p className="mt-xs text-body-md text-copy">{step.description}</p>
             </li>
           ))}
         </ol>

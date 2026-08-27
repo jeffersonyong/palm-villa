@@ -9,9 +9,9 @@ import { cn } from '@/lib/utils'
  * Portal sidebar navigation.
  *
  * A client component only because the active state needs the pathname — the
- * portal is an application surface, not the zero-JS public site. Active is
- * `bg-muted` + full-strength ink, never aqua: aqua marks the primary action,
- * and "where am I" is not an action.
+ * portal is an application surface, not the zero-JS public site. Active is a
+ * white card chip + full-strength ink on the gray ground, never a colour:
+ * "where am I" is not an action.
  */
 const items = [
   { href: '/portal', label: 'Overview', exact: true },
@@ -35,10 +35,10 @@ export function PortalNav() {
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'block rounded-md px-md py-sm text-body-sm-strong transition-colors',
+                  'block rounded-md px-md py-sm text-body-sm transition-colors',
                   isActive
-                    ? 'bg-muted text-foreground'
-                    : 'text-copy hover:bg-muted hover:text-foreground',
+                    ? 'bg-card font-medium text-foreground shadow-card'
+                    : 'text-copy hover:bg-card hover:text-foreground',
                 )}
               >
                 {item.label}

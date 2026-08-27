@@ -6,14 +6,14 @@ import { cn } from '@/lib/utils'
 /**
  * Status badge — the portal's core status language (design.md §Components).
  * Tones are semantic only: confirmed = positive, awaiting payment = warning,
- * expired / cancelled / no-show = negative, checked-in = aqua-pale on deep aqua.
- * Aqua is never a success indicator.
+ * expired / cancelled / no-show = negative, checked-in = brand-pale on deep
+ * aqua. Aqua is never a success indicator.
  *
- * Badges are the one place pills survive: at chip scale a pill reads as soft
- * rather than bubbly, so it stays while buttons and cards do not.
+ * Small and quiet — a badge is metadata, not a button: caption scale at
+ * weight 500, tight padding. Badges are the one place pills survive.
  */
 const badgeVariants = cva(
-  'inline-flex w-fit shrink-0 items-center gap-xs rounded-pill px-sm py-xxs text-body-sm-strong',
+  'inline-flex w-fit shrink-0 items-center gap-xs rounded-pill px-sm py-xxs text-caption font-medium',
   {
     variants: {
       tone: {

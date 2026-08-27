@@ -67,13 +67,13 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   return (
     <div className="max-w-[1120px]">
       <header>
-        <h1 className="text-display-sm text-foreground">New booking</h1>
+        <h1 className="font-display text-display-sm text-foreground">New booking</h1>
         <p className="mt-xs text-body-md text-copy">
           Walk-in only — the guest is here and pays now (prd.md §9.4).
         </p>
       </header>
 
-      <Card surface="summary" className="mt-xl">
+      <Card surface="raised" className="mt-xl">
         <form method="get" className="flex flex-wrap items-end gap-lg">
           <div className="grid w-[164px] gap-sm">
             <Label htmlFor="from">Check-in</Label>
@@ -129,9 +129,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
 
               return (
                 <div key={type.id}>
-                  <dt className="text-caption tracking-wide text-muted-foreground uppercase">
-                    {type.name}
-                  </dt>
+                  <dt className="micro-label text-muted-foreground">{type.name}</dt>
                   <dd className="mt-xs text-display-xs text-foreground tabular-nums">
                     {free}
                     <span className="text-body-sm text-muted-foreground"> of {total} free</span>
@@ -145,7 +143,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
 
       <section className="mt-xl">
         {!hasDates ? (
-          <Card surface="muted">
+          <Card surface="inset" className="p-lg">
             <p className="text-body-md text-copy">
               Choose check-in and check-out dates to see what is free. Check-out must be at least
               one night after check-in, and bookings open up to {config.maxAdvanceBookingDays} days
@@ -153,7 +151,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
             </p>
           </Card>
         ) : availableUnits.length === 0 ? (
-          <Card surface="muted">
+          <Card surface="inset" className="p-lg">
             <p className="text-body-md text-copy">
               Nothing free for those dates{unitTypeId ? ' in that unit type' : ''}. Try different
               dates, or widen the unit type.

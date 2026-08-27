@@ -20,16 +20,17 @@ export function StaysSection() {
     <section
       aria-labelledby="stays-heading"
       id="stays"
-      className="scroll-mt-xl bg-background px-xl py-3xl"
+      className="scroll-mt-xl border-t border-divider bg-card px-xl py-3xl"
     >
-      <div className="mx-auto w-full max-w-[1200px]">
+      <div className="mx-auto w-full max-w-[1120px]">
+        <p className="micro-label text-muted-foreground">Short stays</p>
         <h2
           id="stays-heading"
-          className="max-w-[26ch] font-display text-display-md text-balance text-foreground sm:text-display-lg"
+          className="mt-md max-w-[26ch] font-display text-display-md text-balance text-foreground sm:text-display-lg"
         >
           Four ways to stay, from BND 180 a night
         </h2>
-        <p className="mt-lg max-w-[52ch] text-body-lg text-copy">
+        <p className="mt-md max-w-[52ch] text-body-lg text-copy">
           Whole units, from a two-bedroom apartment to a semi-detached house.
         </p>
 
@@ -41,19 +42,18 @@ export function StaysSection() {
                 aria-label={`${unit.name} — from BND ${unit.fromRateBnd} a night`}
                 className="block h-full rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                <Card
-                  surface="summary"
-                  className="flex h-full card-interactive flex-col hover:border-border"
-                >
+                <Card className="flex h-full card-interactive flex-col hover:shadow-card">
                   <MediaPlaceholder label={unit.imageLabel} />
                   <h3 className="mt-lg text-display-xs text-foreground">{unit.name}</h3>
-                  <p className="mt-sm text-body-md text-copy">{unit.description}</p>
+                  <p className="mt-xs text-body-sm text-copy">{unit.description}</p>
                   {/* Pushed to the card foot so rates line up across the row
                       regardless of description length. */}
-                  <p className="mt-auto pt-xl text-caption text-muted-foreground">from</p>
-                  <p className="text-display-xs text-foreground">
-                    BND {unit.fromRateBnd}{' '}
-                    <span className="text-caption text-muted-foreground">/ night</span>
+                  <p className="mt-auto pt-lg micro-label text-muted-foreground">from</p>
+                  <p className="mt-xxs text-display-xs text-foreground tabular-nums">
+                    BND {unit.fromRateBnd}
+                    <span className="ml-xs text-caption font-normal text-muted-foreground">
+                      / night
+                    </span>
                   </p>
                 </Card>
               </Link>

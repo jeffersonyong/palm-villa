@@ -5,8 +5,8 @@
 export default function FieldLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
-      {/* Aqua belongs to the row-level Check in buttons on this surface, so the
-          chrome stays neutral rather than competing with them. */}
+      {/* The primary fill belongs to the row-level Check in buttons on this
+          surface, so the chrome stays neutral rather than competing. */}
       <header className="border-b border-divider bg-card px-lg py-md">
         <p className="text-body-sm-strong text-foreground">Palm Villa · Field</p>
       </header>

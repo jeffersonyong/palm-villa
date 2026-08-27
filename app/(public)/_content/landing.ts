@@ -13,11 +13,6 @@ export interface Facility {
   description: string
   icon: LucideIcon
   imageLabel: string
-  /**
-   * The one facility card rendered on the `card-feature-aqua` surface — the
-   * grid's single brand moment (design.md §Cards). At most one per grid.
-   */
-  featured?: boolean
 }
 
 export interface UnitType {
@@ -40,7 +35,6 @@ export const facilities: Facility[] = [
     description: 'The centrepiece. Open all day on a single pass — swim as long as you like.',
     icon: Waves,
     imageLabel: 'Pool photo',
-    featured: true,
   },
   {
     name: 'Water park',

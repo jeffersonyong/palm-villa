@@ -74,13 +74,11 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
     const { created } = state
 
     return (
-      <Card surface="summary" className="max-w-[520px]">
+      <Card surface="raised" className="max-w-[520px]">
         <div className="flex items-start justify-between gap-lg">
           <div>
-            <p className="text-caption tracking-wide text-muted-foreground uppercase">
-              Booking created
-            </p>
-            <p className="mt-xs text-display-sm text-foreground">{created.reference}</p>
+            <p className="micro-label text-muted-foreground">Booking created</p>
+            <p className="mt-xs font-mono text-display-sm text-foreground">{created.reference}</p>
           </div>
           <Badge tone="positive">Confirmed</Badge>
         </div>
@@ -127,7 +125,7 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
       <input type="hidden" name="unitTypeId" value={selectedUnit?.unitTypeId ?? ''} />
       <input type="hidden" name="earlyCheckInHours" value={0} />
 
-      <Card surface="summary">
+      <Card surface="raised">
         <section>
           <SectionHeading>Unit</SectionHeading>
           <div className="mt-md grid gap-sm">
@@ -233,10 +231,8 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
       </Card>
 
       <div className="lg:sticky lg:top-xl">
-        <Card surface="summary">
-          <p className="text-caption tracking-wide text-muted-foreground uppercase">
-            Booking summary
-          </p>
+        <Card surface="raised">
+          <p className="micro-label text-muted-foreground">Booking summary</p>
           <p className="mt-sm text-body-md-strong text-foreground">
             {formatStayDate(checkIn)} → {formatStayDate(checkOut)}
           </p>
@@ -264,7 +260,7 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
 
               <div className="flex items-baseline justify-between gap-lg border-t border-divider pt-md">
                 <span className="text-body-md-strong text-foreground">Total</span>
-                <span className="text-display-xs text-foreground tabular-nums">
+                <span className="text-display-sm text-foreground tabular-nums">
                   BND {formatCents(quote.total)}
                 </span>
               </div>
@@ -295,9 +291,9 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
   )
 }
 
-/** The data-surface header voice, reused as the form's section headers. */
+/** The labelling voice (design.md §Typography `micro`), as section headers. */
 function SectionHeading({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-caption tracking-wide text-muted-foreground uppercase">{children}</h2>
+  return <h2 className="micro-label text-muted-foreground">{children}</h2>
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -319,7 +315,7 @@ interface NumberFieldProps {
 
 function NumberField({ id, label, value, min, onChange, error }: NumberFieldProps) {
   return (
-    <div className="grid w-[168px] gap-sm">
+    <div className="grid w-[150px] gap-sm">
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}

@@ -2,85 +2,85 @@
 @import 'tw-animate-css';
 
 /* ---------------------------------------------------------------------------
-   Palm Villa design tokens.
+   Palm Villa design tokens — quiet-utility minimalism (design.md v1.0).
    docs/design.md is normative: this file is the only place its frontmatter is
    transcribed. Nothing downstream should hardcode a hex, a type size or a
    radius — use the utilities generated here.
    --------------------------------------------------------------------------- */
 
 @theme {
-  /* Colour — neutral core, one aqua accent spent sparingly --------------- */
-  --color-primary: #2fc9c0;
-  --color-primary-deep: #0e6b64;
-  --color-on-primary: #16181b;
-  --color-primary-active: #7fe3dc;
-  --color-primary-neutral: #a9e8e3;
-  --color-primary-pale: #dff5f3;
+  /* Colour — white ground, ink actions, aqua as a text-first brand accent ---- */
+  --color-brand: #2fc9c0;
+  --color-brand-deep: #0e6b64;
+  --color-brand-active: #7fe3dc;
+  --color-brand-pale: #dff5f3;
 
-  --color-ink: #16181b;
-  --color-ink-deep: #1f2225;
-  --color-body: #41474c;
-  --color-mute: #626b71;
+  --color-ink: #131417;
+  --color-ink-deep: #1d2025;
+  --color-body: #45494f;
+  --color-mute: #6a7076;
 
   --color-canvas: #ffffff;
-  --color-canvas-soft: #f4f5f6;
+  --color-canvas-soft: #f7f7f8;
 
   /* Semantic — status meaning only, never decorative. Chips are tint
-     background + deep same-hue text; the mid hues are for icons, accents and
-     the destructive button. */
+     background + deep same-hue text; the mid hues are for icons and the
+     destructive button. */
   --color-positive: #1fa552;
   --color-positive-deep: #166534;
-  --color-positive-tint: #dcf3e4;
+  --color-positive-tint: #e2f5e9;
   --color-warning: #d97706;
   --color-warning-deep: #92400e;
-  --color-warning-tint: #fdf2d6;
+  --color-warning-tint: #fdf3d9;
   --color-negative: #d03238;
   --color-negative-deep: #9f1d24;
-  --color-negative-tint: #fbe7e8;
+  --color-negative-tint: #fbe9ea;
 
-  /* Type — Inter carries every surface; hierarchy is size, weight and
-     tracking. The display face is the one sanctioned exception: public-site
-     display headlines only, one weight (600), never on portal or field
-     surfaces (design.md §Typography). */
+  /* Type — Inter carries every surface; hierarchy is size, weight
+     (400/500/600) and negative tracking at display sizes. `micro-label` (a
+     custom utility below) is the labelling voice. The display face is the one
+     sanctioned exception: public-site display headlines (`display-md`+) only,
+     one weight (600), never on portal or field surfaces (design.md
+     §Typography). */
   --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
   --font-display: var(--font-fraunces), Georgia, 'Times New Roman', serif;
 
   /* Type scale ------------------------------------------------------------- */
-  --text-display-xl: 52px;
-  --text-display-xl--line-height: 60px;
+  --text-display-xl: 44px;
+  --text-display-xl--line-height: 50px;
   --text-display-xl--font-weight: 600;
-  --text-display-xl--letter-spacing: -1.04px;
+  --text-display-xl--letter-spacing: -1.2px;
 
-  --text-display-lg: 40px;
-  --text-display-lg--line-height: 46px;
+  --text-display-lg: 34px;
+  --text-display-lg--line-height: 40px;
   --text-display-lg--font-weight: 600;
   --text-display-lg--letter-spacing: -0.8px;
 
-  --text-display-md: 32px;
-  --text-display-md--line-height: 38px;
+  --text-display-md: 28px;
+  --text-display-md--line-height: 34px;
   --text-display-md--font-weight: 600;
-  --text-display-md--letter-spacing: -0.64px;
+  --text-display-md--letter-spacing: -0.56px;
 
-  --text-display-sm: 24px;
-  --text-display-sm--line-height: 30px;
+  --text-display-sm: 22px;
+  --text-display-sm--line-height: 28px;
   --text-display-sm--font-weight: 600;
-  --text-display-sm--letter-spacing: -0.48px;
+  --text-display-sm--letter-spacing: -0.35px;
 
-  --text-display-xs: 20px;
-  --text-display-xs--line-height: 26px;
+  --text-display-xs: 17px;
+  --text-display-xs--line-height: 24px;
   --text-display-xs--font-weight: 600;
-  --text-display-xs--letter-spacing: -0.3px;
+  --text-display-xs--letter-spacing: -0.17px;
 
-  --text-body-lg: 18px;
-  --text-body-lg--line-height: 28px;
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 25px;
   --text-body-lg--font-weight: 400;
 
-  --text-body-md: 15px;
-  --text-body-md--line-height: 22px;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 21px;
   --text-body-md--font-weight: 400;
 
-  --text-body-md-strong: 15px;
-  --text-body-md-strong--line-height: 22px;
+  --text-body-md-strong: 14px;
+  --text-body-md-strong--line-height: 21px;
   --text-body-md-strong--font-weight: 500;
 
   --text-body-sm: 13px;
@@ -95,16 +95,16 @@
   --text-caption--line-height: 16px;
   --text-caption--font-weight: 400;
 
-  --text-button-md: 14px;
+  --text-button-md: 13px;
   --text-button-md--line-height: 20px;
   --text-button-md--font-weight: 500;
 
-  /* Radii — 8px controls, 12px cards, 16px overlays. Pills are badges only. */
+  /* Radii — 6px controls, 10px cards, 14px overlays. Pills are badges only. */
   --radius-none: 0px;
   --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
   --radius-pill: 9999px;
 
   /* Spacing — 4px base. Numeric utilities (p-4 = 16px) stay available; the
@@ -119,10 +119,16 @@
   --spacing-2xl: 32px;
   --spacing-3xl: 48px;
 
-  /* Control heights: 40px on desktop surfaces, 48px minimum on field. These
+  /* Control heights: 36px on desktop surfaces, 48px minimum on field. These
      live in the spacing namespace so `h-control` / `min-h-touch` generate. */
-  --spacing-control: 40px;
+  --spacing-control: 36px;
   --spacing-touch: 48px;
+
+  /* Elevation (design.md §Elevation). `shadow-card` is separation, not
+     emphasis — a white card on the near-white ground needs more than a
+     hairline, and never more than this. Overlays get the only real shadow. */
+  --shadow-card: 0 1px 2px 0 rgb(19 20 23 / 0.04), 0 2px 8px -2px rgb(19 20 23 / 0.06);
+  --shadow-overlay: 0 4px 12px -2px rgb(19 20 23 / 0.08), 0 16px 40px -8px rgb(19 20 23 / 0.16);
 }
 
 /* ---------------------------------------------------------------------------
@@ -150,8 +156,8 @@
 
   --radius: var(--radius-lg);
 
-  /* Ground and surfaces. Surface contrast stays the elevation system: in light
-     it runs gray → white, in dark it runs ink → ink-deep. */
+  /* Ground and surfaces. The ground/card seam is close on purpose — hairlines
+     draw the structure; the fill difference only whispers it. */
   --background: light-dark(var(--color-canvas-soft), var(--color-ink));
   --card: light-dark(var(--color-canvas), var(--color-ink-deep));
   --popover: var(--card);
@@ -171,10 +177,25 @@
     color-mix(in oklab, var(--color-mute) 55%, var(--color-canvas-soft))
   );
 
-  /* The accent is theme-independent: one aqua, same on-primary ink text. It
-     sits on neutral grounds only, and ink is a neutral ground. */
-  --primary: var(--color-primary);
-  --primary-foreground: var(--color-on-primary);
+  /* Lagoon is the action colour: a deep saturated teal fill in light, the
+     vivid brand aqua in dark — always the one striking solid on the screen.
+     Ink stays for text and the dark surfaces; it no longer fills buttons. */
+  --primary: light-dark(var(--color-brand-deep), var(--color-brand));
+  --primary-foreground: light-dark(var(--color-canvas), var(--color-ink));
+  --primary-hover: light-dark(
+    color-mix(in oklab, var(--color-brand-deep) 78%, var(--color-brand)),
+    var(--color-brand-active)
+  );
+
+  /* The primary for dark surfaces (`invert-surface` cards and bands): the
+     opposite theme's construction, so the button stays vivid-on-dark and
+     deep-on-light wherever the ground flips locally. */
+  --primary-invert: light-dark(var(--color-brand), var(--color-brand-deep));
+  --primary-invert-foreground: light-dark(var(--color-ink), var(--color-canvas));
+  --primary-invert-hover: light-dark(
+    var(--color-brand-active),
+    color-mix(in oklab, var(--color-brand-deep) 78%, var(--color-brand))
+  );
 
   --secondary: light-dark(
     var(--color-canvas-soft),
@@ -182,11 +203,13 @@
   );
   --secondary-foreground: light-dark(var(--color-ink), var(--color-canvas-soft));
 
+  /* The brand accent. `accent` is the pale aqua surface (selection highlight,
+     checked-in badge); `accent-foreground` is the only aqua that carries text. */
   --accent: light-dark(
-    var(--color-primary-pale),
-    color-mix(in oklab, var(--color-primary) 20%, var(--color-ink-deep))
+    var(--color-brand-pale),
+    color-mix(in oklab, var(--color-brand) 20%, var(--color-ink-deep))
   );
-  --accent-foreground: light-dark(var(--color-primary-deep), var(--color-primary-active));
+  --accent-foreground: light-dark(var(--color-brand-deep), var(--color-brand-active));
 
   --destructive: var(--color-negative);
   --destructive-foreground: var(--color-canvas);
@@ -194,21 +217,23 @@
   /* Elevation level 1 — a neutral hairline. Light tints down from ink, dark
      tints up from white, so it stays a whisper on either ground. */
   --border: light-dark(
-    color-mix(in oklab, var(--color-ink) 10%, transparent),
-    color-mix(in oklab, var(--color-canvas) 12%, transparent)
+    color-mix(in oklab, var(--color-ink) 12%, transparent),
+    color-mix(in oklab, var(--color-canvas) 14%, transparent)
   );
   --input: var(--border);
 
   /* Table rules and nav edges are quieter than a hairline, so they get their
      own role. */
   --divider: light-dark(
-    color-mix(in oklab, var(--color-ink) 6%, transparent),
-    color-mix(in oklab, var(--color-canvas) 8%, transparent)
+    color-mix(in oklab, var(--color-ink) 7%, transparent),
+    color-mix(in oklab, var(--color-canvas) 9%, transparent)
   );
-  --ring: var(--color-primary);
 
-  /* Polarity-flip surfaces (`hero-band-dark`, `card-feature-dark`) are defined
-     by being the opposite of the current ground, so they invert with the theme
+  /* Focus is the action colour's ring. */
+  --ring: light-dark(var(--color-brand-deep), var(--color-brand));
+
+  /* Polarity-flip surfaces (dark promo card, closing band) are defined by
+     being the opposite of the current ground, so they invert with the theme
      rather than staying literally ink. */
   --invert-surface: light-dark(var(--color-ink), var(--color-canvas-soft));
   --invert-foreground: light-dark(var(--color-canvas), var(--color-ink));
@@ -222,9 +247,8 @@
   --footer-foreground: var(--color-canvas-soft);
 
   /* Status badge chips. Light is a soft tint with deep same-hue text. Dark
-     inverts the construction: a hue-tinted dark chip with light text, which
-     stays legible on ink without a row of glowing pills. The hue mapping is
-     unchanged, so the status language reads the same. */
+     inverts the construction: a hue-tinted dark chip with light text. The hue
+     mapping is unchanged, so the status language reads the same. */
   --badge-positive: light-dark(
     var(--color-positive-tint),
     color-mix(in oklab, var(--color-positive) 28%, var(--color-ink-deep))
@@ -244,10 +268,10 @@
   --badge-negative-foreground: light-dark(var(--color-negative-deep), var(--color-canvas-soft));
 
   --badge-active: light-dark(
-    var(--color-primary-pale),
-    color-mix(in oklab, var(--color-primary) 24%, var(--color-ink-deep))
+    var(--color-brand-pale),
+    color-mix(in oklab, var(--color-brand) 24%, var(--color-ink-deep))
   );
-  --badge-active-foreground: light-dark(var(--color-primary-deep), var(--color-primary-active));
+  --badge-active-foreground: light-dark(var(--color-brand-deep), var(--color-brand-active));
 
   --badge-neutral: var(--muted);
   --badge-neutral-foreground: var(--copy);
@@ -271,7 +295,12 @@
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-invert: var(--primary-invert);
+  --color-primary-invert-foreground: var(--primary-invert-foreground);
+  --color-primary-invert-hover: var(--primary-invert-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -314,8 +343,7 @@
   }
 
   html {
-    /* Keeps in-page anchors clear of the public site's sticky header, which
-       stands 63px tall (24px of padding, a 38px control row, a 1px rule). */
+    /* Keeps in-page anchors clear of the public site's sticky header. */
     scroll-padding-top: calc(var(--spacing-3xl) + var(--spacing-lg));
   }
 
@@ -328,11 +356,23 @@
   }
 }
 
+/* The labelling voice (design.md §Typography `micro`): 11px/500 uppercase with
+   loose tracking, for table headers, form section headers, stat labels and
+   eyebrows. A custom utility because `text-transform` cannot ride a text-*
+   token; colour is applied by the caller (usually `text-muted-foreground`). */
+@utility micro-label {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 500;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
+}
+
 /* Card hover for the public feature grids. Motion stays on colour and a 1px
    lift — compositor-friendly, and it never hides content the way a
    scroll-triggered reveal can when a page is rendered without scrolling. */
 @utility card-interactive {
-  @apply transition-[background-color,border-color,transform] duration-200 ease-out;
+  @apply transition-[background-color,border-color,transform,box-shadow] duration-200 ease-out;
 
   @media (hover: hover) {
     &:hover {

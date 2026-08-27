@@ -6,8 +6,8 @@ import { themeInitScript } from '@/lib/theme'
 import './globals.css'
 
 /**
- * Two families (design.md §Typography). Inter carries everything; hierarchy
- * comes from size, weight and tracking — 400/500/600 is the whole range.
+ * Inter carries every surface; hierarchy comes from size, weight and tracking
+ * — 400/500/600 is the whole range (design.md §Typography).
  */
 const inter = Inter({
   subsets: ['latin'],
@@ -17,8 +17,9 @@ const inter = Inter({
 })
 
 /**
- * The display face: public-site display headlines only, one weight, never on
- * the portal or field surfaces (design.md §Typography).
+ * The display face — the one sanctioned exception: public-site display
+ * headlines (`display-md`+) only, one weight, never on the portal or field
+ * surfaces (design.md §Typography).
  */
 const fraunces = Fraunces({
   subsets: ['latin'],
@@ -37,8 +38,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f4f5f6' },
-    { media: '(prefers-color-scheme: dark)', color: '#16181b' },
+    { media: '(prefers-color-scheme: light)', color: '#f7f7f8' },
+    { media: '(prefers-color-scheme: dark)', color: '#131417' },
   ],
   width: 'device-width',
   initialScale: 1,
