@@ -1,0 +1,350 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* ---------------------------------------------------------------------------
+   Palm Villa design tokens.
+   docs/design.md is normative: this file is the only place its frontmatter is
+   transcribed. Nothing downstream should hardcode a hex, a type size or a
+   radius — use the utilities generated here.
+   --------------------------------------------------------------------------- */
+
+@theme {
+  /* Colour — neutral core, one aqua accent spent sparingly --------------- */
+  --color-primary: #2fc9c0;
+  --color-primary-deep: #0e6b64;
+  --color-on-primary: #16181b;
+  --color-primary-active: #7fe3dc;
+  --color-primary-neutral: #a9e8e3;
+  --color-primary-pale: #dff5f3;
+
+  --color-ink: #16181b;
+  --color-ink-deep: #1f2225;
+  --color-body: #41474c;
+  --color-mute: #626b71;
+
+  --color-canvas: #ffffff;
+  --color-canvas-soft: #f4f5f6;
+
+  /* Semantic — status meaning only, never decorative. Chips are tint
+     background + deep same-hue text; the mid hues are for icons, accents and
+     the destructive button. */
+  --color-positive: #1fa552;
+  --color-positive-deep: #166534;
+  --color-positive-tint: #dcf3e4;
+  --color-warning: #d97706;
+  --color-warning-deep: #92400e;
+  --color-warning-tint: #fdf2d6;
+  --color-negative: #d03238;
+  --color-negative-deep: #9f1d24;
+  --color-negative-tint: #fbe7e8;
+
+  /* Type — Inter carries every surface; hierarchy is size, weight and
+     tracking. The display face is the one sanctioned exception: public-site
+     display headlines only, one weight (600), never on portal or field
+     surfaces (design.md §Typography). */
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, 'Times New Roman', serif;
+
+  /* Type scale ------------------------------------------------------------- */
+  --text-display-xl: 52px;
+  --text-display-xl--line-height: 60px;
+  --text-display-xl--font-weight: 600;
+  --text-display-xl--letter-spacing: -1.04px;
+
+  --text-display-lg: 40px;
+  --text-display-lg--line-height: 46px;
+  --text-display-lg--font-weight: 600;
+  --text-display-lg--letter-spacing: -0.8px;
+
+  --text-display-md: 32px;
+  --text-display-md--line-height: 38px;
+  --text-display-md--font-weight: 600;
+  --text-display-md--letter-spacing: -0.64px;
+
+  --text-display-sm: 24px;
+  --text-display-sm--line-height: 30px;
+  --text-display-sm--font-weight: 600;
+  --text-display-sm--letter-spacing: -0.48px;
+
+  --text-display-xs: 20px;
+  --text-display-xs--line-height: 26px;
+  --text-display-xs--font-weight: 600;
+  --text-display-xs--letter-spacing: -0.3px;
+
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+  --text-body-lg--font-weight: 400;
+
+  --text-body-md: 15px;
+  --text-body-md--line-height: 22px;
+  --text-body-md--font-weight: 400;
+
+  --text-body-md-strong: 15px;
+  --text-body-md-strong--line-height: 22px;
+  --text-body-md-strong--font-weight: 500;
+
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-body-sm--font-weight: 400;
+
+  --text-body-sm-strong: 13px;
+  --text-body-sm-strong--line-height: 18px;
+  --text-body-sm-strong--font-weight: 500;
+
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption--font-weight: 400;
+
+  --text-button-md: 14px;
+  --text-button-md--line-height: 20px;
+  --text-button-md--font-weight: 500;
+
+  /* Radii — 8px controls, 12px cards, 16px overlays. Pills are badges only. */
+  --radius-none: 0px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
+
+  /* Spacing — 4px base. Numeric utilities (p-4 = 16px) stay available; the
+     named steps below exist so markup can quote design.md directly. */
+  --spacing: 4px;
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+  --spacing-3xl: 48px;
+
+  /* Control heights: 40px on desktop surfaces, 48px minimum on field. These
+     live in the spacing namespace so `h-control` / `min-h-touch` generate. */
+  --spacing-control: 40px;
+  --spacing-touch: 48px;
+}
+
+/* ---------------------------------------------------------------------------
+   Theme-aware semantic layer.
+
+   The tokens above are raw brand values and never change. The roles below do:
+   each resolves through `light-dark()`, so a single declaration carries both
+   themes and the browser picks by `color-scheme`.
+
+   Resolution order:
+     1. `data-theme="dark"` on <html> — the reader chose dark
+     2. otherwise light
+   Light is the default and the OS preference is deliberately not followed: this
+   is a booking site whose brand is the light surface, and a visitor arriving
+   from Instagram on a phone in OS dark mode should see the same page everyone
+   else does. Dark remains available as an explicit choice. Setting
+   `color-scheme` is the whole mechanism — no class list, no dependency.
+
+   The dark palette is derived from existing tokens, not invented — see
+   docs/design.md §Dark theme for the mapping and its rationale.
+   --------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  --radius: var(--radius-lg);
+
+  /* Ground and surfaces. Surface contrast stays the elevation system: in light
+     it runs gray → white, in dark it runs ink → ink-deep. */
+  --background: light-dark(var(--color-canvas-soft), var(--color-ink));
+  --card: light-dark(var(--color-canvas), var(--color-ink-deep));
+  --popover: var(--card);
+  --muted: light-dark(
+    var(--color-canvas-soft),
+    color-mix(in oklab, var(--color-ink-deep) 55%, var(--color-ink))
+  );
+
+  /* Text. `foreground` is headings and strong text, `copy` is body, and
+     `muted-foreground` is caption scale. */
+  --foreground: light-dark(var(--color-ink), var(--color-canvas));
+  --card-foreground: var(--foreground);
+  --popover-foreground: var(--foreground);
+  --copy: light-dark(var(--color-body), var(--color-canvas-soft));
+  --muted-foreground: light-dark(
+    var(--color-mute),
+    color-mix(in oklab, var(--color-mute) 55%, var(--color-canvas-soft))
+  );
+
+  /* The accent is theme-independent: one aqua, same on-primary ink text. It
+     sits on neutral grounds only, and ink is a neutral ground. */
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-on-primary);
+
+  --secondary: light-dark(
+    var(--color-canvas-soft),
+    color-mix(in oklab, var(--color-canvas) 8%, var(--color-ink-deep))
+  );
+  --secondary-foreground: light-dark(var(--color-ink), var(--color-canvas-soft));
+
+  --accent: light-dark(
+    var(--color-primary-pale),
+    color-mix(in oklab, var(--color-primary) 20%, var(--color-ink-deep))
+  );
+  --accent-foreground: light-dark(var(--color-primary-deep), var(--color-primary-active));
+
+  --destructive: var(--color-negative);
+  --destructive-foreground: var(--color-canvas);
+
+  /* Elevation level 1 — a neutral hairline. Light tints down from ink, dark
+     tints up from white, so it stays a whisper on either ground. */
+  --border: light-dark(
+    color-mix(in oklab, var(--color-ink) 10%, transparent),
+    color-mix(in oklab, var(--color-canvas) 12%, transparent)
+  );
+  --input: var(--border);
+
+  /* Table rules and nav edges are quieter than a hairline, so they get their
+     own role. */
+  --divider: light-dark(
+    color-mix(in oklab, var(--color-ink) 6%, transparent),
+    color-mix(in oklab, var(--color-canvas) 8%, transparent)
+  );
+  --ring: var(--color-primary);
+
+  /* Polarity-flip surfaces (`hero-band-dark`, `card-feature-dark`) are defined
+     by being the opposite of the current ground, so they invert with the theme
+     rather than staying literally ink. */
+  --invert-surface: light-dark(var(--color-ink), var(--color-canvas-soft));
+  --invert-foreground: light-dark(var(--color-canvas), var(--color-ink));
+
+  /* The footer is a full-width slab: a near-white one would glare on a dark
+     page, so dark uses a raised ink instead of the straight polarity flip. */
+  --footer-surface: light-dark(
+    var(--color-ink),
+    color-mix(in oklab, var(--color-ink-deep) 60%, var(--color-ink))
+  );
+  --footer-foreground: var(--color-canvas-soft);
+
+  /* Status badge chips. Light is a soft tint with deep same-hue text. Dark
+     inverts the construction: a hue-tinted dark chip with light text, which
+     stays legible on ink without a row of glowing pills. The hue mapping is
+     unchanged, so the status language reads the same. */
+  --badge-positive: light-dark(
+    var(--color-positive-tint),
+    color-mix(in oklab, var(--color-positive) 28%, var(--color-ink-deep))
+  );
+  --badge-positive-foreground: light-dark(var(--color-positive-deep), var(--color-canvas-soft));
+
+  --badge-warning: light-dark(
+    var(--color-warning-tint),
+    color-mix(in oklab, var(--color-warning) 26%, var(--color-ink-deep))
+  );
+  --badge-warning-foreground: light-dark(var(--color-warning-deep), var(--color-canvas-soft));
+
+  --badge-negative: light-dark(
+    var(--color-negative-tint),
+    color-mix(in oklab, var(--color-negative) 28%, var(--color-ink-deep))
+  );
+  --badge-negative-foreground: light-dark(var(--color-negative-deep), var(--color-canvas-soft));
+
+  --badge-active: light-dark(
+    var(--color-primary-pale),
+    color-mix(in oklab, var(--color-primary) 24%, var(--color-ink-deep))
+  );
+  --badge-active-foreground: light-dark(var(--color-primary-deep), var(--color-primary-active));
+
+  --badge-neutral: var(--muted);
+  --badge-neutral-foreground: var(--copy);
+}
+
+/* Choosing dark is the only override. Because every role resolves through
+   `light-dark()`, flipping `color-scheme` is the entire mechanism. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-copy: var(--copy);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-divider: var(--divider);
+  --color-ring: var(--ring);
+  --color-invert-surface: var(--invert-surface);
+  --color-invert-foreground: var(--invert-foreground);
+  --color-footer-surface: var(--footer-surface);
+  --color-footer-foreground: var(--footer-foreground);
+  --color-badge-positive: var(--badge-positive);
+  --color-badge-positive-foreground: var(--badge-positive-foreground);
+  --color-badge-warning: var(--badge-warning);
+  --color-badge-warning-foreground: var(--badge-warning-foreground);
+  --color-badge-negative: var(--badge-negative);
+  --color-badge-negative-foreground: var(--badge-negative-foreground);
+  --color-badge-active: var(--badge-active);
+  --color-badge-active-foreground: var(--badge-active-foreground);
+  --color-badge-neutral: var(--badge-neutral);
+  --color-badge-neutral-foreground: var(--badge-neutral-foreground);
+}
+
+/* `dark:` follows exactly the same resolution the tokens do: dark is an
+   explicit choice and nothing else. It deliberately does NOT consult
+   `prefers-color-scheme` — the tokens stopped doing so when light became the
+   default, and a variant that disagreed with them would style an OS-dark
+   visitor's light page with dark-mode rules. Semantic utilities flip on their
+   own; this variant is for the few places that need a raw token to change. */
+@custom-variant dark (&:where(:root[data-theme='dark'], :root[data-theme='dark'] *));
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    /* Keeps in-page anchors clear of the public site's sticky header, which
+       stands 63px tall (24px of padding, a 38px control row, a 1px rule). */
+    scroll-padding-top: calc(var(--spacing-3xl) + var(--spacing-lg));
+  }
+
+  body {
+    @apply bg-background font-sans text-body-md text-copy antialiased;
+  }
+
+  ::selection {
+    @apply bg-accent text-accent-foreground;
+  }
+}
+
+/* Card hover for the public feature grids. Motion stays on colour and a 1px
+   lift — compositor-friendly, and it never hides content the way a
+   scroll-triggered reveal can when a page is rendered without scrolling. */
+@utility card-interactive {
+  @apply transition-[background-color,border-color,transform] duration-200 ease-out;
+
+  @media (hover: hover) {
+    &:hover {
+      @apply -translate-y-px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    @apply transition-none;
+
+    &:hover {
+      @apply translate-y-0;
+    }
+  }
+}

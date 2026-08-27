@@ -1,0 +1,96 @@
+/** Where the explicit theme choice is persisted. */
+export const THEME_STORAGE_KEY = 'pv-theme'
+
+/**
+ * Light is the product's default and the only two states are explicit choices.
+ * The OS preference is deliberately not followed — see the resolution note in
+ * app/globals.css.
+ */
+export type ThemePreference = 'light' | 'dark'
+
+/**
+ * Applies the stored theme before first paint.
+ *
+ * Inlined into <head> as a blocking script: without it, a reader who chose dark
+ * would see one frame of light. Kept dependency-free and wrapped in try/catch
+ * because storage access throws in some privacy modes — and a failure here must
+ * fall through to the light default, not break the page.
+ */
+export const themeInitScript = `
+(function () {
+  try {
+    var stored = localStorage.getItem('${THEME_STORAGE_KEY}');
+    if (stored === 'light' || stored === 'dark') {
+      document.documentElement.setAttribute('data-theme', stored);
+    }
+  } catch (e) {}
+})();
+`
+
+/* ---------------------------------------------------------------------------
+   A minimal external store over localStorage, so the toggle can read it with
+   `useSyncExternalStore` instead of syncing it into state from an effect.
+   Nothing here touches `window` at module scope, so the file stays safe to
+   import from a server component.
+   --------------------------------------------------------------------------- */
+
+const listeners = new Set<() => void>()
+
+/** `getSnapshot` must be cheap and referentially stable, hence the cache. */
+let cached: ThemePreference | null = null
+
+function read(): ThemePreference {
+  try {
+    return window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark' ? 'dark' : 'light'
+  } catch {
+    // Storage unavailable (private mode, blocked cookies) — show the default.
+    return 'light'
+  }
+}
+
+export function subscribeToTheme(onChange: () => void): () => void {
+  listeners.add(onChange)
+
+  // Another tab changing the preference should update this one too.
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== THEME_STORAGE_KEY) return
+    cached = null
+    onChange()
+  }
+
+  window.addEventListener('storage', onStorage)
+
+  return () => {
+    listeners.delete(onChange)
+    window.removeEventListener('storage', onStorage)
+  }
+}
+
+export function getThemeSnapshot(): ThemePreference {
+  cached ??= read()
+  return cached
+}
+
+/** The server cannot know the stored choice, so it renders the default. */
+export function getThemeServerSnapshot(): ThemePreference {
+  return 'light'
+}
+
+/**
+ * Writes the preference and flips `data-theme`. Because every colour role
+ * resolves through `light-dark()`, that attribute is the entire override.
+ */
+export function setThemePreference(preference: ThemePreference): void {
+  const root = document.documentElement
+
+  try {
+    root.setAttribute('data-theme', preference)
+    window.localStorage.setItem(THEME_STORAGE_KEY, preference)
+  } catch {
+    // Persisting failed; still apply for this page view.
+    root.setAttribute('data-theme', preference)
+  }
+
+  cached = preference
+  for (const listener of listeners) listener()
+}
