@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { PageHeader } from '@/components/portal/page-header'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -66,12 +67,10 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
 
   return (
     <div className="max-w-[1120px]">
-      <header>
-        <h1 className="font-display text-display-sm text-foreground">New booking</h1>
-        <p className="mt-xs text-body-md text-copy">
-          Walk-in only — the guest is here and pays now (prd.md §9.4).
-        </p>
-      </header>
+      <PageHeader
+        title="New booking"
+        description="Walk-in only — the guest is here and pays now (prd.md §9.4)."
+      />
 
       <Card surface="raised" className="mt-xl">
         <form method="get" className="flex flex-wrap items-end gap-lg">
