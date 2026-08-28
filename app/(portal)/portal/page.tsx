@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,52 +24,57 @@ export default function PortalOverviewPage() {
     <>
       <header className="flex flex-wrap items-end justify-between gap-lg">
         <div>
-          <h1 className="text-display-sm text-foreground">Overview</h1>
+          <h1 className="font-display text-display-sm text-foreground">Overview</h1>
           <p className="mt-xs text-body-md text-copy">
             Placeholder screen. No data layer is wired — this route exists to prove the
             <span className="font-mono"> (portal) </span> group renders.
           </p>
         </div>
-        <Button>New booking</Button>
+        <Button asChild>
+          <Link href="/portal/bookings/new">New booking</Link>
+        </Button>
       </header>
 
-      <section
-        aria-labelledby="queue-heading"
-        className="mt-xl rounded-lg border border-divider bg-card p-xl"
-      >
+      {/* The portal's signature surface (design.md §Tables): hairline-bounded
+          container, micro header strip on the gray fill, tight body-sm rows. */}
+      <section aria-labelledby="queue-heading" className="mt-xl">
         <h2 id="queue-heading" className="text-display-xs text-foreground">
           Booking states
         </h2>
         <p className="mt-xs text-body-sm text-muted-foreground">
-          The portal&rsquo;s status language: semantic badges, hairline dividers, caption headers.
+          The portal&rsquo;s status language: semantic badges, hairline rules, micro headers.
         </p>
 
-        <table className="mt-lg w-full border-collapse text-left">
-          <thead>
-            <tr className="bg-muted">
-              <th scope="col" className="px-md py-sm text-caption text-muted-foreground uppercase">
-                Reference
-              </th>
-              <th scope="col" className="px-md py-sm text-caption text-muted-foreground uppercase">
-                Guest
-              </th>
-              <th scope="col" className="px-md py-sm text-caption text-muted-foreground uppercase">
-                State
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {queue.map((row) => (
-              <tr key={row.reference} className="border-b border-divider">
-                <td className="px-md py-md text-body-sm-strong text-foreground">{row.reference}</td>
-                <td className="px-md py-md text-body-sm text-copy">{row.guest}</td>
-                <td className="px-md py-md">
-                  <Badge tone={row.tone}>{row.state}</Badge>
-                </td>
+        <div className="mt-lg overflow-hidden rounded-lg border border-border bg-card shadow-card">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="border-b border-border bg-muted">
+                <th scope="col" className="px-lg py-sm micro-label text-muted-foreground">
+                  Reference
+                </th>
+                <th scope="col" className="px-lg py-sm micro-label text-muted-foreground">
+                  Guest
+                </th>
+                <th scope="col" className="px-lg py-sm micro-label text-muted-foreground">
+                  State
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-divider">
+              {queue.map((row) => (
+                <tr key={row.reference} className="transition-colors hover:bg-muted/60">
+                  <td className="px-lg py-md font-mono text-body-sm text-foreground tabular-nums">
+                    {row.reference}
+                  </td>
+                  <td className="px-lg py-md text-body-sm text-copy">{row.guest}</td>
+                  <td className="px-lg py-md">
+                    <Badge tone={row.tone}>{row.state}</Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </>
   )

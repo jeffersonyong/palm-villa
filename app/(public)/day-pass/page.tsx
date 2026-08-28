@@ -25,28 +25,31 @@ const priceRows = [
 export default function DayPassPage() {
   return (
     <>
-      <section aria-labelledby="day-pass-heading" className="bg-background px-xl py-3xl">
-        <div className="mx-auto w-full max-w-[1200px]">
-          <p className="text-body-sm-strong text-muted-foreground">Facility day pass</p>
+      <section aria-labelledby="day-pass-heading" className="bg-card px-xl py-3xl">
+        <div className="mx-auto w-full max-w-[1120px]">
+          <p className="micro-label text-accent-foreground">Facility day pass</p>
           <h1
             id="day-pass-heading"
-            className="mt-lg font-display text-display-md text-foreground sm:text-display-lg"
+            className="mt-md font-display text-display-md text-foreground sm:text-display-lg"
           >
             Day passes at Palm Villa
           </h1>
-          <p className="mt-lg max-w-[52ch] text-body-lg text-copy">
+          <p className="mt-md max-w-[52ch] text-body-lg text-copy">
             One pass for the swimming pool, water park and indoor children’s playground.
           </p>
         </div>
       </section>
 
-      <section aria-labelledby="day-pass-pricing-heading" className="bg-card px-xl py-3xl">
-        <div className="mx-auto w-full max-w-[1200px]">
+      <section
+        aria-labelledby="day-pass-pricing-heading"
+        className="border-t border-divider bg-card px-xl py-3xl"
+      >
+        <div className="mx-auto w-full max-w-[1120px]">
           <h2 id="day-pass-pricing-heading" className="text-display-xs text-foreground">
             What it costs
           </h2>
 
-          <Card surface="summary" className="mt-lg max-w-[560px]">
+          <Card surface="raised" className="mt-lg max-w-[560px]">
             <dl>
               {priceRows.map((row, index) => (
                 <div

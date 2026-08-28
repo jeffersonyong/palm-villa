@@ -35,10 +35,9 @@ export function ThemeToggle({ className }: { className?: string }) {
 
   return (
     <fieldset
-      // Nested radii: the pips are 8px per design.md's `button-icon` spec, and
-      // they sit inside 1px of border plus 2px of padding — so the shell needs
-      // ~11px to stay concentric. `rounded-lg` (12px) is the token that fits.
-      // The 8px control rule still governs the buttons themselves.
+      // Nested radii: the pips sit inside 1px of border plus 2px of padding,
+      // so the shell takes the card radius (10px) and the pips derive theirs
+      // from it below to stay concentric.
       className={cn('flex items-center gap-xxs rounded-lg border border-divider p-xxs', className)}
     >
       <legend className="sr-only">Colour theme</legend>
@@ -54,13 +53,17 @@ export function ThemeToggle({ className }: { className?: string }) {
             onClick={() => setThemePreference(value)}
             className={cn(
               // Concentric with the shell: its radius less the inset the pip
-              // sits behind (1px border + 2px padding), which lands on 9px.
-              // Derived rather than hardcoded so it tracks the shell — the
-              // named steps either side read visibly sharp (8px) or soft (12px).
-              'inline-flex size-8 items-center justify-center transition-colors',
+              // sits behind (1px border + 2px padding). Derived rather than
+              // hardcoded so it tracks the shell.
+              'inline-flex size-7 items-center justify-center transition-colors',
               'rounded-[calc(var(--radius-lg)_-_var(--spacing-xxs)_-_1px)]',
-              'hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-              isSelected ? 'bg-accent text-accent-foreground' : 'text-muted-foreground',
+              'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+              // The selected chip keeps its fill on hover — the muted hover
+              // belongs to the unselected pips only, otherwise hovering the
+              // current mode makes its colour vanish into the ground.
+              isSelected
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
             <Icon aria-hidden className="size-4" />

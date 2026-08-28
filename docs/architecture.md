@@ -23,8 +23,10 @@
 | QR generation | **`qrcode`** (npm), server-side | Produces a PNG at confirmation time for email attachment and WhatsApp forwarding. |
 | PDF generation | **`pdf-lib`** | Accounting pack assembly server-side. |
 | Payments | **None in v1** | Bank transfer + manual verification per PRD §10. A `PaymentProvider` interface isolates this so a gateway can be added without touching booking logic. |
+| Validation | **Zod** | Server actions receive untyped `FormData` from a browser. An authenticated staff member is trusted; the request is not. One schema per action, parsed before anything reaches `lib/domain`. Added 2026-08-27 with the walk-in booking form. |
+| Testing | **Vitest** (dev) | §2 makes coverage mandatory for the pricing engine and state machine, which needs a runner. Node's built-in `node:test` was the zero-dependency alternative but needs stable TS stripping the `engines` floor of Node 20.9 lacks, so it would have pulled in `tsx` regardless. Added 2026-08-27. |
 
-**Explicitly not used:** no monorepo (route groups are sufficient at this scale), no separate API service, no native apps, no client-side direct database access.
+**Explicitly not used:** no monorepo (route groups are sufficient at this scale), no separate API service, no native apps, no client-side direct database access, no form-state library (React 19 `useActionState` plus a server action covers the forms in scope), no date-picker library (see `design.md` — no calendar component is specified yet).
 
 ### 1.1 Ownership boundary
 

@@ -20,12 +20,16 @@ const feedSlots = [
  */
 export function SocialStrip() {
   return (
-    <section aria-labelledby="social-heading" className="bg-card px-xl py-3xl">
-      <div className="mx-auto w-full max-w-[1200px]">
-        <h2 id="social-heading" className="font-display text-display-md text-foreground">
+    <section
+      aria-labelledby="social-heading"
+      className="border-t border-divider bg-card px-xl py-3xl"
+    >
+      <div className="mx-auto w-full max-w-[1120px]">
+        <p className="micro-label text-muted-foreground">{contact.instagramHandle}</p>
+        <h2 id="social-heading" className="mt-md font-display text-display-md text-foreground">
           Follow along
         </h2>
-        <p className="mt-lg max-w-[52ch] text-body-md text-copy">
+        <p className="mt-md max-w-[52ch] text-body-md text-copy">
           Pool days, unit tours and what’s on — {contact.instagramHandle} on Instagram and TikTok.
         </p>
 

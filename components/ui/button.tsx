@@ -4,22 +4,28 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 /**
- * shadcn/ui Button, re-skinned to design.md:
- * - canonical radius is `rounded-md` (8px) — soft, not a pill
- * - one primary per screen region; primary is the only aqua on the screen
- * - 40px standard height; the `touch` size carries the field surface's 48px
+ * shadcn/ui Button, re-skinned to design.md v1.0:
+ * - lagoon is the action colour: `primary` is a deep teal fill in light and
+ *   the vivid brand aqua in dark — the one striking solid on the screen,
+ *   one per screen region
+ * - `inverted` is the counterpart for dark surfaces (`invert-surface` cards
+ *   and bands): vivid-on-dark, deep-on-light
+ * - canonical radius `rounded-md` (6px); 36px standard height; the `touch`
+ *   size carries the field surface's 48px
+ * - focus is a 2px ring in the action colour
  */
 const buttonVariants = cva(
   'inline-flex h-control shrink-0 items-center justify-center gap-sm rounded-md text-button-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-on-primary hover:bg-primary-active',
-        secondary:
-          'bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground',
+        primary: 'bg-primary text-primary-foreground hover:bg-primary-hover',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-border',
         tertiary: 'border border-border bg-card text-foreground hover:bg-muted',
         ghost: 'text-foreground hover:bg-muted',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-negative-deep',
+        /** For dark surfaces (`invert-surface` cards and bands) only. */
+        inverted: 'bg-primary-invert text-primary-invert-foreground hover:bg-primary-invert-hover',
       },
       size: {
         default: 'px-lg py-sm',

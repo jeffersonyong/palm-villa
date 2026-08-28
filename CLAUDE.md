@@ -35,11 +35,11 @@ The `docs/` folder is the source of truth. Each doc is **normative for its domai
 
 ## Design & UX guidelines (summary — details in design.md)
 
-- **Minimal and neutral:** the base is strictly neutral (cool near-white ground, white cards, near-black text). Lagoon aqua (`#2fc9c0`) is the *only* accent and is spent sparingly — one primary action per screen region, plus small brand moments. Scarcity is what makes it read. Aqua is never a success indicator; status uses the semantic tint/deep pairs, which are never decorative.
-- **Surface system:** cool light-gray ground, white cards; surface contrast is the elevation system (shadows only on overlays). Elevation level 1 is a neutral hairline, not a hard ink rule.
-- **Type:** one family, Inter, at a quiet scale — 400/500/600 only, nothing above 52px, and the portal never goes above `display-sm`.
-- **Geometry:** 8px radius for controls, 12px for cards, 16px for overlays. Pills are for status badges only — never buttons or cards.
-- **Three surfaces, one token set:** public site gets the fuller range; portal and field screens use the quiet subset.
+- **Quiet-utility minimalism:** white ground, structure drawn with 1px hairlines and faint gray panels — never coloured bands. **Deep lagoon teal is the action colour**: every primary button is a `brand-deep` fill with white text (vivid `brand` aqua with ink text in dark), one per screen region; ink never fills a button. Beyond the primary fill, the lagoon hue is *text-first* — eyebrows, key price lines, the logo dot — never a band or card fill, and never a success indicator; status uses the semantic tint/deep pairs, which are never decorative.
+- **Surface system:** white working surface; `canvas-soft` faint gray for the portal ground, inset panels and table header strips. Elevation: hairline → hairline + near-invisible `shadow-card` (separation on the gray ground) → real shadows on overlays only.
+- **Type:** Inter — 400/500/600, 14px body, nothing above 44px, portal capped at `display-sm`. Fraunces 600 is the one exception: public-site display headlines (`display-md`+) and each portal screen's single `h1` page title — never the field surface, never body or UI text. The 11px uppercase `micro` label is the voice for table headers, form sections, stats and eyebrows. Data numbers always `tabular-nums`.
+- **Geometry:** 6px radius for controls, 10px for cards, 14px for overlays. Pills are for status badges only — never buttons or cards.
+- **Three surfaces, one token set:** public site gets more air plus two sanctioned dark (ink) moments; portal and field screens are the dense subset.
 - **Field-screen UX:** single column, mobile-first, ≥48px touch targets, today's list loads first, primary action full-width at the bottom of each row card. Must stay usable on mid-range phones and poor signal.
 - **Users are non-technical staff on a live operation.** Every screen must save time over the spreadsheet on day one, or it gets abandoned. Prefer fewer, clearer actions over configurability.
 

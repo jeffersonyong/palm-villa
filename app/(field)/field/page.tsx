@@ -27,10 +27,13 @@ export default function FieldTodayPage() {
 
       <ul className="mt-xl space-y-lg">
         {arrivals.map((arrival) => (
-          <li key={arrival.reference} className="rounded-lg border border-divider bg-card p-xl">
+          <li
+            key={arrival.reference}
+            className="rounded-lg border border-border bg-card p-lg shadow-card"
+          >
             <div className="flex items-start justify-between gap-md">
               <div>
-                <p className="text-body-md-strong text-foreground">{arrival.reference}</p>
+                <p className="font-mono text-body-md-strong text-foreground">{arrival.reference}</p>
                 <p className="mt-xxs text-body-sm text-copy">{arrival.unit}</p>
                 <p className="mt-xxs text-caption text-muted-foreground">{arrival.window}</p>
               </div>

@@ -4,18 +4,17 @@ import { MediaPlaceholder } from './media-placeholder'
 
 /**
  * The one place `display-xl` appears on any surface (design.md §Typography).
+ * White ground, one lagoon CTA; the eyebrow is the section's brand text moment.
  */
 export function Hero() {
   return (
-    <section aria-labelledby="hero-heading" className="bg-background px-xl py-3xl">
-      <div className="mx-auto grid w-full max-w-[1200px] gap-2xl lg:grid-cols-2 lg:items-center">
+    <section aria-labelledby="hero-heading" className="bg-card px-xl py-3xl">
+      <div className="mx-auto grid w-full max-w-[1120px] gap-2xl lg:grid-cols-2 lg:items-center">
         <div>
-          <p className="text-body-sm-strong text-accent-foreground">
-            Palm Villa · Bandar Seri Begawan
-          </p>
+          <p className="micro-label text-accent-foreground">Palm Villa · Bandar Seri Begawan</p>
           <h1
             id="hero-heading"
-            className="mt-lg max-w-[14ch] font-display text-display-md text-balance text-foreground sm:text-display-lg lg:text-display-xl"
+            className="mt-lg max-w-[16ch] font-display text-display-md text-balance text-foreground sm:text-display-lg lg:text-display-xl"
           >
             Swim today, stay tonight.
           </h1>

@@ -20,28 +20,31 @@ export const metadata: Metadata = {
 export default function StayPage() {
   return (
     <>
-      <section aria-labelledby="stay-heading" className="bg-background px-xl py-3xl">
-        <div className="mx-auto w-full max-w-[1200px]">
-          <p className="text-body-sm-strong text-muted-foreground">Short stays</p>
+      <section aria-labelledby="stay-heading" className="bg-card px-xl py-3xl">
+        <div className="mx-auto w-full max-w-[1120px]">
+          <p className="micro-label text-accent-foreground">Short stays</p>
           <h1
             id="stay-heading"
-            className="mt-lg font-display text-display-md text-foreground sm:text-display-lg"
+            className="mt-md font-display text-display-md text-foreground sm:text-display-lg"
           >
             Stay at Palm Villa
           </h1>
-          <p className="mt-lg max-w-[52ch] text-body-lg text-copy">
+          <p className="mt-md max-w-[52ch] text-body-lg text-copy">
             Whole units from BND 180 a night.
           </p>
         </div>
       </section>
 
-      <section aria-labelledby="stay-pricing-heading" className="bg-card px-xl py-3xl">
-        <div className="mx-auto w-full max-w-[1200px]">
+      <section
+        aria-labelledby="stay-pricing-heading"
+        className="border-t border-divider bg-card px-xl py-3xl"
+      >
+        <div className="mx-auto w-full max-w-[1120px]">
           <h2 id="stay-pricing-heading" className="text-display-xs text-foreground">
             Nightly rates
           </h2>
 
-          <Card surface="summary" className="mt-lg max-w-[560px]">
+          <Card surface="raised" className="mt-lg max-w-[560px]">
             <dl>
               {unitTypes.map((unit, index) => (
                 <div
@@ -53,7 +56,7 @@ export default function StayPage() {
                   }
                 >
                   <dt className="text-body-md text-copy">{unit.name}</dt>
-                  <dd className="text-body-md-strong text-foreground">
+                  <dd className="text-body-md-strong text-foreground tabular-nums">
                     from BND {unit.fromRateBnd} / night
                   </dd>
                 </div>
