@@ -1,6 +1,10 @@
 import type { DateRange } from '@/lib/domain/availability'
+import type { BookingStatus } from '@/lib/domain/booking-state'
+import { todayInBrunei } from '@/lib/domain/dates'
 import type { BookingLine } from '@/lib/domain/lines'
 import type { Cents } from '@/lib/domain/money'
+
+import { buildDemoBookings } from './demo-seed'
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -43,7 +47,7 @@ export interface BookingFixture {
   /** Denormalised for display; the schema slice joins instead. */
   unitRef: string
   range: DateRange
-  status: 'confirmed'
+  status: BookingStatus
   guestName: string
   guestPhone: string
   vehicleRegistration: string | null
@@ -102,7 +106,26 @@ export const units: readonly UnitFixture[] = buildUnits()
 /** Bookings created during this dev session. Lost on restart. */
 const bookings: BookingFixture[] = []
 
+let seeded = false
+
+/**
+ * Fills the store with demo bookings on first access.
+ *
+ * Seeding is lazy so the clock is read once, on the first request, rather than
+ * at import time — module scope runs during the build, which would freeze
+ * "today" into the compiled output and leave the arrivals list permanently
+ * showing whatever day the build ran.
+ */
+function ensureSeeded(): void {
+  if (seeded) return
+
+  seeded = true
+  bookings.push(...buildDemoBookings(todayInBrunei(), units))
+}
+
 export function allBookings(): readonly BookingFixture[] {
+  ensureSeeded()
+
   return bookings
 }
 
@@ -113,10 +136,21 @@ export function allBookings(): readonly BookingFixture[] {
  * constraint, not the constraint itself.
  */
 export function bookedRangesFor(unitId: string): readonly DateRange[] {
-  return bookings.filter((booking) => booking.unitId === unitId).map((booking) => booking.range)
+  ensureSeeded()
+
+  // Cancelled and expired bookings release their unit — the same exclusion the
+  // database constraint makes with its `where` clause (architecture.md §5.2).
+  return bookings
+    .filter(
+      (booking) =>
+        booking.unitId === unitId && booking.status !== 'cancelled' && booking.status !== 'expired',
+    )
+    .map((booking) => booking.range)
 }
 
 export function addBooking(booking: BookingFixture): void {
+  ensureSeeded()
+
   bookings.push(booking)
 }
 
@@ -129,10 +163,18 @@ export function addBooking(booking: BookingFixture): void {
  * under concurrency, which is a database concern.
  */
 export function nextReference(): string {
+  ensureSeeded()
+
   return `PV-${String(4821 + bookings.length).padStart(4, '0')}`
 }
 
-/** Clears the store. Test-only. */
+/**
+ * Empties the store and suppresses demo seeding. Test-only.
+ *
+ * Tests build the bookings they need, so a test that has just cleared the store
+ * must not have eight demo bookings reappear underneath it on the next read.
+ */
 export function resetBookings(): void {
   bookings.length = 0
+  seeded = true
 }

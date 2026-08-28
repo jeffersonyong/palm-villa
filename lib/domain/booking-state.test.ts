@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   allowedEvents,
+  BOOKING_STATUSES,
   isTerminal,
   transition,
   type BookingEvent,
@@ -39,6 +40,12 @@ const ALL_EVENTS: readonly BookingEvent[] = [
   'cancel',
   'mark_no_show',
 ]
+
+describe('BOOKING_STATUSES', () => {
+  test('lists every status exactly once', () => {
+    expect([...BOOKING_STATUSES].sort()).toEqual([...ALL_STATUSES].sort())
+  })
+})
 
 describe('the happy paths from prd.md §9.2', () => {
   test('public flow: draft → held → awaiting verification → confirmed → checked in → completed', () => {

@@ -6,6 +6,27 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-28 — operations portal foundation
+
+Phase 1 is the portal, so this slice builds the shell the rest of Phase 1 lands in — navigation, shared primitives, a read layer — plus the two screens that prove it works end to end. Everything still runs on the fixture layer; the schema slice replaces it without touching the screens.
+
+### Added
+- **Portal information architecture, complete up front.** Six nav groups (Bookings, Payments, Property, Finance, Settings) covering the whole planned surface. Every route it lists exists: nine unbuilt screens render a `PlannedScreen` stub naming the capability it will deliver (B4–B6, E1–E3, F1–F4 and the rest). The remaining work is visible in the product rather than only in a document, which makes the portal walkable in a client review and keeps the scope baseline legible against what is actually built. Nav active state matches the **longest** listed route prefixing the current path, so `/portal/bookings/new` highlights one item rather than two.
+- **Shared primitives**, each extracted from markup that was already on screen rather than invented: `ui/table` (the [design.md](docs/design.md) list surface — hairline container, `micro` header strip on the gray fill, divider rules), `portal/page-header`, `portal/stat`, `portal/empty-state`, `portal/planned-screen`, and `portal/booking-status-badge`. The page header is now **the only place `font-display` appears in the portal**, which turns design.md's "Fraunces on the single `h1`" rule from something to remember into something structural.
+- **Overview screen** — today in one screen: arrivals, departures, the count awaiting payment, and units occupied tonight. [prd.md §20](docs/prd.md) names Jason as the primary user rather than a delegating stakeholder, so the screen answers the question he opens the spreadsheet to answer and stops there.
+- **Bookings list** at `/portal/bookings` — capability **B1**, list half. Filters (status, and a date range matching stays that *overlap* it) are URL state via a plain GET form, so a filtered view can be kept in a tab, bookmarked or sent to someone else, and the whole screen stays server-rendered with no client-side filtering to drift out of step. Unusable input — a mistyped date, half a pair, a reversed range, a hand-edited status — falls back to the unfiltered list rather than erroring. The calendar half of B1 is a later slice.
+- **Read layer** in `lib/db/bookings.ts`: `listBookings`, `getBookingByReference` and `getDailySnapshot`, all async so the Supabase swap stays inside `lib/db`. Twenty new tests pin the behaviour the database implementation has to reproduce — filter semantics on the half-open range, sort stability, and what the snapshot counts.
+- **Deterministic demo bookings** (`lib/db/demo-seed.ts`) so the list screens have something to show. Statuses are reached by **walking the state machine** rather than assigned, per [architecture.md §5.3](docs/architecture.md) — a demo booking sitting in an unreachable state would make the screens lie about what staff will see. Prices come from the real pricing engine, so no figure in the seed is invented. Seeding is lazy so the clock is read on first request, not at import: module scope runs during the build, which would otherwise freeze "today" into the output.
+
+### Changed
+- `BookingFixture.status` widens from `'confirmed'` to the full `BookingStatus`, and `bookedRangesFor` now excludes cancelled and expired bookings — the same exclusion the database constraint makes in its `where` clause, so a cancelled booking releases its unit.
+- The theme toggle joins the portal sidebar footer, next to the links out to the public site and field screens.
+
+### Open
+- **design.md specifies no badge tone for `held`, `completed` or `draft`.** All three take `neutral` rather than a tone invented here; the mapping lives in one component, so recording a decision later is a one-line change.
+- **"Occupied tonight" is a display figure, not the reporting definition.** Held units are excluded — a unit blocked by an unpaid hold is not occupied — but the occupancy definition the reports need ([prd.md §14](docs/prd.md)) has to be agreed with the client rather than inherited from this stat.
+- Auth and middleware gating of `(portal)` are still absent; `requirePermission` continues to permit everything in development and fail closed in production. G1 remains undelivered — see the note below, which this slice does not change.
+
 ## 2026-08-28 — design recut to quiet-utility minimalism (design.md v1.0)
 
 ### Changed

@@ -1,10 +1,18 @@
-import { isFree, type DateRange } from '@/lib/domain/availability'
-import { transition } from '@/lib/domain/booking-state'
+import { isFree, overlaps, type DateRange } from '@/lib/domain/availability'
+import { transition, type BookingStatus } from '@/lib/domain/booking-state'
 import { palmVillaConfig, type PropertyConfig } from '@/lib/domain/config'
+import { addDays, type StayDate } from '@/lib/domain/dates'
 import type { BookingLine } from '@/lib/domain/lines'
 import type { Cents } from '@/lib/domain/money'
 
-import { addBooking, bookedRangesFor, nextReference, units, type BookingFixture } from './fixtures'
+import {
+  addBooking,
+  allBookings,
+  bookedRangesFor,
+  nextReference,
+  units,
+  type BookingFixture,
+} from './fixtures'
 import { getUnits, type Unit } from './inventory'
 
 /**
@@ -42,6 +50,91 @@ export async function countAvailableByType(range: DateRange): Promise<Record<str
 
     return counts
   }, {})
+}
+
+export interface BookingListFilter {
+  status?: BookingStatus
+  /** Stays touching this half-open range, matching availability semantics. */
+  overlaps?: DateRange
+}
+
+/**
+ * Bookings, most imminent first.
+ *
+ * Sorted by check-in and then reference so the order is stable — a list that
+ * reshuffles between reads is unusable for a staff member scanning it.
+ */
+export async function listBookings(
+  filter: BookingListFilter = {},
+): Promise<readonly BookingFixture[]> {
+  return allBookings()
+    .filter((booking) => {
+      if (filter.status && booking.status !== filter.status) return false
+      if (filter.overlaps && !overlaps(booking.range, filter.overlaps)) return false
+
+      return true
+    })
+    .toSorted(
+      (a, b) =>
+        a.range.start.localeCompare(b.range.start) || a.reference.localeCompare(b.reference),
+    )
+}
+
+/**
+ * One booking by its human reference.
+ *
+ * Normalised on the way in: staff read references off a bank transfer or a
+ * printout, so leading spaces and lower case are typing, not a different
+ * booking.
+ */
+export async function getBookingByReference(reference: string): Promise<BookingFixture | null> {
+  const normalised = reference.trim().toUpperCase()
+
+  return allBookings().find((booking) => booking.reference === normalised) ?? null
+}
+
+export interface DailySnapshot {
+  /** Confirmed bookings whose stay starts today. */
+  arrivals: readonly BookingFixture[]
+  /** Checked-in bookings whose stay ends today. */
+  departures: readonly BookingFixture[]
+  awaitingVerificationCount: number
+  occupiedTonightCount: number
+  totalUnits: number
+}
+
+/**
+ * Today at a glance: who is arriving, who is leaving, what is waiting on money.
+ *
+ * `today` is a parameter rather than a clock read, so the snapshot is testable
+ * and the caller decides which day it is asking about.
+ *
+ * `occupiedTonightCount` is a display figure for this screen, not the occupancy
+ * definition the reports will need (prd.md §14) — held units are excluded here
+ * because a unit blocked by an unpaid hold is not occupied, but a reporting
+ * definition has to be agreed with the client rather than assumed from this.
+ */
+export async function getDailySnapshot(today: StayDate): Promise<DailySnapshot> {
+  const bookings = allBookings()
+  const tonight: DateRange = { start: today, end: addDays(today, 1) }
+
+  return {
+    arrivals: bookings
+      .filter((booking) => booking.status === 'confirmed' && booking.range.start === today)
+      .toSorted((a, b) => a.unitRef.localeCompare(b.unitRef)),
+    departures: bookings
+      .filter((booking) => booking.status === 'checked_in' && booking.range.end === today)
+      .toSorted((a, b) => a.unitRef.localeCompare(b.unitRef)),
+    awaitingVerificationCount: bookings.filter(
+      (booking) => booking.status === 'awaiting_payment_verification',
+    ).length,
+    occupiedTonightCount: bookings.filter(
+      (booking) =>
+        (booking.status === 'confirmed' || booking.status === 'checked_in') &&
+        overlaps(booking.range, tonight),
+    ).length,
+    totalUnits: units.length,
+  }
 }
 
 export interface CreateWalkInBookingInput {
@@ -110,7 +203,7 @@ export async function createWalkInBooking(
     unitId: unit.id,
     unitRef: unit.ref,
     range: input.range,
-    status: created.status as 'confirmed',
+    status: created.status,
     guestName: input.guestName,
     guestPhone: input.guestPhone,
     vehicleRegistration: input.vehicleRegistration,
