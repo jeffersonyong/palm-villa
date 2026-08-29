@@ -39,9 +39,10 @@ export function PortalMobileNav() {
       <SheetContent side="left" className="bg-background" showCloseButton={false}>
         <SheetTitle className="sr-only">Portal navigation</SheetTitle>
 
-        <div className="px-xl pt-lg pb-md">
+        {/* Matches the sidebar's brand block, hairline included. */}
+        <div className="flex h-14 shrink-0 flex-col justify-center border-b border-divider px-xl">
           <p className="micro-label text-muted-foreground">Palm Villa</p>
-          <p className="mt-xs text-display-xs text-foreground">Operations</p>
+          <p className="text-display-xs text-foreground">Operations</p>
         </div>
 
         {/* Delegation target: every interactive thing inside is itself a link. */}

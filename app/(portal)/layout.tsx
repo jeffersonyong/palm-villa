@@ -21,9 +21,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       {/* Flips <html> to the monochrome operations register (globals.css). */}
       <OperationsSurface />
       <aside className="hidden lg:flex lg:min-h-dvh lg:w-[220px] lg:shrink-0 lg:flex-col lg:border-r lg:border-divider">
-        <div className="px-xl pt-lg pb-md">
+        {/* Exactly the topbar's height with the same bottom hairline, so the
+            rule runs unbroken across both and separates the brand from the
+            navigation (design.md §Components — Portal topbar). */}
+        <div className="flex h-14 shrink-0 flex-col justify-center border-b border-divider px-xl">
           <p className="micro-label text-muted-foreground">Palm Villa</p>
-          <p className="mt-xs text-display-xs text-foreground">Operations</p>
+          <p className="text-display-xs text-foreground">Operations</p>
         </div>
 
         <PortalNav />

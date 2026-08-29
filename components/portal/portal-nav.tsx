@@ -30,14 +30,18 @@ export function PortalNav() {
   const pathname = usePathname()
   const active = activeHref(pathname)
 
+  // pt-lg clears the brand block's rule — the first group label sat on it once
+  // that hairline arrived.
   return (
-    <nav aria-label="Portal navigation" className="px-md pb-lg">
+    <nav aria-label="Portal navigation" className="px-md pt-lg pb-lg">
       <div className="flex flex-col gap-md">
-        {navGroups.map((group, index) => (
-          <div key={group.label ?? `group-${index}`}>
-            {group.label ? (
-              <p className="px-md pb-xs micro-label text-muted-foreground">{group.label}</p>
-            ) : null}
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            {/* Group headers sit in `copy`, a step above the `mute` that labels
+                table headers and stats: here the label is doing structural
+                work, splitting the nav into readable blocks. It stops short of
+                `foreground` so it never out-weighs the active item. */}
+            <p className="px-md pb-xs micro-label text-copy">{group.label}</p>
             <ul className="space-y-xxs">
               {group.items.map((item) => (
                 <li key={item.href}>

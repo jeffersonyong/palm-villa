@@ -10,6 +10,7 @@ import {
   List,
   Plus,
   ScrollText,
+  Settings,
   Smartphone,
   Tag,
   Users,
@@ -33,15 +34,15 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  /** Rendered as a micro label; `null` for the ungrouped lead item. */
-  label: string | null
+  /** Rendered as a micro label above the group. */
+  label: string
   items: readonly NavItem[]
 }
 
 // `as const` keeps the hrefs as literals so Next's typed routes can check them;
 // `satisfies` still enforces the shape.
 export const navGroups = [
-  { label: null, items: [{ href: '/portal', label: 'Overview', icon: LayoutDashboard }] },
+  { label: 'Overview', items: [{ href: '/portal', label: 'Dashboard', icon: LayoutDashboard }] },
   {
     label: 'Bookings',
     items: [
@@ -66,8 +67,10 @@ export const navGroups = [
     ],
   },
   {
-    label: 'Settings',
+    // Not "Settings": that is now one of the screens inside it.
+    label: 'Admin',
     items: [
+      { href: '/portal/settings', label: 'Settings', icon: Settings },
       { href: '/portal/settings/pricing', label: 'Pricing', icon: Tag },
       { href: '/portal/settings/roles', label: 'Roles & staff', icon: Users },
       { href: '/portal/settings/audit', label: 'Audit log', icon: ScrollText },
@@ -143,9 +146,5 @@ export function breadcrumbTrail(pathname: string): Crumb[] {
     return [{ label: 'Portal' }]
   }
 
-  return [
-    { label: 'Portal', href: '/portal' },
-    ...(group.label ? [{ label: group.label }] : []),
-    { label: item.label },
-  ]
+  return [{ label: 'Portal', href: '/portal' }, { label: group.label }, { label: item.label }]
 }

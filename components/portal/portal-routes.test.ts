@@ -10,6 +10,9 @@ describe('activeHref', () => {
   test('prefers the longest match so a child route does not light up its parent', () => {
     expect(activeHref('/portal/bookings/new')).toBe('/portal/bookings/new')
     expect(activeHref('/portal/payments/cash')).toBe('/portal/payments/cash')
+    // The Admin landing page is itself a route, so its children must still win.
+    expect(activeHref('/portal/settings')).toBe('/portal/settings')
+    expect(activeHref('/portal/settings/pricing')).toBe('/portal/settings/pricing')
   })
 
   test('keeps a deeper unlisted route on its nearest listed ancestor', () => {
@@ -40,8 +43,16 @@ describe('breadcrumbTrail', () => {
   test('reads Portal / group / screen, with the group unlinked', () => {
     expect(breadcrumbTrail('/portal/settings/audit')).toEqual([
       { label: 'Portal', href: '/portal' },
-      { label: 'Settings' },
+      { label: 'Admin' },
       { label: 'Audit log' },
+    ])
+  })
+
+  test('distinguishes the Admin landing page from the screens beneath it', () => {
+    expect(breadcrumbTrail('/portal/settings')).toEqual([
+      { label: 'Portal', href: '/portal' },
+      { label: 'Admin' },
+      { label: 'Settings' },
     ])
   })
 
