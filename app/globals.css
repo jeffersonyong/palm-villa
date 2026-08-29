@@ -296,19 +296,21 @@
 }
 
 /* ---------------------------------------------------------------------------
-   The portal is monochrome (design.md §Color roles — two accents, one system).
+   The operations surfaces are monochrome (design.md §Color roles — two
+   accents, one system).
 
-   Lagoon is the public site's brand accent; the staff portal is its own
-   product and keeps a plain instrument register: ink actions in light, white
-   in dark. Only the action roles flip — status colours are meaning, not
-   brand, and stay identical on both surfaces.
+   Lagoon is the customer-facing brand accent. The staff surfaces — the portal
+   and the field screens — are one product on different hardware and keep a
+   plain instrument register: ink actions in light, white in dark. Only the
+   action roles flip; status colours are meaning, not brand, and stay
+   identical everywhere.
 
    Scoped as an attribute on <html> — the same mechanism as data-theme —
    because overlays portal into <body> and must inherit the same register.
    The pre-paint script in lib/theme.ts sets it from the pathname on full
-   loads; PortalSurface keeps it in sync across client-side navigation.
+   loads; OperationsSurface keeps it in sync across client-side navigation.
    --------------------------------------------------------------------------- */
-:root[data-surface='portal'] {
+:root[data-surface='ops'] {
   --primary: light-dark(var(--color-ink), var(--color-canvas));
   --primary-foreground: light-dark(var(--color-canvas), var(--color-ink));
   --primary-hover: light-dark(

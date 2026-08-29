@@ -1,7 +1,7 @@
 import { PortalAccount } from '@/components/portal/portal-account'
 import { PortalNav, PortalNavFooterLinks } from '@/components/portal/portal-nav'
-import { PortalSurface } from '@/components/portal/portal-surface'
 import { PortalTopbar } from '@/components/portal/portal-topbar'
+import { OperationsSurface } from '@/components/operations-surface'
 
 /**
  * Portal chrome: left nav on the white ground, a topbar for what belongs to no
@@ -18,8 +18,8 @@ import { PortalTopbar } from '@/components/portal/portal-topbar'
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh lg:flex">
-      {/* Flips <html> to the portal's monochrome register (globals.css). */}
-      <PortalSurface />
+      {/* Flips <html> to the monochrome operations register (globals.css). */}
+      <OperationsSurface />
       <aside className="hidden lg:flex lg:min-h-dvh lg:w-[220px] lg:shrink-0 lg:flex-col lg:border-r lg:border-divider">
         <div className="px-xl pt-lg pb-md">
           <p className="micro-label text-muted-foreground">Palm Villa</p>
