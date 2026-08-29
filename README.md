@@ -17,11 +17,16 @@ clients are wired. There is no schema, no auth, no booking, pricing or payment l
 ```bash
 npm install
 cp .env.example .env.local   # fill in the Supabase values
+npm run db:start             # local Supabase stack (Docker)
+npm run db:reset             # apply migrations + seed
+npm run db:bootstrap-admin   # create the first Admin (set BOOTSTRAP_ADMIN_* in .env.local first)
 npm run dev
 ```
 
-The app runs at http://localhost:3000. The Supabase clients read their env vars lazily, so every
-route below renders before any Supabase project exists.
+The app runs at http://localhost:3000. The portal and field surfaces require a staff sign-in at
+`/login`; the bootstrap script creates the first Admin account, and every further account is
+created from **Portal → Settings → Roles & staff**. Staff accounts are provisioned with a
+temporary password shared out-of-band — there are no auth emails (architecture.md §3).
 
 | Route | Surface |
 | --- | --- |
@@ -40,6 +45,11 @@ route below renders before any Supabase project exists.
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint (`lint:fix` to autofix) |
 | `npm run format` | Prettier write (`format:check` to verify) |
+| `npm run test` | Vitest — unit + integration (needs the local stack up) |
+| `npm run test:unit` | The fast pure-function subset |
+| `npm run db:start` / `db:stop` | Local Supabase stack |
+| `npm run db:reset` | Apply every migration, then the seed |
+| `npm run db:bootstrap-admin` | Create the first Admin from `BOOTSTRAP_ADMIN_*` env vars |
 
 ## Layout
 

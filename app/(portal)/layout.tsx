@@ -1,4 +1,5 @@
-import { PortalAccount } from '@/components/portal/portal-account'
+import { getAuthenticatedUser } from '@/lib/auth/session'
+import { PortalAccount, type PortalAccountUser } from '@/components/portal/portal-account'
 import { PortalNav, PortalNavFooterLinks } from '@/components/portal/portal-nav'
 import { PortalTopbar } from '@/components/portal/portal-topbar'
 import { OperationsSurface } from '@/components/operations-surface'
@@ -11,11 +12,16 @@ import { OperationsSurface } from '@/components/operations-surface'
  *
  * Below `lg` the sidebar becomes a drawer, opened from the topbar.
  *
- * No auth here yet. Middleware gating of (portal) and (field) lands with the
- * auth slice (architecture.md §3), which is also when the account row below
- * stops being a placeholder and gains a real menu.
+ * proxy.ts guarantees a session behind this layout, so the null case is a
+ * race (signed out in another tab mid-render) — the chrome renders without an
+ * account row and the next navigation lands on /login.
  */
-export default function PortalLayout({ children }: { children: React.ReactNode }) {
+export default async function PortalLayout({ children }: { children: React.ReactNode }) {
+  const user = await getAuthenticatedUser()
+  const account: PortalAccountUser | null = user
+    ? { name: user.displayName, email: user.email }
+    : null
+
   return (
     <div className="min-h-dvh lg:flex">
       {/* Flips <html> to the monochrome operations register (globals.css). */}
@@ -34,13 +40,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         {/* Pushed to the bottom of the sidebar: who is signed in, and leaving
             the portal, are chrome rather than navigation. */}
         <div className="border-divider px-md pt-md pb-lg lg:mt-auto lg:border-t">
-          <PortalAccount />
+          {account ? <PortalAccount user={account} /> : null}
           <PortalNavFooterLinks />
         </div>
       </aside>
 
       <div className="flex min-h-dvh flex-1 flex-col">
-        <PortalTopbar />
+        <PortalTopbar account={account} />
 
         <main className="flex-1 px-lg py-xl lg:px-xl">
           <div className="mx-auto w-full max-w-[1440px]">{children}</div>

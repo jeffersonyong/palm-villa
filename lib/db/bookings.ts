@@ -289,6 +289,12 @@ export interface CreateWalkInBookingInput {
   lines: readonly BookingLine[]
   total: Cents
   securityDeposit: Cents
+  /**
+   * auth.users.id of the staff member acting, from requirePermission()'s
+   * Actor — lands on the audit event. Required, not defaulted: a caller that
+   * has no actor should have to say `null` out loud (tests do).
+   */
+  actorId: string | null
 }
 
 export type CreateBookingResult =
@@ -339,6 +345,7 @@ export async function createWalkInBooking(
     p_total_cents: input.total,
     p_security_deposit_cents: input.securityDeposit ?? config.securityDeposit,
     p_lines: input.lines,
+    p_actor_id: input.actorId,
   })
 
   if (error) {
@@ -413,6 +420,7 @@ export type TransitionBookingResult =
 export async function transitionBooking(
   bookingId: string,
   event: BookingEvent,
+  actorId: string | null = null,
 ): Promise<TransitionBookingResult> {
   const propertyId = await currentPropertyId()
 
@@ -444,6 +452,7 @@ export async function transitionBooking(
     p_from_status: from,
     p_to_status: next.status,
     p_event: event,
+    p_actor_id: actorId,
   })
 
   if (applyError) {

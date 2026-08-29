@@ -46,9 +46,10 @@ export const themeInitScript = `
     // too. Set from the pathname here so the first paint is already
     // monochrome; OperationsSurface keeps it in sync across client-side
     // navigation. Matches whole segments so a future /portal-status route
-    // does not get swept in.
+    // does not get swept in. /login is staff chrome too — the sign-in
+    // screen fronts the operations surfaces and takes their register.
     var path = location.pathname;
-    var isOps = ['/portal', '/field'].some(function (root) {
+    var isOps = ['/portal', '/field', '/login'].some(function (root) {
       return path === root || path.indexOf(root + '/') === 0;
     });
     if (isOps) {

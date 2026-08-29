@@ -74,6 +74,8 @@ export async function bookingInput(spec: BookingSpec): Promise<CreateWalkInBooki
     lines,
     total: totalOf(lines),
     securityDeposit: bnd(100),
+    // Tests act as no one; the auth slice's own tests cover real actors.
+    actorId: null,
   }
 }
 

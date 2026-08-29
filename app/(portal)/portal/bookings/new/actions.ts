@@ -60,7 +60,7 @@ export async function createWalkInBookingAction(
   formData: FormData,
 ): Promise<WalkInBookingState> {
   // architecture.md §4: every mutation passes the permission check first.
-  await requirePermission('booking.create')
+  const actor = await requirePermission('booking.create')
 
   const parsed = walkInBookingSchema.safeParse(Object.fromEntries(formData))
 
@@ -111,6 +111,7 @@ export async function createWalkInBookingAction(
     lines: priced.lines,
     total: priced.total,
     securityDeposit: priced.securityDeposit,
+    actorId: actor.userId,
   })
 
   if (!result.ok) {

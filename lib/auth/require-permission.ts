@@ -1,45 +1,24 @@
+import { cache } from 'react'
+
+import { hasPermission, toPermissionSet, type Permission } from '@/lib/auth/permissions'
+import { getAuthenticatedUser } from '@/lib/auth/session'
+import { permissionsForUser } from '@/lib/db/permissions'
+
 /**
  * Permission gate for server actions.
  *
- * architecture.md §4: "Enforcement is in the server layer (a
- * requirePermission(session, 'deposit.approve_release') helper called at the
- * top of every server action)." This is that helper.
+ * architecture.md §4: "Enforcement is in the server layer (a helper called at
+ * the top of every server action)." This is that helper. It reads the session
+ * from the request's cookies rather than taking one as a parameter — a server
+ * action has ambient cookie access, and one line at the top of every action
+ * is the whole point.
  *
- * ═══════════════════════════════════════════════════════════════════════════
- * AUTHENTICATION IS NOT IMPLEMENTED YET. In development this helper ALLOWS
- * EVERY ACTION.
- *
- * It exists now, and is called now, so that the auth slice fills in one
- * function rather than hunting the codebase for unguarded mutations. The
- * production guard below is deliberately fail-closed: if this ships before
- * auth lands, every mutation refuses rather than silently permitting.
- * ═══════════════════════════════════════════════════════════════════════════
+ * The gate in proxy.ts only answers "is anyone signed in"; this answers "may
+ * this person do this", so it fails closed on both a missing session and a
+ * missing permission.
  */
 
-/**
- * The atomic permission strings (prd.md §4).
- *
- * Permissions, not roles, are the unit of enforcement. Roles are compositions
- * of these and are data rather than code, so a role change is an admin action
- * and never a deployment.
- */
-export type Permission =
-  | 'booking.view'
-  | 'booking.create'
-  | 'booking.amend'
-  | 'booking.cancel'
-  | 'booking.override_hold'
-  | 'payment.verify'
-  | 'payment.record_cash'
-  | 'inspection.record'
-  | 'charge.create'
-  | 'charge.waive'
-  | 'deposit.approve_release'
-  | 'unit.manage'
-  | 'tenancy.manage'
-  | 'config.manage'
-  | 'report.view'
-  | 'document.view_identity'
+export type { Permission } from '@/lib/auth/permissions'
 
 export class PermissionDeniedError extends Error {
   constructor(readonly permission: Permission) {
@@ -49,16 +28,55 @@ export class PermissionDeniedError extends Error {
 }
 
 /**
- * Asserts the current session holds a permission.
+ * The authenticated staff member as an authorisation subject: who they are,
+ * and the union of their roles' permissions (architecture.md §4). Actions
+ * pass `userId` on to the database functions as `p_actor_id`, so every audit
+ * event knows who acted.
+ */
+export interface Actor {
+  userId: string
+  permissions: ReadonlySet<Permission>
+}
+
+/**
+ * Memoised per request: a screen that checks four permissions while rendering
+ * pays for one role lookup, not four. `getAuthenticatedUser` is itself cached,
+ * so the auth round-trip is shared too.
+ */
+const loadActor = cache(async (): Promise<Actor | null> => {
+  const user = await getAuthenticatedUser()
+
+  if (!user) {
+    return null
+  }
+
+  return {
+    userId: user.id,
+    permissions: toPermissionSet(await permissionsForUser(user.id)),
+  }
+})
+
+/**
+ * The non-throwing read, for render-time gating: a screen that should show a
+ * quiet "no access" card instead of an error asks for the actor and decides.
+ * Mutations never use this — they call requirePermission and let it throw.
+ */
+export async function getActor(): Promise<Actor | null> {
+  return loadActor()
+}
+
+/**
+ * Asserts the current session holds a permission, and returns the actor.
  *
  * Throws `PermissionDeniedError` when it does not, so a server action can call
  * this on its first line and treat everything after as authorised.
  */
-export async function requirePermission(permission: Permission): Promise<void> {
-  if (process.env.NODE_ENV === 'production') {
-    // Fail closed. Replaced by the real session and role lookup in the auth
-    // slice: read the Supabase session, union the user's role permissions
-    // (architecture.md §4), and check membership.
+export async function requirePermission(permission: Permission): Promise<Actor> {
+  const actor = await loadActor()
+
+  if (!actor || !hasPermission(actor.permissions, permission)) {
     throw new PermissionDeniedError(permission)
   }
+
+  return actor
 }

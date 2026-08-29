@@ -67,7 +67,11 @@ supabase/
 ## 3. Authentication and sessions
 
 ### Staff
-Supabase Auth, email + password. Staff accounts are created by an Admin; there is no self-registration. Sessions are httpOnly cookies via `@supabase/ssr`. The `(portal)` and `(field)` route groups are gated in middleware; render is additionally gated per-permission server-side.
+Supabase Auth, email + password. Staff accounts are created by an Admin; there is no self-registration (public signup is disabled in the Supabase config; account creation goes through the service-role admin API). Sessions are httpOnly cookies via `@supabase/ssr`. The `(portal)` and `(field)` route groups are gated in the request pipeline (`proxy.ts`), which answers only "is anyone signed in"; render is additionally gated per-permission server-side, and every mutation re-checks via `requirePermission` (§4).
+
+**Provisioning [A]:** an Admin creates the account with a temporary password and shares it out-of-band (in person / WhatsApp) — there are **no auth emails at all**: no invites, no confirmations, no reset emails (§9). Staff change their own password from the account menu; a forgotten password is an Admin reset to a new temporary one. The first Admin is created by `scripts/bootstrap-admin.mjs` (idempotent, env-driven; locally `npm run db:bootstrap-admin`, in production the same script run once from an operator machine).
+
+**Identity [A]:** the display name lives in `auth.users.user_metadata.display_name` — no staff profile table exists, because nothing beyond a name is stored about staff. **Disabling [A]** is a GoTrue ban (`ban_duration`), not a flag or a deletion: an account that has acted is pinned forever by the audit trail's foreign key (restrict, not cascade — migration 001000), so access ends by ban and history stays resolvable. A banned account's already-issued access token stays valid until it expires (≤1 h) — accepted for v1.
 
 ### Customers
 **No accounts.** Guest checkout only (PRD decision). Post-booking access is via:
@@ -83,11 +87,13 @@ Same Supabase Auth. The `(field)` surface is a filtered, large-touch-target view
 
 ## 4. Authorisation
 
-Three tables: `roles`, `role_permissions`, `user_roles`. Users hold **one or more roles**; effective permissions are the union. Permission strings are the atomic unit (see PRD §4 for the canonical set and the five predefined roles). Roles are data, not code: editing a role's permission set is an Admin UI operation.
+Three tables: `staff_role`, `role_permission`, `user_role` (named to keep clear water from Postgres roles). Users hold **one or more roles**; effective permissions are the union. Permission strings are the atomic unit (see PRD §4 for the canonical set and the five predefined roles). Roles are data, not code: editing a role's permission set is an Admin UI operation.
 
-**Enforcement is in the server layer** (a `requirePermission(session, 'deposit.approve_release')` helper called at the top of every server action). Postgres RLS is enabled on all tables as defence in depth, but the application does not rely on RLS for business-level authorisation, because permission logic (e.g. "approve is only available once inspection is recorded") is richer than row filters.
+**Enforcement is in the server layer** — `requirePermission('deposit.approve_release')` called at the top of every server action. The helper reads the session itself from the request's cookies (a server action has ambient cookie access, so passing a session parameter would be a line of boilerplate per action for nothing) and returns the **Actor** — `{ userId, permissions }` — so the action can thread `userId` into the database functions as `p_actor_id`. Session and permission lookups are memoised per request. A non-throwing `getActor()` exists for render-time gating (a screen showing a quiet "no access" card rather than erroring); mutations never use it. Postgres RLS is enabled on all tables as defence in depth, but the application does not rely on RLS for business-level authorisation, because permission logic (e.g. "approve is only available once inspection is recorded") is richer than row filters.
 
-**Approvals are events, not flags.** Any action carrying an approval semantic (deposit release, charge waiver, manual payment match) writes an `audit_event` row with actor, action, entity, before/after, timestamp. The audit table is append-only; no update or delete grants exist on it.
+**Approvals are events, not flags.** Any action carrying an approval semantic (deposit release, charge waiver, manual payment match) writes an `audit_event` row with actor, action, entity, before/after, timestamp. The audit table is append-only; no update or delete grants exist on it. **Role administration is audited too [A]:** creating/disabling an account, resetting a password, and every change to a role's permission set or a user's role set writes an audit event (the role-set writes atomically with their change, via SQL functions) — F4 promises the owner the full trail, and a role change alters what every other event could have been.
+
+**Lock-out guards [A]:** the admin UI refuses the two unrecoverable-by-UI edits — removing your own path to `config.manage`, and removing `config.manage` from the `admin` role. Everything else, including one admin demoting another, is allowed.
 
 ---
 
@@ -183,7 +189,7 @@ v1 ships `ManualTransferProvider` only. A card gateway (Baiduri/BIBD) or stateme
 
 ## 9. Email
 
-Resend, transactional only: booking created (payment instructions + deadline), booking confirmed (QR attached), payment reminder before hold expiry, deposit release note. Sender uses the Vercel-hosted domain until the client selects a domain, at which point the domain is verified in Resend and templates re-pointed. Email capture is added to the booking form; where a customer provides no email, delivery falls back to staff forwarding the QR image via WhatsApp (accepted v1 gap, PRD assumption A6).
+Resend, transactional only: booking created (payment instructions + deadline), booking confirmed (QR attached), payment reminder before hold expiry, deposit release note. **No auth emails** — staff provisioning and password resets are out-of-band (§3), and Supabase's own auth mailer stays unused. Sender uses the Vercel-hosted domain until the client selects a domain, at which point the domain is verified in Resend and templates re-pointed. Email capture is added to the booking form; where a customer provides no email, delivery falls back to staff forwarding the QR image via WhatsApp (accepted v1 gap, PRD assumption A6).
 
 ---
 
