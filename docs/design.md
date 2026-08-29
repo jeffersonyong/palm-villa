@@ -214,6 +214,48 @@ components:
     typography: "{typography.caption} @ 500"
     padding: "{spacing.xxs} {spacing.sm}"
     rounded: "{rounded.pill}"
+  # Elevation level 3. Dialogs, popovers and menus share one shell.
+  overlay:
+    backgroundColor: "{colors.canvas}"
+    borderColor: "{colors.ink} @ 12%"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.xl}"
+    shadow: "shadow-overlay"
+  # A label, not a panel: control radius and the polarity-flip surface.
+  tooltip:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.canvas}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.md}"
+    padding: "{spacing.xs} {spacing.sm}"
+  # Menu items are controls inside the overlay shell.
+  menu-item:
+    textColor: "{colors.body}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.md}"
+    padding: "{spacing.sm} {spacing.md}"
+  # The portal's chrome bar. Ground fill, structure by hairline.
+  topbar:
+    backgroundColor: "{colors.canvas-soft}"
+    borderBottom: "1px {colors.ink} @ 7%"
+    height: 48px
+    padding: "0 {spacing.xl}"
+  # Segmented control — the same "where am I" construction as the sidebar chip.
+  tab-segment:
+    trackBackgroundColor: "{colors.canvas-soft}"
+    activeBackgroundColor: "{colors.canvas}"
+    activeTextColor: "{colors.ink}"
+    textColor: "{colors.body}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.sm}"
+    padding: "{spacing.xs} {spacing.md}"
+  avatar:
+    backgroundColor: "{colors.canvas-soft}"
+    textColor: "{colors.ink}"
+    typography: "{typography.caption} @ 500"
+    rounded: "{rounded.full}"
+    size: 32px
 
 # Theme-aware roles. The palette above is the fixed brand set; these roles are
 # what application code consumes, and each resolves per theme.
@@ -241,6 +283,7 @@ themes:
     invert-foreground: "{colors.canvas}"
     footer-surface: "{colors.ink}"
     ring: "{colors.brand-deep}"
+    scrim: "{colors.ink} @ 45%"
     badge-positive: "{colors.positive-tint}"
     badge-positive-foreground: "{colors.positive-deep}"
     badge-warning: "{colors.warning-tint}"
@@ -272,6 +315,9 @@ themes:
     invert-foreground: "{colors.ink}"
     footer-surface: "mix({colors.ink-deep} 60%, {colors.ink})"
     ring: "{colors.brand}"
+    # Dimming an ink ground with ink does nothing, so dark reaches past the
+    # palette to black.
+    scrim: "black @ 60%"
     badge-positive: "mix({colors.positive} 28%, {colors.ink-deep})"
     badge-positive-foreground: "{colors.canvas-soft}"
     badge-warning: "mix({colors.warning} 26%, {colors.ink-deep})"
@@ -364,6 +410,11 @@ Standard control height is **36px** (buttons, inputs, selects) on desktop surfac
 
 `shadow-card` is deliberately near-invisible — it separates a white card from a near-white ground where the hairline alone looks flat. Anything stronger than that reads as decoration.
 
+Level 3 sits over a `scrim` (ink @ 45% in light; black @ 60% in dark, because dimming an ink ground with ink does nothing). Overlays take `{rounded.xl}` 14px, a hairline and `shadow-overlay`. Two exceptions: **edge-anchored drawers** drop the radius on the edges they meet — a rounded corner against the viewport edge reads as a rendering error — and **tooltips** take the control radius on the polarity-flip surface, because at caption height a 14px corner reads as a pill.
+
+### Motion
+Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion stays on `opacity` and `transform`. Every animation is suppressed under `prefers-reduced-motion` — the element appears in its final state rather than moving.
+
 ## Components
 
 **Buttons.** `primary` (deep lagoon fill, white text — vivid aqua fill, ink text in dark), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour.
@@ -381,6 +432,10 @@ Standard control height is **36px** (buttons, inputs, selects) on desktop surfac
 **Tables (the portal's signature surface).** A hairline-bounded container at `{rounded.lg}` with `overflow-hidden`; header row on `canvas-soft` in `micro` mute; body rows `body-sm` with `divider` rules; cells pad `{spacing.md} {spacing.lg}` vertically tight. Reference and money columns set `tabular-nums`. Row hover is a whisper of `canvas-soft`. This is the payment queue, arrivals list, and every list screen.
 
 **QR block.** White card, centred QR ≥ 200px with default quiet zone, booking reference in `display-sm` beneath, guidance in `body-sm`.
+
+**Overlays (dialogs, popovers, menus).** One shell: `{rounded.xl}` 14px, hairline, `shadow-overlay`, over the `scrim`. A dialog title is `display-xs` in Inter — a modal heading is a section heading, so the display face stays off it. Its footer holds at most one primary fill, like any other screen region. Menu items are *controls* inside that shell: `{rounded.md}` 6px, `body-sm`, 16px icons in mute, `muted` fill on focus. Menu group labels are `micro`, same as every other data-region label.
+
+**Drawers.** The mobile portal nav is a left drawer, 280px, sliding over the scrim, closing on navigation. It fills with the page ground rather than card white, so the nav's active white chip still reads against it. Edge-anchored, so no radius.
 
 ## Do's and Don'ts
 

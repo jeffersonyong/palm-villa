@@ -232,6 +232,13 @@
   /* Focus is the action colour's ring. */
   --ring: light-dark(var(--color-brand-deep), var(--color-brand));
 
+  /* Elevation level 3's backdrop. Dark needs a heavier scrim: dimming an ink
+     ground with ink does nothing, so it reaches past the palette to black. */
+  --scrim: light-dark(
+    color-mix(in oklab, var(--color-ink) 45%, transparent),
+    color-mix(in oklab, black 60%, transparent)
+  );
+
   /* Polarity-flip surfaces (dark promo card, closing band) are defined by
      being the opposite of the current ground, so they invert with the theme
      rather than staying literally ink. */
@@ -313,6 +320,7 @@
   --color-input: var(--input);
   --color-divider: var(--divider);
   --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
   --color-invert-surface: var(--invert-surface);
   --color-invert-foreground: var(--invert-foreground);
   --color-footer-surface: var(--footer-surface);
