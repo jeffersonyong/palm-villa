@@ -25,10 +25,7 @@ function Table({
   return (
     <div
       data-slot="table-container"
-      className={cn(
-        'overflow-hidden rounded-lg border border-border bg-card shadow-card',
-        containerClassName,
-      )}
+      className={cn('overflow-hidden rounded-lg border border-border bg-card', containerClassName)}
     >
       <table
         data-slot="table"

@@ -239,7 +239,7 @@ components:
   topbar:
     backgroundColor: "{colors.canvas}"
     borderBottom: "1px {colors.ink} @ 7%"
-    height: 48px
+    height: 56px
     padding: "0 {spacing.xl}"
   # Segmented control — the same "where am I" construction as the sidebar chip.
   tab-segment:
@@ -299,9 +299,9 @@ themes:
     foreground: "{colors.canvas}"
     copy: "{colors.canvas-soft}"
     muted-foreground: "mix({colors.mute} 55%, {colors.canvas-soft})"
-    # 11% / 8% — anything stronger reads as wireframe against the ink ground.
-    border: "{colors.canvas} @ 11%"
-    divider: "{colors.canvas} @ 8%"
+    # 9% / 7% — anything stronger reads as wireframe against the ink ground.
+    border: "{colors.canvas} @ 9%"
+    divider: "{colors.canvas} @ 7%"
     primary: "{colors.brand}"
     primary-foreground: "{colors.ink}"
     primary-hover: "{colors.brand-active}"
@@ -405,13 +405,12 @@ Standard control height is **36px** (buttons, inputs, selects) on desktop surfac
 | Level | Treatment | Use |
 |---|---|---|
 | 0 — Flat | Nothing | Default. |
-| 1 — Hairline | 1px `border` | Inputs, tertiary buttons, table containers, cards on white. |
-| 2 — Card | Hairline + `shadow-card` (two-layer, ≤6% ink) | Tables and key cards that earn a whisper of lift; the public booking summary. |
-| 3 — Overlay | `shadow-overlay` | Modals, popovers, toasts only. |
+| 1 — Hairline | 1px `border` | Inputs, tertiary buttons, table containers, cards — every in-page surface. |
+| 2 — Overlay | Hairline + `shadow-overlay` | Modals, popovers, menus, drawers, toasts, tooltips — anything that floats. |
 
-`shadow-card` is deliberately near-invisible — it separates a white card from a near-white ground where the hairline alone looks flat. Anything stronger than that reads as decoration.
+**Surfaces are flat.** A card, a table, a chip never carries a shadow — the hairline is the entire boundary. The system's one shadow belongs to overlays, where it is structure (the thing genuinely floats) rather than decoration.
 
-Level 3 sits over a `scrim` (ink @ 45% in light; black @ 60% in dark, because dimming an ink ground with ink does nothing). Overlays take `{rounded.xl}` 14px, a hairline and `shadow-overlay`. Two exceptions: **edge-anchored drawers** drop the radius on the edges they meet — a rounded corner against the viewport edge reads as a rendering error — and **tooltips** take the control radius on the polarity-flip surface, because at caption height a 14px corner reads as a pill.
+Overlays sit over a `scrim` (ink @ 45% in light; black @ 60% in dark, because dimming an ink ground with ink does nothing) and take `{rounded.xl}` 14px, a hairline and `shadow-overlay`. Two exceptions: **edge-anchored drawers** drop the radius on the edges they meet — a rounded corner against the viewport edge reads as a rendering error — and **tooltips** take the control radius on the polarity-flip surface, because at caption height a 14px corner reads as a pill.
 
 ### Motion
 Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion stays on `opacity` and `transform`. Every animation is suppressed under `prefers-reduced-motion` — the element appears in its final state rather than moving.
@@ -420,7 +419,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **Buttons.** `primary` (deep lagoon fill, white text — vivid aqua fill, ink text in dark), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour.
 
-**Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline; `shadow-card` only where a card earns a whisper of lift (tables, the booking summary). `card-inset` is the faint gray panel *inside* a card (fine print, deposit notes, grouped stats) at `{rounded.md}`. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment.
+**Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline, no shadow. `card-inset` is the faint gray panel *inside* a card (fine print, deposit notes, grouped stats) at `{rounded.md}`. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment. Interactive cards signal hover by strengthening the hairline and a 1px lift, never a shadow.
 
 **Inputs.** White, hairline, `{rounded.md}` 6px, `body-md` 14px, height 36px, horizontal padding `{spacing.md}`. Focus: the border strengthens to the action colour plus a faint same-hue halo (`ring`) — decisive, not a glow. Labels are `body-sm-strong` ink. Field-screen inputs use the `touch` size.
 
@@ -434,7 +433,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **QR block.** White card, centred QR ≥ 200px with default quiet zone, booking reference in `display-sm` beneath, guidance in `body-sm`.
 
-**Portal topbar.** 48px tall, filled with the page ground and separated by a bottom hairline — the sidebar's construction continued across the top. Breadcrumbs sit left in `body-sm` mute with chevron separators, the current crumb in ink at 500; the tools that belong to no single screen (search, notifications, theme) sit right. It is sticky, and it **never carries the page title** — that stays the screen's single `h1` beneath it. Below `lg` it also holds the drawer trigger.
+**Portal topbar.** 56px tall — the 36px controls inside need air, at 48px they read as suffocated — filled with the page ground and separated by a bottom hairline — the sidebar's construction continued across the top. Breadcrumbs sit left in `body-sm` mute with chevron separators, the current crumb in ink at 500; the tools that belong to no single screen (search, notifications, theme) sit right. It is sticky, and it **never carries the page title** — that stays the screen's single `h1` beneath it. Below `lg` it also holds the drawer trigger.
 
 **Portal nav items.** Every item pairs a 16px icon with its label. The active item is a `canvas-soft` chip with ink text at 500 — a quiet surface shift on the white ground, never a colour; hover is the same chip at a whisper. Icons render in `mute` and lift to ink with the chip — they follow the item's state, never carry the brand hue, and never appear without a label in the sidebar. Group headers stay `micro` in mute.
 
@@ -442,7 +441,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **Drawers.** The mobile portal nav is a left drawer, 280px, sliding over the scrim, closing on navigation. It fills with the page ground — the same surface the sidebar sits on, so the nav reads identically in both places. Edge-anchored, so no radius.
 
-**Tabs — a segmented control, not underlines.** A `muted` track at `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a white card chip with `shadow-card` at `{rounded.sm}` (concentric inside the track). Labels `body-sm`, ink and 500 when active. The same principle as the sidebar's active item — *where am I* is a quiet surface shift, never the action colour; here the track supplies the gray, so the active segment lifts out of it in white. No underline tabs, no pill tabs.
+**Tabs — a segmented control, not underlines.** A `muted` track at `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a white card chip drawn in with a hairline at `{rounded.sm}` (concentric inside the track). Labels `body-sm`, ink and 500 when active. The same principle as the sidebar's active item — *where am I* is a quiet surface shift, never the action colour; here the track supplies the gray, so the active segment lifts out of it in white. No underline tabs, no pill tabs.
 
 **Checkboxes.** 16px, `{rounded.sm}` 4px (6px reads as a circle at that size), hairline on white; checked fills with the action colour. Small enough that the fill does not count against the one-primary-per-region rule.
 
@@ -469,7 +468,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 - Don't use aqua as a success state; success is the `positive` pair.
 - Don't let Fraunces off display headlines — public `display-md`+ and the portal's `h1` page title only; never on the field surface, never for body or UI text. And no third family, anywhere.
 - Don't build coloured band alternation; sections separate with hairlines on white.
-- Don't use shadows for emphasis — `shadow-card` is separation, overlays are the only real shadow.
+- Don't put a shadow on anything that is not an overlay. Cards, tables and chips are hairline-bounded and flat; `shadow-overlay` exists only for things that genuinely float (dialogs, menus, popovers, drawers, tooltips, toasts).
 - Don't let bolded body text do a label's job; if it names a data region, it is `micro`.
 - Don't let any type above `display-sm` into the portal.
 - Don't render buttons or cards as pills — badges and avatars are the only round things.

@@ -193,8 +193,8 @@ export function TabsDemo() {
       </TabsList>
       <TabsContent value="all">
         <p className="text-body-sm text-muted-foreground">
-          The active segment is the white chip + shadow-card — the same construction as the
-          sidebar&rsquo;s active item. Never an underline, never the action colour.
+          The active segment is a white chip drawn in with a hairline — the same quiet-surface
+          answer the sidebar gives. Never an underline, never a shadow, never the action colour.
         </p>
       </TabsContent>
       <TabsContent value="arrivals">
@@ -254,7 +254,7 @@ export function AvatarDemo() {
 
 export function SkeletonDemo() {
   return (
-    <Card surface="raised" className="w-full max-w-[420px] space-y-md">
+    <Card className="w-full max-w-[420px] space-y-md">
       <div className="flex items-center gap-sm">
         <Skeleton className="size-8 rounded-full" />
         <div className="flex-1 space-y-xs">

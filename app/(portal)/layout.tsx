@@ -18,7 +18,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   return (
     <div className="min-h-dvh lg:flex">
       <aside className="hidden lg:flex lg:min-h-dvh lg:w-[220px] lg:shrink-0 lg:flex-col lg:border-r lg:border-divider">
-        <div className="px-xl py-lg">
+        <div className="px-xl pt-lg pb-md">
           <p className="micro-label text-muted-foreground">Palm Villa</p>
           <p className="mt-xs text-display-xs text-foreground">Operations</p>
         </div>

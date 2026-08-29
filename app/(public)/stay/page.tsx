@@ -44,7 +44,7 @@ export default function StayPage() {
             Nightly rates
           </h2>
 
-          <Card surface="raised" className="mt-lg max-w-[560px]">
+          <Card className="mt-lg max-w-[560px]">
             <dl>
               {unitTypes.map((unit, index) => (
                 <div

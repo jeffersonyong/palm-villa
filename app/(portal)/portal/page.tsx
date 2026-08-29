@@ -53,10 +53,7 @@ export default async function PortalOverviewPage() {
         }
       />
 
-      <Card
-        surface="raised"
-        className="mt-xl grid grid-cols-2 gap-lg p-lg lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-divider"
-      >
+      <Card className="mt-xl grid grid-cols-2 gap-lg p-lg lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-divider">
         <Stat
           size="sm"
           label="Arrivals today"

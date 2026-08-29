@@ -24,7 +24,9 @@ export function PortalTopbar() {
   const crumbs = breadcrumbTrail(pathname)
 
   return (
-    <header className="sticky top-0 z-30 flex h-touch shrink-0 items-center justify-between gap-lg border-b border-divider bg-background px-lg lg:px-xl">
+    // 56px: the 36px controls inside need real air above and below — at 48px
+    // the search bar reads as suffocated.
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-lg border-b border-divider bg-background px-lg lg:px-xl">
       <div className="flex min-w-0 items-center gap-sm">
         <PortalMobileNav />
 

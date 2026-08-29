@@ -150,8 +150,8 @@ const roles: { role: string; swatch: string; light: string; dark: string }[] = [
     dark: 'mute lightened',
   },
   { role: 'primary', swatch: 'bg-primary', light: 'brand-deep', dark: 'brand' },
-  { role: 'border', swatch: 'bg-border', light: 'ink 12%', dark: 'white 14%' },
-  { role: 'divider', swatch: 'bg-divider', light: 'ink 7%', dark: 'white 9%' },
+  { role: 'border', swatch: 'bg-border', light: 'ink 12%', dark: 'white 9%' },
+  { role: 'divider', swatch: 'bg-divider', light: 'ink 7%', dark: 'white 7%' },
   { role: 'accent', swatch: 'bg-accent', light: 'brand-pale', dark: 'brand 20% on ink-deep' },
   { role: 'invert-surface', swatch: 'bg-invert-surface', light: 'ink', dark: 'canvas-soft' },
   { role: 'footer-surface', swatch: 'bg-footer-surface', light: 'ink', dark: 'raised ink' },
@@ -445,12 +445,8 @@ export default function TokensPage() {
             <div className="mt-md grid gap-lg md:grid-cols-2 lg:grid-cols-3">
               <Card>
                 <p className="text-body-md-strong">content</p>
-                <p className="mt-xs text-body-sm opacity-80">Hairline card — the default.</p>
-              </Card>
-              <Card surface="raised">
-                <p className="text-body-md-strong">raised</p>
                 <p className="mt-xs text-body-sm opacity-80">
-                  Hairline + shadow-card — a whisper of lift.
+                  Hairline card — the default. No shadow: surfaces are flat, only overlays float.
                 </p>
               </Card>
               <Card surface="inset">

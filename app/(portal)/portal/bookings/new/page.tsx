@@ -72,7 +72,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
         description="Walk-in only — the guest is here and pays now (prd.md §9.4)."
       />
 
-      <Card surface="raised" className="mt-xl">
+      <Card className="mt-xl">
         <form method="get" className="flex flex-wrap items-end gap-lg">
           <div className="grid w-[164px] gap-sm">
             <Label htmlFor="from">Check-in</Label>

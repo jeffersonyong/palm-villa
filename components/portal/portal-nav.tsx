@@ -18,8 +18,10 @@ import { cn } from '@/lib/utils'
  * the table-row hover.
  */
 
+/* py-1.5 = 6px on the 4px base: a 30px row — dense enough to feel like a
+   tool, tall enough to hit. */
 const linkClasses =
-  'flex items-center gap-sm rounded-md px-md py-sm text-body-sm transition-colors [&_svg]:size-4 [&_svg]:shrink-0'
+  'flex items-center gap-sm rounded-md px-md py-1.5 text-body-sm transition-colors [&_svg]:size-4 [&_svg]:shrink-0'
 const activeClasses = 'bg-muted font-medium text-foreground [&_svg]:text-foreground'
 const idleClasses =
   'text-copy hover:bg-muted/60 hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground'
@@ -30,7 +32,7 @@ export function PortalNav() {
 
   return (
     <nav aria-label="Portal navigation" className="px-md pb-lg">
-      <div className="flex flex-col gap-lg">
+      <div className="flex flex-col gap-md">
         {navGroups.map((group, index) => (
           <div key={group.label ?? `group-${index}`}>
             {group.label ? (

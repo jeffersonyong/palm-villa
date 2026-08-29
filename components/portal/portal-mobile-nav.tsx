@@ -39,7 +39,7 @@ export function PortalMobileNav() {
       <SheetContent side="left" className="bg-background" showCloseButton={false}>
         <SheetTitle className="sr-only">Portal navigation</SheetTitle>
 
-        <div className="px-xl py-lg">
+        <div className="px-xl pt-lg pb-md">
           <p className="micro-label text-muted-foreground">Palm Villa</p>
           <p className="mt-xs text-display-xs text-foreground">Operations</p>
         </div>

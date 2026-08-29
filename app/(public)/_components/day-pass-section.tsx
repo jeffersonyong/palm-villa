@@ -36,7 +36,7 @@ export function DayPassSection() {
         <ul className="mt-2xl grid gap-lg md:grid-cols-2 lg:grid-cols-3">
           {facilities.map((facility) => (
             <li key={facility.name}>
-              <Card className="h-full card-interactive hover:shadow-card">
+              <Card className="h-full card-interactive hover:border-foreground/20">
                 <MediaPlaceholder label={facility.imageLabel} icon={facility.icon} />
                 <h3 className="mt-lg text-display-xs text-foreground">{facility.name}</h3>
                 <p className="mt-xs text-body-md text-copy">{facility.description}</p>
@@ -45,10 +45,7 @@ export function DayPassSection() {
           ))}
         </ul>
 
-        <Card
-          surface="raised"
-          className="mt-lg flex flex-col gap-lg sm:flex-row sm:items-center sm:justify-between"
-        >
+        <Card className="mt-lg flex flex-col gap-lg sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-display-xs text-foreground">Day pass</p>
             <p className="mt-xs text-body-sm-strong text-accent-foreground">
