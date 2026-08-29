@@ -237,7 +237,7 @@ components:
     padding: "{spacing.sm} {spacing.md}"
   # The portal's chrome bar. Ground fill, structure by hairline.
   topbar:
-    backgroundColor: "{colors.canvas-soft}"
+    backgroundColor: "{colors.canvas}"
     borderBottom: "1px {colors.ink} @ 7%"
     height: 48px
     padding: "0 {spacing.xl}"
@@ -261,7 +261,7 @@ components:
 # what application code consumes, and each resolves per theme.
 themes:
   light:
-    background: "{colors.canvas-soft}"
+    background: "{colors.canvas}"
     card: "{colors.canvas}"
     muted: "{colors.canvas-soft}"
     foreground: "{colors.ink}"
@@ -299,8 +299,9 @@ themes:
     foreground: "{colors.canvas}"
     copy: "{colors.canvas-soft}"
     muted-foreground: "mix({colors.mute} 55%, {colors.canvas-soft})"
-    border: "{colors.canvas} @ 14%"
-    divider: "{colors.canvas} @ 9%"
+    # 11% / 8% — anything stronger reads as wireframe against the ink ground.
+    border: "{colors.canvas} @ 11%"
+    divider: "{colors.canvas} @ 8%"
     primary: "{colors.brand}"
     primary-foreground: "{colors.ink}"
     primary-hover: "{colors.brand-active}"
@@ -341,7 +342,7 @@ The same tokens serve all three surfaces. The public site gets slightly more air
 ### Roles
 - **Lagoon is the action colour.** `primary` resolves to `{colors.brand-deep}` in light and vivid `{colors.brand}` in dark: filled buttons, the selected state, the focus ring. A screen region has at most one filled-primary button. On locally dark surfaces (the promo card, the closing band) the `primary-invert` roles carry the same construction with the polarity swapped.
 - **Beyond the primary fill, the lagoon hue is text-first.** `{colors.brand-deep}` doubles as the readable brand text: the hero eyebrow, a key price line. Raw `{colors.brand}` outside dark-ground fills is reserved for small graphic moments (the logo dot, the checked-in badge hue) — never bands, never body text (it fails contrast on white).
-- `{colors.canvas}` white is the working surface; `{colors.canvas-soft}` is the faint gray for page ground (portal), inset panels, and table header strips. The two are close on purpose — the seam between them is always drawn with a hairline, not carried by the fill.
+- `{colors.canvas}` white is the working surface **and the page ground** — the portal sits on white, not gray. `{colors.canvas-soft}` is the faint gray spent on *selected and hover chips, inset panels, table header strips and tab tracks* — the small surfaces, never the ground. The two are close on purpose — the seam between them is always drawn with a hairline, not carried by the fill.
 - `{colors.ink}` carries headings and the dark surfaces (footer, the two public dark moments); it never fills a button.
 - Semantic set is **tint + deep text**: soft tinted chip, deep same-hue text. The saturated mid hues exist for icons and the destructive button only. Booking states: confirmed = positive, awaiting payment = warning, expired / cancelled / no-show = negative, checked-in = `brand-pale` with `brand-deep` text. Aqua is never a success indicator; that is `positive`.
 
@@ -354,7 +355,7 @@ The same tokens serve all three surfaces. The public site gets slightly more air
 
 One fixed palette; **light and dark are two role mappings over it** (see `themes` frontmatter). Application code consumes roles (`background`, `card`, `copy`, `border`, `primary`), never raw tokens.
 
-- **Surface order keeps its logic.** Light: gray ground → white card. Dark: ink ground → ink-deep card (lighter, so it still sits above).
+- **Surface order keeps its logic.** Light: white ground and white card, separated by the hairline — structure is drawn, not filled. Dark: ink ground → ink-deep card (lighter, so it still sits above).
 - **The action colour shifts register, not hue.** Deep teal on the light ground becomes vivid aqua on the dark one — the primary button is always the one saturated solid on the screen, in both themes.
 - **Hairlines invert** (ink @ 12% ↔ white @ 14%; dividers 7% ↔ 9%).
 - **Status chips invert construction**: light = soft tint + deep text; dark = hue-tinted dark chip + light text. Hue mapping unchanged.
@@ -405,7 +406,7 @@ Standard control height is **36px** (buttons, inputs, selects) on desktop surfac
 |---|---|---|
 | 0 — Flat | Nothing | Default. |
 | 1 — Hairline | 1px `border` | Inputs, tertiary buttons, table containers, cards on white. |
-| 2 — Card | Hairline + `shadow-card` (two-layer, ≤6% ink) | White cards on the gray portal ground; the public booking summary. |
+| 2 — Card | Hairline + `shadow-card` (two-layer, ≤6% ink) | Tables and key cards that earn a whisper of lift; the public booking summary. |
 | 3 — Overlay | `shadow-overlay` | Modals, popovers, toasts only. |
 
 `shadow-card` is deliberately near-invisible — it separates a white card from a near-white ground where the hairline alone looks flat. Anything stronger than that reads as decoration.
@@ -419,7 +420,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **Buttons.** `primary` (deep lagoon fill, white text — vivid aqua fill, ink text in dark), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour.
 
-**Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline; `shadow-card` when it sits on the gray ground. `card-inset` is the faint gray panel *inside* a card (fine print, deposit notes, grouped stats) at `{rounded.md}`. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment.
+**Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline; `shadow-card` only where a card earns a whisper of lift (tables, the booking summary). `card-inset` is the faint gray panel *inside* a card (fine print, deposit notes, grouped stats) at `{rounded.md}`. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment.
 
 **Inputs.** White, hairline, `{rounded.md}` 6px, `body-md` 14px, height 36px, horizontal padding `{spacing.md}`. Focus: the border strengthens to the action colour plus a faint same-hue halo (`ring`) — decisive, not a glow. Labels are `body-sm-strong` ink. Field-screen inputs use the `touch` size.
 
@@ -435,13 +436,13 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **Portal topbar.** 48px tall, filled with the page ground and separated by a bottom hairline — the sidebar's construction continued across the top. Breadcrumbs sit left in `body-sm` mute with chevron separators, the current crumb in ink at 500; the tools that belong to no single screen (search, notifications, theme) sit right. It is sticky, and it **never carries the page title** — that stays the screen's single `h1` beneath it. Below `lg` it also holds the drawer trigger.
 
-**Portal nav items.** Every item pairs a 16px icon with its label. Icons render in `mute` and lift to ink with the active chip — they follow the item's state, they never carry the brand hue, and they never appear without a label in the sidebar. Group headers stay `micro` in mute.
+**Portal nav items.** Every item pairs a 16px icon with its label. The active item is a `canvas-soft` chip with ink text at 500 — a quiet surface shift on the white ground, never a colour; hover is the same chip at a whisper. Icons render in `mute` and lift to ink with the chip — they follow the item's state, never carry the brand hue, and never appear without a label in the sidebar. Group headers stay `micro` in mute.
 
 **Overlays (dialogs, popovers, menus).** One shell: `{rounded.xl}` 14px, hairline, `shadow-overlay`, over the `scrim`. A dialog title is `display-xs` in Inter — a modal heading is a section heading, so the display face stays off it. Its footer holds at most one primary fill, like any other screen region. Menu items are *controls* inside that shell: `{rounded.md}` 6px, `body-sm`, 16px icons in mute, `muted` fill on focus. Menu group labels are `micro`, same as every other data-region label.
 
-**Drawers.** The mobile portal nav is a left drawer, 280px, sliding over the scrim, closing on navigation. It fills with the page ground rather than card white, so the nav's active white chip still reads against it. Edge-anchored, so no radius.
+**Drawers.** The mobile portal nav is a left drawer, 280px, sliding over the scrim, closing on navigation. It fills with the page ground — the same surface the sidebar sits on, so the nav reads identically in both places. Edge-anchored, so no radius.
 
-**Tabs — a segmented control, not underlines.** A `muted` track at `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a white card chip with `shadow-card` at `{rounded.sm}` (concentric inside the track). Labels `body-sm`, ink and 500 when active. This is deliberately the same construction as the sidebar's active item: *where am I* is answered with a surface, never with the action colour. No underline tabs, no pill tabs.
+**Tabs — a segmented control, not underlines.** A `muted` track at `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a white card chip with `shadow-card` at `{rounded.sm}` (concentric inside the track). Labels `body-sm`, ink and 500 when active. The same principle as the sidebar's active item — *where am I* is a quiet surface shift, never the action colour; here the track supplies the gray, so the active segment lifts out of it in white. No underline tabs, no pill tabs.
 
 **Checkboxes.** 16px, `{rounded.sm}` 4px (6px reads as a circle at that size), hairline on white; checked fills with the action colour. Small enough that the fill does not count against the one-primary-per-region rule.
 
@@ -473,4 +474,4 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 - Don't let any type above `display-sm` into the portal.
 - Don't render buttons or cards as pills — badges and avatars are the only round things.
 - Don't size anything with `max-w-lg` / `w-xl` and friends: the named spacing scale owns those suffixes here, so `max-w-lg` is 16px, not a container width. Widths are explicit (`max-w-[480px]`).
-- Don't answer "where am I" with the action colour; selected nav items and active tabs are a white chip on the gray ground.
+- Don't answer "where am I" with the action colour; it is always a quiet surface shift — a muted chip on the white ground (nav), or a white chip lifted from the muted track (tabs).

@@ -12,16 +12,17 @@ import { cn } from '@/lib/utils'
  *
  * A client component only because the active state needs the pathname — the
  * portal is an application surface, not the zero-JS public site. Active is a
- * white card chip + full-strength ink on the gray ground, never a colour:
+ * muted chip + full-strength ink on the white ground, never a colour:
  * "where am I" is not an action. Icons follow the same rule — mute by default,
- * lifting to ink with the chip.
+ * lifting to ink with the chip. Hover is the same chip at a whisper, matching
+ * the table-row hover.
  */
 
 const linkClasses =
   'flex items-center gap-sm rounded-md px-md py-sm text-body-sm transition-colors [&_svg]:size-4 [&_svg]:shrink-0'
-const activeClasses = 'bg-card font-medium text-foreground shadow-card [&_svg]:text-foreground'
+const activeClasses = 'bg-muted font-medium text-foreground [&_svg]:text-foreground'
 const idleClasses =
-  'text-copy hover:bg-card hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground'
+  'text-copy hover:bg-muted/60 hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground'
 
 export function PortalNav() {
   const pathname = usePathname()

@@ -3,7 +3,7 @@ import { PortalNav, PortalNavFooterLinks } from '@/components/portal/portal-nav'
 import { PortalTopbar } from '@/components/portal/portal-topbar'
 
 /**
- * Portal chrome: left nav on the gray ground, a topbar for what belongs to no
+ * Portal chrome: left nav on the white ground, a topbar for what belongs to no
  * single screen, content to ~1440px, calm tone. The sidebar and the topbar
  * share the page ground — structure is the hairline, not a fill (design.md
  * §Layout). The portal never goes above `display-sm`.

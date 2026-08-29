@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils'
  * `shadow-card` is separation on the near-white ground, never emphasis.
  *
  * - `content`: hairline card, the default everywhere.
- * - `raised`: hairline + `shadow-card` — cards on the gray portal ground and
- *   the public booking summary.
+ * - `raised`: hairline + `shadow-card` — a whisper of lift for tables, key
+ *   cards and the public booking summary.
  * - `inset`: the faint gray panel *inside* a card (fine print, deposit notes,
  *   grouped stats) at the control radius.
  * - `dark`: the public site's promotional polarity flip, at most twice a page.

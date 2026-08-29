@@ -9,12 +9,12 @@ export const THEME_STORAGE_KEY = 'pv-theme'
 export type ThemePreference = 'light' | 'dark'
 
 /**
- * Browser chrome colours, mirroring `canvas-soft` / `ink` (design.md). The
- * `themeColor` viewport export cannot vary by `data-theme`, so the two places
- * that set the theme also rewrite the meta tag.
+ * Browser chrome colours, mirroring the page ground — `canvas` / `ink`
+ * (design.md). The `themeColor` viewport export cannot vary by `data-theme`,
+ * so the two places that set the theme also rewrite the meta tag.
  */
 const THEME_COLOR: Record<ThemePreference, string> = {
-  light: '#f7f7f8',
+  light: '#ffffff',
   dark: '#131417',
 }
 
@@ -52,7 +52,10 @@ export const themeInitScript = `
         meta.setAttribute('name', 'theme-color');
         document.head.appendChild(meta);
       }
-      meta.setAttribute('content', stored === 'dark' ? '${THEME_COLOR.dark}' : '${THEME_COLOR.light}');
+      meta.setAttribute(
+        'content',
+        stored === 'dark' ? '${THEME_COLOR.dark}' : '${THEME_COLOR.light}'
+      );
     }
   } catch (e) {}
 })();

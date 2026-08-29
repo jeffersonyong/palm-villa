@@ -10,7 +10,7 @@ export function HowBookingWorks() {
   return (
     <section
       aria-labelledby="how-heading"
-      className="border-t border-divider bg-background px-xl py-3xl"
+      className="border-t border-divider bg-muted px-xl py-3xl"
     >
       <div className="mx-auto w-full max-w-[1120px]">
         <p className="micro-label text-muted-foreground">How it works</p>

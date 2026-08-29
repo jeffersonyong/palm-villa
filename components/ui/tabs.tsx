@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils'
  * Radix Tabs as a segmented control, per design.md §Components.
  *
  * Not underline tabs: "where am I" is never carried by colour in this system —
- * the sidebar answers it with a white chip on the gray ground, and tabs use the
- * same construction at control scale. The 4px trigger radius is concentric
- * inside the 6px track with its 2px padding.
+ * it is a quiet surface shift, the same principle as the sidebar's muted active
+ * chip. Here the muted track supplies the ground, so the active segment lifts
+ * out of it as a white card chip. The 4px trigger radius is concentric inside
+ * the 6px track with its 2px padding.
  */
 function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
   return (

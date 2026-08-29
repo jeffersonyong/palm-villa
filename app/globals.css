@@ -156,9 +156,11 @@
 
   --radius: var(--radius-lg);
 
-  /* Ground and surfaces. The ground/card seam is close on purpose — hairlines
-     draw the structure; the fill difference only whispers it. */
-  --background: light-dark(var(--color-canvas-soft), var(--color-ink));
+  /* Ground and surfaces. Light keeps a clean white ground — card and ground
+     share the fill and hairlines draw all the structure; canvas-soft is spent
+     on selected chips, inset panels and table header strips instead. Dark
+     keeps the two-tone order (ink ground, ink-deep card). */
+  --background: light-dark(var(--color-canvas), var(--color-ink));
   --card: light-dark(var(--color-canvas), var(--color-ink-deep));
   --popover: var(--card);
   --muted: light-dark(
@@ -215,10 +217,11 @@
   --destructive-foreground: var(--color-canvas);
 
   /* Elevation level 1 — a neutral hairline. Light tints down from ink, dark
-     tints up from white, so it stays a whisper on either ground. */
+     tints up from white, so it stays a whisper on either ground. Dark sits at
+     11% — 14% read as wireframe against the ink ground. */
   --border: light-dark(
     color-mix(in oklab, var(--color-ink) 12%, transparent),
-    color-mix(in oklab, var(--color-canvas) 14%, transparent)
+    color-mix(in oklab, var(--color-canvas) 11%, transparent)
   );
   --input: var(--border);
 
@@ -226,7 +229,7 @@
      own role. */
   --divider: light-dark(
     color-mix(in oklab, var(--color-ink) 7%, transparent),
-    color-mix(in oklab, var(--color-canvas) 9%, transparent)
+    color-mix(in oklab, var(--color-canvas) 8%, transparent)
   );
 
   /* Focus is the action colour's ring. */

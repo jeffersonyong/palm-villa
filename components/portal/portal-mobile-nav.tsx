@@ -10,8 +10,9 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 /**
  * The sidebar as a drawer, below `lg`.
  *
- * It fills with the page ground rather than card white so the nav's active
- * white chip still reads against it (design.md §Components — Drawers).
+ * It fills with the page ground — the same surface the sidebar sits on, so the
+ * nav reads identically in both places (design.md §Components — Drawers). In
+ * dark that keeps it ink rather than the card's ink-deep.
  *
  * It closes when a link inside it is activated, caught by delegation rather
  * than by wrapping every link in a `SheetClose`: the nav is shared with the

@@ -90,7 +90,7 @@ const surfaceColors: Swatch[] = [
     token: 'canvas-soft',
     hex: '#f7f7f8',
     swatch: 'bg-canvas-soft',
-    note: 'Faint gray: portal ground, inset panels, table headers.',
+    note: 'Faint gray: selected chips, inset panels, table headers, tab tracks.',
   },
 ]
 
@@ -138,7 +138,7 @@ const semanticColors: Swatch[] = [
 
 /** Theme-aware roles: these are what application code should reach for. */
 const roles: { role: string; swatch: string; light: string; dark: string }[] = [
-  { role: 'background', swatch: 'bg-background', light: 'canvas-soft', dark: 'ink' },
+  { role: 'background', swatch: 'bg-background', light: 'canvas', dark: 'ink' },
   { role: 'card', swatch: 'bg-card', light: 'canvas', dark: 'ink-deep' },
   { role: 'muted', swatch: 'bg-muted', light: 'canvas-soft', dark: 'ink-deep → ink' },
   { role: 'foreground', swatch: 'bg-foreground', light: 'ink', dark: 'canvas' },
@@ -317,7 +317,7 @@ export default function TokensPage() {
         id="colour"
         title="Raw palette"
         lead="The brand values themselves. These never change with the theme — the roles above are what shift."
-        className="bg-background"
+        className="bg-muted"
       >
         <div className="space-y-xl">
           <SwatchGrid title="Brand" items={brandColors} />
@@ -348,7 +348,7 @@ export default function TokensPage() {
         id="type-body"
         title="Body type"
         lead="The range the entire portal and field surface live in. `micro` is the labelling voice — table headers, form sections, stats."
-        className="bg-background"
+        className="bg-muted"
       >
         <ul className="space-y-md">
           {bodyType.map((item) => (
@@ -406,7 +406,7 @@ export default function TokensPage() {
         id="components"
         title="Components"
         lead="shadcn/ui primitives reading the roles: ink actions, tinted status chips, one hairline card idiom."
-        className="bg-background"
+        className="bg-muted"
       >
         <div className="space-y-xl">
           <div>
@@ -450,7 +450,7 @@ export default function TokensPage() {
               <Card surface="raised">
                 <p className="text-body-md-strong">raised</p>
                 <p className="mt-xs text-body-sm opacity-80">
-                  Hairline + shadow-card, for the gray ground.
+                  Hairline + shadow-card — a whisper of lift.
                 </p>
               </Card>
               <Card surface="inset">
@@ -480,7 +480,7 @@ export default function TokensPage() {
         id="backbone"
         title="Tabs, controls and placeholders"
         lead="The rest of the kit: segmented tabs, the form controls that join Input and Label, and the two ways a screen shows a person rather than a record."
-        className="bg-background"
+        className="bg-muted"
       >
         <div className="space-y-xl">
           <div>
