@@ -1,5 +1,12 @@
 import type { Metadata } from 'next'
 
+import {
+  AvatarDemo,
+  FormControlDemo,
+  OverlayDemos,
+  SkeletonDemo,
+  TabsDemo,
+} from '@/app/(public)/tokens/backbone-demos'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -456,6 +463,54 @@ export default function TokensPage() {
                   The promotional polarity flip — public only, at most twice a page.
                 </p>
               </Card>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        id="overlays"
+        title="Overlays"
+        lead="Elevation level 3 — the only place a real shadow appears. Open each in both themes and check the radius, the hairline, the shadow, and the scrim behind anything modal."
+      >
+        <OverlayDemos />
+      </Section>
+
+      <Section
+        id="backbone"
+        title="Tabs, controls and placeholders"
+        lead="The rest of the kit: segmented tabs, the form controls that join Input and Label, and the two ways a screen shows a person rather than a record."
+        className="bg-background"
+      >
+        <div className="space-y-xl">
+          <div>
+            <h3 className="micro-label text-muted-foreground">Tabs</h3>
+            <div className="mt-md">
+              <TabsDemo />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="micro-label text-muted-foreground">Checkbox &amp; textarea</h3>
+            <div className="mt-md">
+              <FormControlDemo />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="micro-label text-muted-foreground">Avatar</h3>
+            <div className="mt-md">
+              <AvatarDemo />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="micro-label text-muted-foreground">Skeleton</h3>
+            <p className="mt-xs max-w-[60ch] text-body-sm text-muted-foreground">
+              Shaped to match what is arriving. Static under prefers-reduced-motion.
+            </p>
+            <div className="mt-md">
+              <SkeletonDemo />
             </div>
           </div>
         </div>
