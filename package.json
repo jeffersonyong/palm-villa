@@ -19,7 +19,8 @@
     "test:unit": "vitest run --project unit",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
-    "db:reset": "supabase db reset"
+    "db:reset": "supabase db reset",
+    "db:bootstrap-admin": "node --env-file=.env.local scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "1.3.3",

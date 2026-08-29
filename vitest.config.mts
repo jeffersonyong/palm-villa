@@ -37,10 +37,16 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           // `lib/domain` plus the handful of pure functions that live beside
-          // the components consuming them (route matching, breadcrumbs). The
-          // components themselves are chrome over tested primitives and are
-          // verified on /tokens, not here.
-          include: ['lib/domain/**/*.test.ts', 'lib/utils.test.ts', 'components/**/*.test.ts'],
+          // the components consuming them (route matching, breadcrumbs), and
+          // lib/auth's pure permission logic. The components themselves are
+          // chrome over tested primitives and are verified on /tokens, not
+          // here.
+          include: [
+            'lib/domain/**/*.test.ts',
+            'lib/auth/**/*.test.ts',
+            'lib/utils.test.ts',
+            'components/**/*.test.ts',
+          ],
         },
       },
       {
