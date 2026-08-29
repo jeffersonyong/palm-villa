@@ -136,3 +136,7 @@ $function$;
 revoke execute on function create_walk_in_booking(
   uuid, uuid, text, date, date, text, text, text, integer, integer, integer, integer, jsonb, uuid
 ) from public, anon, authenticated;
+
+grant execute on function create_walk_in_booking(
+  uuid, uuid, text, date, date, text, text, text, integer, integer, integer, integer, jsonb, uuid
+) to service_role;

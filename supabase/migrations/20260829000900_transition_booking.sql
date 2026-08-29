@@ -65,3 +65,6 @@ $function$;
 
 revoke execute on function transition_booking(uuid, uuid, text, text, text, uuid)
   from public, anon, authenticated;
+
+grant execute on function transition_booking(uuid, uuid, text, text, text, uuid)
+  to service_role;

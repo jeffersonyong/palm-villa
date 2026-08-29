@@ -124,3 +124,6 @@ $function$;
 
 revoke execute on function available_units(uuid, date, date, text) from public, anon, authenticated;
 revoke execute on function count_available_units_by_type(uuid, date, date) from public, anon, authenticated;
+
+grant execute on function available_units(uuid, date, date, text) to service_role;
+grant execute on function count_available_units_by_type(uuid, date, date) to service_role;

@@ -31,3 +31,9 @@ as $function$
 $function$;
 
 revoke execute on function next_booking_reference() from public, anon, authenticated;
+
+-- Granted explicitly rather than left to inherited defaults: the revoke above
+-- drops the PUBLIC grant these functions would otherwise be reached through,
+-- and a silently unexecutable function surfaces as a permissions error from a
+-- screen rather than as a failed migration.
+grant execute on function next_booking_reference() to service_role;
