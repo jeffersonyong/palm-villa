@@ -208,6 +208,8 @@ any → out_of_service → available
 
 **[O]** Units of the same type are not interchangeable, because bed configuration differs. It is unconfirmed whether guests may choose or request a configuration, or whether it is assigned by staff.
 
+**[O]** The database seeds the 48 confirmed units only. The 2-bedroom **type** exists and prices correctly, with **zero units**, until N1 is answered — answering it is one `INSERT`. Unit references are provisional pending N10.
+
 ### 7.2 Facilities
 
 | Facility | Included in day pass |
@@ -305,6 +307,8 @@ Framed to the client as a **checkout timer**, not a reservation: the unit is hel
 
 **[C]** The deposit paid is forfeited on cancellation or no-show.
 **[O]** Ambiguous which deposit this refers to. The BND 100 security deposit is collected on arrival, so a no-show never pays it. This most likely means the prepayment. **The two must be named distinctly in the product** (for example "booking payment" and "security deposit") before the ambiguity propagates into the schema.
+
+**Partly addressed.** The naming demand is met: the schema names the refundable BND 100 `security_deposit_cents` and never a bare `deposit`, and the booking payment is a separate concept per the §6.2 entity list. **N5 itself remains open** — which of the two is forfeited is still unanswered, and no cancellation or forfeiture behaviour is built, so nothing yet depends on it.
 
 ---
 
@@ -507,6 +511,8 @@ Card gateway, automated statement matching, WhatsApp Business API, full tenancy 
 | N7 | Agreed hold duration for unpaid bookings? |
 | N8 | Total sofa beds available across the property? |
 | N9 | Can guests choose or request a bed configuration? |
+| N10 | How are units labelled on the doors? Nothing in this document records the building's real unit numbering, so the schema seeds a provisional scheme (`3B-01`) purely so units are distinguishable on screen. Staff will not recognise it. |
+| N11 | Which permission gates the check-in action? §4's canonical set has no string for it, so Security currently holds `booking.view` alone and cannot be granted check-in without one being defined. |
 
 ### Non-blocking, configurable later
 

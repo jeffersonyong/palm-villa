@@ -3,13 +3,25 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 /**
- * Test configuration for the domain layer.
+ * Two suites, one command.
  *
- * `lib/domain` is pure — no database, no React, no network — so the default
- * node environment is enough and no framework plugin is needed. The `@/` alias
- * is declared here rather than pulled from tsconfig via a plugin, which keeps
- * the dependency count at one (architecture.md §1: the approved stack is small
- * on purpose).
+ * `unit` covers `lib/domain` — pure functions, no database, no React, no
+ * network. architecture.md §2 makes coverage there mandatory rather than
+ * pragmatic, and it stays fast because nothing in it can be slow.
+ *
+ * `integration` covers `lib/db` against the real local Postgres. It cannot be
+ * mocked: the thing it exists to prove is that the *database* refuses a second
+ * booking over the same unit and dates (capability G1), and a mock would only
+ * confirm that the mock agrees with itself.
+ *
+ * `npm run test` runs both, and the integration suite fails loudly when the
+ * stack is down rather than skipping — see lib/db/test/setup.ts. A green run
+ * has to mean G1 was actually checked, or the guarantee quietly stops being
+ * one. `npm run test:unit` is the fast subset for domain work.
+ *
+ * The `@/` alias is declared here rather than pulled from tsconfig via a
+ * plugin, which keeps the dependency count at one (architecture.md §1: the
+ * approved stack is small on purpose).
  */
 export default defineConfig({
   resolve: {
@@ -18,7 +30,30 @@ export default defineConfig({
     },
   },
   test: {
-    environment: 'node',
-    include: ['lib/**/*.test.ts'],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          environment: 'node',
+          include: ['lib/domain/**/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'integration',
+          environment: 'node',
+          include: ['lib/db/**/*.test.ts'],
+          setupFiles: ['./lib/db/test/setup.ts'],
+          // One database, one set of seeded units. Test files running in
+          // parallel would clear each other's bookings between assertions.
+          fileParallelism: false,
+          // The G1 test deliberately contends for a row lock, and a losing
+          // racer waits for the winner to commit.
+          testTimeout: 20_000,
+        },
+      },
+    ],
   },
 })

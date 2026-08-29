@@ -58,6 +58,7 @@ supabase/
 **Rendering and data rules:**
 
 - All database access is **server-side** (server components, server actions, route handlers). The browser never holds a Supabase client with data access.
+- **Two Supabase clients, one purpose each.** `lib/supabase/server.ts` is the *session* client: cookie-backed via `@supabase/ssr`, tied to a request, and used for auth. `lib/supabase/data.ts` is the *data* client that `lib/db` uses — no cookies, service-role key, memoised per process — because the query layer also runs in server components and in Vitest, where there is no request to read cookies from. It refuses to load in a browser. Authorisation for those queries is `requirePermission(...)` in the server layer (§4), not RLS.
 - Mutations are server actions. Every mutation passes through the permission check helper before touching `lib/db`.
 - The pricing engine and booking state machine are **pure functions** in `lib/domain`, unit-testable without a database. These two modules carry most of the correctness risk in the product and are the only parts where test coverage is treated as mandatory rather than pragmatic.
 
@@ -99,6 +100,9 @@ The PRD's entity list (§6.2) is the conceptual model. Normative implementation 
 - Primary keys are uuids. Human-facing references (`PV-4821`) are separate, unique, indexed columns.
 - **Money is stored as integer cents** (BND). Never floats.
 - Timestamps are `timestamptz` in UTC. Stay dates are `date` interpreted in the property's timezone (`Asia/Brunei`, UTC+8, no DST).
+- Property-scoped tables also carry `unique (property_id, id)`, so children reference them with a **composite foreign key**. A row can then never point at a parent in another property — the data-layer half of §11, at the cost of one extra index.
+- `vehicle_registration` is on the **booking**, not an array on the guest as the PRD §6.2 sketch has it: Security checks the vehicle that arrived for *this* stay, and the same guest returning in a different car is a different fact.
+- `unit.status` (the PRD §6.4 lifecycle) is **not yet modelled**. Nothing built writes or reads it and most of it is derivable from occupancy; an unread status column that availability silently ignores is worse than none. It lands with the housekeeping and inspection slice, which needs the one part that is not derivable (`out_of_service`).
 
 ### 5.2 Double-booking prevention (structural)
 
@@ -117,11 +121,17 @@ alter table occupancy add constraint no_overlapping_occupancy
 
 Half-open ranges `[)` make back-to-back bookings (checkout day = next check-in day) legal by construction. A `held` occupancy participates in the constraint (a held unit is unavailable) and is released by hold expiry (§6.3).
 
+`occupancy.status` mirrors `booking.status`, maintained by an `after update` trigger on the booking and by nothing else. The constraint's `where` clause needs the status on the occupancy row, and two hand-maintained copies would drift; the booking stays the single writer. Availability reads (`available_units()`) apply the identical half-open predicate, so the list a screen renders and the write it then attempts cannot disagree at the boundary.
+
+The constraint is covered by `lib/db/no-double-booking.test.ts`, which fires eight simultaneous bookings at one unit and asserts exactly one wins. That file documents how to watch it fail with the constraint dropped — a concurrency test nobody has seen fail is not evidence.
+
 Day passes have no unit; capacity is enforced by a transactional check against the configured facility headroom for the date, with the booking insert and the count in one transaction.
 
 ### 5.3 Booking state machine
 
 States per PRD §9.2: `draft → held → awaiting_payment_verification → confirmed → checked_in → completed`, with exits to `expired`, `cancelled`, `no_show`. Transitions are implemented as a single function in `lib/domain` that validates legality; no code path sets `status` directly. Every transition writes an audit event.
+
+Legality is decided in TypeScript by `transition()`; persistence is `transition_booking()`, which makes the status write and its audit event atomic and updates `where status = <the status the caller read>`. Zero rows updated means the booking moved underneath the caller — two staff members acting on it at once — which is returned as a message, not a lost write. The booking write path (`create_walk_in_booking()`) is passed the status the state machine already derived; the schema never chooses one.
 
 ### 5.4 Rent periods
 
@@ -185,7 +195,8 @@ Resend, transactional only: booking created (payment instructions + deadline), b
 | Preview | Vercel preview per PR, pointed at a **dev** Supabase project. |
 | Production | Vercel production + **prod** Supabase project. Two Supabase projects total. |
 
-- Migrations are SQL files in `supabase/migrations/`, committed, applied via CLI. No dashboard-only schema changes.
+- Migrations are SQL files in `supabase/migrations/`, committed, applied via CLI (`npm run db:start`, `npm run db:reset`). The Supabase CLI is a pinned devDependency so every machine replays them with the same version. No dashboard-only schema changes.
+- `npm run test` runs both suites: `unit` (pure `lib/domain`) and `integration` (`lib/db` against the local stack). The integration suite **fails loudly when the stack is down rather than skipping**, so a green run always means capability G1 was checked.
 - Secrets live in Vercel env vars and Supabase config; nothing secret in the repository.
 - Backups: Supabase automated daily backups; restore procedure tested once before go-live and documented in the repo.
 - Observability: Vercel logs plus Sentry (free tier) for error reporting. A 24/7 booking system with a solo maintainer needs errors to announce themselves.

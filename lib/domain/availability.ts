@@ -11,14 +11,16 @@ import { nightsBetween, type StayDate } from './dates'
  * occupancy range — and explicitly not by application logic. That constraint is
  * capability G1 in scope-of-capabilities.md, promised to the client in writing.
  *
- * What lives here is the *query* side: deciding what to show as available, and
- * checking a candidate range before attempting a write so the guest gets a
- * sentence rather than a constraint violation. Both are conveniences layered on
- * top of the real control. When two staff members submit at the same instant,
- * the database is what refuses the second one — not this file.
+ * What lives here is the *query* side: the half-open range semantics, and
+ * deciding what to show as available. That is a convenience layered on top of
+ * the real control. When two staff members submit at the same instant, the
+ * database is what refuses the second one — not this file.
  *
- * Until the schema slice lands there is no database, so nothing is currently
- * enforcing G1 at all. See lib/db/fixtures.ts.
+ * The constraint exists as of the schema slice, in
+ * supabase/migrations/20260829000200_bookings_and_occupancy.sql, and
+ * lib/db/no-double-booking.test.ts is the proof. The ranges here are half-open
+ * to match it exactly, so the availability list and the write agree at the
+ * boundary rather than offering a unit the database then refuses.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
