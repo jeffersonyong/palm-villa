@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Menu } from 'lucide-react'
 
-import { PortalAccount } from '@/components/portal/portal-account'
+import { PortalAccount, type PortalAccountUser } from '@/components/portal/portal-account'
 import { PortalNav, PortalNavFooterLinks } from '@/components/portal/portal-nav'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
@@ -20,7 +20,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
  * component instead of two. Keyboard activation fires a click too, so Enter on
  * a link closes the drawer the same way a tap does.
  */
-export function PortalMobileNav() {
+export function PortalMobileNav({ account }: { account: PortalAccountUser | null }) {
   const [isOpen, setIsOpen] = useState(false)
 
   function closeIfNavigating(event: React.MouseEvent<HTMLDivElement>) {
@@ -50,7 +50,7 @@ export function PortalMobileNav() {
           <PortalNav />
 
           <div className="mt-auto border-t border-divider px-md pt-md pb-lg">
-            <PortalAccount />
+            {account ? <PortalAccount user={account} /> : null}
             <PortalNavFooterLinks />
           </div>
         </div>

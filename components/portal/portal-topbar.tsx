@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { Bell, ChevronRight } from 'lucide-react'
 
 import { PortalMobileNav } from '@/components/portal/portal-mobile-nav'
+import type { PortalAccountUser } from '@/components/portal/portal-account'
 import { breadcrumbTrail } from '@/components/portal/portal-routes'
 import { PortalSearch } from '@/components/portal/portal-search'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -19,7 +20,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
  * construction, continued across the top. It never carries the page title:
  * that stays the screen's single `h1` below it (design.md §Components).
  */
-export function PortalTopbar() {
+export function PortalTopbar({ account }: { account: PortalAccountUser | null }) {
   const pathname = usePathname()
   const crumbs = breadcrumbTrail(pathname)
 
@@ -28,7 +29,7 @@ export function PortalTopbar() {
     // the search bar reads as suffocated.
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-lg border-b border-divider bg-background px-lg lg:px-xl">
       <div className="flex min-w-0 items-center gap-sm">
-        <PortalMobileNav />
+        <PortalMobileNav account={account} />
 
         <nav aria-label="Breadcrumb" className="min-w-0">
           <ol className="flex items-center gap-xs text-body-sm">
