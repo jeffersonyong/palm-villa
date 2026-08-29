@@ -16,8 +16,7 @@ import {
   TableHeaderRow,
   TableRow,
 } from '@/components/ui/table'
-import { getDailySnapshot } from '@/lib/db/bookings'
-import type { BookingFixture } from '@/lib/db/fixtures'
+import { getDailySnapshot, type Booking } from '@/lib/db/bookings'
 import { formatStayDate, todayInBrunei } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 
@@ -33,7 +32,7 @@ export const metadata: Metadata = {
  * who is arriving, who is leaving, and what is waiting on money. Anything that
  * does not save him time on day one belongs on another screen.
  *
- * Rendered per request: the data is fixture-backed and anchored to today, so
+ * Rendered per request: the data is read live and anchored to today, so
  * prerendering it at build time would freeze the date into the output.
  */
 export const dynamic = 'force-dynamic'
@@ -108,7 +107,7 @@ function SectionHeading({ id, title, note }: { id: string; title: string; note: 
   )
 }
 
-function ArrivalsSection({ bookings }: { bookings: readonly BookingFixture[] }) {
+function ArrivalsSection({ bookings }: { bookings: readonly Booking[] }) {
   return (
     <section aria-labelledby="arrivals-heading" className="mt-xl">
       <SectionHeading
@@ -163,7 +162,7 @@ function ArrivalsSection({ bookings }: { bookings: readonly BookingFixture[] }) 
   )
 }
 
-function DeparturesSection({ bookings }: { bookings: readonly BookingFixture[] }) {
+function DeparturesSection({ bookings }: { bookings: readonly Booking[] }) {
   return (
     <section aria-labelledby="departures-heading" className="mt-xl">
       <SectionHeading
