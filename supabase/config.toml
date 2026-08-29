@@ -172,7 +172,10 @@ enable_refresh_token_rotation = true
 # Requires enable_refresh_token_rotation = true.
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
-enable_signup = true
+# Disabled: staff accounts are created by an Admin via the service-role admin
+# API, which bypasses this flag; there is no self-registration
+# (architecture.md §3). signInWithPassword is unaffected.
+enable_signup = false
 # Allow/disallow anonymous sign-ins to your project.
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
