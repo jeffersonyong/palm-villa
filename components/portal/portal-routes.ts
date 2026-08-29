@@ -93,10 +93,15 @@ const allHrefs = navGroups.flatMap((group) => group.items.map((item) => item.hre
  * A plain `startsWith` would light up both "All bookings" and "New booking" on
  * `/portal/bookings/new`; matching the longest wins picks the specific one. The
  * portal root only ever matches exactly, since every route is beneath it.
+ *
+ * The match is on whole segments: a bare `startsWith` would also treat
+ * `/portal/bookings-report` as a child of `/portal/bookings` and light up the
+ * wrong item.
  */
 export function activeHref(pathname: string): string | null {
   return allHrefs.reduce<string | null>((best, href) => {
-    const matches = href === '/portal' ? pathname === href : pathname.startsWith(href)
+    const matches =
+      href === '/portal' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
 
     if (!matches) return best
 

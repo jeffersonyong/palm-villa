@@ -38,7 +38,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 /**
  * The interactive half of the proof sheet. A client component because every
@@ -162,14 +162,22 @@ export function OverlayDemos() {
 
       <Row
         title="Tooltip"
-        note="The small-overlay exception: control radius on the invert surface, because a 14px corner on a caption chip reads as a pill."
+        note="The small-overlay exception: control radius on the invert surface, because a 14px corner on a caption chip reads as a pill. One TooltipProvider wraps the surface — never one per tooltip."
       >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="tertiary">Hover or focus me</Button>
-          </TooltipTrigger>
-          <TooltipContent>Deposits are released after inspection</TooltipContent>
-        </Tooltip>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="tertiary">Hover or focus me</Button>
+            </TooltipTrigger>
+            <TooltipContent>Deposits are released after inspection</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="tertiary">And me, without the delay</Button>
+            </TooltipTrigger>
+            <TooltipContent>Moving between neighbours skips the open delay</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </Row>
     </div>
   )

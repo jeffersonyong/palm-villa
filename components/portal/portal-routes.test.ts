@@ -16,6 +16,11 @@ describe('activeHref', () => {
     expect(activeHref('/portal/bookings/abc123')).toBe('/portal/bookings')
   })
 
+  test('matches whole segments, so a sibling sharing a prefix does not match', () => {
+    expect(activeHref('/portal/bookings-report')).toBeNull()
+    expect(activeHref('/portal/payments-history')).toBeNull()
+  })
+
   test('matches the portal root only exactly, since every route is beneath it', () => {
     expect(activeHref('/portal')).toBe('/portal')
     expect(activeHref('/portal/reports')).toBe('/portal/reports')

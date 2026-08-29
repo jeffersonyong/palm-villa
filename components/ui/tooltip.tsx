@@ -12,7 +12,12 @@ import { cn } from '@/lib/utils'
  * the polarity-flip surface instead of white-on-white. It is a label, not a
  * panel — no border, no padding beyond a chip's.
  *
- * The provider is folded into `Tooltip` so callers never need an app-level one.
+ * `TooltipProvider` is mounted once per surface rather than folded into each
+ * `Tooltip`: the skip-delay state that lets a pointer move between neighbouring
+ * tooltips without re-paying the open delay lives in the provider's context, so
+ * a provider per tooltip would isolate it and make every one of a toolbar's
+ * icons wait the full delay again. Radix errors clearly if a `Tooltip` is used
+ * without one in scope.
  */
 function TooltipProvider({
   delayDuration = 200,
@@ -28,11 +33,7 @@ function TooltipProvider({
 }
 
 function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return (
-    <TooltipProvider>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-    </TooltipProvider>
-  )
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 
 function TooltipTrigger({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
