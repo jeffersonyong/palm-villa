@@ -433,6 +433,10 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **QR block.** White card, centred QR ≥ 200px with default quiet zone, booking reference in `display-sm` beneath, guidance in `body-sm`.
 
+**Portal topbar.** 48px tall, filled with the page ground and separated by a bottom hairline — the sidebar's construction continued across the top. Breadcrumbs sit left in `body-sm` mute with chevron separators, the current crumb in ink at 500; the tools that belong to no single screen (search, notifications, theme) sit right. It is sticky, and it **never carries the page title** — that stays the screen's single `h1` beneath it. Below `lg` it also holds the drawer trigger.
+
+**Portal nav items.** Every item pairs a 16px icon with its label. Icons render in `mute` and lift to ink with the active chip — they follow the item's state, they never carry the brand hue, and they never appear without a label in the sidebar. Group headers stay `micro` in mute.
+
 **Overlays (dialogs, popovers, menus).** One shell: `{rounded.xl}` 14px, hairline, `shadow-overlay`, over the `scrim`. A dialog title is `display-xs` in Inter — a modal heading is a section heading, so the display face stays off it. Its footer holds at most one primary fill, like any other screen region. Menu items are *controls* inside that shell: `{rounded.md}` 6px, `body-sm`, 16px icons in mute, `muted` fill on focus. Menu group labels are `micro`, same as every other data-region label.
 
 **Drawers.** The mobile portal nav is a left drawer, 280px, sliding over the scrim, closing on navigation. It fills with the page ground rather than card white, so the nav's active white chip still reads against it. Edge-anchored, so no radius.
@@ -468,4 +472,5 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 - Don't let bolded body text do a label's job; if it names a data region, it is `micro`.
 - Don't let any type above `display-sm` into the portal.
 - Don't render buttons or cards as pills — badges and avatars are the only round things.
+- Don't size anything with `max-w-lg` / `w-xl` and friends: the named spacing scale owns those suffixes here, so `max-w-lg` is 16px, not a container width. Widths are explicit (`max-w-[480px]`).
 - Don't answer "where am I" with the action colour; selected nav items and active tabs are a white chip on the gray ground.
