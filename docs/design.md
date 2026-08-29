@@ -437,6 +437,16 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **Drawers.** The mobile portal nav is a left drawer, 280px, sliding over the scrim, closing on navigation. It fills with the page ground rather than card white, so the nav's active white chip still reads against it. Edge-anchored, so no radius.
 
+**Tabs — a segmented control, not underlines.** A `muted` track at `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a white card chip with `shadow-card` at `{rounded.sm}` (concentric inside the track). Labels `body-sm`, ink and 500 when active. This is deliberately the same construction as the sidebar's active item: *where am I* is answered with a surface, never with the action colour. No underline tabs, no pill tabs.
+
+**Checkboxes.** 16px, `{rounded.sm}` 4px (6px reads as a circle at that size), hairline on white; checked fills with the action colour. Small enough that the fill does not count against the one-primary-per-region rule.
+
+**Textareas.** The input treatment at multiple lines — same hairline, radius, type and focus — sized to their content rather than fixed.
+
+**Avatars.** Circular, 32px by default, `muted` fill with initials at `caption`/500. The sanctioned exception to "pills are badges only", which concerns rectangles becoming pills, not identity marks. Never a brand fill — an avatar identifies a person, it is not an accent.
+
+**Skeletons.** `muted` at the control radius, shaped to match the content arriving, pulsing gently and static under reduced motion. Never a shimmer sweep: that is decoration, and it does not survive the theme flip cleanly.
+
 ## Do's and Don'ts
 
 ### Do
@@ -457,4 +467,5 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 - Don't use shadows for emphasis — `shadow-card` is separation, overlays are the only real shadow.
 - Don't let bolded body text do a label's job; if it names a data region, it is `micro`.
 - Don't let any type above `display-sm` into the portal.
-- Don't render buttons or cards as pills.
+- Don't render buttons or cards as pills — badges and avatars are the only round things.
+- Don't answer "where am I" with the action colour; selected nav items and active tabs are a white chip on the gray ground.
