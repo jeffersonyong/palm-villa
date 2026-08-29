@@ -23,8 +23,15 @@ import { cn } from '@/lib/utils'
 const linkClasses =
   'flex items-center gap-sm rounded-md px-md py-1.5 text-body-sm transition-colors [&_svg]:size-4 [&_svg]:shrink-0'
 const activeClasses = 'bg-muted font-medium text-foreground [&_svg]:text-foreground'
+
+/**
+ * Idle items step down to `muted-foreground` in dark. `copy` is the right
+ * distance below `foreground` in light (#45494f against #131417) but not in
+ * dark, where the two are 3% apart (#f7f7f8 against #ffffff) and idle items
+ * would read as bright as the selected one.
+ */
 const idleClasses =
-  'text-copy hover:bg-muted/60 hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground'
+  'text-copy dark:text-muted-foreground hover:bg-muted/60 hover:text-foreground dark:hover:text-foreground [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground'
 
 export function PortalNav() {
   const pathname = usePathname()
@@ -37,11 +44,12 @@ export function PortalNav() {
       <div className="flex flex-col gap-md">
         {navGroups.map((group) => (
           <div key={group.label}>
-            {/* Group headers sit in `copy`, a step above the `mute` that labels
-                table headers and stats: here the label is doing structural
-                work, splitting the nav into readable blocks. It stops short of
-                `foreground` so it never out-weighs the active item. */}
-            <p className="px-md pb-xs micro-label text-copy">{group.label}</p>
+            {/* Group headers take full `foreground` — the one place the
+                labelling voice does, because here it segments the nav rather
+                than naming a column. At 11px uppercase against 13px items it
+                stays a label, and the active item is distinguished by its
+                chip and weight rather than by being the darkest thing. */}
+            <p className="px-md pb-xs micro-label text-foreground">{group.label}</p>
             <ul className="space-y-xxs">
               {group.items.map((item) => (
                 <li key={item.href}>
