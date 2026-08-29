@@ -44,10 +44,14 @@ export function PortalNav() {
       <div className="flex flex-col gap-md">
         {navGroups.map((group) => (
           <div key={group.label}>
-            {/* Group headers stay `mute`, like every other micro label. The
-                uppercase 11px against 13px items is what separates them; they
-                organise the nav rather than competing with it. */}
-            <p className="px-md pb-xs micro-label text-muted-foreground">{group.label}</p>
+            {/* Group headers sit one step below the items they label, so they
+                organise the nav rather than competing with it. Light gets that
+                for free (`mute` under the items' `copy`); dark needs the alpha,
+                because there both roles would otherwise resolve to the same
+                muted value. */}
+            <p className="px-md pb-xs micro-label text-muted-foreground dark:text-muted-foreground/75">
+              {group.label}
+            </p>
             <ul className="space-y-xxs">
               {group.items.map((item) => (
                 <li key={item.href}>
