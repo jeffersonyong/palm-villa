@@ -9,6 +9,28 @@ export const THEME_STORAGE_KEY = 'pv-theme'
 export type ThemePreference = 'light' | 'dark'
 
 /**
+ * Browser chrome colours, mirroring `canvas-soft` / `ink` (design.md). The
+ * `themeColor` viewport export cannot vary by `data-theme`, so the two places
+ * that set the theme also rewrite the meta tag.
+ */
+const THEME_COLOR: Record<ThemePreference, string> = {
+  light: '#f7f7f8',
+  dark: '#131417',
+}
+
+function applyThemeColorMeta(preference: ThemePreference): void {
+  let meta = document.querySelector('meta[name="theme-color"]')
+
+  if (!meta) {
+    meta = document.createElement('meta')
+    meta.setAttribute('name', 'theme-color')
+    document.head.appendChild(meta)
+  }
+
+  meta.setAttribute('content', THEME_COLOR[preference])
+}
+
+/**
  * Applies the stored theme before first paint.
  *
  * Inlined into <head> as a blocking script: without it, a reader who chose dark
@@ -22,6 +44,15 @@ export const themeInitScript = `
     var stored = localStorage.getItem('${THEME_STORAGE_KEY}');
     if (stored === 'light' || stored === 'dark') {
       document.documentElement.setAttribute('data-theme', stored);
+      // The meta tag may not be parsed yet at this point in <head>; create it
+      // if needed so the chrome never reads the wrong ground.
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'theme-color');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', stored === 'dark' ? '${THEME_COLOR.dark}' : '${THEME_COLOR.light}');
     }
   } catch (e) {}
 })();
@@ -90,6 +121,8 @@ export function setThemePreference(preference: ThemePreference): void {
     // Persisting failed; still apply for this page view.
     root.setAttribute('data-theme', preference)
   }
+
+  applyThemeColorMeta(preference)
 
   cached = preference
   for (const listener of listeners) listener()

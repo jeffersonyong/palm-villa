@@ -37,10 +37,10 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f7f7f8' },
-    { media: '(prefers-color-scheme: dark)', color: '#131417' },
-  ],
+  /* The light default. Theming ignores the OS preference (globals.css), so the
+     browser chrome must too — lib/theme.ts rewrites this meta when the reader's
+     explicit choice is dark. */
+  themeColor: '#f7f7f8',
   width: 'device-width',
   initialScale: 1,
 }
