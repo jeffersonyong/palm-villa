@@ -41,6 +41,14 @@ function applyThemeColorMeta(preference: ThemePreference): void {
 export const themeInitScript = `
 (function () {
   try {
+    // The portal's monochrome register (design.md — two accents, one system)
+    // is keyed off <html> so overlays portaled into <body> inherit it too.
+    // Set from the pathname here so the first paint is already monochrome;
+    // PortalSurface keeps it in sync across client-side navigation.
+    var path = location.pathname;
+    if (path === '/portal' || path.indexOf('/portal/') === 0) {
+      document.documentElement.setAttribute('data-surface', 'portal');
+    }
     var stored = localStorage.getItem('${THEME_STORAGE_KEY}');
     if (stored === 'light' || stored === 'dark') {
       document.documentElement.setAttribute('data-theme', stored);

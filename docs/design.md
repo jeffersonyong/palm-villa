@@ -1,7 +1,7 @@
 ---
 version: 1.0
 name: Palm-Villa-design-system
-description: Design language for the Palm Villa booking platform — quiet-utility minimalism. A white ground structured by hairlines and faint gray panels, deep lagoon teal as the action colour (vivid aqua in dark), an Inter type scale tightened around 14px body and 11px uppercase micro-labels with Fraunces 600 reserved for display headlines, small radii, dense-but-breathing spacing, and the lagoon hue otherwise spent as a text-first brand accent. Semantic colour carries status meaning only.
+description: Design language for the Palm Villa booking platform — quiet-utility minimalism. A white ground structured by hairlines and faint gray panels; deep lagoon teal as the public surface's action colour (vivid aqua in dark) while the staff portal runs monochrome (ink/white actions); an Inter type scale tightened around 14px body and 11px uppercase micro-labels with Fraunces 600 reserved for display headlines, small radii, dense-but-breathing spacing, and the lagoon hue otherwise spent as a text-first brand accent. Semantic colour carries status meaning only, on every surface.
 colors:
   brand: "#2fc9c0"
   brand-deep: "#0e6b64"
@@ -327,11 +327,29 @@ themes:
     badge-negative-foreground: "{colors.canvas-soft}"
     badge-active: "mix({colors.brand} 24%, {colors.ink-deep})"
     badge-active-foreground: "{colors.brand-active}"
+  # The portal (staff surface) is monochrome — these override the maps above
+  # inside `[data-surface="portal"]`; everything not listed inherits, and the
+  # semantic status colours are deliberately unchanged.
+  portal:
+    light:
+      primary: "{colors.ink}"
+      primary-foreground: "{colors.canvas}"
+      primary-hover: "mix({colors.ink} 82%, {colors.canvas})"
+      ring: "{colors.ink}"
+      accent: "{colors.canvas-soft}"
+      accent-foreground: "{colors.ink}"
+    dark:
+      primary: "{colors.canvas}"
+      primary-foreground: "{colors.ink}"
+      primary-hover: "{colors.canvas-soft}"
+      ring: "{colors.canvas}"
+      accent: "mix({colors.canvas} 12%, {colors.ink-deep})"
+      accent-foreground: "{colors.canvas}"
 ---
 
 # Palm Villa Design System
 
-**Quiet-utility minimalism.** The reference class is modern product software — tight tables, hairline structure, decisive solid actions, tiny uppercase labels — applied to a place with a pool. The page is white and calm; structure comes from 1px hairlines and faint gray panels, not from coloured bands. The action colour is **deep lagoon teal**: every primary button is a `{colors.brand-deep}` fill with white text in light (the vivid `{colors.brand}` with ink text in dark) — one striking, saturated solid per screen region, which is what makes the page read as decisive *and* branded rather than another near-black B2B surface. Elsewhere the lagoon hue stays text-first — eyebrows, key price lines, the logo moment, the checked-in badge — and it never fills a band or a card. Type is Inter, tightened around a 14px body with 11px uppercase micro-labels doing the labelling work — with **Fraunces 600 as the display face** (public display headlines, plus each portal screen's `h1`), the one place the system spends personality in type. Radii are small (6px controls, 10px cards). Semantic colour means status and nothing else.
+**Quiet-utility minimalism.** The reference class is modern product software — tight tables, hairline structure, decisive solid actions, tiny uppercase labels — applied to a place with a pool. The page is white and calm; structure comes from 1px hairlines and faint gray panels, not from coloured bands. On the public surface the action colour is **deep lagoon teal**: every primary button is a `{colors.brand-deep}` fill with white text in light (the vivid `{colors.brand}` with ink text in dark) — one striking, saturated solid per screen region, which is what makes the booking site read as decisive *and* branded. The **portal runs monochrome** — ink actions in light, white in dark — because the staff tool is its own product and earns its premium feel from restraint rather than brand colour. Elsewhere the lagoon hue stays text-first — eyebrows, key price lines, the logo moment, the checked-in badge — and it never fills a band or a card. Type is Inter, tightened around a 14px body with 11px uppercase micro-labels doing the labelling work — with **Fraunces 600 as the display face** (public display headlines, plus each portal screen's `h1`), the one place the system spends personality in type. Radii are small (6px controls, 10px cards). Semantic colour means status and nothing else.
 
 > **Superseded direction (2026-08-27, v1.0).** The beta direction used aqua-filled primary CTAs, alternating gray/white/pale-aqua/dark marketing bands, 15px body type, 8/12px radii and aqua focus glows. Reviewed against modern product references and recut: too soft, too coloured, too template. Nothing survives except the neutral-base principle, the aqua hue (demoted to brand accent), the semantic status pairs, the Fraunces public display face (dropped in the first recut pass, deliberately reinstated 2026-08-28 — see §Typography), and the theming architecture. An earlier alpha (warm sand, Manrope 800, pills) is two generations gone.
 
@@ -340,7 +358,8 @@ The same tokens serve all three surfaces. The public site gets slightly more air
 ## Color
 
 ### Roles
-- **Lagoon is the action colour.** `primary` resolves to `{colors.brand-deep}` in light and vivid `{colors.brand}` in dark: filled buttons, the selected state, the focus ring. A screen region has at most one filled-primary button. On locally dark surfaces (the promo card, the closing band) the `primary-invert` roles carry the same construction with the polarity swapped.
+- **Lagoon is the action colour — on the public surface.** `primary` resolves to `{colors.brand-deep}` in light and vivid `{colors.brand}` in dark: filled buttons, the selected state, the focus ring. A screen region has at most one filled-primary button. On locally dark surfaces (the promo card, the closing band) the `primary-invert` roles carry the same construction with the polarity swapped.
+- **Two accents, one system.** The public site and the customer booking flow carry the lagoon accent — that is the brand's pop of personality. The **portal is its own product and is monochrome**: `primary` is ink in light and white in dark, the focus ring and selection follow, and nothing on the surface is teal. Only the action roles flip (`primary`, `primary-hover`, `ring`, `accent`); every structural role and every **semantic status colour is identical on both surfaces** — status is meaning, not brand, so the checked-in chip keeps its aqua pair even inside the portal. Implemented as `data-surface="portal"` on `<html>` — the same mechanism as `data-theme`, so overlays portaled into `<body>` inherit it; the frontmatter `themes.portal` block records the values.
 - **Beyond the primary fill, the lagoon hue is text-first.** `{colors.brand-deep}` doubles as the readable brand text: the hero eyebrow, a key price line. Raw `{colors.brand}` outside dark-ground fills is reserved for small graphic moments (the logo dot, the checked-in badge hue) — never bands, never body text (it fails contrast on white).
 - `{colors.canvas}` white is the working surface **and the page ground** — the portal sits on white, not gray. `{colors.canvas-soft}` is the faint gray spent on *selected and hover chips, inset panels, table header strips and tab tracks* — the small surfaces, never the ground. The two are close on purpose — the seam between them is always drawn with a hairline, not carried by the fill.
 - `{colors.ink}` carries headings and the dark surfaces (footer, the two public dark moments); it never fills a button.
@@ -417,7 +436,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 ## Components
 
-**Buttons.** `primary` (deep lagoon fill, white text — vivid aqua fill, ink text in dark), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour.
+**Buttons.** `primary` (the action colour: lagoon on the public surface, ink/white on the portal — see *Two accents, one system*), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour.
 
 **Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline, no shadow. `card-inset` is the faint gray panel *inside* a card (fine print, deposit notes, grouped stats) at `{rounded.md}`. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment. Interactive cards signal hover by strengthening the hairline and a 1px lift, never a shadow.
 
@@ -464,7 +483,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 ### Don't
 - Don't fill bands, cards or any surface larger than a button with the lagoon hue — the primary button (and the badge chip) are its only fills.
-- Don't fill a button with ink; ink is text and the dark surfaces, and a black button reads as someone else's brand.
+- Don't fill a button with ink **on the public surface**; there, ink is text and the dark surfaces, and a black button reads as someone else's brand. The portal is the deliberate exception — its whole register is monochrome, so ink (white in dark) *is* its primary.
 - Don't use aqua as a success state; success is the `positive` pair.
 - Don't let Fraunces off display headlines — public `display-md`+ and the portal's `h1` page title only; never on the field surface, never for body or UI text. And no third family, anywhere.
 - Don't build coloured band alternation; sections separate with hairlines on white.
