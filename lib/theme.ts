@@ -9,6 +9,28 @@ export const THEME_STORAGE_KEY = 'pv-theme'
 export type ThemePreference = 'light' | 'dark'
 
 /**
+ * Browser chrome colours, mirroring the page ground — `canvas` / `ink`
+ * (design.md). The `themeColor` viewport export cannot vary by `data-theme`,
+ * so the two places that set the theme also rewrite the meta tag.
+ */
+const THEME_COLOR: Record<ThemePreference, string> = {
+  light: '#ffffff',
+  dark: '#131417',
+}
+
+function applyThemeColorMeta(preference: ThemePreference): void {
+  let meta = document.querySelector('meta[name="theme-color"]')
+
+  if (!meta) {
+    meta = document.createElement('meta')
+    meta.setAttribute('name', 'theme-color')
+    document.head.appendChild(meta)
+  }
+
+  meta.setAttribute('content', THEME_COLOR[preference])
+}
+
+/**
  * Applies the stored theme before first paint.
  *
  * Inlined into <head> as a blocking script: without it, a reader who chose dark
@@ -19,9 +41,34 @@ export type ThemePreference = 'light' | 'dark'
 export const themeInitScript = `
 (function () {
   try {
+    // The monochrome operations register (design.md — two accents, one
+    // system) is keyed off <html> so overlays portaled into <body> inherit it
+    // too. Set from the pathname here so the first paint is already
+    // monochrome; OperationsSurface keeps it in sync across client-side
+    // navigation. Matches whole segments so a future /portal-status route
+    // does not get swept in.
+    var path = location.pathname;
+    var isOps = ['/portal', '/field'].some(function (root) {
+      return path === root || path.indexOf(root + '/') === 0;
+    });
+    if (isOps) {
+      document.documentElement.setAttribute('data-surface', 'ops');
+    }
     var stored = localStorage.getItem('${THEME_STORAGE_KEY}');
     if (stored === 'light' || stored === 'dark') {
       document.documentElement.setAttribute('data-theme', stored);
+      // The meta tag may not be parsed yet at this point in <head>; create it
+      // if needed so the chrome never reads the wrong ground.
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'theme-color');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute(
+        'content',
+        stored === 'dark' ? '${THEME_COLOR.dark}' : '${THEME_COLOR.light}'
+      );
     }
   } catch (e) {}
 })();
@@ -90,6 +137,8 @@ export function setThemePreference(preference: ThemePreference): void {
     // Persisting failed; still apply for this page view.
     root.setAttribute('data-theme', preference)
   }
+
+  applyThemeColorMeta(preference)
 
   cached = preference
   for (const listener of listeners) listener()

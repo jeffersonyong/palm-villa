@@ -79,7 +79,7 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
         }
       />
 
-      <Card surface="raised" className="mt-xl">
+      <Card className="mt-xl">
         <form method="get" className="flex flex-wrap items-end gap-lg">
           <div className="grid gap-sm">
             <Label htmlFor="status">Status</Label>

@@ -49,7 +49,7 @@ export default function DayPassPage() {
             What it costs
           </h2>
 
-          <Card surface="raised" className="mt-lg max-w-[560px]">
+          <Card className="mt-lg max-w-[560px]">
             <dl>
               {priceRows.map((row, index) => (
                 <div

@@ -124,10 +124,8 @@
   --spacing-control: 36px;
   --spacing-touch: 48px;
 
-  /* Elevation (design.md §Elevation). `shadow-card` is separation, not
-     emphasis — a white card on the near-white ground needs more than a
-     hairline, and never more than this. Overlays get the only real shadow. */
-  --shadow-card: 0 1px 2px 0 rgb(19 20 23 / 0.04), 0 2px 8px -2px rgb(19 20 23 / 0.06);
+  /* Elevation (design.md §Elevation). Surfaces are hairline-bounded and flat;
+     the system's one shadow belongs to overlays — anything that floats. */
   --shadow-overlay: 0 4px 12px -2px rgb(19 20 23 / 0.08), 0 16px 40px -8px rgb(19 20 23 / 0.16);
 }
 
@@ -156,9 +154,11 @@
 
   --radius: var(--radius-lg);
 
-  /* Ground and surfaces. The ground/card seam is close on purpose — hairlines
-     draw the structure; the fill difference only whispers it. */
-  --background: light-dark(var(--color-canvas-soft), var(--color-ink));
+  /* Ground and surfaces. Light keeps a clean white ground — card and ground
+     share the fill and hairlines draw all the structure; canvas-soft is spent
+     on selected chips, inset panels and table header strips instead. Dark
+     keeps the two-tone order (ink ground, ink-deep card). */
+  --background: light-dark(var(--color-canvas), var(--color-ink));
   --card: light-dark(var(--color-canvas), var(--color-ink-deep));
   --popover: var(--card);
   --muted: light-dark(
@@ -215,10 +215,11 @@
   --destructive-foreground: var(--color-canvas);
 
   /* Elevation level 1 — a neutral hairline. Light tints down from ink, dark
-     tints up from white, so it stays a whisper on either ground. */
+     tints up from white, so it stays a whisper on either ground. Dark sits at
+     9% — anything stronger reads as wireframe against the ink ground. */
   --border: light-dark(
     color-mix(in oklab, var(--color-ink) 12%, transparent),
-    color-mix(in oklab, var(--color-canvas) 14%, transparent)
+    color-mix(in oklab, var(--color-canvas) 9%, transparent)
   );
   --input: var(--border);
 
@@ -226,11 +227,18 @@
      own role. */
   --divider: light-dark(
     color-mix(in oklab, var(--color-ink) 7%, transparent),
-    color-mix(in oklab, var(--color-canvas) 9%, transparent)
+    color-mix(in oklab, var(--color-canvas) 7%, transparent)
   );
 
   /* Focus is the action colour's ring. */
   --ring: light-dark(var(--color-brand-deep), var(--color-brand));
+
+  /* Elevation level 3's backdrop. Dark needs a heavier scrim: dimming an ink
+     ground with ink does nothing, so it reaches past the palette to black. */
+  --scrim: light-dark(
+    color-mix(in oklab, var(--color-ink) 45%, transparent),
+    color-mix(in oklab, black 60%, transparent)
+  );
 
   /* Polarity-flip surfaces (dark promo card, closing band) are defined by
      being the opposite of the current ground, so they invert with the theme
@@ -287,6 +295,38 @@
   color-scheme: dark;
 }
 
+/* ---------------------------------------------------------------------------
+   The operations surfaces are monochrome (design.md §Color roles — two
+   accents, one system).
+
+   Lagoon is the customer-facing brand accent. The staff surfaces — the portal
+   and the field screens — are one product on different hardware and keep a
+   plain instrument register: ink actions in light, white in dark. Only the
+   action roles flip; status colours are meaning, not brand, and stay
+   identical everywhere.
+
+   Scoped as an attribute on <html> — the same mechanism as data-theme —
+   because overlays portal into <body> and must inherit the same register.
+   The pre-paint script in lib/theme.ts sets it from the pathname on full
+   loads; OperationsSurface keeps it in sync across client-side navigation.
+   --------------------------------------------------------------------------- */
+:root[data-surface='ops'] {
+  --primary: light-dark(var(--color-ink), var(--color-canvas));
+  --primary-foreground: light-dark(var(--color-canvas), var(--color-ink));
+  --primary-hover: light-dark(
+    color-mix(in oklab, var(--color-ink) 82%, var(--color-canvas)),
+    var(--color-canvas-soft)
+  );
+  --ring: light-dark(var(--color-ink), var(--color-canvas));
+
+  /* Selection and accent moments go neutral with it. */
+  --accent: light-dark(
+    var(--color-canvas-soft),
+    color-mix(in oklab, var(--color-canvas) 12%, var(--color-ink-deep))
+  );
+  --accent-foreground: light-dark(var(--color-ink), var(--color-canvas));
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -313,6 +353,7 @@
   --color-input: var(--input);
   --color-divider: var(--divider);
   --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
   --color-invert-surface: var(--invert-surface);
   --color-invert-foreground: var(--invert-foreground);
   --color-footer-surface: var(--footer-surface);
@@ -372,7 +413,7 @@
    lift — compositor-friendly, and it never hides content the way a
    scroll-triggered reveal can when a page is rendered without scrolling. */
 @utility card-interactive {
-  @apply transition-[background-color,border-color,transform,box-shadow] duration-200 ease-out;
+  @apply transition-[background-color,border-color,transform] duration-200 ease-out;
 
   @media (hover: hover) {
     &:hover {

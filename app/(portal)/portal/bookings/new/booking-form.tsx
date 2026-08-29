@@ -74,7 +74,7 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
     const { created } = state
 
     return (
-      <Card surface="raised" className="max-w-[520px]">
+      <Card className="max-w-[520px]">
         <div className="flex items-start justify-between gap-lg">
           <div>
             <p className="micro-label text-muted-foreground">Booking created</p>
@@ -125,7 +125,7 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
       <input type="hidden" name="unitTypeId" value={selectedUnit?.unitTypeId ?? ''} />
       <input type="hidden" name="earlyCheckInHours" value={0} />
 
-      <Card surface="raised">
+      <Card>
         <section>
           <SectionHeading>Unit</SectionHeading>
           <div className="mt-md grid gap-sm">
@@ -231,7 +231,7 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
       </Card>
 
       <div className="lg:sticky lg:top-xl">
-        <Card surface="raised">
+        <Card>
           <p className="micro-label text-muted-foreground">Booking summary</p>
           <p className="mt-sm text-body-md-strong text-foreground">
             {formatStayDate(checkIn)} → {formatStayDate(checkOut)}

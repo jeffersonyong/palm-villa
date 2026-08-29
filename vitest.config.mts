@@ -36,7 +36,11 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
-          include: ['lib/domain/**/*.test.ts'],
+          // `lib/domain` plus the handful of pure functions that live beside
+          // the components consuming them (route matching, breadcrumbs). The
+          // components themselves are chrome over tested primitives and are
+          // verified on /tokens, not here.
+          include: ['lib/domain/**/*.test.ts', 'lib/utils.test.ts', 'components/**/*.test.ts'],
         },
       },
       {

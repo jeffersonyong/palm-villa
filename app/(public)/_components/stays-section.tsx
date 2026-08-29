@@ -42,7 +42,7 @@ export function StaysSection() {
                 aria-label={`${unit.name} — from BND ${unit.fromRateBnd} a night`}
                 className="block h-full rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                <Card className="flex h-full card-interactive flex-col hover:shadow-card">
+                <Card className="flex h-full card-interactive flex-col hover:border-foreground/20">
                   <MediaPlaceholder label={unit.imageLabel} />
                   <h3 className="mt-lg text-display-xs text-foreground">{unit.name}</h3>
                   <p className="mt-xs text-body-sm text-copy">{unit.description}</p>

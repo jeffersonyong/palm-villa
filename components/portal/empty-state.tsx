@@ -19,7 +19,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, action, className }: EmptyStateProps) {
   return (
-    <Card surface="raised" className={cn('px-lg py-3xl text-center', className)}>
+    <Card className={cn('px-lg py-2xl text-center', className)}>
       <p className="text-display-xs text-foreground">{title}</p>
       {description ? (
         <p className="mx-auto mt-sm max-w-[52ch] text-body-sm text-muted-foreground">

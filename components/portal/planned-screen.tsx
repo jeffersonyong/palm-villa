@@ -12,14 +12,19 @@ import { PageHeader } from '@/components/portal/page-header'
  * `capability` is the scope-of-capabilities.md reference this screen delivers,
  * so what is promised and what is built stay legible against each other.
  * Replacing a stub means deleting one component usage.
+ *
+ * It is optional because a few screens are navigational rather than
+ * capability-bearing (the Admin landing page). Omitting it is the honest
+ * option — inventing a reference to fill the slot would put a promise in the
+ * UI that the scope document never made.
  */
 
 interface PlannedScreenProps {
   title: string
   /** What this screen will do, in the language staff would use. */
   description: string
-  /** Scope reference(s), e.g. `B4–B6`. */
-  capability: string
+  /** Scope reference(s), e.g. `B4–B6`. Omit where none applies. */
+  capability?: string
 }
 
 export function PlannedScreen({ title, description, capability }: PlannedScreenProps) {
@@ -29,7 +34,11 @@ export function PlannedScreen({ title, description, capability }: PlannedScreenP
       <EmptyState
         className="mt-xl"
         title="Not built yet"
-        description={`This screen is planned for a later slice. It covers ${capability} in the agreed scope.`}
+        description={
+          capability
+            ? `This screen is planned for a later slice. It covers ${capability} in the agreed scope.`
+            : 'This screen is planned for a later slice.'
+        }
       />
     </>
   )

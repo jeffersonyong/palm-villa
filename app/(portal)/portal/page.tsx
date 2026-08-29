@@ -21,7 +21,7 @@ import { formatStayDate, todayInBrunei } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 
 export const metadata: Metadata = {
-  title: 'Overview',
+  title: 'Dashboard',
 }
 
 /**
@@ -44,7 +44,7 @@ export default async function PortalOverviewPage() {
   return (
     <>
       <PageHeader
-        title="Overview"
+        title="Dashboard"
         description={formatStayDate(today)}
         actions={
           <Button asChild>
@@ -53,10 +53,7 @@ export default async function PortalOverviewPage() {
         }
       />
 
-      <Card
-        surface="raised"
-        className="mt-xl grid grid-cols-2 gap-lg p-lg lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-divider"
-      >
+      <Card className="mt-xl grid grid-cols-2 gap-lg p-lg lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-divider">
         <Stat
           size="sm"
           label="Arrivals today"

@@ -10,7 +10,7 @@ export function HowBookingWorks() {
   return (
     <section
       aria-labelledby="how-heading"
-      className="border-t border-divider bg-background px-xl py-3xl"
+      className="border-t border-divider bg-muted px-xl py-3xl"
     >
       <div className="mx-auto w-full max-w-[1120px]">
         <p className="micro-label text-muted-foreground">How it works</p>
@@ -24,7 +24,7 @@ export function HowBookingWorks() {
         <ol className="mt-2xl grid gap-xl md:grid-cols-3">
           {bookingSteps.map((step, index) => (
             <li key={step.title}>
-              <span className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-body-sm-strong text-foreground shadow-card">
+              <span className="flex size-9 items-center justify-center rounded-md border border-border bg-card text-body-sm-strong text-foreground">
                 {index + 1}
               </span>
               <h3 className="mt-lg text-display-xs text-foreground">{step.title}</h3>

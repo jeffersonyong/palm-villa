@@ -1,5 +1,12 @@
 import type { Metadata } from 'next'
 
+import {
+  AvatarDemo,
+  FormControlDemo,
+  OverlayDemos,
+  SkeletonDemo,
+  TabsDemo,
+} from '@/app/(public)/tokens/backbone-demos'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -83,7 +90,7 @@ const surfaceColors: Swatch[] = [
     token: 'canvas-soft',
     hex: '#f7f7f8',
     swatch: 'bg-canvas-soft',
-    note: 'Faint gray: portal ground, inset panels, table headers.',
+    note: 'Faint gray: selected chips, inset panels, table headers, tab tracks.',
   },
 ]
 
@@ -131,7 +138,7 @@ const semanticColors: Swatch[] = [
 
 /** Theme-aware roles: these are what application code should reach for. */
 const roles: { role: string; swatch: string; light: string; dark: string }[] = [
-  { role: 'background', swatch: 'bg-background', light: 'canvas-soft', dark: 'ink' },
+  { role: 'background', swatch: 'bg-background', light: 'canvas', dark: 'ink' },
   { role: 'card', swatch: 'bg-card', light: 'canvas', dark: 'ink-deep' },
   { role: 'muted', swatch: 'bg-muted', light: 'canvas-soft', dark: 'ink-deep → ink' },
   { role: 'foreground', swatch: 'bg-foreground', light: 'ink', dark: 'canvas' },
@@ -143,8 +150,8 @@ const roles: { role: string; swatch: string; light: string; dark: string }[] = [
     dark: 'mute lightened',
   },
   { role: 'primary', swatch: 'bg-primary', light: 'brand-deep', dark: 'brand' },
-  { role: 'border', swatch: 'bg-border', light: 'ink 12%', dark: 'white 14%' },
-  { role: 'divider', swatch: 'bg-divider', light: 'ink 7%', dark: 'white 9%' },
+  { role: 'border', swatch: 'bg-border', light: 'ink 12%', dark: 'white 9%' },
+  { role: 'divider', swatch: 'bg-divider', light: 'ink 7%', dark: 'white 7%' },
   { role: 'accent', swatch: 'bg-accent', light: 'brand-pale', dark: 'brand 20% on ink-deep' },
   { role: 'invert-surface', swatch: 'bg-invert-surface', light: 'ink', dark: 'canvas-soft' },
   { role: 'footer-surface', swatch: 'bg-footer-surface', light: 'ink', dark: 'raised ink' },
@@ -310,7 +317,7 @@ export default function TokensPage() {
         id="colour"
         title="Raw palette"
         lead="The brand values themselves. These never change with the theme — the roles above are what shift."
-        className="bg-background"
+        className="bg-muted"
       >
         <div className="space-y-xl">
           <SwatchGrid title="Brand" items={brandColors} />
@@ -341,7 +348,7 @@ export default function TokensPage() {
         id="type-body"
         title="Body type"
         lead="The range the entire portal and field surface live in. `micro` is the labelling voice — table headers, form sections, stats."
-        className="bg-background"
+        className="bg-muted"
       >
         <ul className="space-y-md">
           {bodyType.map((item) => (
@@ -399,7 +406,7 @@ export default function TokensPage() {
         id="components"
         title="Components"
         lead="shadcn/ui primitives reading the roles: ink actions, tinted status chips, one hairline card idiom."
-        className="bg-background"
+        className="bg-muted"
       >
         <div className="space-y-xl">
           <div>
@@ -438,12 +445,8 @@ export default function TokensPage() {
             <div className="mt-md grid gap-lg md:grid-cols-2 lg:grid-cols-3">
               <Card>
                 <p className="text-body-md-strong">content</p>
-                <p className="mt-xs text-body-sm opacity-80">Hairline card — the default.</p>
-              </Card>
-              <Card surface="raised">
-                <p className="text-body-md-strong">raised</p>
                 <p className="mt-xs text-body-sm opacity-80">
-                  Hairline + shadow-card, for the gray ground.
+                  Hairline card — the default. No shadow: surfaces are flat, only overlays float.
                 </p>
               </Card>
               <Card surface="inset">
@@ -456,6 +459,54 @@ export default function TokensPage() {
                   The promotional polarity flip — public only, at most twice a page.
                 </p>
               </Card>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        id="overlays"
+        title="Overlays"
+        lead="Elevation level 3 — the only place a real shadow appears. Open each in both themes and check the radius, the hairline, the shadow, and the scrim behind anything modal."
+      >
+        <OverlayDemos />
+      </Section>
+
+      <Section
+        id="backbone"
+        title="Tabs, controls and placeholders"
+        lead="The rest of the kit: segmented tabs, the form controls that join Input and Label, and the two ways a screen shows a person rather than a record."
+        className="bg-muted"
+      >
+        <div className="space-y-xl">
+          <div>
+            <h3 className="micro-label text-muted-foreground">Tabs</h3>
+            <div className="mt-md">
+              <TabsDemo />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="micro-label text-muted-foreground">Checkbox &amp; textarea</h3>
+            <div className="mt-md">
+              <FormControlDemo />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="micro-label text-muted-foreground">Avatar</h3>
+            <div className="mt-md">
+              <AvatarDemo />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="micro-label text-muted-foreground">Skeleton</h3>
+            <p className="mt-xs max-w-[60ch] text-body-sm text-muted-foreground">
+              Shaped to match what is arriving. Static under prefers-reduced-motion.
+            </p>
+            <div className="mt-md">
+              <SkeletonDemo />
             </div>
           </div>
         </div>
