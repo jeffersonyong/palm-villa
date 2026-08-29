@@ -163,8 +163,7 @@ export interface CreateStaffAccountInput {
 }
 
 export type CreateStaffAccountResult =
-  | { ok: true; userId: string }
-  | { ok: false; error: { code: 'email_exists'; message: string } }
+  { ok: true; userId: string } | { ok: false; error: { code: 'email_exists'; message: string } }
 
 export async function createStaffAccount(
   input: CreateStaffAccountInput,

@@ -50,11 +50,13 @@ async function grantRole(userId: string, slug: string): Promise<void> {
     throw new Error(`Test setup could not find the seeded role '${slug}': ${error.message}`)
   }
 
-  const { error: grantError } = await dataClient().from('user_role').insert({
-    user_id: userId,
-    property_id: propertyId,
-    role_id: (data as { id: string }).id,
-  })
+  const { error: grantError } = await dataClient()
+    .from('user_role')
+    .insert({
+      user_id: userId,
+      property_id: propertyId,
+      role_id: (data as { id: string }).id,
+    })
 
   if (grantError) {
     throw new Error(`Test setup could not grant '${slug}': ${grantError.message}`)

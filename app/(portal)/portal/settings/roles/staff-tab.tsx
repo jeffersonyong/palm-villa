@@ -117,12 +117,20 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
                   )}
                 </TableCell>
                 <TableCell>
-                  {account.disabled ? <Badge tone="negative">Disabled</Badge> : <Badge tone="positive">Active</Badge>}
+                  {account.disabled ? (
+                    <Badge tone="negative">Disabled</Badge>
+                  ) : (
+                    <Badge tone="positive">Active</Badge>
+                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label={`Actions for ${account.displayName}`}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Actions for ${account.displayName}`}
+                      >
                         <MoreHorizontal aria-hidden />
                       </Button>
                     </DropdownMenuTrigger>
@@ -159,7 +167,11 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
       ) : null}
 
       {activeAccount && activeRow?.dialog === 'roles' ? (
-        <ManageRolesDialog account={activeAccount} roles={roles} onClose={() => setActiveRow(null)} />
+        <ManageRolesDialog
+          account={activeAccount}
+          roles={roles}
+          onClose={() => setActiveRow(null)}
+        />
       ) : null}
 
       {activeAccount && activeRow?.dialog === 'password' ? (
@@ -204,7 +216,7 @@ function RoleCheckboxes({
 }) {
   return (
     <fieldset className="grid gap-sm">
-      <legend className="micro-label mb-sm text-muted-foreground">Roles</legend>
+      <legend className="mb-sm micro-label text-muted-foreground">Roles</legend>
       {roles.map((role) => (
         <div key={role.id} className="flex items-center gap-sm">
           <Checkbox
@@ -363,13 +375,7 @@ function ManageRolesDialog({
 
 /* ── Reset password (F1) ───────────────────────────────────────────────── */
 
-function ResetPasswordDialog({
-  account,
-  onClose,
-}: {
-  account: StaffAccount
-  onClose: () => void
-}) {
+function ResetPasswordDialog({ account, onClose }: { account: StaffAccount; onClose: () => void }) {
   const [state, formAction, isPending] = useActionState(resetStaffPasswordAction, initialState)
 
   return (
@@ -430,13 +436,7 @@ function ResetPasswordDialog({
 
 /* ── Disable / enable (F1) ─────────────────────────────────────────────── */
 
-function AccountStatusDialog({
-  account,
-  onClose,
-}: {
-  account: StaffAccount
-  onClose: () => void
-}) {
+function AccountStatusDialog({ account, onClose }: { account: StaffAccount; onClose: () => void }) {
   const [state, formAction, isPending] = useActionState(setAccountStatusAction, initialState)
   const disabling = !account.disabled
 
@@ -468,7 +468,11 @@ function AccountStatusDialog({
             <Button type="button" variant="tertiary" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" variant={disabling ? 'destructive' : 'primary'} disabled={isPending}>
+            <Button
+              type="submit"
+              variant={disabling ? 'destructive' : 'primary'}
+              disabled={isPending}
+            >
               {isPending
                 ? disabling
                   ? 'Disabling…'

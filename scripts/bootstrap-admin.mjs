@@ -21,9 +21,7 @@ function required(name) {
   const value = process.env[name]
 
   if (!value || value.trim() === '') {
-    console.error(
-      `Missing ${name}. Set it in the environment (see .env.example) and re-run.`,
-    )
+    console.error(`Missing ${name}. Set it in the environment (see .env.example) and re-run.`)
     process.exit(1)
   }
 

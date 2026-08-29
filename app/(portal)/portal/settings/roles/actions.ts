@@ -112,7 +112,9 @@ export async function setUserRolesAction(
   const roles = await listRolesWithPermissions()
   const permissionsByRoleId = new Map(roles.map((role) => [role.id, role.permissions]))
 
-  if (wouldLockSelfOut(parsed.data.userId === actor.userId, parsed.data.roleIds, permissionsByRoleId)) {
+  if (
+    wouldLockSelfOut(parsed.data.userId === actor.userId, parsed.data.roleIds, permissionsByRoleId)
+  ) {
     return {
       status: 'error',
       message: "You can't remove your own admin access — ask another admin to change your roles.",
@@ -159,7 +161,8 @@ export async function setRolePermissionsAction(
   if (!adminRoleKeepsConfigManage(role.slug, parsed.data.permissions)) {
     return {
       status: 'error',
-      message: 'The Admin role always keeps "Edit settings & roles" — without it, nobody could undo this.',
+      message:
+        'The Admin role always keeps "Edit settings & roles" — without it, nobody could undo this.',
     }
   }
 

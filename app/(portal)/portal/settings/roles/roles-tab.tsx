@@ -73,7 +73,10 @@ function RoleCard({ role }: { role: RoleWithPermissions }) {
                         // enforced server-side too (lib/auth/role-guards.ts).
                         disabled={isLocked}
                       />
-                      <Label htmlFor={id} className={isLocked ? 'text-muted-foreground' : undefined}>
+                      <Label
+                        htmlFor={id}
+                        className={isLocked ? 'text-muted-foreground' : undefined}
+                      >
                         {PERMISSION_LABELS[permission]}
                       </Label>
                     </div>
@@ -85,7 +88,10 @@ function RoleCard({ role }: { role: RoleWithPermissions }) {
         </div>
 
         {state.status === 'error' && state.message ? (
-          <p role="alert" className="mt-lg rounded-md bg-negative-tint p-md text-body-sm text-negative-deep">
+          <p
+            role="alert"
+            className="mt-lg rounded-md bg-negative-tint p-md text-body-sm text-negative-deep"
+          >
             {state.message}
           </p>
         ) : null}

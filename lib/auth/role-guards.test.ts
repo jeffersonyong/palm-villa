@@ -11,13 +11,21 @@ const PERMISSIONS_BY_ROLE: ReadonlyMap<string, readonly string[]> = new Map([
 describe('roleUnionHasPermission', () => {
   test('finds a permission held by any of the roles', () => {
     expect(
-      roleUnionHasPermission(['role-front-office', 'role-admin'], PERMISSIONS_BY_ROLE, 'config.manage'),
+      roleUnionHasPermission(
+        ['role-front-office', 'role-admin'],
+        PERMISSIONS_BY_ROLE,
+        'config.manage',
+      ),
     ).toBe(true)
   })
 
   test('misses a permission held by none of them', () => {
     expect(
-      roleUnionHasPermission(['role-front-office', 'role-finance'], PERMISSIONS_BY_ROLE, 'config.manage'),
+      roleUnionHasPermission(
+        ['role-front-office', 'role-finance'],
+        PERMISSIONS_BY_ROLE,
+        'config.manage',
+      ),
     ).toBe(false)
   })
 

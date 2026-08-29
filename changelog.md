@@ -6,7 +6,22 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
-## 2026-08-29 — design backbone: the primitive kit and the portal shell
+## 2026-08-29 — auth: staff sign-in, the permission gate made real, and the F1/F2 admin screens
+
+The slice both earlier slices were building toward: the schema slice left `user_role.user_id` and `audit_event.actor_id` without their `auth.users` foreign keys "for the auth slice", and `requirePermission()` shipped as a dev no-op that failed closed in production. This is that slice — staff can sign in, the operations surfaces are actually gated, and the Owner/Admin capabilities F1/F2 (manage staff accounts and roles; adjust what each role may do, without a developer) are delivered at **Portal → Settings → Roles & staff**.
+
+### Added
+- **Staff sign-in** at `/login` (Supabase Auth, email + password) and a request-pipeline gate (`proxy.ts`) over `(portal)` and `(field)`. The gate answers only "is anyone signed in"; authorisation stays `requirePermission()` in the server layer, and the `?next=` redirect target is validated against an ops-path allowlist (open-redirect-safe). Sign-in failures share one message, so the form never confirms which emails exist.
+- **`requirePermission()` is real**: session from the verified cookie, permissions as the union of the user's roles, memoised per request, returning the `Actor` so actions thread `userId` into the database functions that were already waiting for it (`p_actor_id`) — audit events now know who acted. Signature recorded in [architecture.md](docs/architecture.md) §4 (it reads the session itself rather than taking one as a parameter).
+- **F1/F2 screens**: staff accounts (create with temp password, assign multiple roles, reset password, disable/enable) and per-role permission editing over the 16 canonical strings. Role-set writes go through SQL functions (migration 001100) that make the change and its audit event one transaction; the closed CHECK on permission strings aborts a save containing an unknown one. Lock-out guards: you cannot remove your own path to `config.manage`, and the Admin role cannot lose it.
+- **First-admin bootstrap** (`npm run db:bootstrap-admin`) — idempotent, env-driven, no credentials in the repo; account chrome (sign out, change own password) on both operations surfaces.
+
+### Decided
+- **Provisioning is out-of-band, with no auth emails at all** — admin sets a temporary password and hands it over; forgotten passwords are admin resets. [A] in architecture.md §3, alongside: display name lives in `user_metadata` (no staff profile table), and **disable = GoTrue ban**, because an account that has acted is pinned forever by the new restrict FK on `audit_event.actor_id` and must never be hard-deleted. Public signup is disabled in `supabase/config.toml`.
+- **Role administration is itself audited** [A] — account created/disabled, password reset, every role/permission-set change — since F4 promises the full trail and a role change alters what every other event could have been.
+- **PRD §18 N11 stays open** (no permission string exists for the check-in action); Security ships holding exactly what the seed grants. RLS stays enabled-deny-all with zero policies, per architecture.md §4.
+
+Verified by 165 passing tests — unit coverage on the pure permission/redirect/guard logic, integration proofs that the FKs behave (role grants cascade; an actor with history cannot be deleted) and that role-admin writes are atomic with their audit rows — plus an end-to-end browser pass: gate redirect, sign-in, account menu, staff creation, a booking whose audit event names its actor, the no-access card for a non-admin, and a role edit round-trip.
 
 Locking the design system before feature screens start depending on it. The token layer was already sound — [globals.css](app/globals.css) is a faithful transcription of [design.md](docs/design.md) and no raw hex or stock Tailwind colour appears anywhere in `app/` or `components/` — but there were no overlay primitives at all, and the portal chrome was thinner than the reference direction the client asked for. Both gaps are the kind that get filled badly and permanently once screens are being built under deadline.
 

@@ -29,10 +29,7 @@ export default async function RolesSettingsPage() {
   if (!actor || !hasPermission(actor.permissions, 'config.manage')) {
     return (
       <>
-        <PageHeader
-          title="Roles & staff"
-          description="Staff accounts and what each role may do."
-        />
+        <PageHeader title="Roles & staff" description="Staff accounts and what each role may do." />
         <EmptyState
           className="mt-xl"
           title="You don't have access to this screen"

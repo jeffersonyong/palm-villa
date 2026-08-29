@@ -65,7 +65,10 @@ export function LoginForm({ next }: { next?: string }) {
           </div>
 
           {state.status === 'error' && state.message ? (
-            <p role="alert" className="rounded-md bg-negative-tint p-md text-body-sm text-negative-deep">
+            <p
+              role="alert"
+              className="rounded-md bg-negative-tint p-md text-body-sm text-negative-deep"
+            >
               {state.message}
             </p>
           ) : null}

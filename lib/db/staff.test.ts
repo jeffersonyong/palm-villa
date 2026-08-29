@@ -173,8 +173,8 @@ describe('setUserRoles', () => {
       .eq('entity_id', userId)
 
     expect(events).toHaveLength(2)
-    expect((events as { action: string }[]).every((event) => event.action === 'staff.roles_set')).toBe(
-      true,
-    )
+    expect(
+      (events as { action: string }[]).every((event) => event.action === 'staff.roles_set'),
+    ).toBe(true)
   })
 })

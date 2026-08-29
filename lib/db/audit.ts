@@ -26,15 +26,17 @@ export interface AuditEventInput {
 export async function recordAuditEvent(input: AuditEventInput): Promise<void> {
   const propertyId = await currentPropertyId()
 
-  const { error } = await dataClient().from('audit_event').insert({
-    property_id: propertyId,
-    actor_id: input.actorId,
-    action: input.action,
-    entity_type: input.entityType,
-    entity_id: input.entityId,
-    before: input.before ?? null,
-    after: input.after ?? null,
-  })
+  const { error } = await dataClient()
+    .from('audit_event')
+    .insert({
+      property_id: propertyId,
+      actor_id: input.actorId,
+      action: input.action,
+      entity_type: input.entityType,
+      entity_id: input.entityId,
+      before: input.before ?? null,
+      after: input.after ?? null,
+    })
 
   if (error) {
     throw new Error(`Could not record audit event ${input.action}: ${error.message}`)
