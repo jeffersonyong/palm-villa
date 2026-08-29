@@ -1,4 +1,5 @@
-import { PortalNav } from '@/components/portal-nav'
+import { PortalNav, PortalNavFooterLinks } from '@/components/portal/portal-nav'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 /**
  * Portal chrome: left nav on the gray ground, content to ~1440px, calm tone.
@@ -11,12 +12,20 @@ import { PortalNav } from '@/components/portal-nav'
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh lg:flex">
-      <aside className="border-b border-divider lg:min-h-dvh lg:w-[220px] lg:shrink-0 lg:border-r lg:border-b-0">
+      <aside className="border-b border-divider lg:flex lg:min-h-dvh lg:w-[220px] lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0">
         <div className="px-xl py-lg">
           <p className="micro-label text-muted-foreground">Palm Villa</p>
           <p className="mt-xs text-display-xs text-foreground">Operations</p>
         </div>
+
         <PortalNav />
+
+        {/* Pushed to the bottom of the sidebar on desktop: leaving the portal
+            and switching theme are chrome, not navigation. */}
+        <div className="border-divider px-md pt-md pb-lg lg:mt-auto lg:border-t">
+          <PortalNavFooterLinks />
+          <ThemeToggle className="mt-md ml-md w-fit" />
+        </div>
       </aside>
 
       <main className="flex-1 px-xl py-xl">

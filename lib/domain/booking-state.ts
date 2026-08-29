@@ -87,6 +87,14 @@ const TRANSITIONS: Readonly<Record<BookingStatus, Partial<Record<BookingEvent, B
   no_show: {},
 }
 
+/**
+ * Every status, derived from the transition map rather than retyped.
+ *
+ * Screens that offer a status filter enumerate this, so adding a state to the
+ * machine cannot leave a filter silently missing it.
+ */
+export const BOOKING_STATUSES = Object.keys(TRANSITIONS) as readonly BookingStatus[]
+
 export interface TransitionError {
   code: 'illegal_transition' | 'terminal_state'
   message: string
