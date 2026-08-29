@@ -44,12 +44,10 @@ export function PortalNav() {
       <div className="flex flex-col gap-md">
         {navGroups.map((group) => (
           <div key={group.label}>
-            {/* Group headers take full `foreground` — the one place the
-                labelling voice does, because here it segments the nav rather
-                than naming a column. At 11px uppercase against 13px items it
-                stays a label, and the active item is distinguished by its
-                chip and weight rather than by being the darkest thing. */}
-            <p className="px-md pb-xs micro-label text-foreground">{group.label}</p>
+            {/* Group headers stay `mute`, like every other micro label. The
+                uppercase 11px against 13px items is what separates them; they
+                organise the nav rather than competing with it. */}
+            <p className="px-md pb-xs micro-label text-muted-foreground">{group.label}</p>
             <ul className="space-y-xxs">
               {group.items.map((item) => (
                 <li key={item.href}>

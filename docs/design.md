@@ -456,7 +456,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **Portal nav items.** Every item pairs a 16px icon with its label. The active item is a `canvas-soft` chip with ink text at 500 — a quiet surface shift on the white ground, never a colour; hover is the same chip at a whisper. Icons render in `mute` and lift to ink with the chip — they follow the item's state, never carry the brand hue, and never appear without a label in the sidebar. **Every item belongs to a labelled group** — there is no ungrouped lead item.
 
-Group headers are `micro` in **`foreground`** — the one place the labelling voice goes to full strength, because here it segments the nav into readable blocks rather than naming a column. At 11px uppercase against 13px items it still reads as a label, and the active item is marked by its chip and its weight rather than by being the darkest thing on the surface. Table headers, stat labels and form sections stay `mute`.
+Group headers are `micro` in `mute`, like every other label in the system — the 11px uppercase against 13px items is what separates them. They organise the nav; they do not compete with it.
 
 Idle items are `copy` in light but step down to **`muted-foreground` in dark**. This asymmetry is deliberate and load-bearing: `copy` sits a readable distance below `foreground` in light (`{colors.body}` against `{colors.ink}`) but nearly on top of it in dark (`{colors.canvas-soft}` against `{colors.canvas}`), where idle items would otherwise read as bright as the selected one.
 
