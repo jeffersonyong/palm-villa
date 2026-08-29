@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach } from 'vitest'
+import { afterAll, beforeAll, beforeEach } from 'vitest'
 
 import { dataClient } from '@/lib/supabase/data'
 
@@ -20,6 +20,13 @@ import { loadEnvLocal } from './env'
  * that quietly passes when the database is absent would mean a green run no
  * longer says G1 was verified, and G1 is a written commitment to the client
  * (scope-of-capabilities.md). A missing database is a broken test run.
+ *
+ * ── The suite shares your development database ─────────────────────────────
+ *
+ * The local stack has one database, so running these tests **deletes any
+ * bookings you created by hand in the portal**. That is worth knowing before
+ * it surprises you mid-demo; the seeded property, units and roles are left
+ * alone, so `npm run dev` still works immediately afterwards.
  */
 
 loadEnvLocal()
@@ -35,6 +42,14 @@ beforeEach(async () => {
   // The suite may have been pointed at a freshly reset database, which reseeds
   // the property with a new uuid.
   resetPropertyCache()
+})
+
+// Clearing before each test is what guarantees isolation; clearing again at the
+// end is courtesy. Without it the final test's bookings stay in the database and
+// turn up in the portal afterwards, which reads as real data until you notice
+// the guest is called "Test Guest".
+afterAll(async () => {
+  await clearTransactionalData()
 })
 
 async function assertDatabaseReady(): Promise<void> {
