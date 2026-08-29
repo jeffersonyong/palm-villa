@@ -6,6 +6,30 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-29 — design backbone: the primitive kit and the portal shell
+
+Locking the design system before feature screens start depending on it. The token layer was already sound — [globals.css](app/globals.css) is a faithful transcription of [design.md](docs/design.md) and no raw hex or stock Tailwind colour appears anywhere in `app/` or `components/` — but there were no overlay primitives at all, and the portal chrome was thinner than the reference direction the client asked for. Both gaps are the kind that get filled badly and permanently once screens are being built under deadline.
+
+### Added
+- **The overlay layer, which did not exist.** Dialog, sheet, popover, dropdown menu and tooltip, on the already-installed `radix-ui` package. `--radius-xl` and `--shadow-overlay` had been defined since the token slice and consumed by nothing, so the first feature needing a modal would have invented its own treatment. One shell now: 14px, hairline, `shadow-overlay`, over a new **`scrim`** role — ink @ 45% in light, black @ 60% in dark, because dimming an ink ground with ink does nothing.
+- **Tabs, avatar, skeleton, checkbox and textarea**, completing the kit. Tabs are a **segmented control, not underlines**: this system never answers "where am I" with the action colour — the sidebar uses a white chip on the gray ground, so tabs use the same construction at control scale. Recorded in design.md as a new Don't, because the pull toward an underline or a brand fill will recur.
+- **A portal topbar** — 48px, ground fill, bottom hairline, the sidebar's construction continued across the top. Breadcrumbs are derived from the nav map rather than parsed from URL segments, so a screen cannot show a crumb its sidebar entry does not have. It never carries the page title; that stays the screen's single `h1`.
+- **Nav icons and a mobile drawer.** Every nav item now pairs a 16px icon with its label, following the item's state (mute, lifting to ink with the active chip) and never the brand hue. Below `lg` the sidebar becomes a left drawer filled with the *page ground* rather than card white, so the active white chip still reads against it — replacing the wrapping row of ~20 undifferentiated text chips the nav previously degraded to on a phone.
+- **Overlay and kit sections on [/tokens](app/(public)/tokens/page.tsx)**, since a primitive that is not on the proof sheet is not really verifiable.
+
+### Fixed
+- **`cn()` was silently dropping type tokens.** tailwind-merge only knows Tailwind's stock scales, so every token in globals.css was invisible to it: `cn('text-body-sm', 'text-copy')` returned `text-copy` alone — two `text-*` utilities look like a conflict when it cannot tell a size from a colour — and the element rendered at the inherited size. **The portal nav has been shipping 14px links that design.md specifies as 13px.** Separately `cn('px-md', 'px-lg')` kept both, leaving a caller's `className` override to win or lose by stylesheet order rather than by being passed last. Both scales are now declared via `extendTailwindMerge`, with `lib/utils.test.ts` pinning it — the failure mode is invisible in review, since nothing throws and the source reads correctly.
+- **The named spacing scale shadows Tailwind's container widths here**, so `max-w-lg` is 16px, not 32rem. It made the search dialog render as a 50px column. Widths are explicit pixel values now, and it is a documented Don't.
+- **`themeColor` followed the OS** while the token system deliberately does not, so an OS-dark visitor got dark browser chrome around a light page. The two places that set the theme now rewrite the meta tag, using the same `data-theme` mechanism as everything else.
+
+### Decided
+- **Search and notifications are affordances, not features, and say so.** There is no backend for either. The search trigger opens a real dialog stating plainly what is missing and what it will cover, rendering **no results list at all** — an empty one reads as "found nothing" rather than "not built". The bell is disabled with a tooltip explaining why. The account row is static for the same reason: a control that opens an empty menu is worse than one that admits the feature is absent. It becomes the dropdown-menu trigger when auth lands.
+- **Tested where testing means something.** The route map, active-route matching and breadcrumb trail moved to `portal-routes.ts` and are unit tested, as is `cn()`. The primitives themselves are chrome over already-tested Radix behaviour; asserting their class strings in jsdom would only confirm the assertions agree with themselves, so they are verified on /tokens instead. Both halves of that split are deliberate.
+
+### Open
+- **No calendar component.** [design.md](docs/design.md) requires the public availability calendar (A1) to be specified before it is built, and this slice does not specify it. `/portal/bookings/calendar` stays a stub.
+- Real search, notification delivery, and the contents of the account menu all wait on the slices that own them.
+
 ## 2026-08-29 — real database: schema, seed and the G1 constraint
 
 The fixture layer is gone. `lib/db` now runs on Postgres via the Supabase CLI local stack, and **capability G1 is delivered** — the first written commitment in [scope-of-capabilities.md](docs/scope-of-capabilities.md) that had nothing enforcing it.
