@@ -12,6 +12,10 @@ import { cn } from '@/lib/utils'
  * is `display-xs` in Inter, not the display face: a modal heading is a section
  * heading, and Fraunces is reserved for a screen's single h1 (§Typography).
  * The footer holds at most one primary fill, like any other screen region.
+ *
+ * Widths are explicit pixel values, never `max-w-lg`/`max-w-xl`: the named
+ * spacing scale in globals.css shadows Tailwind's container scale here, so
+ * `max-w-lg` would resolve to 16px.
  */
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -60,7 +64,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-lg rounded-xl border border-border bg-card p-xl text-card-foreground shadow-overlay outline-none',
+          'fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-[480px] -translate-x-1/2 -translate-y-1/2 gap-lg rounded-xl border border-border bg-card p-xl text-card-foreground shadow-overlay outline-none',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
           'motion-reduce:animate-none',
