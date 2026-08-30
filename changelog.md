@@ -6,6 +6,20 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-31 — one register for everything still unanswered
+
+The open questions lived at the end of the PRD, in §18, mixed in with the ones already answered — thirteen entries across four tables, written as engineering notes, at line 503 of a 578-line document. They were complete enough to be normative and buried enough that nobody would take them into a meeting.
+
+**Added [docs/open-questions.md](docs/open-questions.md)**, and PRD §18 is now a pointer to it. Moved rather than copied: two lists of the same questions drift, and the day they disagree there is no way to tell which one the client actually answered.
+
+Ordered by what is holding something up rather than by number. **N5 and N7 lead**, because both have a finished screen waiting on them — the cancel screen moves no money, and nothing expires an abandoned transfer. Each entry now says what to ask in plain language, what it is blocking, and **what was assumed in the meantime**, which is the part that was hardest to reconstruct before: the assumptions were real and scattered through the sections they applied to.
+
+Two questions that were in the PRD body but never in the table are now in the register — the under-3 exemption for the semi-detached units, and which of the three phone numbers carries WhatsApp. The "complete" list had not been complete.
+
+**N13 answered** (assumed, not confirmed): a transfer that never arrives gets no outcome of its own. Staff cancel, or record cash if the guest pays another way. Recorded as **[A]** rather than **[C]** because it is Jeff's judgement, not the client's. The register carries the uncomfortable half of that: confirming a payment at the exact amount expected asks for nothing, so a phantom confirmation is currently indistinguishable from a real one apart from whose name is on it.
+
+**Doc authority moved with it.** [CLAUDE.md](CLAUDE.md), prd.md's document map and architecture.md's document boundaries all now name the register as owning what is unanswered, and the rule that an answer is never left in only one place is unchanged — it still propagates into whichever document owns the decision.
+
 ## 2026-08-31 — payment verification and cash recording (B4–B7)
 
 `verify_payment` had existed in the state machine since the schema slice, and nothing could reach it or leave it. There was no `payment` table, no screen called the transition, and `createWalkInBooking` hardcoded `pay_in_full` — so every booking the portal could make was born `confirmed`, `awaiting_payment_verification` was a state the machine described and the product could not enter, and the dashboard's **Awaiting payment** stat was structurally zero. This closes that: **Portal → Payments**.
