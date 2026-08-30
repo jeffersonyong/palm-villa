@@ -241,11 +241,12 @@ components:
     borderBottom: "1px {colors.ink} @ 7%"
     height: 56px
     padding: "0 {spacing.xl}"
-  # Segmented control — the same "where am I" construction as the sidebar chip.
+  # Segmented control — a polarity-flip chip (ink in light, white in dark) on
+  # the muted track.
   tab-segment:
     trackBackgroundColor: "{colors.canvas-soft}"
-    activeBackgroundColor: "{colors.canvas}"
-    activeTextColor: "{colors.ink}"
+    activeBackgroundColor: "{colors.ink}"
+    activeTextColor: "{colors.canvas}"
     textColor: "{colors.body}"
     typography: "{typography.body-sm}"
     rounded: "{rounded.sm}"
@@ -436,7 +437,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 ## Components
 
-**Buttons.** `primary` (the action colour: lagoon on the customer surface, ink/white on the operations surfaces — see *Two accents, one system*), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (portal 32px, field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour. A primary **create** action leads with a plus glyph — "+ New booking" — never a bare verb-noun label.
+**Buttons.** `primary` (the action colour: lagoon on the customer surface, ink/white on the operations surfaces — see *Two accents, one system*), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (portal 32px, field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour. A primary **create** action leads with a plus glyph — "+ New booking" — never a bare verb-noun label. An **edit form's Save is dirty-gated**: disabled until the draft actually differs from what is saved, so an idle click cannot fire a no-op write or its audit event. Create forms stay enabled — they are never a no-op.
 
 **Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline, no shadow. `card-inset` is the faint gray panel *inside* a card (fine print, deposit notes, grouped stats) at `{rounded.md}`. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment. Interactive cards signal hover by strengthening the hairline and a 1px lift, never a shadow.
 
@@ -464,7 +465,7 @@ Idle items are `copy` in light but step down to **`muted-foreground` in dark**. 
 
 **Drawers.** The mobile portal nav is a left drawer, 280px, sliding over the scrim, closing on navigation. It fills with the page ground — the same surface the sidebar sits on, so the nav reads identically in both places. Edge-anchored, so no radius.
 
-**Tabs — a segmented control, not underlines.** A `muted` track at control height and `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a borderless white card chip at `{rounded.sm}` (concentric inside the track), stretched to the track's full inner height — a chip floating with track above and below it breaks the concentric geometry. No hairline on the chip: like the sidebar's active item, the selection is the one seam the surface shift carries alone. Labels `body-sm`, ink and 500 when active. The same principle as the sidebar's active item — *where am I* is a quiet surface shift, never the action colour; here the track supplies the gray, so the active segment lifts out of it in white. No underline tabs, no pill tabs.
+**Tabs — a segmented control, not underlines.** A `muted` track at control height and `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a borderless **polarity-flip chip** at `{rounded.sm}` (concentric inside the track), stretched to the track's full inner height — ink with a white label in light, white with an ink label in dark: the same construction as the tooltip and the operations primary. Tabs appear only on the operations surfaces, where ink *is* the action register, so the strong fill names the current view without borrowing the customer accent. Labels `body-sm` at 500 when active. No underline tabs, no pill tabs.
 
 **Checkboxes.** 16px, `{rounded.sm}` 4px (6px reads as a circle at that size), hairline on white; checked fills with the action colour. Small enough that the fill does not count against the one-primary-per-region rule.
 
@@ -496,4 +497,4 @@ Idle items are `copy` in light but step down to **`muted-foreground` in dark**. 
 - Don't let any type above `display-sm` into the portal.
 - Don't render buttons or cards as pills — badges and avatars are the only round things.
 - Don't size anything with `max-w-lg` / `w-xl` and friends: the named spacing scale owns those suffixes here, so `max-w-lg` is 16px, not a container width. Widths are explicit (`max-w-[480px]`).
-- Don't answer "where am I" with the action colour; it is always a quiet surface shift — a muted chip on the white ground (nav), or a white chip lifted from the muted track (tabs).
+- Don't answer "where am I" with the lagoon accent; navigation is a quiet surface shift — a muted chip on the white ground (nav). The segmented control is the one loud exception: its active segment takes the polarity-flip fill (ink in light, white in dark), never a colour.

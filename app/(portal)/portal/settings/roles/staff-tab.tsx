@@ -202,12 +202,31 @@ function FormError({ state }: { state: RoleAdminState }) {
   )
 }
 
+/** A copy of `previous` with `id` added or removed — never a mutation. */
+function toggleId(
+  previous: ReadonlySet<string>,
+  id: string,
+  checked: boolean,
+): ReadonlySet<string> {
+  const next = new Set(previous)
+
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+
+  return next
+}
+
 function RoleCheckboxes({
   roles,
-  defaultRoleIds,
+  selectedRoleIds,
+  onToggle,
 }: {
   roles: readonly RoleWithPermissions[]
-  defaultRoleIds: readonly string[]
+  selectedRoleIds: ReadonlySet<string>
+  onToggle: (roleId: string, checked: boolean) => void
 }) {
   return (
     <fieldset className="grid gap-sm">
@@ -218,7 +237,8 @@ function RoleCheckboxes({
             id={`role-${role.id}`}
             name="roleIds"
             value={role.id}
-            defaultChecked={defaultRoleIds.includes(role.id)}
+            checked={selectedRoleIds.has(role.id)}
+            onCheckedChange={(checked) => onToggle(role.id, checked === true)}
           />
           <Label htmlFor={`role-${role.id}`}>{role.name}</Label>
         </div>
@@ -237,6 +257,7 @@ export function NewStaffDialog({
   onClose: () => void
 }) {
   const [state, formAction, isPending] = useActionState(createStaffAction, initialState)
+  const [selectedRoleIds, setSelectedRoleIds] = useState<ReadonlySet<string>>(new Set())
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -301,7 +322,13 @@ export function NewStaffDialog({
               <FieldError message={state.fieldErrors?.tempPassword} />
             </div>
 
-            <RoleCheckboxes roles={roles} defaultRoleIds={[]} />
+            <RoleCheckboxes
+              roles={roles}
+              selectedRoleIds={selectedRoleIds}
+              onToggle={(roleId, checked) =>
+                setSelectedRoleIds((previous) => toggleId(previous, roleId, checked))
+              }
+            />
 
             <FormError state={state} />
 
@@ -332,6 +359,15 @@ function ManageRolesDialog({
   onClose: () => void
 }) {
   const [state, formAction, isPending] = useActionState(setUserRolesAction, initialState)
+  const [selectedRoleIds, setSelectedRoleIds] = useState<ReadonlySet<string>>(
+    () => new Set(account.roles.map((role) => role.id)),
+  )
+
+  // Save is dirty-gated: a no-op click should not fire a write and its audit
+  // event. Same convention as the Roles tab's Save.
+  const isDirty =
+    selectedRoleIds.size !== account.roles.length ||
+    account.roles.some((role) => !selectedRoleIds.has(role.id))
 
   useEffect(() => {
     if (state.status === 'done') onClose()
@@ -350,7 +386,13 @@ function ManageRolesDialog({
         <form action={formAction} className="grid gap-lg">
           <input type="hidden" name="userId" value={account.id} />
 
-          <RoleCheckboxes roles={roles} defaultRoleIds={account.roles.map((role) => role.id)} />
+          <RoleCheckboxes
+            roles={roles}
+            selectedRoleIds={selectedRoleIds}
+            onToggle={(roleId, checked) =>
+              setSelectedRoleIds((previous) => toggleId(previous, roleId, checked))
+            }
+          />
 
           <FormError state={state} />
 
@@ -358,7 +400,7 @@ function ManageRolesDialog({
             <Button type="button" variant="tertiary" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={!isDirty || isPending}>
               {isPending ? 'Saving…' : 'Save roles'}
             </Button>
           </DialogFooter>
