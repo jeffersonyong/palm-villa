@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { Plus } from 'lucide-react'
 
 import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { EmptyState } from '@/components/portal/empty-state'
@@ -48,7 +49,10 @@ export default async function PortalOverviewPage() {
         description={formatStayDate(today)}
         actions={
           <Button asChild>
-            <Link href="/portal/bookings/new">New booking</Link>
+            <Link href="/portal/bookings/new">
+              <Plus aria-hidden />
+              New booking
+            </Link>
           </Button>
         }
       />

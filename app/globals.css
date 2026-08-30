@@ -125,8 +125,16 @@
   --spacing-touch: 48px;
 
   /* Elevation (design.md §Elevation). Surfaces are hairline-bounded and flat;
-     the system's one shadow belongs to overlays — anything that floats. */
+     the system's one shadow belongs to overlays — anything that floats. The
+     segmented control's active chip is the single sanctioned exception: a
+     faint lift in place of a drawn edge. Dark grounds swallow shade, so
+     there the lift flips to light — a white-alpha edge ring plus deeper
+     black shade — the dark-elevation convention. */
   --shadow-overlay: 0 4px 12px -2px rgb(19 20 23 / 0.08), 0 16px 40px -8px rgb(19 20 23 / 0.16);
+  --shadow-chip:
+    0 0 0 1px light-dark(transparent, rgb(255 255 255 / 0.1)),
+    0 1px 3px 0 light-dark(rgb(19 20 23 / 0.1), rgb(0 0 0 / 0.4)),
+    0 1px 2px -1px light-dark(rgb(19 20 23 / 0.06), rgb(0 0 0 / 0.3));
 }
 
 /* ---------------------------------------------------------------------------
@@ -164,6 +172,14 @@
   --muted: light-dark(
     var(--color-canvas-soft),
     color-mix(in oklab, var(--color-ink-deep) 55%, var(--color-ink))
+  );
+
+  /* The segmented control's active chip. Light: the card white. Dark: a
+     half-step above card — dark elevation reads through a lighter fill, but
+     secondary's full step (canvas 8%) reads too bright at chip size. */
+  --tab-chip: light-dark(
+    var(--color-canvas),
+    color-mix(in oklab, var(--color-canvas) 4%, var(--color-ink-deep))
   );
 
   /* Text. `foreground` is headings and strong text, `copy` is body, and
@@ -325,6 +341,13 @@
     color-mix(in oklab, var(--color-canvas) 12%, var(--color-ink-deep))
   );
   --accent-foreground: light-dark(var(--color-ink), var(--color-canvas));
+
+  /* The dense subset tightens the standard control: next to the sidebar's
+     30px rows, 36px buttons read padded; 32px reads like the same tool
+     (design.md §Control heights). Field screens are unaffected — everything
+     interactive there uses the ≥48px `touch` size, which keys off
+     `--spacing-touch`. */
+  --spacing-control: 32px;
 }
 
 @theme inline {
@@ -345,6 +368,7 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-tab-chip: var(--tab-chip);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);

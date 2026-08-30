@@ -163,7 +163,7 @@ components:
     borderColor: "{colors.ink} @ 12%"
     typography: "{typography.body-md}"
     rounded: "{rounded.md}"
-    padding: "{spacing.sm} {spacing.md}"
+    padding: "{spacing.xs} {spacing.md}"
   card:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
@@ -242,14 +242,16 @@ components:
     height: 56px
     padding: "0 {spacing.xl}"
   # Segmented control — the same "where am I" construction as the sidebar chip.
+  # The active chip's faint shadow is the system's one non-overlay shadow.
   tab-segment:
     trackBackgroundColor: "{colors.canvas-soft}"
     activeBackgroundColor: "{colors.canvas}"
     activeTextColor: "{colors.ink}"
+    activeShadow: "shadow-chip"
     textColor: "{colors.body}"
     typography: "{typography.body-sm}"
     rounded: "{rounded.sm}"
-    padding: "{spacing.xs} {spacing.md}"
+    padding: "0 {spacing.md}"
   avatar:
     backgroundColor: "{colors.canvas-soft}"
     textColor: "{colors.ink}"
@@ -417,7 +419,7 @@ The `micro` token is what makes surfaces read as engineered: everywhere a label 
 | Desktop | ≥ 1024px | Portal nav expands; grids full. |
 
 ### Control heights & touch targets
-Standard control height is **36px** (buttons, inputs, selects) on desktop surfaces. On **field screens** every interactive element is ≥ 48px tall and row-level primary actions render full-width in the `touch` size.
+Standard control height is **36px** (buttons, inputs, selects) on the customer surface. The **portal** tightens the same controls to **32px** — next to its 30px nav rows, 36px controls read padded — via the `--spacing-control` override on the operations register, so buttons, inputs and tab tracks stay one height. On **field screens** every interactive element is ≥ 48px tall and row-level primary actions render full-width in the `touch` size.
 
 ## Elevation & Depth
 
@@ -427,7 +429,7 @@ Standard control height is **36px** (buttons, inputs, selects) on desktop surfac
 | 1 — Hairline | 1px `border` | Inputs, tertiary buttons, table containers, cards — every in-page surface. |
 | 2 — Overlay | Hairline + `shadow-overlay` | Modals, popovers, menus, drawers, toasts, tooltips — anything that floats. |
 
-**Surfaces are flat.** A card, a table, a chip never carries a shadow — the hairline is the entire boundary. The system's one shadow belongs to overlays, where it is structure (the thing genuinely floats) rather than decoration.
+**Surfaces are flat.** A card, a table, a chip never carries a shadow — the hairline is the entire boundary. The system's one shadow belongs to overlays, where it is structure (the thing genuinely floats) rather than decoration. Single exception: the segmented control's active chip carries the faint `shadow-chip` in place of a hairline (§Components — Tabs); nothing else borrows it.
 
 Overlays sit over a `scrim` (ink @ 45% in light; black @ 60% in dark, because dimming an ink ground with ink does nothing) and take `{rounded.xl}` 14px, a hairline and `shadow-overlay`. Two exceptions: **edge-anchored drawers** drop the radius on the edges they meet — a rounded corner against the viewport edge reads as a rendering error — and **tooltips** take the control radius on the polarity-flip surface, because at caption height a 14px corner reads as a pill.
 
@@ -436,11 +438,11 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 ## Components
 
-**Buttons.** `primary` (the action colour: lagoon on the customer surface, ink/white on the operations surfaces — see *Two accents, one system*), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour.
+**Buttons.** `primary` (the action colour: lagoon on the customer surface, ink/white on the operations surfaces — see *Two accents, one system*), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (portal 32px, field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour. A primary **create** action leads with a plus glyph — "+ New booking" — never a bare verb-noun label. An **edit form's Save is dirty-gated**: disabled until the draft actually differs from what is saved, so an idle click cannot fire a no-op write or its audit event. Create forms stay enabled — they are never a no-op.
 
 **Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline, no shadow. `card-inset` is the faint gray panel *inside* a card (fine print, deposit notes, grouped stats) at `{rounded.md}`. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment. Interactive cards signal hover by strengthening the hairline and a 1px lift, never a shadow.
 
-**Inputs.** White, hairline, `{rounded.md}` 6px, `body-md` 14px, height 36px, horizontal padding `{spacing.md}`. Focus: the border strengthens to the action colour plus a faint same-hue halo (`ring`) — decisive, not a glow. Labels are `body-sm-strong` ink. Field-screen inputs use the `touch` size.
+**Inputs.** White, hairline, `{rounded.md}` 6px, `body-md` 14px, height 36px (portal 32px), horizontal padding `{spacing.md}`. Focus: the border strengthens to the action colour plus a faint same-hue halo (`ring`) — decisive, not a glow. Labels are `body-sm-strong` ink. Field-screen inputs use the `touch` size.
 
 **Date entry — no calendar component is specified.** Surfaces needing dates use native `<input type="date">` with the input treatment. Adequate for the portal; **not** adequate for the public availability calendar (A1), which must be specified here before it is built.
 
@@ -464,7 +466,7 @@ Idle items are `copy` in light but step down to **`muted-foreground` in dark**. 
 
 **Drawers.** The mobile portal nav is a left drawer, 280px, sliding over the scrim, closing on navigation. It fills with the page ground — the same surface the sidebar sits on, so the nav reads identically in both places. Edge-anchored, so no radius.
 
-**Tabs — a segmented control, not underlines.** A `muted` track at `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a white card chip drawn in with a hairline at `{rounded.sm}` (concentric inside the track). Labels `body-sm`, ink and 500 when active. The same principle as the sidebar's active item — *where am I* is a quiet surface shift, never the action colour; here the track supplies the gray, so the active segment lifts out of it in white. No underline tabs, no pill tabs.
+**Tabs — a segmented control, not underlines.** A `muted` track at control height and `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a white card chip at `{rounded.sm}` (concentric inside the track), stretched to the track's full inner height — a chip floating with track above and below it breaks the concentric geometry. No hairline on the chip: it carries `shadow-chip`, a faint lift that is the system's **one non-overlay shadow** — an edge felt rather than drawn. Dark grounds swallow shade, so in dark the lift flips to light: a 1px white-alpha edge ring with deeper black shade beneath, and the chip's fill (`tab-chip`) lifts a half-step above card (canvas @ 4% over ink-deep) — dark elevation reads through a lighter surface, held short of `secondary`'s full step. Labels `body-sm`, ink and 500 when active. The same principle as the sidebar's active item — *where am I* is a quiet surface shift, never the action colour; here the track supplies the gray, so the active segment lifts out of it in white. No underline tabs, no pill tabs.
 
 **Checkboxes.** 16px, `{rounded.sm}` 4px (6px reads as a circle at that size), hairline on white; checked fills with the action colour. Small enough that the fill does not count against the one-primary-per-region rule.
 
@@ -491,7 +493,7 @@ Idle items are `copy` in light but step down to **`muted-foreground` in dark**. 
 - Don't use aqua as a success state; success is the `positive` pair.
 - Don't let Fraunces off display headlines — public `display-md`+ and the portal's `h1` page title only; never on the field surface, never for body or UI text. And no third family, anywhere.
 - Don't build coloured band alternation; sections separate with hairlines on white.
-- Don't put a shadow on anything that is not an overlay. Cards, tables and chips are hairline-bounded and flat; `shadow-overlay` exists only for things that genuinely float (dialogs, menus, popovers, drawers, tooltips, toasts).
+- Don't put a shadow on anything that is not an overlay. Cards, tables and chips are hairline-bounded and flat; `shadow-overlay` exists only for things that genuinely float (dialogs, menus, popovers, drawers, tooltips, toasts). The segmented control's active chip (`shadow-chip`) is the one exception — don't reuse it elsewhere.
 - Don't let bolded body text do a label's job; if it names a data region, it is `micro`.
 - Don't let any type above `display-sm` into the portal.
 - Don't render buttons or cards as pills — badges and avatars are the only round things.

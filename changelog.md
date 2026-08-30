@@ -6,6 +6,20 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-30 — portal UI polish: density, the segmented control, and the roles screen recut
+
+A client-review round over the built portal — four smaller asks that each pulled a system decision out with it. Everything stays inside the existing token set; design.md is updated in the same PR wherever a spec moved.
+
+### Changed
+- **The portal is denser: controls drop from 36px to 32px.** Next to the sidebar's 30px rows, 36px buttons read padded. One override — `--spacing-control` on the `data-surface="ops"` register — moves buttons, inputs, selects and tab tracks together, so nothing misaligns; overlays portaled into `<body>` inherit it. The customer surface keeps 36px; field screens are untouched (everything interactive there is the ≥48px `touch` size).
+- **The Roles tab is one permission list, not five cards of the same sixteen checkboxes.** A role switcher sits where the heading was (the selected segment names the role), with Save far right on the same row, wired to the active role's form via the `form` attribute. Every role's form stays mounted, so switching keeps unsaved ticks; each role is still its own form, so a save cannot half-apply. The page-level Staff/Roles switcher now shares its row with "+ New staff account" (Staff tab only).
+- **The segmented control's active chip: stretched, then re-edged.** The chip now fills the track's inner height (it floated with track showing above and below, breaking the concentric geometry). After trying borderless, a darker track, and a polarity-flip ink fill — all reverted — the hairline gave way to **`shadow-chip`**, a faint lift. Dark grounds swallow shade, so there the same token flips the lift to light (1px white-alpha edge ring, deeper black shade), the fill steps up a half-step above card (the new `tab-chip` role), and idle labels take the sidebar's existing dark-only step down to `muted-foreground`.
+- **Primary create actions lead with a plus glyph** — "+ New booking", "+ New staff account" — recorded as a Buttons convention in design.md.
+
+### Decided
+- **Edit-form saves are dirty-gated** — disabled until the draft differs from what the server holds, so an idle click cannot fire a no-op write or its audit event. Applied to the role permission forms and the Manage-roles dialog; create forms stay enabled (never a no-op). Recorded in [design.md](docs/design.md) §Components as the convention for future edit screens; rolling it onto existing ones (pricing, later deposit/tenancy screens) is a follow-up.
+- **`shadow-chip` is the system's one non-overlay shadow** — a named single exception to "shadows belong to overlays", written into the elevation doctrine and the Don't list so it does not become a precedent.
+
 ## 2026-08-29 — auth: staff sign-in, the permission gate made real, and the F1/F2 admin screens
 
 The slice both earlier slices were building toward: the schema slice left `user_role.user_id` and `audit_event.actor_id` without their `auth.users` foreign keys "for the auth slice", and `requirePermission()` shipped as a dev no-op that failed closed in production. This is that slice — staff can sign in, the operations surfaces are actually gated, and the Owner/Admin capabilities F1/F2 (manage staff accounts and roles; adjust what each role may do, without a developer) are delivered at **Portal → Settings → Roles & staff**.

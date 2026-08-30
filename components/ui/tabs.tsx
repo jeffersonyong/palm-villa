@@ -10,8 +10,12 @@ import { cn } from '@/lib/utils'
  * Not underline tabs: "where am I" is never carried by colour in this system —
  * it is a quiet surface shift, the same principle as the sidebar's muted active
  * chip. Here the muted track supplies the ground, so the active segment lifts
- * out of it as a white card chip. The 4px trigger radius is concentric inside
- * the 6px track with its 2px padding.
+ * out of it as a white card chip carrying `shadow-chip` — the system's one
+ * non-overlay shadow: a faint lift in place of a drawn edge, so the chip
+ * separates from the track without a hairline. The 4px trigger radius is
+ * concentric inside the 6px track with its 2px padding — which is also why
+ * triggers stretch to the track's full height: a chip that floats with track
+ * showing above and below it breaks the concentric geometry.
  */
 function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
   return (
@@ -24,7 +28,7 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        'inline-flex h-control w-fit items-center gap-xxs rounded-md bg-muted p-xxs',
+        'inline-flex h-control w-fit items-stretch gap-xxs rounded-md bg-muted p-xxs',
         className,
       )}
       {...props}
@@ -37,10 +41,19 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        'inline-flex flex-1 items-center justify-center gap-sm rounded-sm border border-transparent px-md py-xs text-body-sm whitespace-nowrap text-copy transition-colors outline-none',
-        'hover:text-foreground',
+        'inline-flex flex-1 items-center justify-center gap-sm rounded-sm px-md text-body-sm whitespace-nowrap transition-colors outline-none',
+        // Idle labels step down to `muted-foreground` in dark, exactly like
+        // the sidebar's idle items (portal-nav.tsx): `copy` sits well below
+        // `foreground` in light but only 3% apart in dark, where idle would
+        // read as bright as the selected segment.
+        'text-copy dark:text-muted-foreground',
+        'hover:text-foreground dark:hover:text-foreground',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted',
-        'data-[state=active]:border-border data-[state=active]:bg-card data-[state=active]:font-medium data-[state=active]:text-foreground',
+        // `tab-chip` is card white in light; in dark it lifts a half-step
+        // above card (canvas 4% over ink-deep), because dark elevation reads
+        // through a lighter fill and card against the muted track is a
+        // whisker apart.
+        'data-[state=active]:bg-tab-chip data-[state=active]:font-medium data-[state=active]:text-foreground data-[state=active]:shadow-chip dark:data-[state=active]:text-foreground',
         'disabled:pointer-events-none disabled:opacity-50',
         '[&_svg]:size-4 [&_svg]:shrink-0',
         className,

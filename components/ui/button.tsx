@@ -10,8 +10,9 @@ import { cn } from '@/lib/utils'
  *   one per screen region
  * - `inverted` is the counterpart for dark surfaces (`invert-surface` cards
  *   and bands): vivid-on-dark, deep-on-light
- * - canonical radius `rounded-md` (6px); 36px standard height; the `touch`
- *   size carries the field surface's 48px
+ * - canonical radius `rounded-md` (6px); `h-control` height — 36px standard,
+ *   32px on the operations portal via the `--spacing-control` override
+ *   (globals.css); the `touch` size carries the field surface's 48px
  * - focus is a 2px ring in the action colour
  */
 const buttonVariants = cva(

@@ -49,6 +49,10 @@ import {
  * disable/enable. Client because every row carries dialogs; the data itself
  * arrives server-fetched from page.tsx.
  *
+ * The "New staff account" button and its open state live in the tab row
+ * (roles-staff-tabs.tsx) so the action shares a line with the Staff/Roles
+ * switcher; `NewStaffDialog` is exported for it. Row dialogs stay here.
+ *
  * Dialogs mount only while open, so each opens with a fresh action state
  * instead of replaying the previous outcome.
  */
@@ -64,7 +68,6 @@ interface StaffTabProps {
 type RowDialog = 'roles' | 'password' | 'status'
 
 export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
-  const [isNewStaffOpen, setIsNewStaffOpen] = useState(false)
   const [activeRow, setActiveRow] = useState<{ userId: string; dialog: RowDialog } | null>(null)
 
   const activeAccount = activeRow
@@ -73,10 +76,6 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
 
   return (
     <div className="grid gap-lg">
-      <div className="flex justify-end">
-        <Button onClick={() => setIsNewStaffOpen(true)}>New staff account</Button>
-      </div>
-
       {staff.length === 0 ? (
         <EmptyState
           title="No staff accounts yet"
@@ -162,10 +161,6 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
         </Table>
       )}
 
-      {isNewStaffOpen ? (
-        <NewStaffDialog roles={roles} onClose={() => setIsNewStaffOpen(false)} />
-      ) : null}
-
       {activeAccount && activeRow?.dialog === 'roles' ? (
         <ManageRolesDialog
           account={activeAccount}
@@ -207,12 +202,31 @@ function FormError({ state }: { state: RoleAdminState }) {
   )
 }
 
+/** A copy of `previous` with `id` added or removed — never a mutation. */
+function toggleId(
+  previous: ReadonlySet<string>,
+  id: string,
+  checked: boolean,
+): ReadonlySet<string> {
+  const next = new Set(previous)
+
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+
+  return next
+}
+
 function RoleCheckboxes({
   roles,
-  defaultRoleIds,
+  selectedRoleIds,
+  onToggle,
 }: {
   roles: readonly RoleWithPermissions[]
-  defaultRoleIds: readonly string[]
+  selectedRoleIds: ReadonlySet<string>
+  onToggle: (roleId: string, checked: boolean) => void
 }) {
   return (
     <fieldset className="grid gap-sm">
@@ -223,7 +237,8 @@ function RoleCheckboxes({
             id={`role-${role.id}`}
             name="roleIds"
             value={role.id}
-            defaultChecked={defaultRoleIds.includes(role.id)}
+            checked={selectedRoleIds.has(role.id)}
+            onCheckedChange={(checked) => onToggle(role.id, checked === true)}
           />
           <Label htmlFor={`role-${role.id}`}>{role.name}</Label>
         </div>
@@ -234,7 +249,7 @@ function RoleCheckboxes({
 
 /* ── New staff (F1) ────────────────────────────────────────────────────── */
 
-function NewStaffDialog({
+export function NewStaffDialog({
   roles,
   onClose,
 }: {
@@ -242,6 +257,7 @@ function NewStaffDialog({
   onClose: () => void
 }) {
   const [state, formAction, isPending] = useActionState(createStaffAction, initialState)
+  const [selectedRoleIds, setSelectedRoleIds] = useState<ReadonlySet<string>>(new Set())
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -306,7 +322,13 @@ function NewStaffDialog({
               <FieldError message={state.fieldErrors?.tempPassword} />
             </div>
 
-            <RoleCheckboxes roles={roles} defaultRoleIds={[]} />
+            <RoleCheckboxes
+              roles={roles}
+              selectedRoleIds={selectedRoleIds}
+              onToggle={(roleId, checked) =>
+                setSelectedRoleIds((previous) => toggleId(previous, roleId, checked))
+              }
+            />
 
             <FormError state={state} />
 
@@ -337,6 +359,15 @@ function ManageRolesDialog({
   onClose: () => void
 }) {
   const [state, formAction, isPending] = useActionState(setUserRolesAction, initialState)
+  const [selectedRoleIds, setSelectedRoleIds] = useState<ReadonlySet<string>>(
+    () => new Set(account.roles.map((role) => role.id)),
+  )
+
+  // Save is dirty-gated: a no-op click should not fire a write and its audit
+  // event. Same convention as the Roles tab's Save.
+  const isDirty =
+    selectedRoleIds.size !== account.roles.length ||
+    account.roles.some((role) => !selectedRoleIds.has(role.id))
 
   useEffect(() => {
     if (state.status === 'done') onClose()
@@ -355,7 +386,13 @@ function ManageRolesDialog({
         <form action={formAction} className="grid gap-lg">
           <input type="hidden" name="userId" value={account.id} />
 
-          <RoleCheckboxes roles={roles} defaultRoleIds={account.roles.map((role) => role.id)} />
+          <RoleCheckboxes
+            roles={roles}
+            selectedRoleIds={selectedRoleIds}
+            onToggle={(roleId, checked) =>
+              setSelectedRoleIds((previous) => toggleId(previous, roleId, checked))
+            }
+          />
 
           <FormError state={state} />
 
@@ -363,7 +400,7 @@ function ManageRolesDialog({
             <Button type="button" variant="tertiary" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={!isDirty || isPending}>
               {isPending ? 'Saving…' : 'Save roles'}
             </Button>
           </DialogFooter>
