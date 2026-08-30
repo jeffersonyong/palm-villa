@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { activeHref, breadcrumbTrail } from './portal-routes'
+import { activeHref, breadcrumbTrail, navGroups } from './portal-routes'
 
 describe('activeHref', () => {
   test('matches a listed route exactly', () => {
@@ -48,12 +48,22 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
-  test('distinguishes the Admin landing page from the screens beneath it', () => {
+  test('names Others as the group for the account screen', () => {
     expect(breadcrumbTrail('/portal/settings')).toEqual([
       { label: 'Portal', href: '/portal' },
-      { label: 'Admin' },
+      { label: 'Others' },
       { label: 'Settings' },
     ])
+  })
+
+  test('keeps Settings out of Admin, whose screens are the permission-gated ones', () => {
+    const admin = navGroups.find((group) => group.label === 'Admin')
+
+    expect(admin?.items.map((item) => item.href)).not.toContain('/portal/settings')
+  })
+
+  test('closes the nav on Others, so the catch-all does not sit mid-list', () => {
+    expect(navGroups.at(-1)?.label).toBe('Others')
   })
 
   test('names the specific screen rather than its parent', () => {

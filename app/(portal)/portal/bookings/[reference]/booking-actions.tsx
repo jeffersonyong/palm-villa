@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
+import { Notice } from '@/components/ui/notice'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast-store'
 
@@ -133,10 +134,10 @@ function CancelBookingDialog({
               cancellation without saying which payment that means. Until the
               client answers, the honest thing is to say no money moves here
               rather than to imply a policy the system does not implement. */}
-          <p className="rounded-md bg-muted p-md text-caption text-copy">
+          <Notice>
             No refund or forfeiture is calculated here. Any money already taken is settled outside
             the system.
-          </p>
+          </Notice>
 
           {state.status === 'error' && state.message ? (
             <p className="text-body-sm text-destructive">{state.message}</p>

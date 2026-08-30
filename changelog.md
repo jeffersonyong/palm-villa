@@ -6,6 +6,51 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-31 — a mark on the portal, a colour for the things staff must read
+
+Four small things the portal had been getting away with, each of which was really a rule that had never been written down.
+
+### Changed
+- **The escape from a filtered-empty list is worded the same everywhere.** Cash payments offered a bare underlined link reading "Clear the date filter" where Bookings offered a `tertiary` button reading "Clear filters". The button won: a screen with one filter today grows a second one later, and staff who learn the escape on one list should recognise it on the next. [design.md §Empty states](docs/design.md) now owns the rule, including the plural.
+- **The operations lockup got a mark, and stopped shouting.** "Palm Villa / Operations" was two lines of type in the top-left corner of three different files. It is now one `PortalBrand` component — a placeholder ink mark with a palm, then the two lines pulled `xxs` tighter than their line-heights leave them. The wordmark came down from `display-xs` to 14px/600: the lockup is chrome beside a 28px mark, not a heading, and at 17px it outweighed the thing it sits next to. `micro` stayed at 11px, the system's floor.
+- **Settings left the Admin group.** The screens in Admin are the ones only an administrator may open; Settings is where anyone signed in manages their own account, and filing it there implied a permission it does not need. It closes the nav under **Others**. Units stayed in **Property** rather than joining Admin for the same reason in reverse — it is a daily operations screen, and a one-item group whose label names a real area that will fill is not a problem worth solving. [design.md §Portal nav items](docs/design.md).
+
+### Added
+- **Notice — the `info` blue, and the fourth status hue.** The gray inset panel was doing two jobs: grouped figures, and sentences that change what someone does next. Only the second is a notice, and six of them across the portal now carry a light sky blue (≈208°, 95% S, 92% L) so they are findable on a page built from hairlines and gray. `info` is the only status hue that is never an outcome — the other three report how something turned out, this one says what to know first. It took three passes and the lesson was which dial to turn: a steel blue read as one more gray, saturating it fixed the hue but not the presence, and darkening the ground for presence produced a corporate blue. High chroma at *high* lightness is what makes a panel bright rather than heavy. 208° is the ceiling — past ≈200° the fill reads teal, and teal is the customer's colour. [design.md §Notices](docs/design.md).
+
+**Decided:** a notice takes its radius from where it sits, not from what it is. Nested in a card or a dialog it is an inset panel at 6px; standing on the page ground it is card-scale at 10px. Both readings fail if you pick one and apply it everywhere — 10px inside a 10px card reads as a mis-drawn edge, and 6px in a page slot beside real cards reads as a control that grew.
+
+**Decided:** the notice's ground is deliberately heavier than the three status tints (1.35 against white where they sit at 1.11–1.22). Those are chips a word wide, where the text carries the hue; a notice is a band with a sentence in it, and at chip weight it vanishes. Text contrast is what was held constant instead.
+
+## 2026-08-31 — every dropdown and every date picker is now ours
+
+Two controls in the portal were the product's only remaining browser chrome: they wore our treatment closed, and the moment you clicked one the operating system drew the panel.
+
+### Changed
+- **No native `<select>` anywhere.** Four were left — unit and payment method on the walk-in form, unit on the amend form, rows-per-page under every table — all of them opening the OS picker. They now use the `Select` the rest of the product already used, so a dropdown opens the same overlay shell whichever screen it is on: 14px panel, hairline, `shadow-overlay`, options at the control radius, selection as a weight shift rather than a fill. Radix renders a hidden native field when `name` is set, so the `method="get"` availability form submits exactly as before. `components/ui/native-select.tsx` is deleted — the "forms that must submit without JavaScript" exception it existed for has no callers, and what it actually bought was two dropdowns on one screen opening two different objects. [design.md §Dropdowns](docs/design.md).
+- **Single date entry is the range picker's twin, not the browser's calendar.** The three `<input type="date">` fields — check-in and check-out on the walk-in and amend forms, statement date on the manual payment match — are now `DateField`: an Input to the pixel when closed, a calendar glyph rather than the select's chevron, and one month of the *same grid* the bookings filter opens. A staff member who learns to pick a stay on the filter now recognises the grid on the form; before, Chrome, Safari and Firefox each drew a different one and none of them carried a token from this system. `min`/`max` survive as bounds on the grid, so a day outside the booking window is drawn and not offered rather than rejected after the fact. [design.md §Single date entry](docs/design.md).
+
+- **The walk-in screen's date row lost its card** ([new booking](app/(portal)/portal/bookings/new/page.tsx)). Check-in, check-out, unit type and Check availability are the screen's **control line** — they ask what to show, the way a list screen's filter chips do — and a box around them opened the page with a panel of chrome before the booking had been started. Undrawn, the fields line up with the page title. The availability counts under them keep a card, because they are the other thing: the answer, not the question, and the card is now what tells the two apart. Everything from the header down then runs on one `xl` rhythm — the counts were briefly pulled closer to the row that produced them, but with a card of their own they are a peer of the form below, and the tighter gap read as a slip rather than as grouping.
+
+### Added
+- **`components/ui/calendar-grid.tsx`** — the month header, the day grid, the day cell and the roving-tabindex keyboard model, extracted from the range calendar so both pickers are literally the same components rather than two things that look alike until one of them is edited. A single day is passed to the grid as a range whose ends are equal, which draws one filled cell and no band; the band only exists where the ends differ. `RangeCalendar` and the new `DayCalendar` are now thin.
+- A **Date field** row on the [proof sheet](app/(public)/tokens), beside the select and the filter row, so the two dresses can be compared in both themes on one screen.
+
+**Decided:** invalidity on the date field is `data-invalid` plus `aria-describedby` at the message, not `aria-invalid` — the trigger is a button that opens a dialog, not a widget that takes input, and `aria-invalid` is not supported on that role.
+
+## 2026-08-31 — two shades a calendar can be read by, and a colour per face
+
+Two portal surfaces where the contrast ladder was doing less work than it looked like.
+
+### Changed
+- **Calendar days are two shades, not three.** Spill days and the month's own days were `mute` and `copy` — 1.8:1 apart on white, which is not a difference at 14px in a grid where the two sit one cell apart, while the emphasis step above them was twice as wide. The month's own days now take `ink` outright (**3.7:1** to the spill in light, 3.2:1 in dark, both shades still AA). Nothing was lost with the third step: today has its dot and weight, hover has the surface, an end mid-pick has its drawn chip, a chosen end is a fill — none of them were leaning on the colour. Dark's spill moved 60% → 80% of `muted-foreground`, which also lifted it out of a **3.5:1 failure** it had been sitting in. [design.md §Date range](docs/design.md).
+
+### Added
+- **Identity colour — a third colour register, neither brand nor status.** Seven hues (sky, blue, violet, fuchsia, rose, orange, lime) worn by avatars only, indexed from the account id, so a person is the same colour everywhere and forever. **No teal**: that one is the customer's, and keeping it off staff surfaces is what the monochrome ops rule is for. The other meaningful hues are sat beside rather than avoided — lime against positive's mint, rose against negative's red — because form separates them anyway (a circle with two letters is not a pill with a word). `orange` is the deliberate exception, sharing `warning`'s hue and leaning on the fill instead: a peach tint against warning's cream. Confining the set to the arc the status hues leave unclaimed was tried first and produced five near-identical blues; an eighth stop then crowded blue and violet, so the set settled at seven with stops ≈35–45° apart. Seeded on the **id**, never name or email — both are editable, and fixing a typo in a surname should not repaint someone. The set's order is therefore load bearing: append, never reorder. [design.md §Avatars](docs/design.md).
+- **Avatars in the staff table** ([settings → roles](app/(portal)/portal/settings/roles/staff-tab.tsx)). The change was asked for as a pop of colour in the portal, and the audit that preceded it found the avatar rendered in exactly **one** place in the product — the sidebar account chip, showing your own initials. Per-person colour is worth nothing where one person is shown, so the colours were given the one screen that lists several people. `initials()` moved out of the account chip into `components/ui/avatar-identity.ts` beside the tone, rather than being copied.
+
+**Decided:** identity roles deliberately do *not* flip under `data-surface="ops"`. The monochrome rule exists so the staff surfaces never wear the customer brand; identity is not brand, and the portal is the only place these hues are used.
+
 ## 2026-08-31 — one register for everything still unanswered
 
 The open questions lived at the end of the PRD, in §18, mixed in with the ones already answered — thirteen entries across four tables, written as engineering notes, at line 503 of a 578-line document. They were complete enough to be normative and buried enough that nobody would take them into a meeting.

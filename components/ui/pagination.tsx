@@ -2,7 +2,13 @@
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 
-import { NativeSelect } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   clampPage,
   pageCountFor,
@@ -88,21 +94,28 @@ export function Pagination({
         {canChangePageSize ? (
           <>
             <span aria-hidden className="hidden h-4 w-px bg-border sm:block" />
-            <label className="flex items-center gap-sm">
+            <div className="flex items-center gap-sm">
               <span className="text-body-sm text-muted-foreground">Rows per page</span>
-              <NativeSelect
-                className="w-[76px]"
-                aria-label="Rows per page"
+              {/* The product's own select, not the OS picker: this footer sits
+                  under every table in the portal, and it is the one place a
+                  native dropdown would open browser chrome on a screen made
+                  entirely of our own surfaces. */}
+              <Select
                 value={String(pageSize)}
-                onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
+                onValueChange={(next) => onPageSizeChange?.(Number(next))}
               >
-                {pageSizeOptions.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </NativeSelect>
-            </label>
+                <SelectTrigger aria-label="Rows per page" className="w-[76px] bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  {pageSizeOptions.map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </>
         ) : null}
       </div>

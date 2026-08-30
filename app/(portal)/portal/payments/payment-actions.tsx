@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
+import { DateField } from '@/components/ui/date-field'
 import {
   Dialog,
   DialogContent,
@@ -309,17 +310,23 @@ function ManualMatchDialog({
 
           <div className="grid gap-sm">
             <Label htmlFor="observedOn">Date on the statement</Label>
-            <Input
+            {/* Not clearable: the field is required and always opens on a
+                real date, so it must never be able to reach empty. Left
+                unbounded, as the native input was — the server takes any
+                well-formed calendar date, and narrowing it here would invent a
+                rule nobody has asked for. */}
+            <DateField
               id="observedOn"
               name="observedOn"
-              type="date"
-              required
               defaultValue={submitted?.observedOn || todayInBrunei()}
               className="w-[180px]"
-              aria-invalid={Boolean(state.fieldErrors?.observedOn)}
+              invalid={Boolean(state.fieldErrors?.observedOn)}
+              describedBy={state.fieldErrors?.observedOn ? 'observedOn-error' : undefined}
             />
             {state.fieldErrors?.observedOn ? (
-              <p className="text-caption text-destructive">{state.fieldErrors.observedOn}</p>
+              <p id="observedOn-error" className="text-caption text-destructive">
+                {state.fieldErrors.observedOn}
+              </p>
             ) : null}
           </div>
 

@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { DateField } from '@/components/ui/date-field'
 import { Label } from '@/components/ui/label'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
@@ -130,10 +130,9 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
         <form method="get" className="flex flex-wrap items-end gap-lg">
           <div className="grid w-[164px] gap-sm">
             <Label htmlFor="from">Check-in</Label>
-            <Input
+            <DateField
               id="from"
               name="from"
-              type="date"
               defaultValue={requested.start}
               min={today}
               max={addDays(today, config.maxAdvanceBookingDays)}
@@ -142,10 +141,9 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
 
           <div className="grid w-[164px] gap-sm">
             <Label htmlFor="to">Check-out</Label>
-            <Input
+            <DateField
               id="to"
               name="to"
-              type="date"
               defaultValue={requested.end}
               min={today}
               max={addDays(today, config.maxAdvanceBookingDays + 1)}

@@ -6,13 +6,15 @@ import { Select as SelectPrimitive } from 'radix-ui'
 import { cn } from '@/lib/utils'
 
 /**
- * Radix Select — the portal's dropdown baseline (design.md §Components).
+ * Radix Select — every dropdown in the product (design.md §Components).
  *
- * `NativeSelect` stays for plain-HTML forms that must submit without
- * JavaScript. This is what everything else uses, because a drawn panel is the
- * only way a dropdown can be part of the design system: the OS picker cannot
- * carry a `micro` group label, a status dot beside an option, or the overlay
- * shell every other floating surface in the product uses.
+ * There is no native `<select>` left. A drawn panel is the only way a dropdown
+ * can be part of the design system — the OS picker cannot carry a `micro` group
+ * label, a status dot beside an option, or the overlay shell every other
+ * floating surface uses — and the native fallback that once covered the
+ * plain-HTML forms bought nothing except two dropdowns on one screen opening
+ * two different objects. Radix renders a hidden native field when `name` is
+ * set, so a `<form method="get">` still submits exactly as it did.
  *
  * Three rules hold it to the system, and they are the rules any future dropdown
  * inherits:

@@ -58,6 +58,12 @@ export const navGroups = [
       { href: '/portal/payments/cash', label: 'Cash payments', icon: Banknote },
     ],
   },
+  /**
+   * Property holds one screen today and will hold more — facilities, and
+   * whatever housekeeping and long-stay bring — which is why it is a group
+   * rather than a lone item filed under Admin. Units is a daily operations
+   * screen, and Admin is where the permission-gated ones live.
+   */
   { label: 'Property', items: [{ href: '/portal/units', label: 'Units', icon: DoorOpen }] },
   {
     label: 'Finance',
@@ -67,15 +73,20 @@ export const navGroups = [
     ],
   },
   {
-    // Not "Settings": that is now one of the screens inside it.
     label: 'Admin',
     items: [
-      { href: '/portal/settings', label: 'Settings', icon: Settings },
       { href: '/portal/settings/pricing', label: 'Pricing', icon: Tag },
       { href: '/portal/settings/roles', label: 'Roles & staff', icon: Users },
       { href: '/portal/settings/audit', label: 'Audit log', icon: ScrollText },
     ],
   },
+  /**
+   * Settings is not Admin: the screens in that group are the ones only an
+   * administrator may open, while this is where anyone signed in manages their
+   * own account. It belongs to no area of the work, so it closes the nav under
+   * the catch-all label rather than borrowing a permission it does not need.
+   */
+  { label: 'Others', items: [{ href: '/portal/settings', label: 'Settings', icon: Settings }] },
 ] as const satisfies readonly NavGroup[]
 
 /**
