@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useState } from 'react'
-import { MoreHorizontal, Plus } from 'lucide-react'
+import { MoreHorizontal } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +49,10 @@ import {
  * disable/enable. Client because every row carries dialogs; the data itself
  * arrives server-fetched from page.tsx.
  *
+ * The "New staff account" button and its open state live in the tab row
+ * (roles-staff-tabs.tsx) so the action shares a line with the Staff/Roles
+ * switcher; `NewStaffDialog` is exported for it. Row dialogs stay here.
+ *
  * Dialogs mount only while open, so each opens with a fresh action state
  * instead of replaying the previous outcome.
  */
@@ -64,7 +68,6 @@ interface StaffTabProps {
 type RowDialog = 'roles' | 'password' | 'status'
 
 export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
-  const [isNewStaffOpen, setIsNewStaffOpen] = useState(false)
   const [activeRow, setActiveRow] = useState<{ userId: string; dialog: RowDialog } | null>(null)
 
   const activeAccount = activeRow
@@ -73,13 +76,6 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
 
   return (
     <div className="grid gap-lg">
-      <div className="flex justify-end">
-        <Button onClick={() => setIsNewStaffOpen(true)}>
-          <Plus aria-hidden />
-          New staff account
-        </Button>
-      </div>
-
       {staff.length === 0 ? (
         <EmptyState
           title="No staff accounts yet"
@@ -165,10 +161,6 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
         </Table>
       )}
 
-      {isNewStaffOpen ? (
-        <NewStaffDialog roles={roles} onClose={() => setIsNewStaffOpen(false)} />
-      ) : null}
-
       {activeAccount && activeRow?.dialog === 'roles' ? (
         <ManageRolesDialog
           account={activeAccount}
@@ -237,7 +229,7 @@ function RoleCheckboxes({
 
 /* ── New staff (F1) ────────────────────────────────────────────────────── */
 
-function NewStaffDialog({
+export function NewStaffDialog({
   roles,
   onClose,
 }: {

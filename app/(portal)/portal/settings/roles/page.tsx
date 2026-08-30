@@ -2,13 +2,11 @@ import type { Metadata } from 'next'
 
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listRolesWithPermissions, listStaff } from '@/lib/db/staff'
 
-import { RolesTab } from './roles-tab'
-import { StaffTab } from './staff-tab'
+import { RolesStaffTabs } from './roles-staff-tabs'
 
 export const metadata: Metadata = {
   title: 'Roles & staff',
@@ -50,20 +48,7 @@ export default async function RolesSettingsPage() {
         description="Staff accounts and what each role may do. One person can hold several roles."
       />
 
-      <Tabs defaultValue="staff" className="mt-xl">
-        <TabsList>
-          <TabsTrigger value="staff">Staff</TabsTrigger>
-          <TabsTrigger value="roles">Roles</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="staff">
-          <StaffTab staff={staff} roles={roles} currentUserId={actor.userId} />
-        </TabsContent>
-
-        <TabsContent value="roles">
-          <RolesTab roles={roles} />
-        </TabsContent>
-      </Tabs>
+      <RolesStaffTabs staff={staff} roles={roles} currentUserId={actor.userId} />
     </>
   )
 }
