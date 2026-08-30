@@ -79,6 +79,18 @@ describe('the happy paths from prd.md §9.2', () => {
     expect(result.status).toBe('confirmed')
   })
 
+  test('walk-in by transfer: draft → awaiting verification, without a hold', () => {
+    // The guest is at the desk and transfers on their phone, so the money is
+    // sent but nobody has checked the bank yet. Straight to the queue rather
+    // than through `held`, which carries an expiry this path does not have.
+    const result = transition('draft', 'submit_payment')
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.status).toBe('awaiting_payment_verification')
+  })
+
   test('a lapsed hold expires', () => {
     const result = transition('held', 'expire')
 

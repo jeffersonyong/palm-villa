@@ -51,6 +51,14 @@ const TERMINAL: readonly BookingStatus[] = ['completed', 'expired', 'cancelled',
  * pays immediately, so the booking is created and paid in one action and never
  * passes through `held`. No unit is ever held against an unpaid promise.
  *
+ * `submit_payment` leaves `draft` as well as `held`, and the two are the same
+ * event for the same reason: the customer says they have paid and somebody has
+ * to check. The difference is only whether a hold preceded it. A booking taken
+ * at the desk and paid by bank transfer goes straight to the queue rather than
+ * fabricating a transient `held` state it never persists — `held` carries hold
+ * semantics (`hold_expires_at`, the expiry job in architecture.md §6.3) that
+ * this path does not have, and whose duration is prd.md §18 N7, still open.
+ *
  * There is deliberately no transition that reaches `confirmed` without either a
  * verified payment or a walk-in payment. prd.md §9.4 excludes booked-ahead,
  * pay-on-arrival from v1; §9.4 also notes that adding it later is additive —
@@ -59,6 +67,7 @@ const TERMINAL: readonly BookingStatus[] = ['completed', 'expired', 'cancelled',
 const TRANSITIONS: Readonly<Record<BookingStatus, Partial<Record<BookingEvent, BookingStatus>>>> = {
   draft: {
     hold: 'held',
+    submit_payment: 'awaiting_payment_verification',
     pay_in_full: 'confirmed',
     cancel: 'cancelled',
   },

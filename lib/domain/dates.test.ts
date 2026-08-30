@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { formatStayRange, formatTimestamp } from './dates'
+import { elapsedMinutes, formatElapsed, formatStayRange, formatTimestamp } from './dates'
 
 /**
  * Timestamps are rendered in the property's timezone, not the reader's.
@@ -47,5 +47,51 @@ describe('formatStayRange', () => {
 
   test('refuses a malformed date', () => {
     expect(() => formatStayRange('2026-02-30', '2026-03-04')).toThrow(/valid calendar date/)
+  })
+})
+
+/**
+ * The verification queue's waiting clock (capability B4).
+ *
+ * `now` is injectable so these assert an elapsed span rather than racing the
+ * wall clock, which is the difference between a test and a flake.
+ */
+describe('elapsedMinutes', () => {
+  const now = new Date('2026-08-30T10:00:00Z')
+
+  test('counts whole minutes, rounding down', () => {
+    expect(elapsedMinutes('2026-08-30T10:00:00Z', now)).toBe(0)
+    expect(elapsedMinutes('2026-08-30T09:59:01Z', now)).toBe(0)
+    expect(elapsedMinutes('2026-08-30T09:59:00Z', now)).toBe(1)
+    expect(elapsedMinutes('2026-08-30T06:00:00Z', now)).toBe(240)
+  })
+
+  test('clamps a future timestamp at zero', () => {
+    // The database clock and this process disagreeing is a skew problem, not a
+    // negative wait. "Waiting -3 minutes" helps nobody.
+    expect(elapsedMinutes('2026-08-30T10:05:00Z', now)).toBe(0)
+  })
+})
+
+describe('formatElapsed', () => {
+  test.each([
+    [0, '0m'],
+    [1, '1m'],
+    [59, '59m'],
+    [60, '1h 0m'],
+    [61, '1h 1m'],
+    [252, '4h 12m'],
+    [1439, '23h 59m'],
+    [1440, '1 day'],
+    [2880, '2 days'],
+    [4321, '3 days'],
+  ])('%i minutes reads as %s', (minutes, expected) => {
+    expect(formatElapsed(minutes)).toBe(expected)
+  })
+
+  test('drops the minutes past a day', () => {
+    // The queue is refreshed by hand, so minute accuracy on a three-day wait
+    // is precision the screen cannot honour.
+    expect(formatElapsed(4321)).toBe(formatElapsed(4400))
   })
 })

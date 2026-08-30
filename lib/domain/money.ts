@@ -32,6 +32,34 @@ export function bnd(amount: number): Cents {
   return amount * CENTS_PER_BND
 }
 
+/** The most minor units a typed amount may carry. BND has two. */
+const TYPED_AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/
+
+/**
+ * Parses an amount a staff member typed, in BND, to cents.
+ *
+ * `bnd()` refuses anything that is not whole dollars, which is right for the
+ * rate table — every price in prd.md §7.1 is a round figure — but wrong for a
+ * payment: a clerk records what was actually transferred or counted, and that
+ * routinely has cents in it.
+ *
+ * Returns null rather than throwing, and rejects rather than repairs: a
+ * grouping comma, a currency symbol, a minus sign or a third decimal place all
+ * come back as null so the form can say what it did not understand. Guessing
+ * at "1,0O0" is how a payment gets recorded at the wrong amount.
+ */
+export function centsFromInput(value: string): Cents | null {
+  const trimmed = value.trim()
+
+  if (!TYPED_AMOUNT_PATTERN.test(trimmed)) {
+    return null
+  }
+
+  const [major, minor = ''] = trimmed.split('.')
+
+  return Number(major) * CENTS_PER_BND + Number(minor.padEnd(2, '0'))
+}
+
 /** Sums a list of amounts. */
 export function sumCents(amounts: readonly Cents[]): Cents {
   return amounts.reduce((total, amount) => total + amount, 0)

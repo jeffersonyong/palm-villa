@@ -121,6 +121,46 @@ export function formatTimestamp(timestamp: string): string {
   }).format(new Date(timestamp))
 }
 
+const MINUTES_PER_HOUR = 60
+const MINUTES_PER_DAY = 1440
+
+/**
+ * Whole minutes between an instant and now.
+ *
+ * The verification queue's "time waiting" column (capability B4). Clamped at
+ * zero: a timestamp in the future means the database clock and this process
+ * disagree, and "waiting -3 minutes" helps nobody.
+ */
+export function elapsedMinutes(since: string, now: Date = new Date()): number {
+  const elapsed = now.getTime() - new Date(since).getTime()
+
+  return Math.max(0, Math.floor(elapsed / 60_000))
+}
+
+/**
+ * A coarse duration for display, e.g. `12m`, `4h 12m`, `3 days`.
+ *
+ * Deliberately coarse, and it drops the minutes past a day: the queue is
+ * refreshed by hand, so a figure accurate to the minute is precision the
+ * screen cannot honour. What a staff member needs from this column is the
+ * order of magnitude — minutes, hours, or too long.
+ */
+export function formatElapsed(minutes: number): string {
+  if (minutes < MINUTES_PER_HOUR) {
+    return `${minutes}m`
+  }
+
+  if (minutes < MINUTES_PER_DAY) {
+    const hours = Math.floor(minutes / MINUTES_PER_HOUR)
+
+    return `${hours}h ${minutes % MINUTES_PER_HOUR}m`
+  }
+
+  const days = Math.floor(minutes / MINUTES_PER_DAY)
+
+  return `${days} ${days === 1 ? 'day' : 'days'}`
+}
+
 /**
  * Formats an inclusive span of stay dates for a label, e.g. `1 – 7 Sept 2026`.
  *
