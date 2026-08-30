@@ -1,11 +1,14 @@
 'use client'
 
 import { CalendarDays, Check, Copy, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import type { StayDateRange } from '@/components/ui/calendar'
 import { Checkbox } from '@/components/ui/checkbox'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import {
   Dialog,
   DialogClose,
@@ -25,8 +28,19 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { FilterChip } from '@/components/ui/filter-chip'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Sheet,
   SheetContent,
@@ -230,6 +244,65 @@ export function FormControlDemo() {
         <Label htmlFor="demo-notes">Notes</Label>
         <Textarea id="demo-notes" placeholder="Anything the next shift should know…" />
       </div>
+    </div>
+  )
+}
+
+export function DropdownDemos() {
+  const [unit, setUnit] = useState('studio')
+  const [status, setStatus] = useState<string | null>(null)
+  const [range, setRange] = useState<StayDateRange | null>(null)
+
+  return (
+    <div className="space-y-xl">
+      <Row
+        title="Select — the form dress"
+        note="The trigger is an Input with a chevron: same height, hairline, radius and focus, so a closed select and a text field in one form row are indistinguishable until you open one. The panel is the overlay shell and its items are controls; the checked item goes ink at 500, never a fill."
+      >
+        <div className="grid w-[232px] gap-sm">
+          <Label htmlFor="demo-unit">Unit type</Label>
+          <Select value={unit} onValueChange={setUnit}>
+            <SelectTrigger id="demo-unit">
+              <SelectValue placeholder="Choose a unit type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Short stay</SelectLabel>
+                <SelectItem value="studio">Studio</SelectItem>
+                <SelectItem value="one-bed">One bedroom</SelectItem>
+                <SelectItem value="two-bed">Two bedroom</SelectItem>
+              </SelectGroup>
+              <SelectSeparator />
+              <SelectItem value="penthouse" disabled>
+                Penthouse — not yet let
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </Row>
+
+      <Row
+        title="Filter row"
+        note="The same Select and a date range wearing the filter dress: the field name lives inside the control, an unset filter shows only its name, and a set one fills with canvas-soft and puts its value in ink. Two clicks on the calendar define both ends — there is no Apply."
+      >
+        <Select
+          value={status ?? 'any'}
+          onValueChange={(next) => setStatus(next === 'any' ? null : next)}
+        >
+          <SelectTrigger asChild>
+            <FilterChip label="Status" value={status} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">Any status</SelectItem>
+            <SelectSeparator />
+            <SelectItem value="Confirmed">Confirmed</SelectItem>
+            <SelectItem value="Awaiting payment">Awaiting payment</SelectItem>
+            <SelectItem value="Checked in">Checked in</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <DateRangePicker label="Staying" value={range} onChange={setRange} />
+      </Row>
     </div>
   )
 }

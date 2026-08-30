@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 
 import {
   AvatarDemo,
+  DropdownDemos,
   FormControlDemo,
   OverlayDemos,
   SkeletonDemo,
@@ -470,6 +471,14 @@ export default function TokensPage() {
         lead="Elevation level 3 — the only place a real shadow appears. Open each in both themes and check the radius, the hairline, the shadow, and the scrim behind anything modal."
       >
         <OverlayDemos />
+      </Section>
+
+      <Section
+        id="dropdowns"
+        title="Dropdowns"
+        lead="One dropdown, two dresses. The form dress is an Input with a chevron; the filter dress is a chip that names its field and reports its value. Both open the same overlay shell, and selection is always a weight shift, never a colour."
+      >
+        <DropdownDemos />
       </Section>
 
       <Section

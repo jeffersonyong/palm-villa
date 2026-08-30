@@ -2,14 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 
-import { BookingStatusBadge, bookingStatusLabel } from '@/components/portal/booking-status-badge'
+import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { NativeSelect } from '@/components/ui/native-select'
 import {
   Table,
   TableBody,
@@ -23,8 +19,10 @@ import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listBookings, type BookingListFilter } from '@/lib/db/bookings'
 import { BOOKING_STATUSES, type BookingStatus } from '@/lib/domain/booking-state'
-import { formatStayDate, isStayDate, nightsBetween } from '@/lib/domain/dates'
+import { addDays, formatStayDate, isStayDate, nightsBetween } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
+
+import { BookingsFilters } from './bookings-filters'
 
 export const metadata: Metadata = {
   title: 'Bookings',
@@ -37,9 +35,10 @@ export const metadata: Metadata = {
  * scan, read. The calendar view of the same data is a later slice.
  *
  * Filters are URL state, so a staff member can keep "everything awaiting
- * payment" open in a tab, bookmark it, or send the link to someone else. The
- * form is a plain GET, which means the whole screen is server-rendered and
- * there is no client-side filtering to drift out of step with the data.
+ * payment" open in a tab, bookmark it, or send the link to someone else. They
+ * are read and validated here and applied in the query, so there is no
+ * client-side filtering to drift out of step with the data; the filter row
+ * itself is a small island that does nothing but write those params.
  *
  * Rows open the booking's own screen. The link is stretched across the row from
  * the reference cell rather than the row being made clickable in JavaScript,
@@ -87,9 +86,18 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
     Boolean(params.from && params.to) &&
     isStayDate(params.from!) &&
     isStayDate(params.to!) &&
-    params.from! < params.to!
+    params.from! <= params.to!
 
-  const range = hasRange ? { start: params.from!, end: params.to! } : undefined
+  const from = hasRange ? params.from! : undefined
+  const to = hasRange ? params.to! : undefined
+
+  // `from` and `to` are **inclusive** — the first and last day the filter row's
+  // calendar shows as selected — because that is what the person clicking them
+  // meant. The query range is half-open, matching the occupancy convention the
+  // exclusion constraint uses (architecture.md §5.2), so the last day is pushed
+  // out by one here. This conversion belongs at the boundary and nowhere else:
+  // a single-day filter is `[d, d+1)`, which is exactly "stays touching d".
+  const range = from && to ? { start: from, end: addDays(to, 1) } : undefined
 
   const filter: BookingListFilter = { status, overlaps: range }
   const bookings = await listBookings(filter)
@@ -110,58 +118,23 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
         }
       />
 
-      <Card className="mt-xl">
-        <form method="get" className="flex flex-wrap items-end gap-lg">
-          <div className="grid gap-sm">
-            <Label htmlFor="status">Status</Label>
-            <NativeSelect
-              className="w-[232px]"
-              id="status"
-              name="status"
-              defaultValue={status ?? ''}
-            >
-              <option value="">Any status</option>
-              {BOOKING_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {bookingStatusLabel(value)}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
+      {/* The filter row. It reads as a row of chips rather than a form: each
+          chip names its field and reports its value, so the state of the list
+          is legible without opening anything, and the count of what came back
+          sits at the end of the same line — the answer to "did that do
+          anything" beside the control that asked. */}
+      <div className="mt-xl flex flex-wrap items-center justify-between gap-md">
+        <BookingsFilters status={status} from={from} to={to} />
 
-          {/* Labelled as "staying" rather than "from / to" because the filter
-              matches stays that overlap the range, not stays that begin in it. */}
-          <div className="grid w-[164px] gap-sm">
-            <Label htmlFor="from">Staying from</Label>
-            <Input id="from" name="from" type="date" defaultValue={params.from ?? ''} />
-          </div>
-
-          <div className="grid w-[164px] gap-sm">
-            <Label htmlFor="to">Staying until</Label>
-            <Input id="to" name="to" type="date" defaultValue={params.to ?? ''} />
-          </div>
-
-          <Button type="submit" variant="tertiary">
-            Apply
-          </Button>
-
-          {isFiltered ? (
-            <Button asChild variant="ghost">
-              <Link href="/portal/bookings">Clear</Link>
-            </Button>
-          ) : null}
-        </form>
-      </Card>
-
-      <section aria-labelledby="results-heading" className="mt-xl">
         <h2 id="results-heading" className="micro-label text-muted-foreground">
           {bookings.length} {bookings.length === 1 ? 'booking' : 'bookings'}
           {isFiltered ? ' matching' : ''}
         </h2>
+      </div>
 
+      <section aria-labelledby="results-heading" className="mt-md">
         {bookings.length === 0 ? (
           <EmptyState
-            className="mt-md"
             title={isFiltered ? 'No bookings match these filters' : 'No bookings yet'}
             description={
               isFiltered
@@ -181,7 +154,7 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
             }
           />
         ) : (
-          <Table containerClassName="mt-md">
+          <Table>
             <TableHeader>
               <TableHeaderRow>
                 <TableHead>Reference</TableHead>

@@ -6,6 +6,30 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-30 — the bookings filter row, and the dropdown baseline behind it
+
+The bookings list opened with a card of three labelled fields — a status select and a `Staying from` / `Staying until` pair of native date inputs — and an **Apply** button. It read as a form to fill in rather than a filter to set, and the date pair carried every failure a date pair carries: a "from" typed after the "to", one half filled, a hand-edited URL, and no way to tell whether anything matched until Apply was pressed.
+
+Replaced with a **filter row**: two chips above the table, applying on the click that made them, with the result count at the far end of the same line.
+
+### Added
+- **`Select`** (Radix), the portal's **dropdown baseline** — this is the shape any future dropdown copies. Two dresses over one shell: the *form dress*, whose trigger is an Input with a chevron so a closed select and a text field in the same row are indistinguishable until opened; and the *filter dress* described below. Inside, the panel is the overlay shell and its options are controls — identical to `DropdownMenu`, because a select panel and a menu are the same object with different jobs. **Selection is a weight shift, never a colour.** `NativeSelect` stays only for forms that must submit without JavaScript.
+- **`FilterChip`**, the filter-row trigger idiom, worn by both a `Select` and a `Popover` so two different kinds of control read as siblings in one row. Unset, it shows only its field name; set, it fills with `canvas-soft`, steps the name back to mute and puts the value in ink.
+- **`RangeCalendar` and `DateRangePicker`** — one control for a span of dates, replacing the field pair. A two-month grid where the first click sets one end and the second sets the other, in either order; there is no Apply, because the second click *is* the answer. Full arrow-key navigation on a roving tabindex (84 tab stops in a two-month panel is not a keyboard path), and the month arithmetic is pure and unit-tested — leap Februaries and Monday-first lead blanks are the part of a calendar that is actually easy to get wrong. No new dependency: the grid is ~120 lines over the Radix bundle already installed.
+- **Status dots** in the status filter's options, so the list of choices carries the same language as the badges in the table. The tone mapping is read from `booking-status-badge.tsx`, which owns it, rather than restated.
+
+### Changed
+- **The bookings list's filters are now an island, but the list is still a server component** and filters are still URL state — a filtered list is still bookmarkable and sendable. All that moved is who writes the URL. The current values reach the row as props rather than through `useSearchParams`, so the chips can only ever show a filter the server actually applied.
+- **`from` and `to` in the URL are now inclusive** — the first and last day the calendar shows selected, which is what the person clicking them meant. The half-open occupancy range the query needs (architecture.md §5.2) is derived at the page boundary and nowhere else, which also makes a single-day filter mean "stays touching that day" instead of matching nothing.
+
+### Decided
+- **design.md said "no calendar component is specified"; it now specifies one.** That line was written when the portal's only date entry was a native input, and it explicitly deferred the decision rather than ruling one out. [design.md](docs/design.md) §Components now carries the dropdown, filter-row and date-range specs in full — including that a filter chip is not a form field, that the range is inclusive, and that a selection still in progress shows its far end as a drawn white chip so provisional and committed never look alike. Single date entry still uses the native input, and **the public availability calendar (A1) remains unspecified** — it carries per-night price and availability and is a different component from this one.
+- **Both new components are on the tokens proof sheet** (`/tokens` §Dropdowns), which is where the shell, the radius and the two themes get checked.
+
+Verified by 246 passing tests (23 of them new, on the calendar arithmetic and the range formatter) and a browser pass in both themes and at 390px: the range picking and its hover preview, the chip's set and unset states, keyboard navigation across a month boundary, and the URL the row writes. The pass turned up three real defects — a `Select` trigger that broke under `asChild`, a status dot rendered inside Radix's `ItemText` (inline, so zero-width, and mirrored onto the trigger), and focus stranded on a hidden month below `md`.
+
+---
+
 ## 2026-08-30 — the booking detail screen, with amend and cancel (B3)
 
 A booking could be created (B2) and listed (B1), and then nothing could be done to it. Rows in the bookings table were not clickable, no detail view existed in any form, `getBookingByReference()` had no caller outside its tests, and `booking.amend` / `booking.cancel` had shipped as permissions that nothing enforced or consumed. This closes that gap: **Portal → Bookings → any row**.
