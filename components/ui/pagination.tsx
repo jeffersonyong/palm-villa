@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 
 import { NativeSelect } from '@/components/ui/native-select'
 import {
@@ -18,6 +18,11 @@ import { cn } from '@/lib/utils'
  * foot, separated by the same `divider` hairline, so the data sits between
  * two bands of chrome and the container keeps one hairline boundary
  * (design.md §Components — Tables).
+ *
+ * Two clusters, read left to right: **where you are** (the range, then
+ * the page size behind a hairline separator) and **how to move** (the page
+ * chips flanked by step and jump arrows). Splitting them keeps the reading
+ * of the count away from the controls that change it.
  *
  * "Where am I" is a quiet surface shift, never colour: the current page is a
  * white chip on the gray strip, the sidebar's and segmented control's own
@@ -75,39 +80,54 @@ export function Pagination({
         className,
       )}
     >
-      <p className="text-body-sm text-muted-foreground">
-        {from}–{to} of {total} {itemLabel}
-      </p>
-
       <div className="flex flex-wrap items-center gap-md">
+        <p className="text-body-sm text-muted-foreground">
+          {from}–{to} of {total} {itemLabel}
+        </p>
+
         {canChangePageSize ? (
-          <label className="flex items-center gap-sm">
-            <span className="micro-label text-muted-foreground">Per page</span>
-            <NativeSelect
-              className="w-[76px]"
-              aria-label="Rows per page"
-              value={String(pageSize)}
-              onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
-            >
-              {pageSizeOptions.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </NativeSelect>
-          </label>
+          <>
+            <span aria-hidden className="hidden h-4 w-px bg-border sm:block" />
+            <label className="flex items-center gap-sm">
+              <span className="text-body-sm text-muted-foreground">Rows per page</span>
+              <NativeSelect
+                className="w-[76px]"
+                aria-label="Rows per page"
+                value={String(pageSize)}
+                onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
+              >
+                {pageSizeOptions.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </NativeSelect>
+            </label>
+          </>
         ) : null}
+      </div>
 
-        {pageCount > 1 ? (
-          <div className="flex items-center gap-xxs">
-            <StepButton
-              label="Previous page"
-              disabled={current === 1}
-              onClick={() => onPageChange(current - 1)}
-            >
-              <ChevronLeft aria-hidden className="size-4" />
-            </StepButton>
+      {pageCount > 1 ? (
+        <div className="flex items-center gap-xxs">
+          <StepButton
+            label="First page"
+            disabled={current === 1}
+            onClick={() => onPageChange(1)}
+            className="hidden sm:inline-flex"
+          >
+            <ChevronsLeft aria-hidden className="size-4" />
+          </StepButton>
+          <StepButton
+            label="Previous page"
+            disabled={current === 1}
+            onClick={() => onPageChange(current - 1)}
+          >
+            <ChevronLeft aria-hidden className="size-4" />
+          </StepButton>
 
+          {/* The numbers sit in their own group so the arrows read as a
+              frame around them rather than as two more pages. */}
+          <div className="flex items-center gap-xxs px-xs">
             {slots.map((slot, index) =>
               slot === 'ellipsis' ? (
                 <span
@@ -126,17 +146,25 @@ export function Pagination({
                 />
               ),
             )}
-
-            <StepButton
-              label="Next page"
-              disabled={current === pageCount}
-              onClick={() => onPageChange(current + 1)}
-            >
-              <ChevronRight aria-hidden className="size-4" />
-            </StepButton>
           </div>
-        ) : null}
-      </div>
+
+          <StepButton
+            label="Next page"
+            disabled={current === pageCount}
+            onClick={() => onPageChange(current + 1)}
+          >
+            <ChevronRight aria-hidden className="size-4" />
+          </StepButton>
+          <StepButton
+            label="Last page"
+            disabled={current === pageCount}
+            onClick={() => onPageChange(pageCount)}
+            className="hidden sm:inline-flex"
+          >
+            <ChevronsRight aria-hidden className="size-4" />
+          </StepButton>
+        </div>
+      ) : null}
     </nav>
   )
 }
@@ -146,17 +174,24 @@ export function Pagination({
  * height (32px in the portal) so they line up with the per-page select.
  */
 const stepClasses =
-  'inline-flex size-control items-center justify-center rounded-md text-body-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted'
+  'inline-flex size-control items-center justify-center rounded-md text-body-sm transition-[background-color,border-color,color] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted'
 
+/**
+ * The arrows are drawn controls — hairline-bounded chips on the card fill,
+ * like every other button in the portal. Only the numbers are bare, so the
+ * two jobs (move by one / jump to a page) never look like the same control.
+ */
 function StepButton({
   label,
   disabled,
   onClick,
+  className,
   children,
 }: {
   label: string
   disabled: boolean
   onClick: () => void
+  className?: string
   children: React.ReactNode
 }) {
   return (
@@ -167,8 +202,10 @@ function StepButton({
       onClick={onClick}
       className={cn(
         stepClasses,
-        'text-copy hover:bg-card hover:text-foreground',
-        'disabled:pointer-events-none disabled:opacity-40',
+        'border border-border bg-card text-copy',
+        'hover:border-foreground/20 hover:text-foreground',
+        'disabled:pointer-events-none disabled:border-divider disabled:opacity-40',
+        className,
       )}
     >
       {children}

@@ -227,6 +227,17 @@
   );
   --accent-foreground: light-dark(var(--color-brand-deep), var(--color-brand-active));
 
+  /* Text selection. It gets its own role rather than borrowing `accent`:
+     on the operations surface `accent` *is* `canvas-soft` — the same fill as
+     table header strips, footers and inset panels — so a selection dragged
+     across one was invisible. This sits a clear step below every ground it
+     has to show up on, and stays quiet enough to read through. */
+  --selection: light-dark(
+    color-mix(in oklab, var(--color-brand) 30%, var(--color-canvas)),
+    color-mix(in oklab, var(--color-brand) 34%, var(--color-ink-deep))
+  );
+  --selection-foreground: light-dark(var(--color-ink), var(--color-canvas));
+
   --destructive: var(--color-negative);
   --destructive-foreground: var(--color-canvas);
 
@@ -342,6 +353,14 @@
   );
   --accent-foreground: light-dark(var(--color-ink), var(--color-canvas));
 
+  /* Monochrome with it — but a real step darker than `canvas-soft`, so the
+     highlight still reads on the gray strips the portal is full of. */
+  --selection: light-dark(
+    color-mix(in oklab, var(--color-ink) 16%, var(--color-canvas)),
+    color-mix(in oklab, var(--color-canvas) 26%, var(--color-ink-deep))
+  );
+  --selection-foreground: light-dark(var(--color-ink), var(--color-canvas));
+
   /* The dense subset tightens the standard control: next to the sidebar's
      30px rows, 36px buttons read padded; 32px reads like the same tool
      (design.md §Control heights). Field screens are unaffected — everything
@@ -371,6 +390,8 @@
   --color-tab-chip: var(--tab-chip);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -417,7 +438,7 @@
   }
 
   ::selection {
-    @apply bg-accent text-accent-foreground;
+    @apply bg-selection text-selection-foreground;
   }
 }
 
