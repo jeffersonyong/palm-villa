@@ -253,16 +253,60 @@
 
   --radius: var(--radius-lg);
 
+  /* ---------------------------------------------------------------------
+     The dark theme's grounds and text, derived from the fixed palette by
+     stepping the two ends toward each other (softened 2026-08-31).
+
+     `ink` and pure `canvas` stay exactly where they are, because they are
+     still right for the job they were chosen for: a near-black promo card or
+     footer slab sitting on a *white* page, where the whole point is maximum
+     separation from what surrounds it. A whole interface held at that pairing
+     is a different question with a different answer — near-white text on a
+     near-black ground is the harshest thing this palette can make (18.9:1,
+     which is not an accessibility win past a point, it is glare), and the
+     screen is one someone reads all evening at a front desk.
+
+     So dark lifts its ground ~6% toward canvas, and brings its text down off
+     pure white. That second half also fixes a structural fault: `foreground`
+     and `copy` used to resolve to canvas and canvas-soft in dark, 1.03:1
+     apart — the ladder was collapsed at the top, which is why the nav had to
+     reach past `copy` to `muted-foreground` for its idle state. There are
+     three real steps now.
+
+     Everything else in the dark theme — chips, avatars, notices — is mixed
+     over `--dark-raised` rather than over `ink-deep`, so the whole surface
+     set moves together and the elevation order is preserved.
+
+     These four are **pinned literals rather than `color-mix()` expressions**,
+     the one place this file stops deriving and writes the answer down. They
+     are exactly the mix results, computed once:
+
+       --dark-ground     = oklab(canvas 6%, ink)       #131417 → #1e1f22
+       --dark-raised     = oklab(canvas 6%, ink-deep)  #1d2025 → #282b30
+       --dark-foreground = oklab(ink 9%, canvas)       #ffffff → #e7e7e7
+       --dark-copy       = oklab(ink 26%, canvas)      #f7f7f8 → #bababb
+
+     They have to be literals because they are themselves mix *sources*: every
+     chip, badge and avatar in dark is `color-mix(hue n%, --dark-raised)`, and
+     a `color-mix()` nested inside another does not resolve — the property
+     computes to `transparent`, which deletes the fill silently rather than
+     failing loudly. Change them by recomputing the mix, not by nesting one.
+     --------------------------------------------------------------------- */
+  --dark-ground: #1e1f22;
+  --dark-raised: #282b30;
+  --dark-foreground: #e7e7e7;
+  --dark-copy: #bababb;
+
   /* Ground and surfaces. Light keeps a clean white ground — card and ground
      share the fill and hairlines draw all the structure; canvas-soft is spent
      on selected chips, inset panels and table header strips instead. Dark
      keeps the two-tone order (ink ground, ink-deep card). */
-  --background: light-dark(var(--color-canvas), var(--color-ink));
-  --card: light-dark(var(--color-canvas), var(--color-ink-deep));
+  --background: light-dark(var(--color-canvas), var(--dark-ground));
+  --card: light-dark(var(--color-canvas), var(--dark-raised));
   --popover: var(--card);
   --muted: light-dark(
     var(--color-canvas-soft),
-    color-mix(in oklab, var(--color-ink-deep) 55%, var(--color-ink))
+    color-mix(in oklab, var(--dark-raised) 55%, var(--dark-ground))
   );
 
   /* The segmented control's active chip. Light: the card white. Dark: a
@@ -270,15 +314,17 @@
      secondary's full step (canvas 8%) reads too bright at chip size. */
   --tab-chip: light-dark(
     var(--color-canvas),
-    color-mix(in oklab, var(--color-canvas) 4%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-canvas) 4%, var(--dark-raised))
   );
 
   /* Text. `foreground` is headings and strong text, `copy` is body, and
-     `muted-foreground` is caption scale. */
-  --foreground: light-dark(var(--color-ink), var(--color-canvas));
+     `muted-foreground` is caption scale — three real steps in both themes.
+     Dark used to spend `canvas` and `canvas-soft` on the top two, which are
+     1.03:1 apart: two names for one colour. */
+  --foreground: light-dark(var(--color-ink), var(--dark-foreground));
   --card-foreground: var(--foreground);
   --popover-foreground: var(--foreground);
-  --copy: light-dark(var(--color-body), var(--color-canvas-soft));
+  --copy: light-dark(var(--color-body), var(--dark-copy));
   --muted-foreground: light-dark(
     var(--color-mute),
     color-mix(in oklab, var(--color-mute) 55%, var(--color-canvas-soft))
@@ -306,7 +352,7 @@
 
   --secondary: light-dark(
     var(--color-canvas-soft),
-    color-mix(in oklab, var(--color-canvas) 8%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-canvas) 8%, var(--dark-raised))
   );
   --secondary-foreground: light-dark(var(--color-ink), var(--color-canvas-soft));
 
@@ -314,7 +360,7 @@
      checked-in badge); `accent-foreground` is the only aqua that carries text. */
   --accent: light-dark(
     var(--color-brand-pale),
-    color-mix(in oklab, var(--color-brand) 20%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-brand) 20%, var(--dark-raised))
   );
   --accent-foreground: light-dark(var(--color-brand-deep), var(--color-brand-active));
 
@@ -325,7 +371,7 @@
      has to show up on, and stays quiet enough to read through. */
   --selection: light-dark(
     color-mix(in oklab, var(--color-brand) 30%, var(--color-canvas)),
-    color-mix(in oklab, var(--color-brand) 34%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-brand) 34%, var(--dark-raised))
   );
   --selection-foreground: light-dark(var(--color-ink), var(--color-canvas));
 
@@ -368,7 +414,7 @@
      page, so dark uses a raised ink instead of the straight polarity flip. */
   --footer-surface: light-dark(
     var(--color-ink),
-    color-mix(in oklab, var(--color-ink-deep) 60%, var(--color-ink))
+    color-mix(in oklab, var(--dark-raised) 60%, var(--dark-ground))
   );
   --footer-foreground: var(--color-canvas-soft);
 
@@ -377,25 +423,25 @@
      mapping is unchanged, so the status language reads the same. */
   --badge-positive: light-dark(
     var(--color-positive-tint),
-    color-mix(in oklab, var(--color-positive) 28%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-positive) 28%, var(--dark-raised))
   );
   --badge-positive-foreground: light-dark(var(--color-positive-deep), var(--color-canvas-soft));
 
   --badge-warning: light-dark(
     var(--color-warning-tint),
-    color-mix(in oklab, var(--color-warning) 26%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-warning) 26%, var(--dark-raised))
   );
   --badge-warning-foreground: light-dark(var(--color-warning-deep), var(--color-canvas-soft));
 
   --badge-negative: light-dark(
     var(--color-negative-tint),
-    color-mix(in oklab, var(--color-negative) 28%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-negative) 28%, var(--dark-raised))
   );
   --badge-negative-foreground: light-dark(var(--color-negative-deep), var(--color-canvas-soft));
 
   --badge-active: light-dark(
     var(--color-brand-pale),
-    color-mix(in oklab, var(--color-brand) 24%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-brand) 24%, var(--dark-raised))
   );
   --badge-active-foreground: light-dark(var(--color-brand-deep), var(--color-brand-active));
 
@@ -413,7 +459,7 @@
      Text stays ≈10:1 on it. */
   --notice-info: light-dark(
     var(--color-info-tint),
-    color-mix(in oklab, var(--color-info) 32%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-info) 32%, var(--dark-raised))
   );
   --notice-info-foreground: light-dark(var(--color-info-deep), var(--color-canvas-soft));
 
@@ -434,17 +480,17 @@
      place they are used. */
   --avatar-sky: light-dark(
     var(--color-identity-sky-tint),
-    color-mix(in oklab, var(--color-identity-sky) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-sky) 40%, var(--dark-raised))
   );
   --avatar-sky-foreground: light-dark(var(--color-identity-sky-deep), var(--color-canvas-soft));
   --avatar-blue: light-dark(
     var(--color-identity-blue-tint),
-    color-mix(in oklab, var(--color-identity-blue) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-blue) 40%, var(--dark-raised))
   );
   --avatar-blue-foreground: light-dark(var(--color-identity-blue-deep), var(--color-canvas-soft));
   --avatar-violet: light-dark(
     var(--color-identity-violet-tint),
-    color-mix(in oklab, var(--color-identity-violet) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-violet) 40%, var(--dark-raised))
   );
   --avatar-violet-foreground: light-dark(
     var(--color-identity-violet-deep),
@@ -452,7 +498,7 @@
   );
   --avatar-fuchsia: light-dark(
     var(--color-identity-fuchsia-tint),
-    color-mix(in oklab, var(--color-identity-fuchsia) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-fuchsia) 40%, var(--dark-raised))
   );
   --avatar-fuchsia-foreground: light-dark(
     var(--color-identity-fuchsia-deep),
@@ -460,12 +506,12 @@
   );
   --avatar-rose: light-dark(
     var(--color-identity-rose-tint),
-    color-mix(in oklab, var(--color-identity-rose) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-rose) 40%, var(--dark-raised))
   );
   --avatar-rose-foreground: light-dark(var(--color-identity-rose-deep), var(--color-canvas-soft));
   --avatar-orange: light-dark(
     var(--color-identity-orange-tint),
-    color-mix(in oklab, var(--color-identity-orange) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-orange) 40%, var(--dark-raised))
   );
   --avatar-orange-foreground: light-dark(
     var(--color-identity-orange-deep),
@@ -473,7 +519,7 @@
   );
   --avatar-lime: light-dark(
     var(--color-identity-lime-tint),
-    color-mix(in oklab, var(--color-identity-lime) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-lime) 40%, var(--dark-raised))
   );
   --avatar-lime-foreground: light-dark(var(--color-identity-lime-deep), var(--color-canvas-soft));
 }
@@ -515,7 +561,7 @@
   /* Selection and accent moments go neutral with it. */
   --accent: light-dark(
     var(--color-canvas-soft),
-    color-mix(in oklab, var(--color-canvas) 12%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-canvas) 12%, var(--dark-raised))
   );
   --accent-foreground: light-dark(var(--color-ink), var(--color-canvas));
 
@@ -523,7 +569,7 @@
      highlight still reads on the gray strips the portal is full of. */
   --selection: light-dark(
     color-mix(in oklab, var(--color-ink) 16%, var(--color-canvas)),
-    color-mix(in oklab, var(--color-canvas) 26%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-canvas) 26%, var(--dark-raised))
   );
   --selection-foreground: light-dark(var(--color-ink), var(--color-canvas));
 

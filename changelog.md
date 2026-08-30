@@ -6,6 +6,20 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-31 — the portal drops the serif, the tiles lose their box, dark stops glaring
+
+Three follow-ons from looking at the surface pass on real screens.
+
+### Changed
+- **The portal's `h1` is Inter.** It had carried Fraunces since 2026-08-28 so the brand voice would follow the journey through the portal door. Three things said otherwise: a display face is the same order of gesture as the lagoon hue, which the operations surfaces already refuse on the grounds that teal is the customer's; at `display-sm` the face is too small to show the character it is chosen for; and a booking reference is the worst thing to set in it — `PV-6845` as a serif page title above a table rendering the identical string in mono. The rule that replaces it is simpler than the exception it removes: **lagoon and Fraunces are the customer surface, monochrome and Inter are operations**. [design.md §Typography](docs/design.md).
+- **Stat tiles stand on the page ground, uncontained.** The dashboard's four figures and the walk-in availability counts were tiles inside a card — a box drawn around four boxes, whose outer hairline bounded nothing the tiles were not already bounding and made each screen open with a panel of chrome. They now sit directly on the ground at **card scale**, which is the `Notice`'s rule generalised: a gray panel takes its radius and padding from where it sits, so `Card` gained the same `placement` variant. [design.md §Components — Cards](docs/design.md).
+- **Dark is a step less dark, and off pure white.** It ran `ink` under `canvas` — 18.9:1, the harshest pairing the palette can make, on a screen someone reads all evening at a front desk. The ground lifts 6% toward canvas (`#131417` → `#1e1f22`), the card with it (`#1d2025` → `#282b30`), and text comes down off white (`#e7e7e7` headings, `#bababb` body): **13.3:1 and 8.5:1**, still far above AA and no longer a spotlight. `ink` and pure `canvas` are untouched — they are still right for a near-black card sitting on a *white* page, which is a different question. [design.md §Dark theme](docs/design.md).
+
+### Fixed
+- **Dark's text ladder was collapsed at the top.** `foreground` and `copy` resolved to canvas and canvas-soft — 1.03:1 apart, two names for one colour — which is why the nav had to reach past `copy` to `muted-foreground` to find an idle state. Three real steps now. The nav keeps its step-down because it is right on its own terms, and its dark group label went from 75% to 85% opacity: the softer ground had left it at 4.52:1, clearing AA by 0.02. Now 5.5:1, against 7.1 idle and 12.3 selected.
+
+**Decided:** the four dark tokens are pinned literals, not `color-mix()` expressions — the one place this system stops deriving. They are mix *sources* for every dark chip, badge and avatar, and a `color-mix()` nested inside another does not resolve: the property computes to `transparent` and the fill vanishes silently rather than failing loudly. Found by measuring, not by looking — the tiles had gone invisible against a ground close enough to hide it.
+
 ## 2026-08-31 — the pages learn the overlays' surface grammar
 
 The dropdowns had a DNA the pages didn't: nested surfaces, tight clusters, small ornaments doing precise jobs. The pages were two planes — white ground, white card, hairline between — spread at one even rhythm, which reads as a wireframe next to the overlays' layering. This slice redistributes the existing surface system onto the pages; no new colour, no new tokens.

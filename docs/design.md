@@ -1,7 +1,7 @@
 ---
 version: 1.0
 name: Palm-Villa-design-system
-description: Design language for the Palm Villa booking platform — quiet-utility minimalism. A white ground structured by hairlines and faint gray panels; deep lagoon teal as the customer surface's action colour (vivid aqua in dark) while the staff operations surfaces (portal and field) run monochrome (ink/white actions); an Inter type scale tightened around 14px body and 11px uppercase micro-labels with Fraunces 600 reserved for display headlines, small radii, dense-but-breathing spacing, and the lagoon hue otherwise spent as a text-first brand accent. Semantic colour carries status meaning only, on every surface.
+description: Design language for the Palm Villa booking platform — quiet-utility minimalism. A white ground structured by hairlines and faint gray panels; deep lagoon teal as the customer surface's action colour (vivid aqua in dark) while the staff operations surfaces (portal and field) run monochrome (ink/white actions); an Inter type scale tightened around 14px body and 11px uppercase micro-labels with Fraunces 600 reserved for the customer surface's display headlines, small radii, dense-but-breathing spacing, and the lagoon hue otherwise spent as a text-first brand accent. Brand colour and brand face travel together: both belong to the customer surface, neither to operations. Semantic colour carries status meaning only, on every surface.
 colors:
   brand: "#2fc9c0"
   brand-deep: "#0e6b64"
@@ -13,6 +13,15 @@ colors:
   mute: "#6a7076"
   canvas: "#ffffff"
   canvas-soft: "#f7f7f8"
+
+  # The dark theme's own grounds and text (softened 2026-08-31). Derived by
+  # stepping ink and canvas toward each other, then pinned as literals —
+  # they are mix *sources* for every dark chip, and a color-mix nested in
+  # another color-mix resolves to transparent. See §Dark theme.
+  dark-ground: "#1e1f22"      # oklab(canvas 6%, ink) — the dark page ground
+  dark-raised: "#282b30"      # oklab(canvas 6%, ink-deep) — the dark card
+  dark-foreground: "#e7e7e7"  # oklab(ink 9%, canvas) — headings, strong text
+  dark-copy: "#bababb"        # oklab(ink 26%, canvas) — body copy
   positive: "#1fa552"
   positive-deep: "#166534"
   positive-tint: "#e2f5e9"
@@ -52,9 +61,9 @@ colors:
 typography:
   # Inter everywhere. Hierarchy is size, weight (400/500/600) and tight
   # negative tracking at display sizes. The display face is the one sanctioned
-  # exception, one weight: public-site display headlines (display-md and
-  # above) plus each portal screen's single h1 page title — nothing else, and
-  # the field surface never uses it (§Typography).
+  # exception, one weight, and it belongs to the customer surface alone:
+  # public-site display headlines (display-md and above) — nothing else. The
+  # portal and the field surface never use it (§Typography).
   display-face:
     fontFamily: Fraunces, Georgia, serif
     fontWeight: 600
@@ -354,11 +363,11 @@ themes:
     avatar-lime: "{colors.identity-lime-tint}"
     avatar-lime-foreground: "{colors.identity-lime-deep}"
   dark:
-    background: "{colors.ink}"
-    card: "{colors.ink-deep}"
-    muted: "mix({colors.ink-deep} 55%, {colors.ink})"
-    foreground: "{colors.canvas}"
-    copy: "{colors.canvas-soft}"
+    background: "{colors.dark-ground}"
+    card: "{colors.dark-raised}"
+    muted: "mix({colors.dark-raised} 55%, {colors.dark-ground})"
+    foreground: "{colors.dark-foreground}"
+    copy: "{colors.dark-copy}"
     muted-foreground: "mix({colors.mute} 55%, {colors.canvas-soft})"
     # 9% / 7% — anything stronger reads as wireframe against the ink ground.
     border: "{colors.canvas} @ 9%"
@@ -369,42 +378,42 @@ themes:
     primary-invert: "{colors.brand-deep}"
     primary-invert-foreground: "{colors.canvas}"
     primary-invert-hover: "mix({colors.brand-deep} 78%, {colors.brand})"
-    accent: "mix({colors.brand} 20%, {colors.ink-deep})"
+    accent: "mix({colors.brand} 20%, {colors.dark-raised})"
     accent-foreground: "{colors.brand-active}"
-    selection: "mix({colors.brand} 34%, {colors.ink-deep})"
+    selection: "mix({colors.brand} 34%, {colors.dark-raised})"
     selection-foreground: "{colors.canvas}"
-    secondary: "mix({colors.canvas} 8%, {colors.ink-deep})"
+    secondary: "mix({colors.canvas} 8%, {colors.dark-raised})"
     secondary-foreground: "{colors.canvas-soft}"
     invert-surface: "{colors.canvas-soft}"
     invert-foreground: "{colors.ink}"
-    footer-surface: "mix({colors.ink-deep} 60%, {colors.ink})"
+    footer-surface: "mix({colors.dark-raised} 60%, {colors.dark-ground})"
     ring: "{colors.brand}"
     # Dimming an ink ground with ink does nothing, so dark reaches past the
     # palette to black.
     scrim: "black @ 60%"
-    badge-positive: "mix({colors.positive} 28%, {colors.ink-deep})"
+    badge-positive: "mix({colors.positive} 28%, {colors.dark-raised})"
     badge-positive-foreground: "{colors.canvas-soft}"
-    badge-warning: "mix({colors.warning} 26%, {colors.ink-deep})"
+    badge-warning: "mix({colors.warning} 26%, {colors.dark-raised})"
     badge-warning-foreground: "{colors.canvas-soft}"
-    badge-negative: "mix({colors.negative} 28%, {colors.ink-deep})"
+    badge-negative: "mix({colors.negative} 28%, {colors.dark-raised})"
     badge-negative-foreground: "{colors.canvas-soft}"
-    notice-info: "mix({colors.info} 32%, {colors.ink-deep})"
+    notice-info: "mix({colors.info} 32%, {colors.dark-raised})"
     notice-info-foreground: "{colors.canvas-soft}"
-    badge-active: "mix({colors.brand} 24%, {colors.ink-deep})"
+    badge-active: "mix({colors.brand} 24%, {colors.dark-raised})"
     badge-active-foreground: "{colors.brand-active}"
-    avatar-sky: "mix({colors.identity-sky} 40%, {colors.ink-deep})"
+    avatar-sky: "mix({colors.identity-sky} 40%, {colors.dark-raised})"
     avatar-sky-foreground: "{colors.canvas-soft}"
-    avatar-blue: "mix({colors.identity-blue} 40%, {colors.ink-deep})"
+    avatar-blue: "mix({colors.identity-blue} 40%, {colors.dark-raised})"
     avatar-blue-foreground: "{colors.canvas-soft}"
-    avatar-violet: "mix({colors.identity-violet} 40%, {colors.ink-deep})"
+    avatar-violet: "mix({colors.identity-violet} 40%, {colors.dark-raised})"
     avatar-violet-foreground: "{colors.canvas-soft}"
-    avatar-fuchsia: "mix({colors.identity-fuchsia} 40%, {colors.ink-deep})"
+    avatar-fuchsia: "mix({colors.identity-fuchsia} 40%, {colors.dark-raised})"
     avatar-fuchsia-foreground: "{colors.canvas-soft}"
-    avatar-rose: "mix({colors.identity-rose} 40%, {colors.ink-deep})"
+    avatar-rose: "mix({colors.identity-rose} 40%, {colors.dark-raised})"
     avatar-rose-foreground: "{colors.canvas-soft}"
-    avatar-orange: "mix({colors.identity-orange} 40%, {colors.ink-deep})"
+    avatar-orange: "mix({colors.identity-orange} 40%, {colors.dark-raised})"
     avatar-orange-foreground: "{colors.canvas-soft}"
-    avatar-lime: "mix({colors.identity-lime} 40%, {colors.ink-deep})"
+    avatar-lime: "mix({colors.identity-lime} 40%, {colors.dark-raised})"
     avatar-lime-foreground: "{colors.canvas-soft}"
   # The operations surfaces (portal + field) are monochrome — these override
   # the maps above inside `[data-surface="ops"]`; everything not listed
@@ -433,9 +442,9 @@ themes:
 
 # Palm Villa Design System
 
-**Quiet-utility minimalism.** The reference class is modern product software — tight tables, hairline structure, decisive solid actions, tiny uppercase labels — applied to a place with a pool. The page is white and calm; structure comes from 1px hairlines and faint gray panels, not from coloured bands. On the public surface the action colour is **deep lagoon teal**: every primary button is a `{colors.brand-deep}` fill with white text in light (the vivid `{colors.brand}` with ink text in dark) — one striking, saturated solid per screen region, which is what makes the booking site read as decisive *and* branded. The **operations surfaces run monochrome** — ink actions in light, white in dark — because the staff tool (portal and field alike) is its own product and earns its premium feel from restraint rather than brand colour. Elsewhere the lagoon hue stays text-first — eyebrows, key price lines, the logo moment, the checked-in badge — and it never fills a band or a card. Type is Inter, tightened around a 14px body with 11px uppercase micro-labels doing the labelling work — with **Fraunces 600 as the display face** (public display headlines, plus each portal screen's `h1`), the one place the system spends personality in type. Radii are small (6px controls, 10px cards). Semantic colour means status and nothing else.
+**Quiet-utility minimalism.** The reference class is modern product software — tight tables, hairline structure, decisive solid actions, tiny uppercase labels — applied to a place with a pool. The page is white and calm; structure comes from 1px hairlines and faint gray panels, not from coloured bands. On the public surface the action colour is **deep lagoon teal**: every primary button is a `{colors.brand-deep}` fill with white text in light (the vivid `{colors.brand}` with ink text in dark) — one striking, saturated solid per screen region, which is what makes the booking site read as decisive *and* branded. The **operations surfaces run monochrome** — ink actions in light, white in dark — because the staff tool (portal and field alike) is its own product and earns its premium feel from restraint rather than brand colour. Elsewhere the lagoon hue stays text-first — eyebrows, key price lines, the logo moment, the checked-in badge — and it never fills a band or a card. Type is Inter, tightened around a 14px body with 11px uppercase micro-labels doing the labelling work — with **Fraunces 600 as the display face on public display headlines**, the one place the system spends personality in type, and the portal in Inter throughout for the same reason it is monochrome. Radii are small (6px controls, 10px cards). Semantic colour means status and nothing else.
 
-> **Superseded direction (2026-08-27, v1.0).** The beta direction used aqua-filled primary CTAs, alternating gray/white/pale-aqua/dark marketing bands, 15px body type, 8/12px radii and aqua focus glows. Reviewed against modern product references and recut: too soft, too coloured, too template. Nothing survives except the neutral-base principle, the aqua hue (demoted to brand accent), the semantic status pairs, the Fraunces public display face (dropped in the first recut pass, deliberately reinstated 2026-08-28 — see §Typography), and the theming architecture. An earlier alpha (warm sand, Manrope 800, pills) is two generations gone.
+> **Superseded direction (2026-08-27, v1.0).** The beta direction used aqua-filled primary CTAs, alternating gray/white/pale-aqua/dark marketing bands, 15px body type, 8/12px radii and aqua focus glows. Reviewed against modern product references and recut: too soft, too coloured, too template. Nothing survives except the neutral-base principle, the aqua hue (demoted to brand accent), the semantic status pairs, the Fraunces public display face (dropped in the first recut pass, reinstated 2026-08-28, and confined to the customer surface on 2026-08-31 — see §Typography), and the theming architecture. An earlier alpha (warm sand, Manrope 800, pills) is two generations gone.
 
 The same tokens serve all three surfaces. The public site gets slightly more air and the two sanctioned dark moments (long-term card, closing band); the portal and field screens are the dense subset — tables, forms, badges.
 
@@ -461,7 +470,10 @@ The same tokens serve all three surfaces. The public site gets slightly more air
 
 One fixed palette; **light and dark are two role mappings over it** (see `themes` frontmatter). Application code consumes roles (`background`, `card`, `copy`, `border`, `primary`), never raw tokens.
 
-- **Surface order keeps its logic.** Light: white ground and white card, separated by the hairline — structure is drawn, not filled. Dark: ink ground → ink-deep card (lighter, so it still sits above).
+- **Surface order keeps its logic.** Light: white ground and white card, separated by the hairline — structure is drawn, not filled. Dark: `dark-ground` → `dark-raised` card (lighter, so it still sits above).
+- **Dark is deliberately not as dark as the palette goes (softened 2026-08-31).** It ran on `ink` under pure `canvas` text — 18.9:1, the harshest pairing this palette can produce, on a screen someone reads all evening at a front desk. Past a point more contrast stops being legibility and starts being glare. The ground lifts 6% toward canvas and the text comes down off white, landing at **13.3:1** for headings and **8.5:1** for body: still far above AA, no longer a spotlight. `ink` and pure `canvas` are untouched, because they remain right for the job they were picked for — a near-black promo card or footer sitting on a *white* page, where maximum separation is the whole point. A dark interface and a dark object on a light page are different questions.
+- **The softening also repaired the text ladder.** Dark used to map `foreground` to canvas and `copy` to canvas-soft — **1.03:1 apart**, two names for one colour, which is why the nav had to reach past `copy` to `muted-foreground` to find an idle state. There are three real steps now: `dark-foreground` → `dark-copy` → `muted-foreground`.
+- **Every dark chip mixes over `dark-raised`**, not over `ink-deep`, so the surface set moves as one and the elevation order survives. The four dark tokens are **pinned literals rather than mix expressions** for a mechanical reason worth knowing: they are themselves mix sources, and a `color-mix()` nested inside another `color-mix()` does not resolve — the property computes to `transparent` and the fill disappears silently. Change them by recomputing the mix and writing the result down.
 - **The action colour shifts register, not hue.** Deep teal on the light ground becomes vivid aqua on the dark one — the primary button is always the one saturated solid on the screen, in both themes.
 - **Hairlines invert** (ink @ 12% ↔ white @ 14%; dividers 7% ↔ 9%).
 - **Status chips invert construction**: light = soft tint + deep text; dark = hue-tinted dark chip + light text. Hue mapping unchanged.
@@ -471,14 +483,16 @@ One fixed palette; **light and dark are two role mappings over it** (see `themes
 
 **Inter carries every surface** via `next/font`. Hierarchy is size, weight (400/500/600) and negative tracking at display sizes. Numbers in data contexts always set `tabular-nums`; booking references may use the system mono stack (`font-mono`) at body-sm.
 
-**One sanctioned exception (reinstated 2026-08-28): Fraunces 600 as the display face.** The public site is the surface that has to invite rather than operate, and it is where the brand shows personality in type. Fraunces is used for public-site display headlines — the hero `h1` and marketing-section `h2`s, i.e. type rendered at `display-md` and above on `(public)` routes — **and for the single `h1` page title of each portal screen** (at `display-sm`), so the brand voice carries through the booking journey instead of stopping at the portal door. One weight (600); it inherits the display tokens' sizes, line-heights and tracking. Everything else, on every surface — body, buttons, cards, captions, `display-xs` titles, section headings, micro-labels, the whole field surface — stays Inter. The failure mode this rule guards against is the alpha's — a loud face used everywhere at huge sizes — not the existence of a display face.
+**One sanctioned exception: Fraunces 600 as the display face, on the customer surface only.** The public site is the surface that has to invite rather than operate, and it is where the brand shows personality in type. Fraunces is used for public-site display headlines — the hero `h1` and marketing-section `h2`s, i.e. type rendered at `display-md` and above on `(public)` routes. One weight (600); it inherits the display tokens' sizes, line-heights and tracking. Everything else, on every surface — body, buttons, cards, captions, `display-xs` titles, section headings, micro-labels, **the whole portal**, the whole field surface — stays Inter. The failure mode this rule guards against is the alpha's — a loud face used everywhere at huge sizes — not the existence of a display face.
+
+**The portal's `h1` came off Fraunces on 2026-08-31**, having carried it since 2026-08-28 on the reasoning that the brand voice should follow the journey through the portal door. Three things said otherwise, in order of weight. It is **the same order of gesture as the lagoon hue** — a brand face and a brand colour say the same thing in different media — and the operations surfaces already refuse the hue on the grounds that teal is the customer's; refusing one and spending the other was the rule contradicting itself. At **`display-sm` the face is too small to show the character it is chosen for** — Fraunces is drawn to sing at large optical sizes, so the portal was paying the inconsistency in full and collecting little of the benefit. And a **booking reference is the worst thing to set in it**: `PV-6845` reads as a serif page title above a table that renders the identical string in mono, so one token wore two personalities on one screen. What falls out is a cleaner rule than the exception it replaces — **lagoon and Fraunces are the customer surface; monochrome and Inter are operations** — and one line of the type system now matches the colour system exactly.
 
 | Token | Size | Weight | Use |
 |---|---|---|---|
 | `display-xl` | 44px | 600 | Public hero only (Fraunces). |
 | `display-lg` | 34px | 600 | Public section headlines (Fraunces). |
 | `display-md` | 28px | 600 | Public sub-sections (Fraunces on public routes). |
-| `display-sm` | 22px | 600 | Portal page titles (Fraunces on the `h1` only); key figures. |
+| `display-sm` | 22px | 600 | Portal page titles (Inter, like the rest of the surface); key figures. |
 | `display-xs` | 17px | 600 | Card titles; portal section headings. |
 | `body-lg` | 16px | 400 | Lead paragraphs (public). |
 | `body-md` (+strong) | 14px | 400/500 | Default body; form inputs. |
@@ -582,11 +596,13 @@ The native `<input type="date">` this replaced was ours only until it was clicke
 
 **Portal topbar.** 56px tall — the 36px controls inside need air, at 48px they read as suffocated — filled with the page ground and separated by a bottom hairline. The sidebar's brand block takes the same height and the same bottom hairline, so **one unbroken rule runs across the full width**, separating the brand from both the navigation and the content — the sidebar's construction continued across the top. Breadcrumbs sit left in `body-sm` mute with chevron separators, the current crumb in ink at 500; the tools that belong to no single screen (search, notifications, theme) sit right. It is sticky, and it **never carries the page title** — that stays the screen's single `h1` beneath it. Below `lg` it also holds the drawer trigger.
 
+**Portal screen header.** The screen's single `h1` at `display-sm` in Inter, and two slots under it that are not interchangeable. **`meta` runs on the title's own line** and carries what identifies *this record* — a booking's status chip, the guest and their number — because a reference and the state it is in are one thought, read together, and stacking them made a two-line header out of a sentence that fits beside the title. **`description` sits on the line below** and explains *the screen*: what a list holds, what a form is for. A record screen takes `meta`; a list or form screen takes `description`; nothing takes both. A header keeps its actions only on screens with no control line (see *Filter rows*).
+
 **Portal nav items.** Every item pairs a 16px icon with its label. The active item is a `canvas-soft` chip with ink text at 500 — a quiet surface shift on the white ground, never a colour; hover is the same chip at a whisper. Icons render in `mute` and lift to ink with the chip — they follow the item's state, never carry the brand hue, and never appear without a label in the sidebar. **Every item belongs to a labelled group** — there is no ungrouped item, at either end of the list, and no hairline inside the nav: the labels are the structure, and a rule between them would be a second one saying the same thing. **The groups name areas of the work, not permission levels.** A group may hold a single item — Overview and Property both do — where the area is real and will fill; the test is whether the label names something, not how many screens are under it yet. Filing a lone screen into a neighbouring group to avoid a one-item label is the wrong trade when the groups mean different things: Units is a daily operations screen, and moving it under Admin would have said only administrators open it. What belongs to no area at all closes the list under **Others**: Settings lives there, because it is where anyone signed in manages their own account, and Admin would likewise have implied a permission it does not need.
 
-Group headers are `micro` in `mute`, and always sit **one step below the items they label** — they organise the nav, they do not compete with it. Light gets that from the roles directly (`mute` label under `copy` items); dark takes `muted-foreground` at 75%, because there the label and item roles would otherwise resolve to the same value. The result is one contrast ladder in both themes: label ≈ 5:1, idle ≈ 8–9:1, selected 18:1, with the label still clearing AA at 11px.
+Group headers are `micro` in `mute`, and always sit **one step below the items they label** — they organise the nav, they do not compete with it. Light gets that from the roles directly (`mute` label under `copy` items); dark takes `muted-foreground` at 85%, because there the label and item roles would otherwise resolve to the same value. The result is the same ladder shape in both themes, measured in the browser: **light 4.9 → 8.9 → 18:1** and **dark 5.5 → 7.1 → 12.3:1** for label → idle → selected. Dark's is the more compressed of the two because the whole theme is (§Dark theme), and the label is the number to watch when anything there moves: it is the only one near the 4.5 floor, which is why the dark opacity is 85% and not the 75% it carried until 2026-08-31.
 
-Idle items are `copy` in light but step down to **`muted-foreground` in dark**. This asymmetry is deliberate and load-bearing: `copy` sits a readable distance below `foreground` in light (`{colors.body}` against `{colors.ink}`) but nearly on top of it in dark (`{colors.canvas-soft}` against `{colors.canvas}`), where idle items would otherwise read as bright as the selected one.
+Idle items are `copy` in light but step down to **`muted-foreground` in dark**. The asymmetry was originally a workaround: dark's `copy` and `foreground` resolved to canvas-soft and canvas, 1.03:1 apart, so idle items would have read as bright as the selected one. The 2026-08-31 softening gave dark a real three-step ladder and removed that constraint — the step-down stays because it is *also* right on its own terms. A sidebar is a column of thirty-odd words a reader is scanning past, not reading; it wants to sit further back than body copy does, and the ladder it produces (label ≈5:1, idle ≈8–9:1, selected 18:1) is the one that makes "where am I" legible at a glance.
 
 **Overlays (dialogs, popovers, menus).** One shell: `{rounded.xl}` 14px, hairline, `shadow-overlay`, over the `scrim`. A dialog title is `display-xs` in Inter — a modal heading is a section heading, so the display face stays off it. Its footer holds at most one primary fill, like any other screen region. Menu items are *controls* inside that shell: `{rounded.md}` 6px, `body-sm`, 16px icons in mute, `muted` fill on focus. Menu group labels are `micro`, same as every other data-region label.
 
@@ -639,7 +655,7 @@ Never a **brand** fill — an avatar identifies a person, it is not an accent, a
 - Don't fill a button with ink **on the customer surface**; there, ink is text and the dark surfaces, and a black button reads as someone else's brand. The operations surfaces are the deliberate exception — their whole register is monochrome, so ink (white in dark) *is* their primary.
 - Don't use aqua as a success state; success is the `positive` pair.
 - Don't spend the `info` blue for emphasis, decoration or a bit of colour on a dull screen. It means "know this before you act" — a second blue panel on a screen halves what the first one is worth, and a blue that means nothing is the fastest way to teach staff to stop reading them.
-- Don't let Fraunces off display headlines — public `display-md`+ and the portal's `h1` page title only; never on the field surface, never for body or UI text. And no third family, anywhere.
+- Don't let Fraunces off the customer surface's display headlines — public `display-md`+ only; never in the portal, never on the field surface, never for body or UI text. And no third family, anywhere.
 - Don't build coloured band alternation; sections separate with hairlines on white.
 - Don't put a shadow on anything that is not an overlay. Cards, tables and chips are hairline-bounded and flat; `shadow-overlay` exists only for things that genuinely float (dialogs, menus, popovers, drawers, tooltips, toasts). The segmented control's active chip (`shadow-chip`) is the one exception — don't reuse it elsewhere.
 - Don't let bolded body text do a label's job; if it names a data region, it is `micro`.

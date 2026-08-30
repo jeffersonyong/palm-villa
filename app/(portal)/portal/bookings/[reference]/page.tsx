@@ -112,13 +112,16 @@ export default async function BookingDetailPage({ params }: PageProps) {
     <div className="max-w-[1120px]">
       <PageHeader
         title={booking.reference}
-        description={
-          <span className="flex flex-wrap items-center gap-sm">
+        // On the title's line, not under it: the reference, the state it is in
+        // and whose booking it is are one thought, and staff read them
+        // together (design.md §Components — Portal screen header).
+        meta={
+          <>
             <BookingStatusBadge status={booking.status} />
-            <span>
+            <span className="text-body-md text-copy">
               {booking.guestName} · {booking.guestPhone}
             </span>
-          </span>
+          </>
         }
         actions={
           <>
@@ -347,22 +350,25 @@ function PaymentsSection({
                 key={payment.id}
                 className="grid gap-xs border-b border-divider pb-lg last:border-0 last:pb-0"
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-sm">
-                  <span className="text-body-md text-foreground">
-                    {PAYMENT_METHOD_LABELS[payment.method]}
+                {/* Method and its state on one line, with the amount opposite:
+                    "Cash, verified, 200.00" is how the row is read aloud, so
+                    the chip belongs beside the method rather than on a line of
+                    its own underneath it. */}
+                <div className="flex flex-wrap items-center justify-between gap-sm">
+                  <span className="flex flex-wrap items-center gap-sm">
+                    <span className="text-body-md text-foreground">
+                      {PAYMENT_METHOD_LABELS[payment.method]}
+                    </span>
+                    <Badge tone={payment.status === 'verified' ? 'positive' : 'warning'}>
+                      {payment.status === 'verified' ? 'Verified' : 'Awaiting verification'}
+                    </Badge>
+                    {payment.matchKind === 'manual' ? (
+                      <Badge tone="neutral">Matched by hand</Badge>
+                    ) : null}
                   </span>
                   <span className="text-body-md-strong text-foreground tabular-nums">
                     BND {formatCents(payment.amount ?? payment.due)}
                   </span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-sm">
-                  <Badge tone={payment.status === 'verified' ? 'positive' : 'warning'}>
-                    {payment.status === 'verified' ? 'Verified' : 'Awaiting verification'}
-                  </Badge>
-                  {payment.matchKind === 'manual' ? (
-                    <Badge tone="neutral">Matched by hand</Badge>
-                  ) : null}
                 </div>
 
                 {payment.verifiedAt ? (

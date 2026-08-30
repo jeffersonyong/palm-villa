@@ -63,13 +63,15 @@ export default async function PortalOverviewPage() {
         }
       />
 
-      {/* Grouped stats as inset tiles inside the card — the Money card's
-          nested construction (design.md §Components — Cards) rather than one
-          wide surface split by dividers, so the strip reads as four objects
-          instead of four labels adrift on white. The dots carry each figure's
-          booking state; "occupied tonight" is a capacity, so it takes none. */}
-      <Card className="mt-xl grid grid-cols-2 gap-md lg:grid-cols-4">
-        <Card surface="inset">
+      {/* Four gray tiles standing on the page ground — no container. A card
+          around them was a box drawn around four boxes: the outer hairline
+          bounded nothing the tiles were not already bounding, and it made the
+          screen's first object a panel of chrome. Card-scale radius and
+          padding, because they sit in a card's slot (design.md §Components —
+          Cards). The dots carry each figure's booking state; "occupied
+          tonight" is a capacity, so it takes none. */}
+      <div className="mt-xl grid grid-cols-2 gap-md lg:grid-cols-4">
+        <Card surface="inset" placement="page">
           <Stat
             size="sm"
             label="Arrivals today"
@@ -77,7 +79,7 @@ export default async function PortalOverviewPage() {
             dot={<StatusDot tone="positive" />}
           />
         </Card>
-        <Card surface="inset">
+        <Card surface="inset" placement="page">
           <Stat
             size="sm"
             label="Departures today"
@@ -85,7 +87,7 @@ export default async function PortalOverviewPage() {
             dot={<StatusDot tone="active" />}
           />
         </Card>
-        <Card surface="inset">
+        <Card surface="inset" placement="page">
           <Stat
             size="sm"
             label="Awaiting payment"
@@ -93,7 +95,7 @@ export default async function PortalOverviewPage() {
             dot={<StatusDot tone="warning" />}
           />
         </Card>
-        <Card surface="inset">
+        <Card surface="inset" placement="page">
           <Stat
             size="sm"
             label="Occupied tonight"
@@ -101,7 +103,7 @@ export default async function PortalOverviewPage() {
             hint={`of ${snapshot.totalUnits} units`}
           />
         </Card>
-      </Card>
+      </div>
 
       <ArrivalsSection bookings={snapshot.arrivals} />
       <DeparturesSection bookings={snapshot.departures} />
