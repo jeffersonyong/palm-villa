@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { generateTempPassword } from '@/lib/auth/temp-password'
 import {
   Table,
   TableBody,
@@ -37,6 +38,7 @@ import type { RoleWithPermissions, StaffAccount } from '@/lib/db/staff'
 
 import {
   createStaffAction,
+  deleteStaffAction,
   resetStaffPasswordAction,
   setAccountStatusAction,
   setUserRolesAction,
@@ -65,7 +67,7 @@ interface StaffTabProps {
   currentUserId: string
 }
 
-type RowDialog = 'roles' | 'password' | 'status'
+type RowDialog = 'roles' | 'password' | 'status' | 'delete'
 
 export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
   const [activeRow, setActiveRow] = useState<{ userId: string; dialog: RowDialog } | null>(null)
@@ -152,6 +154,13 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
                       >
                         {account.disabled ? 'Enable account' : 'Disable account'}
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        disabled={account.id === currentUserId}
+                        onSelect={() => setActiveRow({ userId: account.id, dialog: 'delete' })}
+                      >
+                        Delete account
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -176,6 +185,10 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
       {activeAccount && activeRow?.dialog === 'status' ? (
         <AccountStatusDialog account={activeAccount} onClose={() => setActiveRow(null)} />
       ) : null}
+
+      {activeAccount && activeRow?.dialog === 'delete' ? (
+        <DeleteAccountDialog account={activeAccount} onClose={() => setActiveRow(null)} />
+      ) : null}
     </div>
   )
 }
@@ -199,6 +212,82 @@ function FormError({ state }: { state: RoleAdminState }) {
     <p role="alert" className="rounded-md bg-negative-tint p-md text-body-sm text-negative-deep">
       {state.message}
     </p>
+  )
+}
+
+/**
+ * The temporary-password input with its Generate control. Controlled, so the
+ * dialog still holds the value after a successful submit and can offer it
+ * for copying in the handover panel.
+ */
+function TempPasswordField({
+  id,
+  value,
+  onChange,
+  error,
+}: {
+  id: string
+  value: string
+  onChange: (value: string) => void
+  error?: string
+}) {
+  return (
+    <div className="grid gap-sm">
+      <div className="flex items-baseline justify-between gap-lg">
+        <Label htmlFor={id}>Temporary password</Label>
+        <button
+          type="button"
+          onClick={() => onChange(generateTempPassword())}
+          className="rounded-sm text-body-sm text-copy underline underline-offset-2 transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Generate
+        </button>
+      </div>
+      {/* Visible text on purpose: the admin reads it out or copies it to the
+          new staff member. */}
+      <Input
+        id={id}
+        name="tempPassword"
+        autoComplete="off"
+        required
+        minLength={6}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-invalid={error ? true : undefined}
+        className="font-mono"
+      />
+      <FieldError message={error} />
+    </div>
+  )
+}
+
+/**
+ * The success panel after a create or reset: the password, visible one last
+ * time, with a copy control so it can go straight into WhatsApp.
+ */
+function PasswordHandover({ note, password }: { note: string; password: string }) {
+  const [isCopied, setIsCopied] = useState(false)
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(password)
+      setIsCopied(true)
+    } catch {
+      // Clipboard refused (unusual browser context) — the password is visible
+      // and selectable right above the button, so nothing is lost.
+    }
+  }
+
+  return (
+    <div className="grid gap-md">
+      <p className="rounded-md bg-positive-tint p-md text-body-sm text-positive-deep">{note}</p>
+      <div className="flex items-center justify-between gap-lg rounded-md border border-border px-md py-sm">
+        <code className="font-mono text-body-md text-foreground select-all">{password}</code>
+        <Button type="button" variant="secondary" onClick={copy}>
+          {isCopied ? 'Copied' : 'Copy'}
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -258,6 +347,7 @@ export function NewStaffDialog({
 }) {
   const [state, formAction, isPending] = useActionState(createStaffAction, initialState)
   const [selectedRoleIds, setSelectedRoleIds] = useState<ReadonlySet<string>>(new Set())
+  const [tempPassword, setTempPassword] = useState('')
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -271,9 +361,10 @@ export function NewStaffDialog({
 
         {state.status === 'done' ? (
           <>
-            <p className="rounded-md bg-positive-tint p-md text-body-sm text-positive-deep">
-              Account created. Hand over the temporary password now — it is not shown again.
-            </p>
+            <PasswordHandover
+              note="Account created. Send them the temporary password now — it is not shown again after this."
+              password={tempPassword}
+            />
             <DialogFooter>
               <Button variant="secondary" onClick={onClose}>
                 Done
@@ -307,20 +398,12 @@ export function NewStaffDialog({
               <FieldError message={state.fieldErrors?.email} />
             </div>
 
-            <div className="grid gap-sm">
-              <Label htmlFor="staff-temp-password">Temporary password</Label>
-              {/* Visible text on purpose: the admin reads it out or copies it
-                  to the new staff member. */}
-              <Input
-                id="staff-temp-password"
-                name="tempPassword"
-                autoComplete="off"
-                required
-                minLength={6}
-                aria-invalid={state.fieldErrors?.tempPassword ? true : undefined}
-              />
-              <FieldError message={state.fieldErrors?.tempPassword} />
-            </div>
+            <TempPasswordField
+              id="staff-temp-password"
+              value={tempPassword}
+              onChange={setTempPassword}
+              error={state.fieldErrors?.tempPassword}
+            />
 
             <RoleCheckboxes
               roles={roles}
@@ -414,6 +497,7 @@ function ManageRolesDialog({
 
 function ResetPasswordDialog({ account, onClose }: { account: StaffAccount; onClose: () => void }) {
   const [state, formAction, isPending] = useActionState(resetStaffPasswordAction, initialState)
+  const [tempPassword, setTempPassword] = useState('')
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -428,9 +512,10 @@ function ResetPasswordDialog({ account, onClose }: { account: StaffAccount; onCl
 
         {state.status === 'done' ? (
           <>
-            <p className="rounded-md bg-positive-tint p-md text-body-sm text-positive-deep">
-              Password reset. Hand over the new temporary password now.
-            </p>
+            <PasswordHandover
+              note="Password reset. Send them the new temporary password now."
+              password={tempPassword}
+            />
             <DialogFooter>
               <Button variant="secondary" onClick={onClose}>
                 Done
@@ -441,18 +526,12 @@ function ResetPasswordDialog({ account, onClose }: { account: StaffAccount; onCl
           <form action={formAction} className="grid gap-lg">
             <input type="hidden" name="userId" value={account.id} />
 
-            <div className="grid gap-sm">
-              <Label htmlFor="reset-temp-password">Temporary password</Label>
-              <Input
-                id="reset-temp-password"
-                name="tempPassword"
-                autoComplete="off"
-                required
-                minLength={6}
-                aria-invalid={state.fieldErrors?.tempPassword ? true : undefined}
-              />
-              <FieldError message={state.fieldErrors?.tempPassword} />
-            </div>
+            <TempPasswordField
+              id="reset-temp-password"
+              value={tempPassword}
+              onChange={setTempPassword}
+              error={state.fieldErrors?.tempPassword}
+            />
 
             <FormError state={state} />
 
@@ -517,6 +596,45 @@ function AccountStatusDialog({ account, onClose }: { account: StaffAccount; onCl
                 : disabling
                   ? 'Disable account'
                   : 'Enable account'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/* ── Delete an unused account (F1) ─────────────────────────────────────── */
+
+function DeleteAccountDialog({ account, onClose }: { account: StaffAccount; onClose: () => void }) {
+  const [state, formAction, isPending] = useActionState(deleteStaffAction, initialState)
+
+  useEffect(() => {
+    if (state.status === 'done') onClose()
+  }, [state.status, onClose])
+
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
+      <DialogContent className="max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>Delete — {account.displayName}</DialogTitle>
+          <DialogDescription>
+            Only an account that has never acted can be deleted — one with history must be disabled
+            instead, so the audit trail stays whole. This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form action={formAction} className="grid gap-lg">
+          <input type="hidden" name="userId" value={account.id} />
+
+          <FormError state={state} />
+
+          <DialogFooter>
+            <Button type="button" variant="tertiary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="destructive" disabled={isPending}>
+              {isPending ? 'Deleting…' : 'Delete account'}
             </Button>
           </DialogFooter>
         </form>

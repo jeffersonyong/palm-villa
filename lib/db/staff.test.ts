@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test } from 'vitest'
 import { dataClient } from '@/lib/supabase/data'
 
 import { currentPropertyId } from './property'
-import { setRolePermissions, setUserRoles } from './staff'
+import { deleteStaffAccount, setRolePermissions, setUserRoles } from './staff'
 
 /**
  * The role-administration writes (migration 001100) against the real
@@ -176,5 +176,71 @@ describe('setUserRoles', () => {
     expect(
       (events as { action: string }[]).every((event) => event.action === 'staff.roles_set'),
     ).toBe(true)
+  })
+})
+
+describe('deleteStaffAccount', () => {
+  test('deletes an unused account, role grants included, and records it', async () => {
+    const userId = await givenAuthUser()
+    const actorId = await givenAuthUser()
+    const roleId = await givenScratchRole()
+    const propertyId = await currentPropertyId()
+
+    await dataClient()
+      .from('user_role')
+      .insert({ user_id: userId, property_id: propertyId, role_id: roleId })
+
+    const result = await deleteStaffAccount(userId, actorId)
+
+    expect(result.ok).toBe(true)
+
+    const { data: gone } = await dataClient().auth.admin.getUserById(userId)
+
+    expect(gone?.user ?? null).toBeNull()
+
+    const { data: grants } = await dataClient()
+      .from('user_role')
+      .select('role_id')
+      .eq('user_id', userId)
+
+    expect(grants).toHaveLength(0)
+
+    const { data: events } = await dataClient()
+      .from('audit_event')
+      .select('action, actor_id')
+      .eq('entity_id', userId)
+
+    expect(events).toHaveLength(1)
+    expect((events as { action: string; actor_id: string }[])[0]?.action).toBe(
+      'staff.account_deleted',
+    )
+    expect((events as { action: string; actor_id: string }[])[0]?.actor_id).toBe(actorId)
+  })
+
+  test('refuses an account that has acted', async () => {
+    const userId = await givenAuthUser()
+    const actorId = await givenAuthUser()
+    const propertyId = await currentPropertyId()
+
+    await dataClient().from('audit_event').insert({
+      property_id: propertyId,
+      actor_id: userId,
+      action: 'test.acted',
+      entity_type: 'test_entity',
+      entity_id: randomUUID(),
+    })
+
+    const result = await deleteStaffAccount(userId, actorId)
+
+    expect(result.ok).toBe(false)
+
+    if (!result.ok) {
+      expect(result.error.code).toBe('has_history')
+    }
+
+    // Still there — refusal must not be destructive.
+    const { data } = await dataClient().auth.admin.getUserById(userId)
+
+    expect(data?.user?.id).toBe(userId)
   })
 })

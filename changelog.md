@@ -6,6 +6,12 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-30 — staff provisioning ergonomics: generated passwords, copy handover, unused-account delete
+
+Follow-up polish on the F1 staff screen after using it. The New staff and Reset password dialogs gain a **Generate** control (crypto-random `xxxx-xxxx-xxxx`, lowercase, no look-alike characters — shaped to be read out loud) and the success panel now shows the password one last time with a **Copy** button, so it goes straight into WhatsApp instead of being retyped. **Delete account** joins the row menu with a deliberate boundary: only an account that has *never acted* can be deleted (typo cleanup); anything with audit history is refused with a message steering to disable — the restrict FK from migration 001000 remains the structural enforcement, the UI check just gives it a sentence. Deletions are themselves audited. Recorded in [architecture.md](docs/architecture.md) §3.
+
+---
+
 ## 2026-08-30 — portal UI polish: density, the segmented control, and the roles screen recut
 
 A client-review round over the built portal — four smaller asks that each pulled a system decision out with it. Everything stays inside the existing token set; design.md is updated in the same PR wherever a spec moved.

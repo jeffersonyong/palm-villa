@@ -39,10 +39,7 @@ function draftsFromRoles(
   return new Map(roles.map((role) => [role.id, new Set(role.permissions)]))
 }
 
-function isDraftDirty(
-  draft: ReadonlySet<string> | undefined,
-  saved: readonly string[],
-): boolean {
+function isDraftDirty(draft: ReadonlySet<string> | undefined, saved: readonly string[]): boolean {
   if (!draft) {
     return false
   }
@@ -181,17 +178,12 @@ function RoleForm({ role, draft, result, formAction, onSubmit, onToggle }: RoleF
                       name="permissions"
                       value={permission}
                       checked={isLocked || draft.has(permission)}
-                      onCheckedChange={(checked) =>
-                        onToggle(role.id, permission, checked === true)
-                      }
+                      onCheckedChange={(checked) => onToggle(role.id, permission, checked === true)}
                       // The Admin role always keeps role administration —
                       // enforced server-side too (lib/auth/role-guards.ts).
                       disabled={isLocked}
                     />
-                    <Label
-                      htmlFor={id}
-                      className={isLocked ? 'text-muted-foreground' : undefined}
-                    >
+                    <Label htmlFor={id} className={isLocked ? 'text-muted-foreground' : undefined}>
                       {PERMISSION_LABELS[permission]}
                     </Label>
                   </div>
