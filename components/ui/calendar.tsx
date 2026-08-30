@@ -413,7 +413,8 @@ function DayCell({
 
   // A spill day is still a real day and still selectable — it just belongs to
   // a month this grid is not about, so it recedes. Inside the band it comes
-  // back to `copy`, because a muted numeral on the band would read as disabled.
+  // back to the resting colour, because a muted numeral on the band would read
+  // as disabled.
   const isSpill = !cell.inMonth
 
   return (
@@ -447,18 +448,15 @@ function DayCell({
         onFocus={() => onHover(day)}
         className={cn(
           'relative flex size-9 items-center justify-center rounded-md text-body-sm transition-colors outline-none',
-          'text-copy hover:bg-muted hover:text-foreground',
-          isSpill && !isInBand && 'text-muted-foreground/70',
+          'hover:bg-muted',
           'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-popover',
-          isToday && !isFilled && !isSoftEnd && 'font-medium text-foreground',
-          // Both selected treatments pin their own hover. Without it the row's
-          // generic `hover:text-foreground` still applies — a hover variant and
-          // a base colour are not a conflict tailwind-merge resolves — and ink
-          // text lands on the ink fill, which is a day you cannot read.
-          isSoftEnd &&
-            'border border-border bg-card font-medium text-foreground hover:bg-card hover:text-foreground',
-          isFilled &&
-            'bg-primary font-medium text-primary-foreground hover:bg-primary hover:text-primary-foreground',
+          dayTextClasses({ isFilled, isSoftEnd, isToday, isRecessed: isSpill && !isInBand }),
+          (isToday || isSoftEnd || isFilled) && 'font-medium',
+          // Both selected treatments pin their own fill on hover, so a day
+          // already chosen does not flicker to the hover surface under the
+          // pointer.
+          isSoftEnd && 'border border-border bg-card hover:bg-card',
+          isFilled && 'bg-primary hover:bg-primary',
         )}
       >
         {/* The numeral is centred in the cell and stays centred: the today mark
@@ -474,4 +472,47 @@ function DayCell({
       </button>
     </td>
   )
+}
+
+/**
+ * A day's text colour, as exactly one class rather than a stack of them.
+ *
+ * **Three legible steps, and they are not the same three in each theme.**
+ * `copy` sits a readable distance below `foreground` in light but a whisker
+ * from it in dark (`canvas-soft` against `canvas`), so a dark resting day steps
+ * down to `muted-foreground` and the spill steps down again — otherwise dark
+ * shows two shades where light shows three, and hovering a day changes nothing
+ * you can see. This is the same asymmetry the sidebar and the segmented control
+ * already carry (design.md §Portal nav items); the calendar simply had not
+ * inherited it.
+ *
+ * Returned as one value because a base utility and a `dark:` one for the same
+ * property are *not* a conflict `tailwind-merge` resolves — both survive into
+ * the stylesheet and source order decides the winner. Layering them works until
+ * one day it quietly does not.
+ */
+function dayTextClasses({
+  isFilled,
+  isSoftEnd,
+  isToday,
+  isRecessed,
+}: {
+  isFilled: boolean
+  isSoftEnd: boolean
+  isToday: boolean
+  isRecessed: boolean
+}): string {
+  if (isFilled) {
+    return 'text-primary-foreground hover:text-primary-foreground'
+  }
+
+  if (isSoftEnd || isToday) {
+    return 'text-foreground hover:text-foreground'
+  }
+
+  if (isRecessed) {
+    return 'text-muted-foreground hover:text-foreground dark:text-muted-foreground/60'
+  }
+
+  return 'text-copy hover:text-foreground dark:text-muted-foreground'
 }
