@@ -11,7 +11,9 @@ import { cn } from '@/lib/utils'
  * it is a quiet surface shift, the same principle as the sidebar's muted active
  * chip. Here the muted track supplies the ground, so the active segment lifts
  * out of it as a white card chip. The 4px trigger radius is concentric inside
- * the 6px track with its 2px padding.
+ * the 6px track with its 2px padding — which is also why triggers stretch to
+ * the track's full height: a chip that floats with track showing above and
+ * below it breaks the concentric geometry and reads as misaligned.
  */
 function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
   return (
@@ -24,7 +26,7 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        'inline-flex h-control w-fit items-center gap-xxs rounded-md bg-muted p-xxs',
+        'inline-flex h-control w-fit items-stretch gap-xxs rounded-md bg-muted p-xxs',
         className,
       )}
       {...props}
@@ -37,7 +39,7 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        'inline-flex flex-1 items-center justify-center gap-sm rounded-sm border border-transparent px-md py-xs text-body-sm whitespace-nowrap text-copy transition-colors outline-none',
+        'inline-flex flex-1 items-center justify-center gap-sm rounded-sm border border-transparent px-md text-body-sm whitespace-nowrap text-copy transition-colors outline-none',
         'hover:text-foreground',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted',
         'data-[state=active]:border-border data-[state=active]:bg-card data-[state=active]:font-medium data-[state=active]:text-foreground',
