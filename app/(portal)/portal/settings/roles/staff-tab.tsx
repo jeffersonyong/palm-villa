@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useState } from 'react'
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal, Plus } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
 import { Badge } from '@/components/ui/badge'
@@ -74,7 +74,10 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
   return (
     <div className="grid gap-lg">
       <div className="flex justify-end">
-        <Button onClick={() => setIsNewStaffOpen(true)}>New staff account</Button>
+        <Button onClick={() => setIsNewStaffOpen(true)}>
+          <Plus aria-hidden />
+          New staff account
+        </Button>
       </div>
 
       {staff.length === 0 ? (
