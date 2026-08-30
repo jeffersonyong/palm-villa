@@ -37,6 +37,16 @@ export interface RecordCashState {
   message?: string
   fieldErrors?: Record<string, string>
   recorded?: { reference: string; amount: number }
+  /**
+   * What was typed, echoed back so a refusal does not empty the form.
+   *
+   * React resets an uncontrolled field once its form action resolves, so
+   * without this a clerk who is asked to justify an amount loses both the
+   * reference and the figure they just entered — and retyping the amount
+   * slightly differently would make the reason describe a discrepancy that no
+   * longer exists.
+   */
+  submitted?: { reference: string; amount: string; amountOverrideReason: string }
 }
 
 export async function recordCashAction(
@@ -57,7 +67,12 @@ export async function recordCashAction(
       }
     }
 
-    return { status: 'error', message: 'Check the highlighted fields.', fieldErrors }
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors,
+      submitted: echo(formData),
+    }
   }
 
   const input = parsed.data
@@ -73,6 +88,7 @@ export async function recordCashAction(
       status: 'error',
       message: `No booking found with reference ${input.reference.toUpperCase()}.`,
       fieldErrors: { reference: 'Check the reference and try again.' },
+      submitted: echo(formData),
     }
   }
 
@@ -91,10 +107,11 @@ export async function recordCashAction(
         fieldErrors: {
           amountOverrideReason: 'This is not the amount due. Say why.',
         },
+        submitted: echo(formData),
       }
     }
 
-    return { status: 'error', message: result.error.message }
+    return { status: 'error', message: result.error.message, submitted: echo(formData) }
   }
 
   revalidatePath('/portal/payments/cash')
@@ -106,5 +123,18 @@ export async function recordCashAction(
   return {
     status: 'done',
     recorded: { reference: booking.reference, amount },
+  }
+}
+
+/** The raw form values, for re-filling a refused form. */
+function echo(formData: FormData): {
+  reference: string
+  amount: string
+  amountOverrideReason: string
+} {
+  return {
+    reference: String(formData.get('reference') ?? ''),
+    amount: String(formData.get('amount') ?? ''),
+    amountOverrideReason: String(formData.get('amountOverrideReason') ?? ''),
   }
 }

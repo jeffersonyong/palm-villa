@@ -22,14 +22,17 @@ import { formatTimestamp } from '@/lib/domain/dates'
  */
 
 const ACTION_LABELS: Record<string, string> = {
-  'booking.created_walk_in': 'Created — walk-in, paid on the spot',
   'booking.amended': 'Amended',
   'booking.cancel': 'Cancelled',
   'booking.check_in': 'Checked in',
   'booking.check_out': 'Checked out',
-  'booking.verify_payment': 'Payment verified',
-  'booking.submit_payment': 'Payment submitted',
-  'booking.pay_in_full': 'Paid in full',
+  // The booking's own status move, distinct from the payment event beside it.
+  // Both are recorded, and labelling both "Payment verified" made the trail
+  // say the same thing twice — the money is the payment's event, the status
+  // is the booking's.
+  'booking.verify_payment': 'Booking confirmed',
+  'booking.pay_in_full': 'Booking confirmed',
+  'booking.submit_payment': 'Sent for verification',
   'booking.expire': 'Hold expired',
   'booking.mark_no_show': 'Marked no-show',
   'booking.hold': 'Held',
@@ -41,14 +44,35 @@ const ACTION_LABELS: Record<string, string> = {
 }
 
 /**
+ * Creation reads differently depending on how the guest paid, so it is the one
+ * label derived from the event's payload rather than its verb alone.
+ *
+ * "Paid on the spot" was true of every booking this product could make until
+ * the payments slice; it is a lie about a transfer booking, which is created
+ * precisely because the money has *not* been confirmed yet.
+ */
+function createdLabel(event: AuditEvent): string {
+  return event.after?.payment_method === 'bank_transfer'
+    ? 'Created — walk-in, paying by transfer'
+    : 'Created — walk-in, paid on the spot'
+}
+
+/**
  * An unmapped action still renders, as its raw verb.
  *
  * Falling back rather than hiding it: an event nobody wrote a label for is
  * still something that happened to this booking, and silently dropping it
  * would make the trail lie by omission.
  */
-function actionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action.replace(/^(booking|payment)\./, '').replace(/_/g, ' ')
+function actionLabel(event: AuditEvent): string {
+  if (event.action === 'booking.created_walk_in') {
+    return createdLabel(event)
+  }
+
+  return (
+    ACTION_LABELS[event.action] ??
+    event.action.replace(/^(booking|payment)\./, '').replace(/_/g, ' ')
+  )
 }
 
 /** The typed note a staff member left, when the action asked for one. */
@@ -84,7 +108,7 @@ export function BookingHistory({ events, actorNames }: BookingHistoryProps) {
             className="grid gap-xxs border-b border-divider pb-md last:border-0 last:pb-0"
           >
             <div className="flex flex-wrap items-baseline justify-between gap-sm">
-              <p className="text-body-sm-strong text-foreground">{actionLabel(event.action)}</p>
+              <p className="text-body-sm-strong text-foreground">{actionLabel(event)}</p>
               <p className="text-caption text-muted-foreground tabular-nums">
                 {formatTimestamp(event.at)}
               </p>

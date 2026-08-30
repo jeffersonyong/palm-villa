@@ -101,6 +101,9 @@ function ConfirmDialog({
 }: PaymentActionsProps & { onClose: () => void }) {
   const [state, formAction, isPending] = useActionState(verifyPaymentAction, initialState)
   const [typed, setTyped] = useState(() => formatCents(due))
+  // React empties an uncontrolled field once the action resolves, so a refused
+  // submission is re-filled from what the server echoed back.
+  const submitted = state.submitted
 
   useCompletion(state, bookingReference, guestName, onClose)
 
@@ -150,7 +153,7 @@ function ConfirmDialog({
             <Input
               id="observedReference"
               name="observedReference"
-              defaultValue={bookingReference}
+              defaultValue={submitted?.observedReference ?? bookingReference}
               autoComplete="off"
               className="font-mono"
             />
@@ -206,6 +209,7 @@ function VarianceNotice({ variance, state }: { variance: Cents; state: PaymentAc
         name="amountOverrideReason"
         required
         maxLength={280}
+        defaultValue={state.submitted?.amountOverrideReason ?? ''}
         placeholder={
           kind === 'short'
             ? 'Guest is settling the balance in cash on arrival'
@@ -234,6 +238,7 @@ function ManualMatchDialog({
 }: PaymentActionsProps & { onClose: () => void }) {
   const [state, formAction, isPending] = useActionState(matchPaymentManuallyAction, initialState)
   const [typed, setTyped] = useState(() => formatCents(due))
+  const submitted = state.submitted
 
   useCompletion(state, bookingReference, guestName, onClose)
 
@@ -290,6 +295,7 @@ function ManualMatchDialog({
               maxLength={120}
               autoComplete="off"
               placeholder="SITI BINTI ABDULLAH"
+              defaultValue={submitted?.observedSender ?? ''}
               aria-invalid={Boolean(state.fieldErrors?.observedSender)}
             />
             {state.fieldErrors?.observedSender ? (
@@ -308,7 +314,7 @@ function ManualMatchDialog({
               name="observedOn"
               type="date"
               required
-              defaultValue={todayInBrunei()}
+              defaultValue={submitted?.observedOn || todayInBrunei()}
               className="w-[180px]"
               aria-invalid={Boolean(state.fieldErrors?.observedOn)}
             />
@@ -325,6 +331,7 @@ function ManualMatchDialog({
               autoComplete="off"
               className="font-mono"
               placeholder="Leave blank if none was quoted"
+              defaultValue={submitted?.observedReference ?? ''}
             />
           </div>
 
@@ -336,6 +343,7 @@ function ManualMatchDialog({
               required
               maxLength={280}
               placeholder="Sender name matches the guest and the amount is exact"
+              defaultValue={submitted?.matchReason ?? ''}
               aria-invalid={Boolean(state.fieldErrors?.matchReason)}
             />
             {state.fieldErrors?.matchReason ? (

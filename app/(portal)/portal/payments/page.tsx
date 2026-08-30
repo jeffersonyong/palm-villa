@@ -110,7 +110,14 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
                 <TableHead>Reference</TableHead>
                 <TableHead>Guest</TableHead>
                 <TableHead>Arriving</TableHead>
-                <TableHead className="text-right">Amount expected</TableHead>
+                {/* prd.md §10.4 names this column "amount expected", and that
+                    is exactly what it is while a payment is waiting. Once one
+                    is settled the useful figure is what actually arrived, so
+                    the header follows the view rather than claiming one thing
+                    and showing another. */}
+                <TableHead className="text-right">
+                  {view === 'waiting' ? 'Amount expected' : 'Amount'}
+                </TableHead>
                 <TableHead className="text-right">Waiting</TableHead>
                 <TableHead>Slip</TableHead>
                 {mayVerify ? <TableHead className="text-right">Action</TableHead> : null}
@@ -157,8 +164,17 @@ function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean
       <TableCell className="text-foreground">{payment.guestName}</TableCell>
       <TableCell>{payment.checkIn ? formatStayDate(payment.checkIn) : '—'}</TableCell>
       <TableCell className="text-right tabular-nums">
-        BND {formatCents(payment.due)}
-        {isRepriced ? (
+        {/* Waiting: what the guest was asked for. Settled: what actually
+            arrived — showing the amount due against a payment already taken
+            reads as the sum that was banked, and for anything confirmed with a
+            discrepancy that would be the wrong number. */}
+        BND {formatCents(isPending ? payment.due : (payment.amount ?? payment.due))}
+        {!isPending && payment.amount !== null && payment.amount !== payment.expected ? (
+          <span className="mt-xxs block text-caption text-muted-foreground">
+            of {formatCents(payment.expected)} due
+          </span>
+        ) : null}
+        {isPending && isRepriced ? (
           <span className="mt-xxs flex justify-end">
             <Badge tone="warning">Repriced</Badge>
           </span>

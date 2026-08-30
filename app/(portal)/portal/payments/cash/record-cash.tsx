@@ -70,6 +70,10 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
   }, [state.status, state.recorded, onClose, router])
 
   const needsReason = Boolean(state.fieldErrors?.amountOverrideReason)
+  // React empties an uncontrolled field once the action resolves, so a refused
+  // submission is re-filled from what the server echoed back rather than
+  // making the clerk type it all again.
+  const submitted = state.submitted
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -92,6 +96,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
               autoComplete="off"
               autoFocus
               placeholder="PV-4821"
+              defaultValue={submitted?.reference ?? ''}
               className="w-[180px] font-mono uppercase tabular-nums"
               aria-invalid={Boolean(state.fieldErrors?.reference)}
             />
@@ -111,6 +116,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
                 required
                 autoComplete="off"
                 className="w-[160px] tabular-nums"
+                defaultValue={submitted?.amount ?? ''}
                 aria-invalid={Boolean(state.fieldErrors?.amount)}
               />
             </div>
@@ -134,6 +140,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
                 required
                 maxLength={280}
                 placeholder="Late check-out collected at the desk"
+                defaultValue={submitted?.amountOverrideReason ?? ''}
                 aria-invalid
               />
               <p className="text-caption text-destructive">

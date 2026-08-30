@@ -56,6 +56,15 @@ export interface PaymentActionState {
   status: 'idle' | 'error' | 'done'
   message?: string
   fieldErrors?: Record<string, string>
+  /**
+   * What was typed, echoed back so a refusal does not empty the form.
+   *
+   * React resets an uncontrolled field once its form action resolves. Without
+   * this, a clerk who is asked for a reason loses the observations they just
+   * transcribed off a bank statement — which is the one thing in this dialog
+   * that is genuinely tedious to re-enter.
+   */
+  submitted?: Record<string, string>
 }
 
 export async function verifyPaymentAction(
@@ -79,7 +88,7 @@ export async function verifyPaymentAction(
   const payment = await getPaymentById(input.paymentId)
 
   if (!payment) {
-    return { status: 'error', message: 'That payment no longer exists.' }
+    return { status: 'error', message: 'That payment no longer exists.', submitted: echo(formData) }
   }
 
   // Matched against what is due now, read fresh. The form's figure is never
@@ -97,6 +106,7 @@ export async function verifyPaymentAction(
       status: 'error',
       message: match.error.message,
       fieldErrors: { amountOverrideReason: match.error.message },
+      submitted: echo(formData),
     }
   }
 
@@ -110,7 +120,7 @@ export async function verifyPaymentAction(
   })
 
   if (!result.ok) {
-    return { status: 'error', message: result.error.message }
+    return { status: 'error', message: result.error.message, submitted: echo(formData) }
   }
 
   revalidateAfterPayment(result.payment.bookingReference)
@@ -138,7 +148,7 @@ export async function matchPaymentManuallyAction(
   const payment = await getPaymentById(input.paymentId)
 
   if (!payment) {
-    return { status: 'error', message: 'That payment no longer exists.' }
+    return { status: 'error', message: 'That payment no longer exists.', submitted: echo(formData) }
   }
 
   const match = checkPaymentMatch({
@@ -154,6 +164,7 @@ export async function matchPaymentManuallyAction(
       status: 'error',
       message: match.error.message,
       fieldErrors: { [match.error.field]: match.error.message },
+      submitted: echo(formData),
     }
   }
 
@@ -170,7 +181,7 @@ export async function matchPaymentManuallyAction(
   })
 
   if (!result.ok) {
-    return { status: 'error', message: result.error.message }
+    return { status: 'error', message: result.error.message, submitted: echo(formData) }
   }
 
   revalidateAfterPayment(result.payment.bookingReference)
@@ -188,6 +199,19 @@ function revalidateAfterPayment(reference: string): void {
   revalidatePath(`/portal/bookings/${reference}`)
   revalidatePath('/portal/bookings')
   revalidatePath('/portal')
+}
+
+/** The raw form values, for re-filling a refused form. */
+function echo(formData: FormData): Record<string, string> {
+  const submitted: Record<string, string> = {}
+
+  for (const [key, value] of formData.entries()) {
+    if (typeof value === 'string') {
+      submitted[key] = value
+    }
+  }
+
+  return submitted
 }
 
 function fields(parsed: { error: z.ZodError }): Record<string, string> {
