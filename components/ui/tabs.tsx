@@ -49,10 +49,11 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
         'text-copy dark:text-muted-foreground',
         'hover:text-foreground dark:hover:text-foreground',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted',
-        // In dark the chip lifts to `secondary` — one step lighter than card
-        // (canvas 8% over ink-deep) — because dark elevation reads through a
-        // lighter fill, and card against the muted track is a whisker apart.
-        'data-[state=active]:bg-card data-[state=active]:font-medium data-[state=active]:text-foreground data-[state=active]:shadow-chip dark:data-[state=active]:bg-secondary dark:data-[state=active]:text-foreground',
+        // `tab-chip` is card white in light; in dark it lifts a half-step
+        // above card (canvas 4% over ink-deep), because dark elevation reads
+        // through a lighter fill and card against the muted track is a
+        // whisker apart.
+        'data-[state=active]:bg-tab-chip data-[state=active]:font-medium data-[state=active]:text-foreground data-[state=active]:shadow-chip dark:data-[state=active]:text-foreground',
         'disabled:pointer-events-none disabled:opacity-50',
         '[&_svg]:size-4 [&_svg]:shrink-0',
         className,
