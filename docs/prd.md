@@ -275,6 +275,8 @@ total = (base_rate × nights)
 **[C]** Maximum advance booking period is two months.
 **[C]** Full payment is required to secure a unit. Unpaid bookings do not hold inventory.
 
+**[A] One qualification, added when the payment layer was built.** A booking taken at the desk and paid by bank transfer holds its unit from the moment it is created — its occupancy row counts against the exclusion constraint — and stays held until someone confirms the money landed. That is §9.3's checkout timer in substance, but **nothing expires it**: the duration is §18 N7, still open, and the expiry job in architecture.md §6.3 is unbuilt. Until N7 is answered, an abandoned transfer blocks a unit until a staff member cancels it. The verification queue sorts oldest-first and shows the wait so this is visible rather than silent.
+
 ### 9.2 Booking states
 
 ```
@@ -298,6 +300,8 @@ Framed to the client as a **checkout timer**, not a reservation: the unit is hel
 **[C]** Staff can check availability and create a booking on the spot, using the same availability check, pricing engine, and document capture as the public flow.
 
 **[C] v1 supports walk-ins only.** The guest is present and pays immediately. The booking is created and paid in a single action, and no unit is ever held against an unpaid promise.
+
+**[A] "Pays immediately" covers both methods in §10.1.** Cash is counted at the desk and the booking is confirmed outright. A bank transfer is sent from the guest's phone while they stand there — payment made, but not yet payment seen — so the booking goes to the verification queue and someone checks the bank (§10.3). Neither is the booked-ahead, pay-on-arrival case excluded below: in both, the guest has actually paid. This is what gives the queue something to work on before the public flow (phase two) exists. The qualification in §9.1 applies to the transfer path.
 
 **[C] Booked-ahead, pay-on-arrival is explicitly excluded from v1.** Staff cannot reserve a unit for a customer who intends to pay cash on the day. Advance bookings require payment, in line with stated policy.
 
@@ -357,11 +361,21 @@ Each row shows reference, guest name, amount expected, time waiting, and the upl
 - Provide a **manual match escape hatch**. Customers will omit the reference. Without a way to attach an arbitrary payment to a booking, staff will revert to WhatsApp.
 - Treat the slip as **evidence, not verification**. Slips can be edited. Staff still check the bank. The slip's value is dispute resolution and automatic inclusion in the accounting pack.
 
+**As built.** A mismatched amount can only be confirmed through an explicit override that records a reason — architecture.md §6.2 tightened "must flag" into that, and it is enforced by a database constraint, not only by the screen. An overpayment is refused without a reason exactly as firmly as a short payment: an overpayment is a refund conversation, and refunds are §18 N5, open.
+
+**[A] Slip display is deferred.** The queue ships showing "No slip on file" and says on screen where upload arrives. Nothing could upload one yet — the customer-facing upload is phase two (A6) and document storage is its own slice — and this bullet's own "evidence, not verification" is what makes the queue complete without it. **This is a delta against scope-of-capabilities.md B4, which promises the slip; it is flagged to the client rather than quietly amended.**
+
 ### 10.5 Cash
 
 **[C]** Cash is collected on site and reconciled against recorded transactions and receipts, verified by Finance.
 
 Requirements: record who collected, when, and against which booking. Provide a daily cash-up view comparing recorded cash against banked amounts.
+
+**[A] "Verified by Finance" is read as the daily cash-up**, not a per-payment approval step. A cash payment is therefore recorded as verified when it is taken — there is no bank to check, the clerk is holding the notes — and Finance's reconciliation is the separate cash-up screen. If the client means a per-payment sign-off, that is a third payment status and an additional screen; additive, but it should be asked rather than assumed.
+
+**[A] Who and when are the acting user and the moment of recording**, not editable fields. The schema carries both as columns, so back-dating or recording on a colleague's behalf is a later form change rather than a migration.
+
+**Cash gets the same amount rule as a transfer.** Where the notes do not add up to the booking total, a person says why; the system does not write its own justification to satisfy the constraint.
 
 ### 10.6 Later (out of scope for v1)
 
@@ -522,12 +536,13 @@ Card gateway, automated statement matching, WhatsApp Business API, full tenancy 
 | N4 | Family bundle rule for combinations other than 2+1 and 2+2? |
 | N5 | Which deposit is forfeited on cancellation: booking payment or security deposit? **The cancel screen is built and waiting on this** — it moves no money today and says so on screen (§9.6). |
 | N6 | Standard check-in time, so "early check-in" is definable? |
-| N7 | Agreed hold duration for unpaid bookings? |
+| N7 | Agreed hold duration for unpaid bookings? **The verification queue is built and nothing expires a pending transfer** — a booking paid by transfer holds its unit until it is confirmed or cancelled by hand (§9.1). This is now the second screen waiting on an answer, alongside N5. |
 | N8 | Total sofa beds available across the property? |
 | N9 | Can guests choose or request a bed configuration? |
 | N10 | How are units labelled on the doors? Nothing in this document records the building's real unit numbering, so the schema seeds a provisional scheme (`3B-01`) purely so units are distinguishable on screen. Staff will not recognise it. |
-| N11 | Which permission gates the check-in action? §4's canonical set has no string for it, so Security currently holds `booking.view` alone and cannot be granted check-in without one being defined. |
+| N11 | Which permission gates the check-in action? §4's canonical set has no string for it, so Security currently holds `booking.view` alone and cannot be granted check-in without one being defined. **The same gap applies to payments:** confirming a mismatched amount and matching a transfer by hand both reuse `payment.verify`, on the reading that all three are one job — checking the bank and deciding the money is there. If either should be restricted further, that is a new permission string. Note the consequence of §4 as written: Finance can override and hand-match but cannot record cash. |
 | N12 | May a booking be amended after the guest has checked in, and if so what does a mid-stay reprice charge for nights already taken? See §9.6. |
+| N13 | Is there an outcome for a transfer that never arrives, other than cancelling the booking? The payment record deliberately has no `rejected` status — B4–B7 describes no action for it, and inventing one would be the schema deciding a product question. |
 
 ### Non-blocking, configurable later
 
