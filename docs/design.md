@@ -13,15 +13,6 @@ colors:
   mute: "#6a7076"
   canvas: "#ffffff"
   canvas-soft: "#f7f7f8"
-
-  # The dark theme's own grounds and text (softened 2026-08-31). Derived by
-  # stepping ink and canvas toward each other, then pinned as literals —
-  # they are mix *sources* for every dark chip, and a color-mix nested in
-  # another color-mix resolves to transparent. See §Dark theme.
-  dark-ground: "#1e1f22"      # oklab(canvas 6%, ink) — the dark page ground
-  dark-raised: "#282b30"      # oklab(canvas 6%, ink-deep) — the dark card
-  dark-foreground: "#e7e7e7"  # oklab(ink 9%, canvas) — headings, strong text
-  dark-copy: "#bababb"        # oklab(ink 26%, canvas) — body copy
   positive: "#1fa552"
   positive-deep: "#166534"
   positive-tint: "#e2f5e9"
@@ -363,11 +354,11 @@ themes:
     avatar-lime: "{colors.identity-lime-tint}"
     avatar-lime-foreground: "{colors.identity-lime-deep}"
   dark:
-    background: "{colors.dark-ground}"
-    card: "{colors.dark-raised}"
-    muted: "mix({colors.dark-raised} 55%, {colors.dark-ground})"
-    foreground: "{colors.dark-foreground}"
-    copy: "{colors.dark-copy}"
+    background: "{colors.ink}"
+    card: "{colors.ink-deep}"
+    muted: "mix({colors.ink-deep} 55%, {colors.ink})"
+    foreground: "{colors.canvas}"
+    copy: "{colors.canvas-soft}"
     muted-foreground: "mix({colors.mute} 55%, {colors.canvas-soft})"
     # 9% / 7% — anything stronger reads as wireframe against the ink ground.
     border: "{colors.canvas} @ 9%"
@@ -378,42 +369,42 @@ themes:
     primary-invert: "{colors.brand-deep}"
     primary-invert-foreground: "{colors.canvas}"
     primary-invert-hover: "mix({colors.brand-deep} 78%, {colors.brand})"
-    accent: "mix({colors.brand} 20%, {colors.dark-raised})"
+    accent: "mix({colors.brand} 20%, {colors.ink-deep})"
     accent-foreground: "{colors.brand-active}"
-    selection: "mix({colors.brand} 34%, {colors.dark-raised})"
+    selection: "mix({colors.brand} 34%, {colors.ink-deep})"
     selection-foreground: "{colors.canvas}"
-    secondary: "mix({colors.canvas} 8%, {colors.dark-raised})"
+    secondary: "mix({colors.canvas} 8%, {colors.ink-deep})"
     secondary-foreground: "{colors.canvas-soft}"
     invert-surface: "{colors.canvas-soft}"
     invert-foreground: "{colors.ink}"
-    footer-surface: "mix({colors.dark-raised} 60%, {colors.dark-ground})"
+    footer-surface: "mix({colors.ink-deep} 60%, {colors.ink})"
     ring: "{colors.brand}"
     # Dimming an ink ground with ink does nothing, so dark reaches past the
     # palette to black.
     scrim: "black @ 60%"
-    badge-positive: "mix({colors.positive} 28%, {colors.dark-raised})"
+    badge-positive: "mix({colors.positive} 28%, {colors.ink-deep})"
     badge-positive-foreground: "{colors.canvas-soft}"
-    badge-warning: "mix({colors.warning} 26%, {colors.dark-raised})"
+    badge-warning: "mix({colors.warning} 26%, {colors.ink-deep})"
     badge-warning-foreground: "{colors.canvas-soft}"
-    badge-negative: "mix({colors.negative} 28%, {colors.dark-raised})"
+    badge-negative: "mix({colors.negative} 28%, {colors.ink-deep})"
     badge-negative-foreground: "{colors.canvas-soft}"
-    notice-info: "mix({colors.info} 32%, {colors.dark-raised})"
+    notice-info: "mix({colors.info} 32%, {colors.ink-deep})"
     notice-info-foreground: "{colors.canvas-soft}"
-    badge-active: "mix({colors.brand} 24%, {colors.dark-raised})"
+    badge-active: "mix({colors.brand} 24%, {colors.ink-deep})"
     badge-active-foreground: "{colors.brand-active}"
-    avatar-sky: "mix({colors.identity-sky} 40%, {colors.dark-raised})"
+    avatar-sky: "mix({colors.identity-sky} 40%, {colors.ink-deep})"
     avatar-sky-foreground: "{colors.canvas-soft}"
-    avatar-blue: "mix({colors.identity-blue} 40%, {colors.dark-raised})"
+    avatar-blue: "mix({colors.identity-blue} 40%, {colors.ink-deep})"
     avatar-blue-foreground: "{colors.canvas-soft}"
-    avatar-violet: "mix({colors.identity-violet} 40%, {colors.dark-raised})"
+    avatar-violet: "mix({colors.identity-violet} 40%, {colors.ink-deep})"
     avatar-violet-foreground: "{colors.canvas-soft}"
-    avatar-fuchsia: "mix({colors.identity-fuchsia} 40%, {colors.dark-raised})"
+    avatar-fuchsia: "mix({colors.identity-fuchsia} 40%, {colors.ink-deep})"
     avatar-fuchsia-foreground: "{colors.canvas-soft}"
-    avatar-rose: "mix({colors.identity-rose} 40%, {colors.dark-raised})"
+    avatar-rose: "mix({colors.identity-rose} 40%, {colors.ink-deep})"
     avatar-rose-foreground: "{colors.canvas-soft}"
-    avatar-orange: "mix({colors.identity-orange} 40%, {colors.dark-raised})"
+    avatar-orange: "mix({colors.identity-orange} 40%, {colors.ink-deep})"
     avatar-orange-foreground: "{colors.canvas-soft}"
-    avatar-lime: "mix({colors.identity-lime} 40%, {colors.dark-raised})"
+    avatar-lime: "mix({colors.identity-lime} 40%, {colors.ink-deep})"
     avatar-lime-foreground: "{colors.canvas-soft}"
   # The operations surfaces (portal + field) are monochrome — these override
   # the maps above inside `[data-surface="ops"]`; everything not listed
@@ -470,10 +461,7 @@ The same tokens serve all three surfaces. The public site gets slightly more air
 
 One fixed palette; **light and dark are two role mappings over it** (see `themes` frontmatter). Application code consumes roles (`background`, `card`, `copy`, `border`, `primary`), never raw tokens.
 
-- **Surface order keeps its logic.** Light: white ground and white card, separated by the hairline — structure is drawn, not filled. Dark: `dark-ground` → `dark-raised` card (lighter, so it still sits above).
-- **Dark is deliberately not as dark as the palette goes (softened 2026-08-31).** It ran on `ink` under pure `canvas` text — 18.9:1, the harshest pairing this palette can produce, on a screen someone reads all evening at a front desk. Past a point more contrast stops being legibility and starts being glare. The ground lifts 6% toward canvas and the text comes down off white, landing at **13.3:1** for headings and **8.5:1** for body: still far above AA, no longer a spotlight. `ink` and pure `canvas` are untouched, because they remain right for the job they were picked for — a near-black promo card or footer sitting on a *white* page, where maximum separation is the whole point. A dark interface and a dark object on a light page are different questions.
-- **The softening also repaired the text ladder.** Dark used to map `foreground` to canvas and `copy` to canvas-soft — **1.03:1 apart**, two names for one colour, which is why the nav had to reach past `copy` to `muted-foreground` to find an idle state. There are three real steps now: `dark-foreground` → `dark-copy` → `muted-foreground`.
-- **Every dark chip mixes over `dark-raised`**, not over `ink-deep`, so the surface set moves as one and the elevation order survives. The four dark tokens are **pinned literals rather than mix expressions** for a mechanical reason worth knowing: they are themselves mix sources, and a `color-mix()` nested inside another `color-mix()` does not resolve — the property computes to `transparent` and the fill disappears silently. Change them by recomputing the mix and writing the result down.
+- **Surface order keeps its logic.** Light: white ground and white card, separated by the hairline — structure is drawn, not filled. Dark: ink ground → ink-deep card (lighter, so it still sits above).
 - **The action colour shifts register, not hue.** Deep teal on the light ground becomes vivid aqua on the dark one — the primary button is always the one saturated solid on the screen, in both themes.
 - **Hairlines invert** (ink @ 12% ↔ white @ 14%; dividers 7% ↔ 9%).
 - **Status chips invert construction**: light = soft tint + deep text; dark = hue-tinted dark chip + light text. Hue mapping unchanged.
@@ -540,7 +528,11 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **Buttons.** `primary` (the action colour: lagoon on the customer surface, ink/white on the operations surfaces — see *Two accents, one system*), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (portal 32px, field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour. A primary **create** action leads with a plus glyph — "+ New booking" — never a bare verb-noun label. An **edit form's Save is dirty-gated**: disabled until the draft actually differs from what is saved, so an idle click cannot fire a no-op write or its audit event. Create forms stay enabled — they are never a no-op.
 
-**Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline, no shadow. `card-inset` is the faint gray panel *inside* a card (fine print, deposit notes, grouped stats) at `{rounded.md}`. **A stat strip is a card holding one inset tile per figure** — the deposit panel's nested construction, not one wide surface split by dividers: four labels adrift on a shared white ground read as a spreadsheet header, where four tiles read as four objects. The overlay components earn their feel from exactly this nesting, and a page card with no interior surface at all (no inset, no header or footer strip, no rule) is usually a card that has not been designed yet. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment. Interactive cards signal hover by strengthening the hairline and a 1px lift, never a shadow.
+**Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline, no shadow. `card-inset` is the faint gray panel — fine print, deposit notes, grouped stats. The overlay components earn their feel from nesting one surface inside another, and a page card with no interior surface at all (no inset, no header or footer strip, no rule) is usually a card that has not been designed yet.
+
+**A gray panel takes its radius and padding from where it sits, not from what it is** — the same rule as a notice, and for the same reason: the radius scale measures *scale*, not component. Nested inside a card it is an inset at `{rounded.md}` with `{spacing.md}`; standing on the page ground it is card-scale at `{rounded.lg}` with `{spacing.lg}`, because it fills a card's slot beside real cards, where 6px reads as a control that grew. Nested is the default.
+
+**A stat strip is one tile per figure, and it takes no container.** The tiles are gray panels at page scale, sitting directly on the ground. A card around them was a box drawn around four boxes — the outer hairline bounded nothing the tiles were not already bounding, and it opened the screen with a panel of chrome. What the tiles replaced was worse still: four labels adrift on one wide surface split by dividers, which reads as a spreadsheet header rather than four objects. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment. Interactive cards signal hover by strengthening the hairline and a 1px lift, never a shadow.
 
 **Inputs.** White, hairline, `{rounded.md}` 6px, `body-md` 14px, height 36px (portal 32px), horizontal padding `{spacing.md}`. Focus: the border strengthens to the action colour plus a faint same-hue halo (`ring`) — decisive, not a glow. Labels are `body-sm-strong` ink. Field-screen inputs use the `touch` size.
 
@@ -600,9 +592,9 @@ The native `<input type="date">` this replaced was ours only until it was clicke
 
 **Portal nav items.** Every item pairs a 16px icon with its label. The active item is a `canvas-soft` chip with ink text at 500 — a quiet surface shift on the white ground, never a colour; hover is the same chip at a whisper. Icons render in `mute` and lift to ink with the chip — they follow the item's state, never carry the brand hue, and never appear without a label in the sidebar. **Every item belongs to a labelled group** — there is no ungrouped item, at either end of the list, and no hairline inside the nav: the labels are the structure, and a rule between them would be a second one saying the same thing. **The groups name areas of the work, not permission levels.** A group may hold a single item — Overview and Property both do — where the area is real and will fill; the test is whether the label names something, not how many screens are under it yet. Filing a lone screen into a neighbouring group to avoid a one-item label is the wrong trade when the groups mean different things: Units is a daily operations screen, and moving it under Admin would have said only administrators open it. What belongs to no area at all closes the list under **Others**: Settings lives there, because it is where anyone signed in manages their own account, and Admin would likewise have implied a permission it does not need.
 
-Group headers are `micro` in `mute`, and always sit **one step below the items they label** — they organise the nav, they do not compete with it. Light gets that from the roles directly (`mute` label under `copy` items); dark takes `muted-foreground` at 85%, because there the label and item roles would otherwise resolve to the same value. The result is the same ladder shape in both themes, measured in the browser: **light 4.9 → 8.9 → 18:1** and **dark 5.5 → 7.1 → 12.3:1** for label → idle → selected. Dark's is the more compressed of the two because the whole theme is (§Dark theme), and the label is the number to watch when anything there moves: it is the only one near the 4.5 floor, which is why the dark opacity is 85% and not the 75% it carried until 2026-08-31.
+Group headers are `micro` in `mute`, and always sit **one step below the items they label** — they organise the nav, they do not compete with it. Light gets that from the roles directly (`mute` label under `copy` items); dark takes `muted-foreground` at 75%, because there the label and item roles would otherwise resolve to the same value. The result is one contrast ladder in both themes: label ≈ 5:1, idle ≈ 8–9:1, selected 18:1, with the label still clearing AA at 11px.
 
-Idle items are `copy` in light but step down to **`muted-foreground` in dark**. The asymmetry was originally a workaround: dark's `copy` and `foreground` resolved to canvas-soft and canvas, 1.03:1 apart, so idle items would have read as bright as the selected one. The 2026-08-31 softening gave dark a real three-step ladder and removed that constraint — the step-down stays because it is *also* right on its own terms. A sidebar is a column of thirty-odd words a reader is scanning past, not reading; it wants to sit further back than body copy does, and the ladder it produces (label ≈5:1, idle ≈8–9:1, selected 18:1) is the one that makes "where am I" legible at a glance.
+Idle items are `copy` in light but step down to **`muted-foreground` in dark**. This asymmetry is deliberate and load-bearing: `copy` sits a readable distance below `foreground` in light (`{colors.body}` against `{colors.ink}`) but nearly on top of it in dark (`{colors.canvas-soft}` against `{colors.canvas}`), where idle items would otherwise read as bright as the selected one.
 
 **Overlays (dialogs, popovers, menus).** One shell: `{rounded.xl}` 14px, hairline, `shadow-overlay`, over the `scrim`. A dialog title is `display-xs` in Inter — a modal heading is a section heading, so the display face stays off it. Its footer holds at most one primary fill, like any other screen region. Menu items are *controls* inside that shell: `{rounded.md}` 6px, `body-sm`, 16px icons in mute, `muted` fill on focus. Menu group labels are `micro`, same as every other data-region label.
 

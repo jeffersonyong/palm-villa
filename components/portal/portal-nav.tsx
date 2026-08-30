@@ -49,7 +49,7 @@ export function PortalNav() {
                 for free (`mute` under the items' `copy`); dark needs the alpha,
                 because there both roles would otherwise resolve to the same
                 muted value. */}
-            <p className="px-md pb-xs micro-label text-muted-foreground dark:text-muted-foreground/85">
+            <p className="px-md pb-xs micro-label text-muted-foreground dark:text-muted-foreground/75">
               {group.label}
             </p>
             <ul className="space-y-xxs">
