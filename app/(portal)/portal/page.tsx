@@ -6,6 +6,7 @@ import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
 import { Stat } from '@/components/portal/stat'
+import { StatusDot } from '@/components/portal/status-dot'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -48,51 +49,62 @@ export default async function PortalOverviewPage() {
         title="Dashboard"
         description={formatStayDate(today)}
         actions={
-          <Button asChild>
-            <Link href="/portal/bookings/new">
-              <Plus aria-hidden />
-              New booking
-            </Link>
-          </Button>
+          <>
+            <Button asChild variant="tertiary">
+              <Link href="/portal/bookings">All bookings</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/portal/bookings/new">
+                <Plus aria-hidden />
+                New booking
+              </Link>
+            </Button>
+          </>
         }
       />
 
-      <Card className="mt-xl grid grid-cols-2 gap-lg p-lg lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-divider">
-        <Stat
-          size="sm"
-          label="Arrivals today"
-          value={snapshot.arrivals.length}
-          className="lg:px-lg lg:first:pl-0"
-        />
-        <Stat
-          size="sm"
-          label="Departures today"
-          value={snapshot.departures.length}
-          className="lg:px-lg"
-        />
-        <Stat
-          size="sm"
-          label="Awaiting payment"
-          value={snapshot.awaitingVerificationCount}
-          className="lg:px-lg"
-        />
-        <Stat
-          size="sm"
-          label="Occupied tonight"
-          value={snapshot.occupiedTonightCount}
-          hint={`of ${snapshot.totalUnits} units`}
-          className="lg:px-lg lg:last:pr-0"
-        />
+      {/* Grouped stats as inset tiles inside the card — the Money card's
+          nested construction (design.md §Components — Cards) rather than one
+          wide surface split by dividers, so the strip reads as four objects
+          instead of four labels adrift on white. The dots carry each figure's
+          booking state; "occupied tonight" is a capacity, so it takes none. */}
+      <Card className="mt-xl grid grid-cols-2 gap-md lg:grid-cols-4">
+        <Card surface="inset">
+          <Stat
+            size="sm"
+            label="Arrivals today"
+            value={snapshot.arrivals.length}
+            dot={<StatusDot tone="positive" />}
+          />
+        </Card>
+        <Card surface="inset">
+          <Stat
+            size="sm"
+            label="Departures today"
+            value={snapshot.departures.length}
+            dot={<StatusDot tone="active" />}
+          />
+        </Card>
+        <Card surface="inset">
+          <Stat
+            size="sm"
+            label="Awaiting payment"
+            value={snapshot.awaitingVerificationCount}
+            dot={<StatusDot tone="warning" />}
+          />
+        </Card>
+        <Card surface="inset">
+          <Stat
+            size="sm"
+            label="Occupied tonight"
+            value={snapshot.occupiedTonightCount}
+            hint={`of ${snapshot.totalUnits} units`}
+          />
+        </Card>
       </Card>
 
       <ArrivalsSection bookings={snapshot.arrivals} />
       <DeparturesSection bookings={snapshot.departures} />
-
-      <p className="mt-xl">
-        <Button asChild variant="tertiary">
-          <Link href="/portal/bookings">All bookings</Link>
-        </Button>
-      </p>
     </>
   )
 }
@@ -110,7 +122,7 @@ function SectionHeading({ id, title, note }: { id: string; title: string; note: 
 
 function ArrivalsSection({ bookings }: { bookings: readonly Booking[] }) {
   return (
-    <section aria-labelledby="arrivals-heading" className="mt-xl">
+    <section aria-labelledby="arrivals-heading" className="mt-2xl">
       <SectionHeading
         id="arrivals-heading"
         title="Arriving today"
@@ -119,12 +131,12 @@ function ArrivalsSection({ bookings }: { bookings: readonly Booking[] }) {
 
       {bookings.length === 0 ? (
         <EmptyState
-          className="mt-lg"
+          className="mt-md"
           title="No arrivals today"
           description="Nothing is due to check in. Confirmed bookings appear here on their check-in date."
         />
       ) : (
-        <Table containerClassName="mt-lg">
+        <Table containerClassName="mt-md">
           <TableHeader>
             <TableHeaderRow>
               <TableHead>Reference</TableHead>
@@ -165,7 +177,7 @@ function ArrivalsSection({ bookings }: { bookings: readonly Booking[] }) {
 
 function DeparturesSection({ bookings }: { bookings: readonly Booking[] }) {
   return (
-    <section aria-labelledby="departures-heading" className="mt-xl">
+    <section aria-labelledby="departures-heading" className="mt-2xl">
       <SectionHeading
         id="departures-heading"
         title="Leaving today"
@@ -174,12 +186,12 @@ function DeparturesSection({ bookings }: { bookings: readonly Booking[] }) {
 
       {bookings.length === 0 ? (
         <EmptyState
-          className="mt-lg"
+          className="mt-md"
           title="No departures today"
           description="Nothing is due out. Checked-in bookings appear here on their check-out date."
         />
       ) : (
-        <Table containerClassName="mt-lg">
+        <Table containerClassName="mt-md">
           <TableHeader>
             <TableHeaderRow>
               <TableHead>Reference</TableHead>

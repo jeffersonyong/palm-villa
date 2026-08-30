@@ -146,19 +146,21 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
 
       {hasDates && (
         <Card className="mt-xl">
-          <dl className="grid grid-cols-2 gap-lg sm:grid-cols-4">
+          {/* Grouped stats as inset tiles — the dashboard strip's construction,
+              so the two screens' "how many" readouts are the same object. */}
+          <dl className="grid grid-cols-2 gap-md sm:grid-cols-4">
             {config.unitTypes.map((type) => {
               const free = availableByType[type.id] ?? 0
               const total = totalByType[type.id] ?? 0
 
               return (
-                <div key={type.id}>
+                <Card key={type.id} surface="inset">
                   <dt className="micro-label text-muted-foreground">{type.name}</dt>
                   <dd className="mt-xs text-display-xs text-foreground tabular-nums">
                     {free}
                     <span className="text-body-sm text-muted-foreground"> of {total} free</span>
                   </dd>
-                </div>
+                </Card>
               )
             })}
           </dl>

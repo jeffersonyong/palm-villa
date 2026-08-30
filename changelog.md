@@ -6,6 +6,20 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-31 — the pages learn the overlays' surface grammar
+
+The dropdowns had a DNA the pages didn't: nested surfaces, tight clusters, small ornaments doing precise jobs. The pages were two planes — white ground, white card, hairline between — spread at one even rhythm, which reads as a wireframe next to the overlays' layering. This slice redistributes the existing surface system onto the pages; no new colour, no new tokens.
+
+### Changed
+- **Empty states inverted: absence is recessed, not drawn.** The empty-state card was a raised hairline card around nothing — the emptiest screens were the most built-up. It is now a recessed `muted` panel with no hairline, the segmented control's track without its chip, which gives the portal one rule of surface grammar: content is drawn, absence is recessed. [design.md §Empty states](docs/design.md).
+- **Stat strips are nested tiles, not divided surfaces.** The dashboard's four figures and the walk-in screen's availability counts sat on one wide card split by dividers — four labels adrift on white. Each figure now sits in its own `card-inset` tile inside the card, the Money card's deposit-panel construction, so the strip reads as four objects and the two screens' "how many" readouts are the same object. [design.md §Cards](docs/design.md).
+- **Portal rhythm clusters instead of spreading.** Dashboard sections step apart at `2xl` while a heading now sits `md` above the table it names — tight inside a group, a real gap between groups, the menu's own rhythm at page scale. The stray "All bookings" button orbiting the page bottom moved into the header's action cluster. [design.md §Layout](docs/design.md).
+- **The Stay card reads as a panel of figures.** Its four readouts sit in two columns rather than a single stack that read as a form nobody can fill in.
+
+### Added
+- **`StatusDot`** — the status hue at icon scale, extracted from the bookings filter into `components/portal/status-dot.tsx` and now also marking the dashboard's stat labels: a green point on arrivals, the checked-in aqua on departures, amber on awaiting payment. A capacity figure (occupied tonight) deliberately takes none. [design.md §Status dots](docs/design.md) owns the rules: never without a label, never on a figure that is not a state count.
+- **Faces beyond the roster.** The cash log's collected-by column and every entry of a booking's history now carry the 24px identity avatar — the derived colour finally doing its job on the operational screens, not just Roles & staff. System events wear the neutral seedless face so the trail keeps one left edge. [design.md §Avatars](docs/design.md).
+
 ## 2026-08-31 — a mark on the portal, a colour for the things staff must read
 
 Four small things the portal had been getting away with, each of which was really a rule that had never been written down.

@@ -185,7 +185,9 @@ function StaySummary({ booking }: { booking: Booking }) {
         Stay
       </h2>
       <Card className="mt-md">
-        <dl className="grid gap-md">
+        {/* Two columns, not a stack: four readouts in one card read as a panel
+            of figures, and stacked they read as a form nobody can fill in. */}
+        <dl className="grid gap-md sm:grid-cols-2">
           <Field label="Unit" value={booking.unitRef} mono />
           <Field
             label="Dates"
