@@ -88,14 +88,10 @@ function DialogContent({
   )
 }
 
-/** Title + description block. Keeps the close button clear of the title. */
+/** Title + description block. */
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
-    <div
-      data-slot="dialog-header"
-      className={cn('flex flex-col gap-xs pr-2xl', className)}
-      {...props}
-    />
+    <div data-slot="dialog-header" className={cn('flex flex-col gap-xs', className)} {...props} />
   )
 }
 
@@ -109,11 +105,16 @@ function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
   )
 }
 
+/**
+ * The close button overlaps only this line, so the clearance for it belongs
+ * here rather than on the header — the description sits below the button and
+ * runs the dialog's full width.
+ */
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn('text-display-xs text-foreground', className)}
+      className={cn('pr-2xl text-display-xs text-foreground', className)}
       {...props}
     />
   )
