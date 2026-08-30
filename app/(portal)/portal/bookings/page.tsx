@@ -48,11 +48,29 @@ export const metadata: Metadata = {
  */
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; from?: string; to?: string }>
+  /** `status` repeats, one param per chosen status. */
+  searchParams: Promise<{ status?: string | string[]; from?: string; to?: string }>
 }
 
 function isBookingStatus(value: string): value is BookingStatus {
   return (BOOKING_STATUSES as readonly string[]).includes(value)
+}
+
+/**
+ * The chosen statuses, in the canonical order rather than the URL's.
+ *
+ * Repeated params (`?status=confirmed&status=checked_in`) rather than one
+ * comma-joined value: it is what a browser does with a multi-valued field, what
+ * `URLSearchParams` reads back without help, and it keeps each value a whole
+ * token so a stray comma cannot invent a third status. Unknown values are
+ * dropped rather than erroring — a hand-edited URL should narrow the list, not
+ * break the screen.
+ */
+function readStatuses(value: string | string[] | undefined): readonly BookingStatus[] {
+  const raw = value === undefined ? [] : Array.isArray(value) ? value : [value]
+  const chosen = new Set(raw.filter(isBookingStatus))
+
+  return BOOKING_STATUSES.filter((status) => chosen.has(status))
 }
 
 export default async function BookingsListPage({ searchParams }: PageProps) {
@@ -80,7 +98,7 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
   // Anything unusable — a hand-edited URL, half a date pair, a reversed range —
   // falls back to no filter rather than erroring. A staff member who mistypes a
   // date should see the full list, not a stack trace.
-  const status = params.status && isBookingStatus(params.status) ? params.status : undefined
+  const statuses = readStatuses(params.status)
 
   const hasRange =
     Boolean(params.from && params.to) &&
@@ -99,37 +117,40 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
   // a single-day filter is `[d, d+1)`, which is exactly "stays touching d".
   const range = from && to ? { start: from, end: addDays(to, 1) } : undefined
 
-  const filter: BookingListFilter = { status, overlaps: range }
+  const filter: BookingListFilter = { statuses, overlaps: range }
   const bookings = await listBookings(filter)
-  const isFiltered = Boolean(status || range)
+  const isFiltered = statuses.length > 0 || Boolean(range)
 
   return (
     <>
       <PageHeader
         title="Bookings"
         description="Every booking across all streams — the single source of truth."
-        actions={
+      />
+
+      {/* One control row: what is being shown on the left, and what can be done
+          about it on the right. The chips name their field and report their
+          value, so the state of the list is legible without opening anything;
+          the count sits next to the create action because the two together are
+          the whole answer to "what is here, and what now". The screen's one
+          primary fill lives here rather than in the header — design.md allows
+          one per screen region, and this row is now that region. */}
+      <div className="mt-xl flex flex-wrap items-center gap-md">
+        <BookingsFilters statuses={statuses} from={from} to={to} />
+
+        <div className="ml-auto flex items-center gap-lg">
+          <h2 id="results-heading" className="micro-label text-muted-foreground">
+            {bookings.length} {bookings.length === 1 ? 'booking' : 'bookings'}
+            {isFiltered ? ' matching' : ''}
+          </h2>
+
           <Button asChild>
             <Link href="/portal/bookings/new">
               <Plus aria-hidden />
               New booking
             </Link>
           </Button>
-        }
-      />
-
-      {/* The filter row. It reads as a row of chips rather than a form: each
-          chip names its field and reports its value, so the state of the list
-          is legible without opening anything, and the count of what came back
-          sits at the end of the same line — the answer to "did that do
-          anything" beside the control that asked. */}
-      <div className="mt-xl flex flex-wrap items-center justify-between gap-md">
-        <BookingsFilters status={status} from={from} to={to} />
-
-        <h2 id="results-heading" className="micro-label text-muted-foreground">
-          {bookings.length} {bookings.length === 1 ? 'booking' : 'bookings'}
-          {isFiltered ? ' matching' : ''}
-        </h2>
+        </div>
       </div>
 
       <section aria-labelledby="results-heading" className="mt-md">

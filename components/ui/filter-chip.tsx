@@ -49,8 +49,6 @@ function FilterChip({ label, value, className, children, ...props }: FilterChipP
   return (
     <button
       type="button"
-      data-slot="filter-chip"
-      data-active={isActive || undefined}
       className={cn(
         'group inline-flex h-control items-center gap-sm rounded-md border border-border px-md text-body-sm whitespace-nowrap transition-colors outline-none',
         'bg-card text-copy hover:bg-muted hover:text-foreground',
@@ -61,6 +59,11 @@ function FilterChip({ label, value, className, children, ...props }: FilterChipP
         className,
       )}
       {...props}
+      // After the spread, deliberately: a Radix trigger handed this chip via
+      // `asChild` sets its own `data-slot`, and every chip in a filter row
+      // should answer to the same name whatever opened it.
+      data-slot="filter-chip"
+      data-active={isActive || undefined}
     >
       <span className={cn(isActive && 'text-muted-foreground')}>{label}</span>
       {isActive ? <span className="font-medium text-foreground">{value}</span> : null}

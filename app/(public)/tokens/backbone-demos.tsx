@@ -28,8 +28,8 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { FilterChip } from '@/components/ui/filter-chip'
 import { Label } from '@/components/ui/label'
+import { MultiSelectFilter } from '@/components/ui/multi-select-filter'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Select,
@@ -250,7 +250,7 @@ export function FormControlDemo() {
 
 export function DropdownDemos() {
   const [unit, setUnit] = useState('studio')
-  const [status, setStatus] = useState<string | null>(null)
+  const [statuses, setStatuses] = useState<readonly string[]>([])
   const [range, setRange] = useState<StayDateRange | null>(null)
 
   return (
@@ -283,23 +283,19 @@ export function DropdownDemos() {
 
       <Row
         title="Filter row"
-        note="The same Select and a date range wearing the filter dress: the field name lives inside the control, an unset filter shows only its name, and a set one fills with canvas-soft and puts its value in ink. Two clicks on the calendar define both ends — there is no Apply."
+        note="The same shell in the filter dress: the field name lives inside the control, an unset filter shows only its name, and a set one fills with canvas-soft and puts its value in ink. Status takes several answers and stays open while you pick them; the date range takes two clicks and closes — there is no Apply on either."
       >
-        <Select
-          value={status ?? 'any'}
-          onValueChange={(next) => setStatus(next === 'any' ? null : next)}
-        >
-          <SelectTrigger asChild>
-            <FilterChip label="Status" value={status} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="any">Any status</SelectItem>
-            <SelectSeparator />
-            <SelectItem value="Confirmed">Confirmed</SelectItem>
-            <SelectItem value="Awaiting payment">Awaiting payment</SelectItem>
-            <SelectItem value="Checked in">Checked in</SelectItem>
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter
+          label="Status"
+          options={[
+            { value: 'Confirmed', label: 'Confirmed' },
+            { value: 'Awaiting payment', label: 'Awaiting payment' },
+            { value: 'Checked in', label: 'Checked in' },
+            { value: 'Cancelled', label: 'Cancelled' },
+          ]}
+          selected={statuses}
+          onChange={setStatuses}
+        />
 
         <DateRangePicker label="Staying" value={range} onChange={setRange} />
       </Row>

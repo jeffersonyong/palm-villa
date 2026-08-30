@@ -188,7 +188,13 @@ export async function countAvailableByType(range: DateRange): Promise<Record<str
 }
 
 export interface BookingListFilter {
-  status?: BookingStatus
+  /**
+   * Any of these statuses. An empty or absent list is no status filter at all
+   * — "all of them" and "none chosen" are the same question, and treating an
+   * empty list as "match nothing" would turn clearing a filter into an empty
+   * screen.
+   */
+  statuses?: readonly BookingStatus[]
   /** Stays touching this half-open range, matching availability semantics. */
   overlaps?: DateRange
 }
@@ -209,8 +215,8 @@ export async function listBookings(filter: BookingListFilter = {}): Promise<read
     .order('check_in')
     .order('reference')
 
-  if (filter.status) {
-    query.eq('status', filter.status)
+  if (filter.statuses && filter.statuses.length > 0) {
+    query.in('status', [...filter.statuses])
   }
 
   // Half-open overlap: a stay ending on the day the filter range starts does

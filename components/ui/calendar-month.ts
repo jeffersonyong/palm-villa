@@ -24,6 +24,21 @@ export type CalendarMonth = string
  */
 export const CELLS_IN_GRID = 42
 
+/**
+ * One cell of a month grid.
+ *
+ * Every cell carries a real date — the leading and trailing ones belong to the
+ * neighbouring months and render muted. Blanks were the first shape of this and
+ * were wrong twice over: a half-empty first row reads as a rendering fault
+ * rather than a design, and a range crossing a month boundary broke into two
+ * disconnected bands with a hole where the week actually continues.
+ */
+export interface CalendarCell {
+  date: StayDate
+  /** False for the spill days from the previous or next month. */
+  inMonth: boolean
+}
+
 /** Monday-first, which is how Brunei — and the rest of `en-GB` — reads a week. */
 export const WEEKDAYS = [
   { short: 'Mo', long: 'Monday' },
@@ -81,11 +96,15 @@ export function shiftMonth(month: CalendarMonth, delta: number): CalendarMonth {
 }
 
 /**
- * The 42 cells of a month grid, Monday-first. `null` is a cell that belongs to
- * a neighbouring month and renders blank — with two months side by side,
- * spilling each one's edges into the other only duplicates dates.
+ * The 42 cells of a month grid, Monday-first, every one of them a real date.
+ *
+ * The two months shown side by side therefore overlap at their edges — the last
+ * days of January appear again as February's lead. That duplication is the
+ * price of a grid with no holes in it, and it is the right way round: a
+ * calendar week is a continuous run of days, and a picker that drew it with
+ * gaps would be lying about the week.
  */
-export function monthGrid(month: CalendarMonth): readonly (StayDate | null)[] {
+export function monthGrid(month: CalendarMonth): readonly CalendarCell[] {
   const parsed = parseCalendarMonth(month)
   const year = Number(parsed.slice(0, 4))
   const index = Number(parsed.slice(5, 7)) - 1
@@ -97,9 +116,30 @@ export function monthGrid(month: CalendarMonth): readonly (StayDate | null)[] {
 
   return Array.from({ length: CELLS_IN_GRID }, (_, cell) => {
     const day = cell - lead + 1
+    const inMonth = day >= 1 && day <= dayCount
 
-    return day >= 1 && day <= dayCount ? `${parsed}-${pad(day)}` : null
+    return {
+      // Date.UTC normalises day 0 and day 32 into the neighbouring month, which
+      // is exactly what the spill cells need.
+      date: new Date(Date.UTC(year, index, day)).toISOString().slice(0, 10),
+      inMonth,
+    }
   })
+}
+
+/** The days of the month itself, without the spill. */
+export function daysInMonth(month: CalendarMonth): readonly StayDate[] {
+  return monthGrid(month)
+    .filter((cell) => cell.inMonth)
+    .map((cell) => cell.date)
+}
+
+/** The last day of a month, as a stay date. */
+export function lastDayOfMonth(month: CalendarMonth): StayDate {
+  const days = daysInMonth(month)
+
+  // A month always has days, but the type does not know that.
+  return days[days.length - 1] ?? firstDayOfMonth(month)
 }
 
 /** The grid's heading, e.g. `September 2026`. */

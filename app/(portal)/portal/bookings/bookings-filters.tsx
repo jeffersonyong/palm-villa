@@ -12,14 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import type { StayDateRange } from '@/components/ui/calendar'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
-import { FilterChip } from '@/components/ui/filter-chip'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-} from '@/components/ui/select'
+import { MultiSelectFilter, type MultiSelectOption } from '@/components/ui/multi-select-filter'
 import { BOOKING_STATUSES, type BookingStatus } from '@/lib/domain/booking-state'
 import type { StayDate } from '@/lib/domain/dates'
 import { cn } from '@/lib/utils'
@@ -42,28 +35,40 @@ import { cn } from '@/lib/utils'
  * page rejected as malformed is not one the row will claim is on.
  */
 
-/** Radix Select has no empty value, so "no filter" needs a name of its own. */
-const ANY_STATUS = 'any'
-
 interface BookingsFiltersProps {
-  status?: BookingStatus
+  /** The chosen statuses, in canonical order. Empty means any. */
+  statuses: readonly BookingStatus[]
   /** Both ends inclusive — the days the calendar shows as selected. */
   from?: StayDate
   to?: StayDate
 }
 
-export function BookingsFilters({ status, from, to }: BookingsFiltersProps) {
+/**
+ * The status options, built once. Each carries its badge colour as a dot, so
+ * the list of choices reads in the same language as the table below it.
+ */
+const STATUS_OPTIONS: readonly MultiSelectOption<BookingStatus>[] = BOOKING_STATUSES.map(
+  (status) => ({
+    value: status,
+    label: bookingStatusLabel(status),
+    leading: <StatusDot status={status} />,
+  }),
+)
+
+export function BookingsFilters({ statuses, from, to }: BookingsFiltersProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const range: StayDateRange | null = from && to ? { start: from, end: to } : null
-  const isFiltered = Boolean(status || range)
+  const isFiltered = statuses.length > 0 || range !== null
 
-  function apply(nextStatus: BookingStatus | null, nextRange: StayDateRange | null) {
+  function apply(nextStatuses: readonly BookingStatus[], nextRange: StayDateRange | null) {
     const params = new URLSearchParams()
 
-    if (nextStatus) {
-      params.set('status', nextStatus)
+    // One param per status rather than one comma-joined value — see the page's
+    // reader for why.
+    for (const status of nextStatuses) {
+      params.append('status', status)
     }
 
     if (nextRange) {
@@ -89,36 +94,21 @@ export function BookingsFilters({ status, from, to }: BookingsFiltersProps) {
         isPending && 'opacity-60',
       )}
     >
-      <Select
-        value={status ?? ANY_STATUS}
-        onValueChange={(next) => apply(next === ANY_STATUS ? null : (next as BookingStatus), range)}
-      >
-        <SelectTrigger asChild>
-          <FilterChip label="Status" value={status ? bookingStatusLabel(status) : null} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY_STATUS} leading={<StatusDot status={null} />}>
-            Any status
-          </SelectItem>
-          <SelectSeparator />
-          {BOOKING_STATUSES.map((value) => (
-            <SelectItem key={value} value={value} leading={<StatusDot status={value} />}>
-              {bookingStatusLabel(value)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* Several statuses at once, because "confirmed and checked in" — who is
+          actually in the building — is a real question this list is asked. */}
+      <MultiSelectFilter
+        label="Status"
+        options={STATUS_OPTIONS}
+        selected={statuses}
+        onChange={(next) => apply(next, range)}
+      />
 
       {/* "Staying", not "from / to": the filter matches stays that overlap the
           range, not stays that begin inside it. */}
-      <DateRangePicker
-        label="Staying"
-        value={range}
-        onChange={(next) => apply(status ?? null, next)}
-      />
+      <DateRangePicker label="Staying" value={range} onChange={(next) => apply(statuses, next)} />
 
       {isFiltered ? (
-        <Button variant="ghost" onClick={() => apply(null, null)}>
+        <Button variant="ghost" onClick={() => apply([], null)}>
           <X aria-hidden />
           Clear
         </Button>
@@ -144,15 +134,7 @@ const DOT_CLASSES: Record<BookingStatusTone, string> = {
   neutral: 'bg-mute',
 }
 
-function StatusDot({ status }: { status: BookingStatus | null }) {
-  if (status === null) {
-    // "Any status" is the absence of a status, so it gets the outline of a dot
-    // rather than one — and the option list stays aligned on one column.
-    return (
-      <span aria-hidden className="size-1.5 shrink-0 rounded-full ring-1 ring-muted-foreground" />
-    )
-  }
-
+function StatusDot({ status }: { status: BookingStatus }) {
   return (
     <span
       aria-hidden
