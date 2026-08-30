@@ -108,6 +108,7 @@ The PRD's entity list (§6.2) is the conceptual model. Normative implementation 
 - Timestamps are `timestamptz` in UTC. Stay dates are `date` interpreted in the property's timezone (`Asia/Brunei`, UTC+8, no DST).
 - Property-scoped tables also carry `unique (property_id, id)`, so children reference them with a **composite foreign key**. A row can then never point at a parent in another property — the data-layer half of §11, at the cost of one extra index.
 - `vehicle_registration` is on the **booking**, not an array on the guest as the PRD §6.2 sketch has it: Security checks the vehicle that arrived for *this* stay, and the same guest returning in a different car is a different fact.
+- **`payment` carries two amounts, and they mean different things.** `expected_amount_cents` is what the booking was worth when the payment was raised *and again when it was verified* — §6.2 explains why it is refreshed rather than snapshotted — while `amount_cents` is what was actually observed, null until somebody has looked. Neither is a balance: nothing sums payments against a total to produce an amount owed, because PRD §9.6 keeps money movement out of this system and N5 is open. Two payments against one booking are two recorded facts.
 - `unit.status` (the PRD §6.4 lifecycle) is **not yet modelled**. Nothing built writes or reads it and most of it is derivable from occupancy; an unread status column that availability silently ignores is worse than none. It lands with the housekeeping and inspection slice, which needs the one part that is not derivable (`out_of_service`).
 
 ### 5.2 Double-booking prevention (structural)
@@ -136,6 +137,8 @@ Day passes have no unit; capacity is enforced by a transactional check against t
 ### 5.3 Booking state machine
 
 States per PRD §9.2: `draft → held → awaiting_payment_verification → confirmed → checked_in → completed`, with exits to `expired`, `cancelled`, `no_show`. Transitions are implemented as a single function in `lib/domain` that validates legality; no code path sets `status` directly. Every transition writes an audit event.
+
+`submit_payment` leaves `draft` as well as `held`. The two are the same event for the same reason — the customer says they have paid and somebody must check — and differ only in whether a hold preceded it. A booking taken at the desk and paid by transfer needs to reach the queue, and the alternative, walking it through `held`, would fabricate a state that is never persisted and that carries hold semantics (`hold_expires_at`, §6.3's expiry job) this path does not have. The routes to `confirmed` are unchanged, so "no booking is confirmed without a verified payment or a walk-in payment" still holds.
 
 Legality is decided in TypeScript by `transition()`; persistence is `transition_booking()`, which makes the status write and its audit event atomic and updates `where status = <the status the caller read>`. Zero rows updated means the booking moved underneath the caller — two staff members acting on it at once — which is returned as a message, not a lost write. The booking write path (`create_walk_in_booking()`) is passed the status the state machine already derived; the schema never chooses one.
 
@@ -169,6 +172,16 @@ The occupancy update is the statement that wins or loses the race against the §
 ### 6.2 Verification queue
 Backed by bookings in `awaiting_payment_verification`. Confirming requires `payment.verify`, records verifier and timestamp, and matches on **amount as well as reference**: a mismatched amount can only be confirmed through an explicit override that records a reason. A manual-match action attaches an arbitrary observed payment to a booking for customers who omit the reference.
 
+**As built.** One `payment` row per payment, with `verify_payment()` and `record_cash_payment()` writing the payment, the booking's status and the audit events in one transaction.
+
+- **The amount rule is a database constraint**, not only a code path. `payment_mismatch_needs_reason` refuses a verified payment whose amount disagrees with what is due unless a reason is attached — from any server action, any RPC, or a `psql` session. The pure `checkPaymentMatch()` in `lib/domain` refuses first, with a sentence a clerk can act on; the constraint refuses last. An overpayment is refused as firmly as a short payment (PRD §18 N5 is open, so a refund is not something to imply).
+- **`expected_amount_cents` is re-read from `booking.total_cents` under the row lock at verification**, not trusted from when the payment was raised. Without that, a booking quoted at 400, amended to 500 and verified at 400 reports a match, and the amount rule is defeated by the amend path rather than by anything in the payment layer. The original quote survives in the audit event's `before`.
+- **Both functions take their row locks first and validate before writing anything**, because a plpgsql `return` does not roll back — a guard that fired after the payment insert would leave the payment written and the booking unmoved. That is also why neither calls `transition_booking()`, which reports a refused move as a return value; both inline the status update instead, and `transition_booking()` carries a comment saying so.
+- **Manual match is an action on a queue row**, not an inbox of unattached payments. The clerk describes what the bank actually shows (amount, sender, date, whatever reference appeared) and the payment is attached with a required reason. No payment row ever exists without a booking, so there is no second reconciliation problem; the inbox shape belongs with statement import (scope X2).
+- **Three audit verbs**, because one click can carry up to three approval semantics: `payment.verified` always, plus `payment.amount_overridden` and `payment.matched_manually` where they apply. Separate rows rather than fields inside one, so "every payment confirmed against a mismatch" is a lookup on `action` rather than a jsonb scan — and §4 names manual payment match as an approval act in its own right.
+- **Reads go through a `payment_summary` view** rather than columns appended to `booking_summary`, which `create or replace view` can only ever add to. It LEFT joins occupancy, unlike `booking_summary`, so a day pass — which occupies no unit — cannot fall out of the queue.
+- **Slip display is deferred** to the documents slice. `slip_document_id` exists without a foreign key until the `document` table does, and the queue says "No slip on file" on screen. PRD §10.4's "evidence, not verification" is what makes the queue complete without it; the delta against scope B4 is flagged to the client.
+
 ### 6.3 Hold expiry
 `hold_expires_at` on the booking. A scheduled job (Vercel cron hitting an internal route, every 5 minutes) transitions lapsed `held` bookings to `expired`, freeing the exclusion-constraint row. Expiry is also checked lazily at read time so availability is never stale between cron runs.
 
@@ -181,6 +194,10 @@ interface PaymentProvider {
 }
 ```
 v1 ships `ManualTransferProvider` only. A card gateway (Baiduri/BIBD) or statement-import matcher plugs in behind this interface later.
+
+**Not built yet, deliberately, and this section is the record of that.** The payments slice implements manual verification directly in `lib/db/payments.ts` over the two database functions, and `lib/payments/` does not exist. Of the three methods above only `confirm` is reachable today, and there it *is* `verify_payment()` — one implementation, one caller, nothing to abstract over. The other two cannot be written honestly: `initiate` must return bank details and a deadline, and there are no bank details anywhere in the PRD (§18 C6 asks whether a merchant account exists) and no agreed deadline (N7); `refund` is blocked by N5 and forbidden by §9.6. `PaymentInstruction`'s shape will be decided by the phase-two public payment screen, so anything written now would be redesigned then.
+
+This is the judgement §5.1 already records about `unit.status` — "an unread status column that availability silently ignores is worse than none" — applied to an interface. The seam is cut when the second caller exists, which is the public flow.
 
 ---
 

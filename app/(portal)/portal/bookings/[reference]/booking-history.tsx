@@ -14,20 +14,47 @@ import { formatTimestamp } from '@/lib/domain/dates'
  * `booking-status-badge` — one table, one place. The F4 audit screen will want
  * this map too; it moves to a shared module when there is a second caller, not
  * before.
+ *
+ * Events on the booking's **payments** are folded in by the page. They carry
+ * `entity_type = 'payment'`, so a trail built only from the booking's own
+ * events would show it reaching `confirmed` with no record of what was
+ * actually banked — the lie by omission this component is written to avoid.
  */
 
 const ACTION_LABELS: Record<string, string> = {
-  'booking.created_walk_in': 'Created — walk-in, paid on the spot',
   'booking.amended': 'Amended',
   'booking.cancel': 'Cancelled',
   'booking.check_in': 'Checked in',
   'booking.check_out': 'Checked out',
-  'booking.verify_payment': 'Payment verified',
-  'booking.submit_payment': 'Payment submitted',
-  'booking.pay_in_full': 'Paid in full',
+  // The booking's own status move, distinct from the payment event beside it.
+  // Both are recorded, and labelling both "Payment verified" made the trail
+  // say the same thing twice — the money is the payment's event, the status
+  // is the booking's.
+  'booking.verify_payment': 'Booking confirmed',
+  'booking.pay_in_full': 'Booking confirmed',
+  'booking.submit_payment': 'Sent for verification',
   'booking.expire': 'Hold expired',
   'booking.mark_no_show': 'Marked no-show',
   'booking.hold': 'Held',
+  'payment.recorded': 'Bank transfer awaited',
+  'payment.cash_recorded': 'Cash recorded',
+  'payment.verified': 'Payment verified',
+  'payment.amount_overridden': 'Confirmed at an amount other than the total',
+  'payment.matched_manually': 'Matched to this booking by hand',
+}
+
+/**
+ * Creation reads differently depending on how the guest paid, so it is the one
+ * label derived from the event's payload rather than its verb alone.
+ *
+ * "Paid on the spot" was true of every booking this product could make until
+ * the payments slice; it is a lie about a transfer booking, which is created
+ * precisely because the money has *not* been confirmed yet.
+ */
+function createdLabel(event: AuditEvent): string {
+  return event.after?.payment_method === 'bank_transfer'
+    ? 'Created — walk-in, paying by transfer'
+    : 'Created — walk-in, paid on the spot'
 }
 
 /**
@@ -37,8 +64,15 @@ const ACTION_LABELS: Record<string, string> = {
  * still something that happened to this booking, and silently dropping it
  * would make the trail lie by omission.
  */
-function actionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action.replace(/^booking\./, '').replace(/_/g, ' ')
+function actionLabel(event: AuditEvent): string {
+  if (event.action === 'booking.created_walk_in') {
+    return createdLabel(event)
+  }
+
+  return (
+    ACTION_LABELS[event.action] ??
+    event.action.replace(/^(booking|payment)\./, '').replace(/_/g, ' ')
+  )
 }
 
 /** The typed note a staff member left, when the action asked for one. */
@@ -74,7 +108,7 @@ export function BookingHistory({ events, actorNames }: BookingHistoryProps) {
             className="grid gap-xxs border-b border-divider pb-md last:border-0 last:pb-0"
           >
             <div className="flex flex-wrap items-baseline justify-between gap-sm">
-              <p className="text-body-sm-strong text-foreground">{actionLabel(event.action)}</p>
+              <p className="text-body-sm-strong text-foreground">{actionLabel(event)}</p>
               <p className="text-caption text-muted-foreground tabular-nums">
                 {formatTimestamp(event.at)}
               </p>

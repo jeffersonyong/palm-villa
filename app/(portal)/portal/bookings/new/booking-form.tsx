@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import Link from 'next/link'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,7 @@ import type { Unit } from '@/lib/db/inventory'
 import type { PropertyConfig } from '@/lib/domain/config'
 import { formatStayDate } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
+import type { PaymentMethod } from '@/lib/domain/payment'
 import { priceStay } from '@/lib/domain/pricing/stay'
 import { cn } from '@/lib/utils'
 
@@ -51,6 +53,9 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
   const [exemptGuests, setExemptGuests] = useState(0)
   const [sofaBeds, setSofaBeds] = useState(0)
   const [lateCheckOutHours, setLateCheckOutHours] = useState(0)
+  // prd.md §10.1 [C]'s two methods. Cash confirms outright; a transfer is paid
+  // but not yet seen, so it goes to the verification queue (§10.3).
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
 
   const selectedUnit = units.find((unit) => unit.id === unitId)
   const totalGuests = chargeableGuests + exemptGuests
@@ -72,6 +77,7 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
 
   if (state.status === 'created' && state.created) {
     const { created } = state
+    const isTransfer = created.paymentMethod === 'bank_transfer'
 
     return (
       <Card className="max-w-[520px]">
@@ -80,7 +86,9 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
             <p className="micro-label text-muted-foreground">Booking created</p>
             <p className="mt-xs font-mono text-display-sm text-foreground">{created.reference}</p>
           </div>
-          <Badge tone="positive">Confirmed</Badge>
+          <Badge tone={isTransfer ? 'warning' : 'positive'}>
+            {isTransfer ? 'Awaiting payment' : 'Confirmed'}
+          </Badge>
         </div>
 
         <p className="mt-sm text-body-md text-copy">
@@ -89,7 +97,7 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
 
         <dl className="mt-lg border-t border-divider pt-lg">
           <div className="flex items-baseline justify-between gap-lg">
-            <dt className="text-body-md text-copy">Paid</dt>
+            <dt className="text-body-md text-copy">{isTransfer ? 'To transfer' : 'Paid'}</dt>
             <dd className="text-body-md-strong text-foreground tabular-nums">
               BND {formatCents(created.total)}
             </dd>
@@ -103,8 +111,23 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
         </dl>
 
         <p className="mt-lg text-body-sm text-muted-foreground">
-          Give the guest the reference above — it is what they quote at the gate.
+          {isTransfer
+            ? 'The guest must quote the reference above in the transfer description — it is how the payment is matched. It is also what they quote at the gate.'
+            : 'Give the guest the reference above — it is what they quote at the gate.'}
         </p>
+
+        {isTransfer ? (
+          <p className="mt-md rounded-md bg-muted p-md text-body-sm text-copy">
+            The unit is held for this booking now. It stays held until someone confirms the transfer
+            landed, so this booking needs working off the verification queue.
+          </p>
+        ) : null}
+
+        {isTransfer ? (
+          <Button asChild variant="tertiary" className="mt-lg mr-sm">
+            <Link href="/portal/payments">Open the verification queue</Link>
+          </Button>
+        ) : null}
 
         {/* A full reload on purpose: it clears the `useActionState` state and
             re-renders the availability counts for the next booking, which a
@@ -233,6 +256,28 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
             </div>
           </div>
         </section>
+
+        <section className="mt-xl border-t border-divider pt-xl">
+          <SectionHeading>Payment</SectionHeading>
+          <div className="mt-md grid gap-sm">
+            <Label htmlFor="paymentMethod">Method</Label>
+            <NativeSelect
+              id="paymentMethod"
+              name="paymentMethod"
+              className="w-[280px]"
+              value={paymentMethod}
+              onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
+            >
+              <option value="cash">Cash — collected now</option>
+              <option value="bank_transfer">Bank transfer — verify later</option>
+            </NativeSelect>
+            <p className="text-caption text-muted-foreground">
+              {paymentMethod === 'cash'
+                ? 'The booking is confirmed as soon as it is created.'
+                : 'The guest quotes the booking reference in the transfer. The booking waits in the verification queue until someone checks the bank.'}
+            </p>
+          </div>
+        </section>
       </Card>
 
       <div className="lg:sticky lg:top-xl">
@@ -282,7 +327,11 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
           )}
 
           <Button type="submit" className="mt-lg w-full" disabled={isPending || !quote?.ok}>
-            {isPending ? 'Creating…' : 'Create & take payment'}
+            {isPending
+              ? 'Creating…'
+              : paymentMethod === 'cash'
+                ? 'Create & take payment'
+                : 'Create & await transfer'}
           </Button>
 
           {state.status === 'error' && state.message && (

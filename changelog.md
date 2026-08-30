@@ -6,6 +6,39 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-31 — payment verification and cash recording (B4–B7)
+
+`verify_payment` had existed in the state machine since the schema slice, and nothing could reach it or leave it. There was no `payment` table, no screen called the transition, and `createWalkInBooking` hardcoded `pay_in_full` — so every booking the portal could make was born `confirmed`, `awaiting_payment_verification` was a state the machine described and the product could not enter, and the dashboard's **Awaiting payment** stat was structurally zero. This closes that: **Portal → Payments**.
+
+### Added
+- **The `payment` record**, one row per payment, written in the same transaction as the booking status it implies. Same reasoning as the occupancy row in `create_walk_in_booking()`: a confirmed booking with no payment record is a booking nobody can prove was paid for.
+- **The verification queue** at `/portal/payments` — [prd.md §10.4](docs/prd.md)'s columns in its order, oldest first, because a queue is worked from the top. Confirming takes one amount field prefilled with what is due; the moment the typed figure disagrees, the variance is stated in words ("Short by BND 50.00"), a required reason appears and the button relabels to "Confirm with discrepancy".
+- **Manual match (B6)** as an action on a queue row rather than an inbox of unattached payments. The clerk describes what the bank actually shows — amount, sender, date, whatever reference appeared — and it is attached with a required reason. No payment row ever exists without a booking, so there is no second reconciliation problem to solve later.
+- **Cash recording (B7)** at `/portal/payments/cash`: a log newest-first, and a dialog taking a typed booking reference, which is the one string staff already have in hand.
+- **A payment method on the booking form.** Cash keeps today's behaviour; bank transfer sends the booking to the queue. This is what gives B4–B7 something to work on before the public flow exists.
+- **A Payments section on the booking**, and the queue's actions repeated there.
+
+### Decided
+- **The amount rule is a database constraint, not a code path.** Scope B5 promises the client that "a short payment is flagged, never silently accepted", and `payment_mismatch_needs_reason` refuses a verified payment whose amount disagrees with what is due unless a reason is attached — from any server action, any RPC, or a `psql` session. Two integration tests bypass the application and prove it. An overpayment is refused as firmly as a short payment: it is a refund conversation, and refunds are N5, open.
+- **What is due is re-read at verification, not snapshotted.** A booking quoted at 400, amended to 500, then paid at 400 would otherwise report a match — B5 defeated by the amend path rather than by anything in the payment layer. The queue flags a repriced booking before the clerk opens anything, and the original quote survives in the audit trail.
+- **Neither write path calls `transition_booking()`.** It reports a refused move as a return value, and a plpgsql `return` does not roll back, so calling it after the payment insert would leave the payment written and the booking unmoved. Both functions take their row locks first and inline the six-line status update; `transition_booking()` now carries a comment saying why, where the next person tidying up the duplication will find it.
+- **`draft --submit_payment--> awaiting_payment_verification`** is new in the machine. Walking a desk transfer through `held` instead would fabricate a state never persisted, carrying an expiry this path does not have. Recorded in [architecture.md §5.3](docs/architecture.md).
+- **No `rejected` payment status.** B4–B7 describes no action for a transfer that never arrives, and inventing one would be the schema deciding a product question. Raised as **new open question N13**.
+- **`PaymentProvider` is deferred, and [architecture.md §6.4](docs/architecture.md) now says so.** Only `confirm` is reachable, and there it *is* the database function; `initiate` needs bank details (C6) and a deadline (N7), and `refund` is blocked by N5. Writing it now means writing it twice — the same judgement §5.1 already records about `unit.status`.
+- **A payment does not get its own URL**, the first record deliberately outside design.md's "detail screens are routes" rule. [design.md](docs/design.md) now carries the boundary: the test is whether a record is a thing people navigate *to*.
+
+### Still open
+- **N7 gains a second screen waiting on it.** A transfer booking holds its unit from creation and **nothing expires it** — the duration is unagreed and the expiry cron unbuilt — so an abandoned transfer blocks a unit until someone cancels it. The queue sorts oldest-first and shows the wait so this is visible rather than silent. Recorded in [prd.md §9.1](docs/prd.md).
+- **Scope B4 promises the uploaded slip; this ships "No slip on file".** Nothing could upload one yet — customer upload is phase two and document storage is its own slice — and §10.4's "evidence, not verification" is what makes the queue complete without it. The scope document is **not** quietly amended; this goes to the client as a question.
+- **No permission string for the override or the manual match.** Both reuse `payment.verify`, on the reading that all three are one job. The consequence worth stating: Finance can override and hand-match but cannot record cash. Noted against N11, which raises the same gap for check-in.
+- **N5 is untouched.** Nothing refunds, forfeits or nets off.
+
+Verified by 347 passing tests (85 new), the load-bearing ones being refusals and races: a short payment with no reason moves nothing and writes no audit row; six simultaneous confirmations yield exactly one winner and one audit event; a confirmation racing a cancellation cannot both happen, and if the cancellation wins the payment is still pending. Plus a browser pass over create → queue → refuse → confirm → record cash, in both themes, which turned up four real defects: a refused form that emptied itself of everything the clerk had typed (React resets an uncontrolled field once its action resolves); a history panel that said "Payment verified" twice; "Created — walk-in, paid on the spot" shown against a booking created precisely because the money had *not* been confirmed; and the queue showing the amount **due** against payments already settled, so a payment confirmed at 150 displayed as 200.
+
+One thing the pass found and this slice did not fix: below `sm`, a table clips its right-hand columns and the row actions become unreachable. The bookings list does the same — it is the shared `Table` component's `overflow-hidden`, which design.md specifies — so it is a design-system decision rather than a payments one. The portal is a desktop surface; the field screens are the mobile one.
+
+---
+
 ## 2026-08-30 — the bookings filter row, and the dropdown baseline behind it
 
 The bookings list opened with a card of three labelled fields — a status select and a `Staying from` / `Staying until` pair of native date inputs — and an **Apply** button. It read as a form to fill in rather than a filter to set, and the date pair carried every failure a date pair carries: a "from" typed after the "to", one half filled, a hand-edited URL, and no way to tell whether anything matched until Apply was pressed.
