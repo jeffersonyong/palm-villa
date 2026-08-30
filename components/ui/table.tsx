@@ -20,8 +20,17 @@ import { cn } from '@/lib/utils'
 function Table({
   className,
   containerClassName,
+  footer,
   ...props
-}: React.ComponentProps<'table'> & { containerClassName?: string }) {
+}: React.ComponentProps<'table'> & {
+  containerClassName?: string
+  /**
+   * Chrome below the rows, inside the container's hairline — the pagination
+   * footer. Kept a slot rather than a sibling so the table keeps one
+   * boundary and one radius.
+   */
+  footer?: React.ReactNode
+}) {
   return (
     <div
       data-slot="table-container"
@@ -32,6 +41,7 @@ function Table({
         className={cn('w-full border-collapse text-left', className)}
         {...props}
       />
+      {footer}
     </div>
   )
 }

@@ -6,6 +6,17 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-30 — staff provisioning ergonomics: generated passwords, copy handover, unused-account delete, toasts and table pagination
+
+Follow-up polish on the F1 staff screen after using it. The New staff and Reset password dialogs gain a **Generate** control (crypto-random `xxxx-xxxx-xxxx`, lowercase, no look-alike characters — shaped to be read out loud) and the success panel now shows the password one last time with a **Copy** button, so it goes straight into WhatsApp instead of being retyped. **Delete account** joins the row menu with a deliberate boundary: only an account that has *never acted* can be deleted (typo cleanup); anything with audit history is refused with a message steering to disable — the restrict FK from migration 001000 remains the structural enforcement, the UI check just gives it a sentence. Deletions are themselves audited. Recorded in [architecture.md](docs/architecture.md) §3.
+
+Two system-level additions came out of the same round, both on the already-installed Radix bundle (no new dependencies):
+
+- **Toasts**, for actions whose outcome is not otherwise visible on screen — role changes, disable/enable, delete, permission saves, own-password change. A white overlay card carrying status as a semantic *icon*, never a coloured band; errors linger longer than confirmations. Deliberately not used where the screen already answers: the password handover panels (they carry the password), the booking confirmation card (a receipt with a reference), and field-level validation, which stays inline beside the field it refers to.
+- **Table pagination**, since every list screen grows without bound — the staff table was already 18 rows of mostly test debris. A footer strip that bookends the header inside the same container, with the range, an optional per-page select and page chips; the current page is a white hairline chip rather than a coloured one, and the control keeps a constant width as you page. The page arithmetic is pure and unit-tested (window, ellipsis rules, and the clamp that matters when deleting the last row of the last page). Specified in [design.md](docs/design.md) §Components. Only the staff table is wired so far — the bookings list needs server-side paging in its query layer first.
+
+---
+
 ## 2026-08-30 — portal UI polish: density, the segmented control, and the roles screen recut
 
 A client-review round over the built portal — four smaller asks that each pulled a system decision out with it. Everything stays inside the existing token set; design.md is updated in the same PR wherever a spec moved.

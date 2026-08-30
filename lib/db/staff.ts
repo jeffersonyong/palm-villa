@@ -304,3 +304,80 @@ export async function resetStaffPassword(
     entityId: userId,
   })
 }
+
+export type DeleteStaffAccountResult =
+  { ok: true } | { ok: false; error: { code: 'has_history'; message: string } }
+
+/**
+ * Deletes an account that has never acted — a typo'd email, a duplicate
+ * created by mistake.
+ *
+ * An account with any audit history is not deletable, by design: the
+ * restrict FK on audit_event.actor_id (migration 001000) encodes the policy
+ * that the trail's actors stay resolvable forever, and such accounts are
+ * disabled instead. The check here exists to give that refusal a sentence;
+ * the FK remains the enforcement, so an action racing in between the check
+ * and the delete still cannot orphan the trail — the delete just fails.
+ *
+ * Role grants cascade away with the user; the deletion itself is recorded
+ * (entity ids in audit_event are not foreign keys, so the event survives its
+ * subject).
+ */
+export async function deleteStaffAccount(
+  userId: string,
+  actorId: string,
+): Promise<DeleteStaffAccountResult> {
+  const { count, error: countError } = await dataClient()
+    .from('audit_event')
+    .select('id', { count: 'exact', head: true })
+    .eq('actor_id', userId)
+
+  if (countError) {
+    throw new Error(`Could not check the account's history: ${countError.message}`)
+  }
+
+  if ((count ?? 0) > 0) {
+    return {
+      ok: false,
+      error: {
+        code: 'has_history',
+        message: 'This account has acted and cannot be deleted — disable it instead.',
+      },
+    }
+  }
+
+  // Read identity before it is gone, so the audit event can say who this was.
+  const { data: userData, error: readError } = await dataClient().auth.admin.getUserById(userId)
+
+  if (readError || !userData.user) {
+    throw new Error(`Could not read the account before deleting: ${readError?.message}`)
+  }
+
+  const { error } = await dataClient().auth.admin.deleteUser(userId)
+
+  if (error) {
+    // The FK backstop: an action landed between the history check and here.
+    return {
+      ok: false,
+      error: {
+        code: 'has_history',
+        message: 'This account has acted and cannot be deleted — disable it instead.',
+      },
+    }
+  }
+
+  const metadataName = userData.user.user_metadata?.display_name
+
+  await recordAuditEvent({
+    actorId,
+    action: 'staff.account_deleted',
+    entityType: 'staff_user',
+    entityId: userId,
+    before: {
+      email: userData.user.email ?? '',
+      display_name: typeof metadataName === 'string' ? metadataName : '',
+    },
+  })
+
+  return { ok: true }
+}

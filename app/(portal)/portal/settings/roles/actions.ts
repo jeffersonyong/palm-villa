@@ -8,6 +8,7 @@ import { requirePermission } from '@/lib/auth/require-permission'
 import { adminRoleKeepsConfigManage, wouldLockSelfOut } from '@/lib/auth/role-guards'
 import {
   createStaffAccount,
+  deleteStaffAccount,
   listRolesWithPermissions,
   resetStaffPassword,
   setAccountDisabled,
@@ -236,6 +237,39 @@ export async function resetStaffPasswordAction(
   }
 
   await resetStaffPassword(parsed.data.userId, parsed.data.tempPassword, actor.userId)
+  revalidatePath(ROLES_PATH)
+
+  return { status: 'done' }
+}
+
+/* ── Delete an unused account ──────────────────────────────────────────── */
+
+const deleteAccountSchema = z.object({
+  userId: z.uuid(),
+})
+
+export async function deleteStaffAction(
+  _previous: RoleAdminState,
+  formData: FormData,
+): Promise<RoleAdminState> {
+  const actor = await requirePermission('config.manage')
+
+  const parsed = deleteAccountSchema.safeParse({ userId: formData.get('userId') })
+
+  if (!parsed.success) {
+    return { status: 'error', message: 'Something went wrong. Reload and try again.' }
+  }
+
+  if (parsed.data.userId === actor.userId) {
+    return { status: 'error', message: "You can't delete your own account." }
+  }
+
+  const result = await deleteStaffAccount(parsed.data.userId, actor.userId)
+
+  if (!result.ok) {
+    return { status: 'error', message: result.error.message }
+  }
+
   revalidatePath(ROLES_PATH)
 
   return { status: 'done' }

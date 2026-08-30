@@ -98,7 +98,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="sheet-header"
-      className={cn('flex flex-col gap-xs px-xl py-lg pr-2xl', className)}
+      className={cn('flex flex-col gap-xs px-xl py-lg', className)}
       {...props}
     />
   )
@@ -114,11 +114,12 @@ function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
   )
 }
 
+/** Clearance for the close button belongs to the line it overlaps — see DialogTitle. */
 function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPrimitive.Title>) {
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn('text-display-xs text-foreground', className)}
+      className={cn('pr-2xl text-display-xs text-foreground', className)}
       {...props}
     />
   )

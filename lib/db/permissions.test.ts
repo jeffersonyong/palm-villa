@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-
 import { afterEach, describe, expect, test } from 'vitest'
 
 import { hasPermission, toPermissionSet } from '@/lib/auth/permissions'
@@ -7,6 +5,7 @@ import { dataClient } from '@/lib/supabase/data'
 
 import { currentPropertyId } from './property'
 import { permissionsForUser } from './permissions'
+import { givenDisposableUser, pinnedUserId } from './test/auth'
 
 /**
  * The role lookup requirePermission() sits on, and the two auth foreign keys
@@ -21,19 +20,11 @@ import { permissionsForUser } from './permissions'
 const createdUserIds: string[] = []
 
 async function givenAuthUser(): Promise<string> {
-  const { data, error } = await dataClient().auth.admin.createUser({
-    email: `test-${randomUUID()}@example.test`,
-    password: 'test-password',
-    email_confirm: true,
-  })
+  const userId = await givenDisposableUser()
 
-  if (error || !data.user) {
-    throw new Error(`Test setup could not create an auth user: ${error?.message}`)
-  }
+  createdUserIds.push(userId)
 
-  createdUserIds.push(data.user.id)
-
-  return data.user.id
+  return userId
 }
 
 async function grantRole(userId: string, slug: string): Promise<void> {
@@ -119,18 +110,9 @@ describe('auth foreign keys (migration 001000)', () => {
   test('a user who has acted cannot be deleted', async () => {
     // The restrict FK encodes the policy: audit actors stay resolvable
     // forever, so an account that has acted is disabled, never deleted.
-    const userId = await givenAuthUser()
-    const propertyId = await currentPropertyId()
-
-    const { error: auditError } = await dataClient().from('audit_event').insert({
-      property_id: propertyId,
-      actor_id: userId,
-      action: 'test.acted',
-      entity_type: 'test_entity',
-      entity_id: randomUUID(),
-    })
-
-    expect(auditError).toBeNull()
+    // The fixture is shared rather than fresh — see lib/db/test/auth.ts, a
+    // new one each run would leave a new undeletable account each run.
+    const userId = await pinnedUserId()
 
     const { error } = await dataClient().auth.admin.deleteUser(userId)
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 
 import { EmptyState } from '@/components/portal/empty-state'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { toast } from '@/components/ui/toast-store'
 import type { Permission } from '@/lib/auth/permissions'
 import type { RoleWithPermissions } from '@/lib/db/staff'
 
@@ -39,10 +40,7 @@ function draftsFromRoles(
   return new Map(roles.map((role) => [role.id, new Set(role.permissions)]))
 }
 
-function isDraftDirty(
-  draft: ReadonlySet<string> | undefined,
-  saved: readonly string[],
-): boolean {
+function isDraftDirty(draft: ReadonlySet<string> | undefined, saved: readonly string[]): boolean {
   if (!draft) {
     return false
   }
@@ -64,6 +62,28 @@ export function RolesTab({ roles }: { roles: readonly RoleWithPermissions[] }) {
   const [state, formAction, isPending] = useActionState(setRolePermissionsAction, initialState)
   const [submittedRoleId, setSubmittedRoleId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState(() => draftsFromRoles(roles))
+
+  // Each completed action produces a new state object; the ref makes sure a
+  // re-render with the same outcome (switching roles, say) cannot re-toast.
+  const lastHandledState = useRef<RoleAdminState>(initialState)
+
+  useEffect(() => {
+    if (state === lastHandledState.current) return
+
+    lastHandledState.current = state
+
+    if (state.status === 'done' && submittedRoleId) {
+      const savedRole = roles.find((role) => role.id === submittedRoleId)
+
+      toast({
+        tone: 'positive',
+        title: 'Permissions saved',
+        description: savedRole
+          ? `Everyone holding ${savedRole.name} has them from their next action.`
+          : undefined,
+      })
+    }
+  }, [state, submittedRoleId, roles])
 
   if (!firstRole) {
     // Roles are seeded with the property, so this is a data problem, not a
@@ -181,17 +201,12 @@ function RoleForm({ role, draft, result, formAction, onSubmit, onToggle }: RoleF
                       name="permissions"
                       value={permission}
                       checked={isLocked || draft.has(permission)}
-                      onCheckedChange={(checked) =>
-                        onToggle(role.id, permission, checked === true)
-                      }
+                      onCheckedChange={(checked) => onToggle(role.id, permission, checked === true)}
                       // The Admin role always keeps role administration —
                       // enforced server-side too (lib/auth/role-guards.ts).
                       disabled={isLocked}
                     />
-                    <Label
-                      htmlFor={id}
-                      className={isLocked ? 'text-muted-foreground' : undefined}
-                    >
+                    <Label htmlFor={id} className={isLocked ? 'text-muted-foreground' : undefined}>
                       {PERMISSION_LABELS[permission]}
                     </Label>
                   </div>
@@ -202,18 +217,15 @@ function RoleForm({ role, draft, result, formAction, onSubmit, onToggle }: RoleF
         ))}
       </div>
 
+      {/* Errors stay inline, next to the choices they refer to; the success
+          confirmation is a toast (RolesTab), since a saved state has nothing
+          on this form left to point at. */}
       {result?.status === 'error' && result.message ? (
         <p
           role="alert"
           className="mt-lg rounded-md bg-negative-tint px-md py-sm text-body-sm text-negative-deep"
         >
           {result.message}
-        </p>
-      ) : null}
-
-      {result?.status === 'done' ? (
-        <p className="mt-lg text-body-sm text-positive-deep">
-          Saved. Everyone holding this role has the new permissions from their next action.
         </p>
       ) : null}
     </form>

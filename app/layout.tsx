@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Fraunces, Inter } from 'next/font/google'
 
+import { Toaster } from '@/components/ui/toast'
 import { themeInitScript } from '@/lib/theme'
 
 import './globals.css'
@@ -53,7 +54,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             other one. Everything else about theming is CSS. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* One toast outlet for every surface (components/ui/toast.tsx). */}
+        <Toaster />
+      </body>
     </html>
   )
 }
