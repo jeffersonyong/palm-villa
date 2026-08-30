@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { toast } from '@/components/ui/toast-store'
 import { generateTempPassword } from '@/lib/auth/temp-password'
 import {
   Table,
@@ -453,8 +454,11 @@ function ManageRolesDialog({
     account.roles.some((role) => !selectedRoleIds.has(role.id))
 
   useEffect(() => {
-    if (state.status === 'done') onClose()
-  }, [state.status, onClose])
+    if (state.status === 'done') {
+      toast({ tone: 'positive', title: 'Roles updated', description: account.displayName })
+      onClose()
+    }
+  }, [state.status, onClose, account.displayName])
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -557,8 +561,15 @@ function AccountStatusDialog({ account, onClose }: { account: StaffAccount; onCl
   const disabling = !account.disabled
 
   useEffect(() => {
-    if (state.status === 'done') onClose()
-  }, [state.status, onClose])
+    if (state.status === 'done') {
+      toast({
+        tone: 'positive',
+        title: disabling ? 'Account disabled' : 'Account enabled',
+        description: account.displayName,
+      })
+      onClose()
+    }
+  }, [state.status, onClose, disabling, account.displayName])
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -610,8 +621,11 @@ function DeleteAccountDialog({ account, onClose }: { account: StaffAccount; onCl
   const [state, formAction, isPending] = useActionState(deleteStaffAction, initialState)
 
   useEffect(() => {
-    if (state.status === 'done') onClose()
-  }, [state.status, onClose])
+    if (state.status === 'done') {
+      toast({ tone: 'positive', title: 'Account deleted', description: account.email })
+      onClose()
+    }
+  }, [state.status, onClose, account.email])
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>

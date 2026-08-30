@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect } from 'react'
 
 import { changeOwnPasswordAction, type ChangePasswordState } from '@/app/(auth)/actions'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { toast } from '@/components/ui/toast-store'
 
 /**
  * Change your own password, from the account menu. Exists because
@@ -31,6 +32,20 @@ interface ChangePasswordDialogProps {
 export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialogProps) {
   const [state, formAction, isPending] = useActionState(changeOwnPasswordAction, initialState)
 
+  // Keyed on the state object, not its status: this dialog stays mounted in
+  // the account chrome, so a second change in the same session produces a new
+  // 'updated' object and must toast and close again.
+  useEffect(() => {
+    if (state.status === 'updated') {
+      toast({
+        tone: 'positive',
+        title: 'Password updated',
+        description: 'Use the new one on your next sign-in.',
+      })
+      onOpenChange(false)
+    }
+  }, [state, onOpenChange])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[400px]">
@@ -41,18 +56,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
           </DialogDescription>
         </DialogHeader>
 
-        {state.status === 'updated' ? (
-          <>
-            <p className="rounded-md bg-positive-tint p-md text-body-sm text-positive-deep">
-              Password updated.
-            </p>
-            <DialogFooter>
-              <Button variant="secondary" onClick={() => onOpenChange(false)}>
-                Done
-              </Button>
-            </DialogFooter>
-          </>
-        ) : (
+        {state.status !== 'updated' ? (
           <form action={formAction} className="grid gap-lg">
             <div className="grid gap-sm">
               <Label htmlFor="new-password">New password</Label>
@@ -96,7 +100,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
               </Button>
             </DialogFooter>
           </form>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   )
