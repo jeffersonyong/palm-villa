@@ -6,6 +6,7 @@ import { dataClient } from '@/lib/supabase/data'
 
 import { currentPropertyId } from './property'
 import { deleteStaffAccount, setRolePermissions, setUserRoles } from './staff'
+import { givenDisposableUser, pinnedUserId, testActorId } from './test/auth'
 
 /**
  * The role-administration writes (migration 001100) against the real
@@ -13,13 +14,26 @@ import { deleteStaffAccount, setRolePermissions, setUserRoles } from './staff'
  * constraint must abort the whole save when a string is unknown.
  *
  * Every test works on a scratch role it creates itself — the seeded five are
- * live configuration for the dev portal and are never touched. Actors are
- * throwaway auth users; having acted, they are pinned by the audit FK and
- * deliberately left behind (local-only; db:reset clears auth.users).
+ * live configuration for the dev portal and are never touched. Subjects are
+ * throwaway users, deleted afterwards; the actor is shared, because acting
+ * pins an account permanently (lib/db/test/auth.ts).
  */
 
 const scratchRoleIds: string[] = []
 const createdUserIds: string[] = []
+
+/**
+ * Actors are shared and reused (lib/db/test/auth.ts): having acted, they can
+ * never be deleted, so a fresh one per run would leave a new undeletable
+ * account in the staff list every time the suite runs.
+ */
+async function givenAuthUser(): Promise<string> {
+  const userId = await givenDisposableUser()
+
+  createdUserIds.push(userId)
+
+  return userId
+}
 
 async function givenScratchRole(): Promise<string> {
   const propertyId = await currentPropertyId()
@@ -39,22 +53,6 @@ async function givenScratchRole(): Promise<string> {
   scratchRoleIds.push(roleId)
 
   return roleId
-}
-
-async function givenAuthUser(): Promise<string> {
-  const { data, error } = await dataClient().auth.admin.createUser({
-    email: `test-${randomUUID()}@example.test`,
-    password: 'test-password',
-    email_confirm: true,
-  })
-
-  if (error || !data.user) {
-    throw new Error(`Test setup could not create an auth user: ${error?.message}`)
-  }
-
-  createdUserIds.push(data.user.id)
-
-  return data.user.id
 }
 
 async function rolePermissions(roleId: string): Promise<string[]> {
@@ -84,7 +82,7 @@ afterEach(async () => {
 describe('setRolePermissions', () => {
   test('replaces the set and audits before/after in one transaction', async () => {
     const roleId = await givenScratchRole()
-    const actorId = await givenAuthUser()
+    const actorId = await testActorId()
     const propertyId = await currentPropertyId()
 
     await dataClient()
@@ -118,7 +116,7 @@ describe('setRolePermissions', () => {
 
   test('an unknown permission aborts the whole save', async () => {
     const roleId = await givenScratchRole()
-    const actorId = await givenAuthUser()
+    const actorId = await testActorId()
     const propertyId = await currentPropertyId()
 
     await dataClient()
@@ -142,7 +140,7 @@ describe('setRolePermissions', () => {
   })
 
   test('reports a role that no longer exists', async () => {
-    const actorId = await givenAuthUser()
+    const actorId = await testActorId()
 
     const result = await setRolePermissions(randomUUID(), ['booking.view'], actorId)
 
@@ -153,7 +151,7 @@ describe('setRolePermissions', () => {
 describe('setUserRoles', () => {
   test('replaces the role set and audits each change', async () => {
     const userId = await givenAuthUser()
-    const actorId = await givenAuthUser()
+    const actorId = await testActorId()
     const first = await givenScratchRole()
     const second = await givenScratchRole()
 
@@ -182,7 +180,7 @@ describe('setUserRoles', () => {
 describe('deleteStaffAccount', () => {
   test('deletes an unused account, role grants included, and records it', async () => {
     const userId = await givenAuthUser()
-    const actorId = await givenAuthUser()
+    const actorId = await testActorId()
     const roleId = await givenScratchRole()
     const propertyId = await currentPropertyId()
 
@@ -218,17 +216,10 @@ describe('deleteStaffAccount', () => {
   })
 
   test('refuses an account that has acted', async () => {
-    const userId = await givenAuthUser()
-    const actorId = await givenAuthUser()
-    const propertyId = await currentPropertyId()
-
-    await dataClient().from('audit_event').insert({
-      property_id: propertyId,
-      actor_id: userId,
-      action: 'test.acted',
-      entity_type: 'test_entity',
-      entity_id: randomUUID(),
-    })
+    // Shared fixture: a fresh one would be pinned by its own audit row and
+    // linger in the staff list after every run (lib/db/test/auth.ts).
+    const userId = await pinnedUserId()
+    const actorId = await testActorId()
 
     const result = await deleteStaffAccount(userId, actorId)
 
