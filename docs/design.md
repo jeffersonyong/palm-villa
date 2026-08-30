@@ -279,6 +279,8 @@ themes:
     primary-invert-hover: "{colors.brand-active}"
     accent: "{colors.brand-pale}"
     accent-foreground: "{colors.brand-deep}"
+    selection: "mix({colors.brand} 30%, {colors.canvas})"
+    selection-foreground: "{colors.ink}"
     secondary: "{colors.canvas-soft}"
     secondary-foreground: "{colors.ink}"
     invert-surface: "{colors.ink}"
@@ -312,6 +314,8 @@ themes:
     primary-invert-hover: "mix({colors.brand-deep} 78%, {colors.brand})"
     accent: "mix({colors.brand} 20%, {colors.ink-deep})"
     accent-foreground: "{colors.brand-active}"
+    selection: "mix({colors.brand} 34%, {colors.ink-deep})"
+    selection-foreground: "{colors.canvas}"
     secondary: "mix({colors.canvas} 8%, {colors.ink-deep})"
     secondary-foreground: "{colors.canvas-soft}"
     invert-surface: "{colors.canvas-soft}"
@@ -340,6 +344,8 @@ themes:
       ring: "{colors.ink}"
       accent: "{colors.canvas-soft}"
       accent-foreground: "{colors.ink}"
+      selection: "mix({colors.ink} 16%, {colors.canvas})"
+      selection-foreground: "{colors.ink}"
     dark:
       primary: "{colors.canvas}"
       primary-foreground: "{colors.ink}"
@@ -347,6 +353,8 @@ themes:
       ring: "{colors.canvas}"
       accent: "mix({colors.canvas} 12%, {colors.ink-deep})"
       accent-foreground: "{colors.canvas}"
+      selection: "mix({colors.canvas} 26%, {colors.ink-deep})"
+      selection-foreground: "{colors.canvas}"
 ---
 
 # Palm Villa Design System
@@ -361,7 +369,8 @@ The same tokens serve all three surfaces. The public site gets slightly more air
 
 ### Roles
 - **Lagoon is the action colour — on the public surface.** `primary` resolves to `{colors.brand-deep}` in light and vivid `{colors.brand}` in dark: filled buttons, the selected state, the focus ring. A screen region has at most one filled-primary button. On locally dark surfaces (the promo card, the closing band) the `primary-invert` roles carry the same construction with the polarity swapped.
-- **Two accents, one system.** The **customer-facing surface** — the public site and the booking flow — carries the lagoon accent; that is the brand's pop of personality. The **operations surfaces are monochrome**: the portal *and the field screens*, which are one product on different hardware and are never seen by a customer. There `primary` is ink in light and white in dark, the focus ring and selection follow, and nothing is teal. Only the action roles flip (`primary`, `primary-hover`, `ring`, `accent`); every structural role and every **semantic status colour is identical everywhere** — status is meaning, not brand, so the checked-in chip keeps its aqua pair on every surface. Implemented as `data-surface="ops"` on `<html>` — the same mechanism as `data-theme`, so overlays portaled into `<body>` inherit it; the frontmatter `themes.ops` block records the values.
+- **Two accents, one system.** The **customer-facing surface** — the public site and the booking flow — carries the lagoon accent; that is the brand's pop of personality. The **operations surfaces are monochrome**: the portal *and the field screens*, which are one product on different hardware and are never seen by a customer. There `primary` is ink in light and white in dark, the focus ring and selection follow, and nothing is teal. Only the action roles flip (`primary`, `primary-hover`, `ring`, `accent`, `selection`); every structural role and every **semantic status colour is identical everywhere** — status is meaning, not brand, so the checked-in chip keeps its aqua pair on every surface. Implemented as `data-surface="ops"` on `<html>` — the same mechanism as `data-theme`, so overlays portaled into `<body>` inherit it; the frontmatter `themes.ops` block records the values.
+- **Text selection is its own role, not a borrowed accent.** `selection` sits a clear step below every ground it has to appear on — teal-tinted on the customer surface, a neutral gray on the operations surface. It is deliberately *not* `accent`: on ops, `accent` is `{colors.canvas-soft}`, which is also the fill of table header strips, pagination footers and inset panels, so a selection dragged across one of them was invisible.
 - **Beyond the primary fill, the lagoon hue is text-first.** `{colors.brand-deep}` doubles as the readable brand text: the hero eyebrow, a key price line. Raw `{colors.brand}` outside dark-ground fills is reserved for small graphic moments (the logo dot, the checked-in badge hue) — never bands, never body text (it fails contrast on white).
 - `{colors.canvas}` white is the working surface **and the page ground** — the portal sits on white, not gray. `{colors.canvas-soft}` is the faint gray spent on *selected and hover chips, inset panels, table header strips and tab tracks* — the small surfaces, never the ground. The two are close on purpose — the seam between them is always drawn with a hairline, not carried by the fill.
 - `{colors.ink}` carries headings and the dark surfaces (footer, the two public dark moments); it never fills a button.
@@ -452,7 +461,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **Tables (the portal's signature surface).** A hairline-bounded container at `{rounded.lg}` with `overflow-hidden`; header row on `canvas-soft` in `micro` mute; body rows `body-sm` with `divider` rules; cells pad `{spacing.md} {spacing.lg}` vertically tight. Reference and money columns set `tabular-nums`. Row hover is a whisper of `canvas-soft`. This is the payment queue, arrivals list, and every list screen.
 
-**Table pagination.** The footer bookends the header: the same `canvas-soft` strip, the same `divider` hairline, *inside* the table's container so one boundary and one radius hold the whole surface. Left, the range in `body-sm` mute ("1–10 of 18 accounts") — it stays even when there is a single page, because the count is useful; the page controls appear only when there is more than one. **Figures here are proportional, not `tabular-nums`** — the tabular rule serves columns that must line up vertically, and nothing in this footer is in a column: the range reads as a sentence, the page numbers are centred in their own chips. Right, an optional `micro` "Per page" select and the page chips at control size. **The current page is a white chip with a hairline** — "where am I" as a quiet surface shift, the sidebar's and segmented control's language — and deliberately *without* `shadow-chip`, which stays the segmented control's alone. Idle pages are `copy`, hover lifts them to the card fill; the step arrows fade rather than disappear at the ends. An ellipsis only ever stands in for two or more pages, and the control's slot count is constant, so it never changes width as you page.
+**Table pagination.** The footer bookends the header: the same `canvas-soft` strip, the same `divider` hairline, *inside* the table's container so one boundary and one radius hold the whole surface. It reads as two clusters. **Left — where you are:** the range in `body-sm` mute ("1–10 of 18 accounts"), which stays even when there is a single page because the count is useful, then a vertical hairline and the optional "Rows per page" select, labelled in the same `body-sm` mute so the whole left cluster reads as one quiet line rather than a shouted `micro` label beside a sentence. A page-number *entry* field is deliberately not offered: the range is the answer to "how much is here", and the chips are the way to move. **Right — how to move:** the page chips, flanked by single-step arrows and, from `sm` up, double-chevron jumps to the first and last page. **Figures here are proportional, not `tabular-nums`** — the tabular rule serves columns that must line up vertically, and nothing in this footer is in a column: the range reads as a sentence, the page numbers are centred in their own chips. The arrows are **drawn controls** — hairline-bounded chips on the card fill, like every other button in the portal — while the numbers are bare, so stepping and jumping never look like the same control; at the ends the arrows fade rather than disappear. **The current page is a white chip with a hairline** — "where am I" as a quiet surface shift, the sidebar's and segmented control's language — and deliberately *without* `shadow-chip`, which stays the segmented control's alone. Idle pages are `copy`, hover lifts them to the card fill. An ellipsis only ever stands in for two or more pages, and the control's slot count is constant, so it never changes width as you page. Below `sm` the jumps and the hairline drop out and the two clusters stack.
 
 **QR block.** White card, centred QR ≥ 200px with default quiet zone, booking reference in `display-sm` beneath, guidance in `body-sm`.
 

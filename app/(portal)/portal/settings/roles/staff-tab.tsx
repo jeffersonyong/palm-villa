@@ -132,7 +132,7 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
                     <span className="ml-sm text-caption text-muted-foreground">you</span>
                   ) : null}
                 </TableCell>
-                <TableCell className="text-copy">{account.email}</TableCell>
+                <TableCell className="text-muted-foreground">{account.email}</TableCell>
                 <TableCell>
                   {account.roles.length === 0 ? (
                     <span className="text-body-sm text-muted-foreground">No roles</span>
