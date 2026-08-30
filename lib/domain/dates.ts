@@ -96,3 +96,27 @@ export function addDays(date: StayDate, days: number): StayDate {
 
   return shifted.toISOString().slice(0, 10)
 }
+
+/**
+ * Formats an instant for display, e.g. `15 Sept 2026, 07:30`.
+ *
+ * In the property's timezone, deliberately, and not the reader's: an audit
+ * trail exists so people can agree on when something happened, and rendering
+ * the same event on two different days depending on who opened the screen
+ * would defeat it. Stay dates format in UTC for the opposite reason — those are
+ * calendar dates, not instants.
+ *
+ * 24-hour, because a front office reading times off a screen should never have
+ * to work out whether 1:05 is lunch or the small hours.
+ */
+export function formatTimestamp(timestamp: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: PROPERTY_TIME_ZONE,
+  }).format(new Date(timestamp))
+}

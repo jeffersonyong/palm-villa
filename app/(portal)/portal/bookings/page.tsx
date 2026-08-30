@@ -19,6 +19,8 @@ import {
   TableHeaderRow,
   TableRow,
 } from '@/components/ui/table'
+import { hasPermission } from '@/lib/auth/permissions'
+import { getActor } from '@/lib/auth/require-permission'
 import { listBookings, type BookingListFilter } from '@/lib/db/bookings'
 import { BOOKING_STATUSES, type BookingStatus } from '@/lib/domain/booking-state'
 import { formatStayDate, isStayDate, nightsBetween } from '@/lib/domain/dates'
@@ -38,6 +40,12 @@ export const metadata: Metadata = {
  * payment" open in a tab, bookmark it, or send the link to someone else. The
  * form is a plain GET, which means the whole screen is server-rendered and
  * there is no client-side filtering to drift out of step with the data.
+ *
+ * Rows open the booking's own screen. The link is stretched across the row from
+ * the reference cell rather than the row being made clickable in JavaScript,
+ * which keeps this a server component with no island on it at all — and keeps
+ * the row keyboard-reachable, middle-clickable and openable in a new tab, none
+ * of which an onClick handler would give for free.
  */
 
 interface PageProps {
@@ -50,6 +58,25 @@ function isBookingStatus(value: string): value is BookingStatus {
 
 export default async function BookingsListPage({ searchParams }: PageProps) {
   const params = await searchParams
+  const actor = await getActor()
+
+  // Render is gated per-permission server-side (architecture.md §3), matching
+  // the booking detail screen. `booking.view` is what Security holds and
+  // nothing else, so it is the permission the list has to answer to.
+  if (!actor || !hasPermission(actor.permissions, 'booking.view')) {
+    return (
+      <>
+        <PageHeader title="Bookings" />
+        <EmptyState
+          className="mt-xl"
+          title="You don't have access to this screen"
+          description={
+            'Seeing bookings needs the "View bookings" permission. Ask an administrator if this is part of your job.'
+          }
+        />
+      </>
+    )
+  }
 
   // Anything unusable — a hand-edited URL, half a date pair, a reversed range —
   // falls back to no filter rather than erroring. A staff member who mistypes a
@@ -169,9 +196,18 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
             </TableHeader>
             <TableBody>
               {bookings.map((booking) => (
-                <TableRow key={booking.id}>
+                <TableRow key={booking.id} className="relative focus-within:bg-muted/60">
                   <TableCell className="font-mono text-foreground tabular-nums">
-                    {booking.reference}
+                    {/* The stretched link: it covers the whole row, so a click
+                        anywhere opens the booking, while the anchor itself stays
+                        on the reference — which is what a screen reader should
+                        announce as the link text. */}
+                    <Link
+                      href={`/portal/bookings/${booking.reference}`}
+                      className="rounded-sm outline-none after:absolute after:inset-0 focus-visible:underline"
+                    >
+                      {booking.reference}
+                    </Link>
                   </TableCell>
                   <TableCell className="text-foreground">{booking.guestName}</TableCell>
                   <TableCell className="tabular-nums">{booking.unitRef}</TableCell>

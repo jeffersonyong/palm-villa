@@ -106,11 +106,16 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
           Give the guest the reference above — it is what they quote at the gate.
         </p>
 
-        {/* A full reload on purpose: it clears the action state and re-renders
-            the availability counts for the next booking. */}
+        {/* A full reload on purpose: it clears the `useActionState` state and
+            re-renders the availability counts for the next booking, which a
+            client-side navigation back to this same route would not. The lint
+            rule cannot see that intent — it only sees an anchor to a known
+            page — so it is silenced here rather than obeyed. */}
+        {/* eslint-disable @next/next/no-html-link-for-pages */}
         <Button asChild variant="tertiary" className="mt-lg">
           <a href="/portal/bookings/new">Take another booking</a>
         </Button>
+        {/* eslint-enable @next/next/no-html-link-for-pages */}
       </Card>
     )
   }
