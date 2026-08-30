@@ -44,3 +44,43 @@ export async function auditEventsFor(entityId: string): Promise<AuditEvent[]> {
 
   return data as AuditEvent[]
 }
+
+export interface PaymentRow {
+  id: string
+  method: string
+  status: string
+  expected_amount_cents: number
+  amount_cents: number | null
+  match_kind: string | null
+  amount_override_reason: string | null
+  match_reason: string | null
+  observed_reference: string | null
+  observed_sender: string | null
+  collected_at: string | null
+  verified_at: string | null
+}
+
+/**
+ * Payments against one booking, oldest first, read straight from the table.
+ *
+ * Not `listPaymentsForBooking`, deliberately: that reads the summary view, and
+ * a test asserting what was actually stored should not be able to pass because
+ * the view papered over it.
+ */
+export async function paymentsFor(bookingId: string): Promise<PaymentRow[]> {
+  const { data, error } = await dataClient()
+    .from('payment')
+    .select(
+      'id, method, status, expected_amount_cents, amount_cents, match_kind, ' +
+        'amount_override_reason, match_reason, observed_reference, observed_sender, ' +
+        'collected_at, verified_at',
+    )
+    .eq('booking_id', bookingId)
+    .order('created_at')
+
+  if (error) {
+    throw new Error(`Could not read payments: ${error.message}`)
+  }
+
+  return data as unknown as PaymentRow[]
+}

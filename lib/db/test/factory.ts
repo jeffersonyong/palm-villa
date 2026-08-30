@@ -5,6 +5,7 @@ import { bnd } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
 
 import { createWalkInBooking, type Booking, type CreateWalkInBookingInput } from '../bookings'
+import { listPaymentsForBooking, type Payment } from '../payments'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { currentPropertyId } from '../property'
 
@@ -100,14 +101,37 @@ export async function givenBooking(spec: BookingSpec): Promise<Booking> {
 }
 
 /**
+ * Creates a booking paid by bank transfer, and hands back its pending payment.
+ *
+ * Goes through the real path, so what these tests act on is exactly what the
+ * booking form produces: a booking in `awaiting_payment_verification` with one
+ * `pending_verification` payment against it.
+ */
+export async function givenTransferBooking(
+  spec: BookingSpec,
+): Promise<{ booking: Booking; payment: Payment }> {
+  const booking = await givenBooking({ ...spec, paymentMethod: 'bank_transfer' })
+  const payments = await listPaymentsForBooking(booking.id)
+
+  const [payment] = payments
+
+  if (payments.length !== 1 || !payment) {
+    throw new Error(`Expected one payment on ${booking.reference}, found ${payments.length}.`)
+  }
+
+  return { booking, payment }
+}
+
+/**
  * Creates a booking already sitting in a state the application cannot yet
  * produce, by writing its rows directly.
  *
- * `held` and `awaiting_payment_verification` are reached from `draft` through
- * the public booking flow, which is phase two — walk-ins go straight to
- * `confirmed` and never pass through either (prd.md §9.4). The daily snapshot
- * already counts both, so the behaviour needs pinning before the flow that
- * produces them exists.
+ * `held` is reached from `draft` through the public booking flow, which is
+ * phase two. `awaiting_payment_verification` is no longer among them — the
+ * payments slice gave it a real creation path, so reach it with
+ * `givenTransferBooking` above and leave this helper to the states nothing can
+ * actually produce. A fixture that hand-writes a state the application can
+ * reach properly pins the fixture's behaviour rather than the product's.
  *
  * The status is still **derived by walking the state machine**, never chosen:
  * a test booking sitting in a state `transition()` cannot actually reach would
