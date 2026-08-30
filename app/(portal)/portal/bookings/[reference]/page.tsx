@@ -345,10 +345,14 @@ function PaymentsSection({
           </p>
         ) : (
           <ul className="grid gap-lg">
+            {/* Each row's headline sits `sm` clear of the metadata under it,
+                which stays on its own tighter `xs` rhythm: what the payment is
+                reads as one line, and what is known about it as a block below
+                — not five lines evenly spaced. */}
             {payments.map((payment) => (
               <li
                 key={payment.id}
-                className="grid gap-xs border-b border-divider pb-lg last:border-0 last:pb-0"
+                className="grid gap-sm border-b border-divider pb-lg last:border-0 last:pb-0"
               >
                 {/* Method and its state on one line, with the amount opposite:
                     "Cash, verified, 200.00" is how the row is read aloud, so
@@ -371,41 +375,43 @@ function PaymentsSection({
                   </span>
                 </div>
 
-                {payment.verifiedAt ? (
-                  <p className="text-caption text-muted-foreground">
-                    {payment.method === 'cash' ? 'Collected by ' : 'Verified by '}
-                    {payment.verifiedBy
-                      ? (actorNames.get(payment.verifiedBy) ?? 'a former staff member')
-                      : 'the system'}{' '}
-                    on {formatTimestamp(payment.verifiedAt)}
-                  </p>
-                ) : (
-                  <p className="text-caption text-muted-foreground">
-                    Raised {formatTimestamp(payment.createdAt)} · no slip on file
-                  </p>
-                )}
+                <div className="grid gap-xs">
+                  {payment.verifiedAt ? (
+                    <p className="text-caption text-muted-foreground">
+                      {payment.method === 'cash' ? 'Collected by ' : 'Verified by '}
+                      {payment.verifiedBy
+                        ? (actorNames.get(payment.verifiedBy) ?? 'a former staff member')
+                        : 'the system'}{' '}
+                      on {formatTimestamp(payment.verifiedAt)}
+                    </p>
+                  ) : (
+                    <p className="text-caption text-muted-foreground">
+                      Raised {formatTimestamp(payment.createdAt)} · no slip on file
+                    </p>
+                  )}
 
-                {/* Only shown when it differs — the ordinary case is that the
-                    customer quoted the booking reference and there is nothing
-                    to say about it. */}
-                {payment.observedSender || payment.observedReference ? (
-                  <p className="text-caption text-muted-foreground">
-                    Bank showed{' '}
-                    {payment.observedSender ? <strong>{payment.observedSender}</strong> : null}
-                    {payment.observedSender && payment.observedReference ? ' · ' : null}
-                    {payment.observedReference ? (
-                      <span className="font-mono">{payment.observedReference}</span>
-                    ) : null}
-                    {payment.observedOn ? ` on ${formatStayDate(payment.observedOn)}` : null}
-                  </p>
-                ) : null}
+                  {/* Only shown when it differs — the ordinary case is that the
+                      customer quoted the booking reference and there is nothing
+                      to say about it. */}
+                  {payment.observedSender || payment.observedReference ? (
+                    <p className="text-caption text-muted-foreground">
+                      Bank showed{' '}
+                      {payment.observedSender ? <strong>{payment.observedSender}</strong> : null}
+                      {payment.observedSender && payment.observedReference ? ' · ' : null}
+                      {payment.observedReference ? (
+                        <span className="font-mono">{payment.observedReference}</span>
+                      ) : null}
+                      {payment.observedOn ? ` on ${formatStayDate(payment.observedOn)}` : null}
+                    </p>
+                  ) : null}
 
-                {payment.amountOverrideReason ? (
-                  <p className="mt-xxs text-body-sm text-copy">“{payment.amountOverrideReason}”</p>
-                ) : null}
-                {payment.matchReason ? (
-                  <p className="mt-xxs text-body-sm text-copy">“{payment.matchReason}”</p>
-                ) : null}
+                  {payment.amountOverrideReason ? (
+                    <p className="text-body-sm text-copy">“{payment.amountOverrideReason}”</p>
+                  ) : null}
+                  {payment.matchReason ? (
+                    <p className="text-body-sm text-copy">“{payment.matchReason}”</p>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
