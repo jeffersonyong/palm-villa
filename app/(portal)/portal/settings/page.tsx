@@ -7,18 +7,23 @@ export const metadata: Metadata = {
 }
 
 /**
- * The Admin area's landing screen.
+ * Settings for the person signed in, not for the property.
  *
- * No `capability` ref: the specific settings screens beneath it carry those
- * (F1–F4), and this page is navigational. Property-level settings that have
- * no home yet — and F5, exporting the business data, which is promised in the
- * scope and has no screen anywhere — are the candidates for what it holds.
+ * No `capability` ref: this is account housekeeping — display name, password,
+ * notification preferences — which the scope never had to ask for, and which
+ * every role can reach. The permission-gated screens (F1–F4) are the Admin
+ * group's, and they sit beneath this URL only because the routes were laid out
+ * when Settings meant the Admin landing page; the nesting is worth revisiting
+ * before this screen is built.
+ *
+ * F5 — exporting the business data, promised in the scope with no screen
+ * anywhere — is property-level, so it belongs to Admin rather than here.
  */
 export default function SettingsPage() {
   return (
     <PlannedScreen
       title="Settings"
-      description="Property-level settings for the operation. The specific screens live beneath this one."
+      description="Your own account — name, password and notification preferences. Property-level configuration lives under Admin."
     />
   )
 }

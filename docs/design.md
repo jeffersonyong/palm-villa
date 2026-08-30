@@ -22,6 +22,32 @@ colors:
   negative: "#d03238"
   negative-deep: "#9f1d24"
   negative-tint: "#fbe9ea"
+  info: "#1c80dd"
+  info-deep: "#0f5ea8"
+  info-tint: "#d8ecfe"
+
+  # Identity — avatar hues. Ordered; the order is load bearing (§Avatars).
+  identity-sky: "#0ea5e9"
+  identity-sky-deep: "#155e75"
+  identity-sky-tint: "#c3eefa"
+  identity-blue: "#2563eb"
+  identity-blue-deep: "#1e40af"
+  identity-blue-tint: "#cde3fe"
+  identity-violet: "#7c3aed"
+  identity-violet-deep: "#5b21b6"
+  identity-violet-tint: "#e0dafe"
+  identity-fuchsia: "#c026d3"
+  identity-fuchsia-deep: "#86198f"
+  identity-fuchsia-tint: "#f8dcff"
+  identity-rose: "#f43f5e"
+  identity-rose-deep: "#9f1239"
+  identity-rose-tint: "#ffd9dd"
+  identity-orange: "#f97316"
+  identity-orange-deep: "#9a3412"
+  identity-orange-tint: "#fee2c0"
+  identity-lime: "#84cc16"
+  identity-lime-deep: "#3f6212"
+  identity-lime-tint: "#e3fbb4"
 
 typography:
   # Inter everywhere. Hierarchy is size, weight (400/500/600) and tight
@@ -214,6 +240,17 @@ components:
     typography: "{typography.caption} @ 500"
     padding: "{spacing.xxs} {spacing.sm}"
     rounded: "{rounded.pill}"
+  # The badge construction at panel scale. Not a card: cards take no tint.
+  notice:
+    backgroundColor: "{colors.info-tint}"
+    textColor: "{colors.info-deep}"
+    typography: "{typography.body-sm}"
+    # Nested in a card or an overlay — an inset panel.
+    padding: "{spacing.md}"
+    rounded: "{rounded.md}"
+    # Standing on the page ground — card scale.
+    pagePadding: "{spacing.lg}"
+    pageRounded: "{rounded.lg}"
   # Elevation level 3. Dialogs, popovers and menus share one shell.
   overlay:
     backgroundColor: "{colors.canvas}"
@@ -252,9 +289,13 @@ components:
     typography: "{typography.body-sm}"
     rounded: "{rounded.sm}"
     padding: "0 {spacing.md}"
+  # Identity mark. The fill and text are the person's identity hue, indexed
+  # from their account id — not a fixed pair. Unseeded falls back to neutral.
   avatar:
-    backgroundColor: "{colors.canvas-soft}"
-    textColor: "{colors.ink}"
+    backgroundColor: "{themes.light.avatar-*}"
+    textColor: "{themes.light.avatar-*-foreground}"
+    unseededBackgroundColor: "{colors.canvas-soft}"
+    unseededTextColor: "{colors.ink}"
     typography: "{typography.caption} @ 500"
     rounded: "{rounded.full}"
     size: 32px
@@ -294,8 +335,24 @@ themes:
     badge-warning-foreground: "{colors.warning-deep}"
     badge-negative: "{colors.negative-tint}"
     badge-negative-foreground: "{colors.negative-deep}"
+    notice-info: "{colors.info-tint}"
+    notice-info-foreground: "{colors.info-deep}"
     badge-active: "{colors.brand-pale}"
     badge-active-foreground: "{colors.brand-deep}"
+    avatar-sky: "{colors.identity-sky-tint}"
+    avatar-sky-foreground: "{colors.identity-sky-deep}"
+    avatar-blue: "{colors.identity-blue-tint}"
+    avatar-blue-foreground: "{colors.identity-blue-deep}"
+    avatar-violet: "{colors.identity-violet-tint}"
+    avatar-violet-foreground: "{colors.identity-violet-deep}"
+    avatar-fuchsia: "{colors.identity-fuchsia-tint}"
+    avatar-fuchsia-foreground: "{colors.identity-fuchsia-deep}"
+    avatar-rose: "{colors.identity-rose-tint}"
+    avatar-rose-foreground: "{colors.identity-rose-deep}"
+    avatar-orange: "{colors.identity-orange-tint}"
+    avatar-orange-foreground: "{colors.identity-orange-deep}"
+    avatar-lime: "{colors.identity-lime-tint}"
+    avatar-lime-foreground: "{colors.identity-lime-deep}"
   dark:
     background: "{colors.ink}"
     card: "{colors.ink-deep}"
@@ -331,11 +388,28 @@ themes:
     badge-warning-foreground: "{colors.canvas-soft}"
     badge-negative: "mix({colors.negative} 28%, {colors.ink-deep})"
     badge-negative-foreground: "{colors.canvas-soft}"
+    notice-info: "mix({colors.info} 32%, {colors.ink-deep})"
+    notice-info-foreground: "{colors.canvas-soft}"
     badge-active: "mix({colors.brand} 24%, {colors.ink-deep})"
     badge-active-foreground: "{colors.brand-active}"
+    avatar-sky: "mix({colors.identity-sky} 40%, {colors.ink-deep})"
+    avatar-sky-foreground: "{colors.canvas-soft}"
+    avatar-blue: "mix({colors.identity-blue} 40%, {colors.ink-deep})"
+    avatar-blue-foreground: "{colors.canvas-soft}"
+    avatar-violet: "mix({colors.identity-violet} 40%, {colors.ink-deep})"
+    avatar-violet-foreground: "{colors.canvas-soft}"
+    avatar-fuchsia: "mix({colors.identity-fuchsia} 40%, {colors.ink-deep})"
+    avatar-fuchsia-foreground: "{colors.canvas-soft}"
+    avatar-rose: "mix({colors.identity-rose} 40%, {colors.ink-deep})"
+    avatar-rose-foreground: "{colors.canvas-soft}"
+    avatar-orange: "mix({colors.identity-orange} 40%, {colors.ink-deep})"
+    avatar-orange-foreground: "{colors.canvas-soft}"
+    avatar-lime: "mix({colors.identity-lime} 40%, {colors.ink-deep})"
+    avatar-lime-foreground: "{colors.canvas-soft}"
   # The operations surfaces (portal + field) are monochrome — these override
   # the maps above inside `[data-surface="ops"]`; everything not listed
-  # inherits, and the semantic status colours are deliberately unchanged.
+  # inherits, and the semantic status *and* identity colours are deliberately
+  # unchanged.
   ops:
     light:
       primary: "{colors.ink}"
@@ -375,10 +449,12 @@ The same tokens serve all three surfaces. The public site gets slightly more air
 - `{colors.canvas}` white is the working surface **and the page ground** — the portal sits on white, not gray. `{colors.canvas-soft}` is the faint gray spent on *selected and hover chips, inset panels, table header strips and tab tracks* — the small surfaces, never the ground. The two are close on purpose — the seam between them is always drawn with a hairline, not carried by the fill.
 - `{colors.ink}` carries headings and the dark surfaces (footer, the two public dark moments); it never fills a button.
 - Semantic set is **tint + deep text**: soft tinted chip, deep same-hue text. The saturated mid hues exist for icons and the destructive button only. Booking states: confirmed = positive, awaiting payment = warning, expired / cancelled / no-show = negative, checked-in = `brand-pale` with `brand-deep` text. Aqua is never a success indicator; that is `positive`.
+- **Identity colour is a third register, and it is neither brand nor status.** Seven hues (`{colors.identity-*}`) worn by avatars only, in the semantic set's tint + deep-text construction, running around the wheel with teal — the customer's colour — the one deliberate omission. Each sits clearly off the status hue nearest it, and form does the rest: a face is a circle with two letters, a status is a pill with a word. A person's hue is *derived from their account id*, so it is stable for the life of the account and the set's order can never be changed. These roles do **not** flip on `data-surface="ops"` — identity is not brand, and the portal is where they live. See §Components — Avatars.
 
 ### Accessibility
 - Body copy `{colors.body}` on white: 8.9:1. `{colors.mute}` (captions, micro-labels): 4.9:1 on `canvas-soft`, passes AA at caption scale.
 - `{colors.brand-deep}` on white: 6.3:1 — the only aqua that may carry text, and as a fill it carries white button labels at the same ratio. Vivid `{colors.brand}` with ink text (dark-theme primary, `primary-invert` on ink): ~8.9:1.
+- Identity hues, deep-on-tint at `caption` scale: sky 5.9:1, blue 6.6:1, violet 6.7:1, fuchsia 6.5:1, rose 6.2:1, orange 5.9:1, lime 6.3:1. Dark inverts to `canvas-soft` over the mix: 6.6:1 (lime) to 10.4:1 (violet), measured in the browser. `identity-orange-deep` is orange-800, deliberately not amber-800, which *is* `{colors.warning-deep}` — an identity hue must never be literally a status token.
 - Verify any new pairing before adding it.
 
 ## Dark theme
@@ -453,7 +529,7 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **Inputs.** White, hairline, `{rounded.md}` 6px, `body-md` 14px, height 36px (portal 32px), horizontal padding `{spacing.md}`. Focus: the border strengthens to the action colour plus a faint same-hue halo (`ring`) — decisive, not a glow. Labels are `body-sm-strong` ink. Field-screen inputs use the `touch` size.
 
-**Dropdowns.** One dropdown, two dresses, and both open the same overlay shell. The **form dress** is the default: the trigger *is* an Input — same height, hairline, `{rounded.md}`, `body-md`, same focus treatment — so a closed select and a text field in one form row are indistinguishable until you open one. Its only addition is a 16px mute chevron, which turns over on open. The **filter dress** is the chip described below. Inside, the panel takes the overlay shell and its options are *controls*: `{rounded.md}` 6px, `body-sm`, `muted` fill on focus, a right-aligned check on the chosen one — identical to a menu, because a select panel and a menu are the same object with different jobs. **Selection is a weight shift, never a colour**: the chosen option goes ink at 500. Group headers are `micro`, like every other data-region label. The panel opens at least as wide as its trigger, grows to fit its content, and scales out of the trigger's own corner so the two read as one control. A leading ornament — a status dot, an icon — sits *beside* the option's text, never inside it. Native `<select>` stays only for forms that must submit without JavaScript.
+**Dropdowns.** One dropdown, two dresses, and both open the same overlay shell. The **form dress** is the default: the trigger *is* an Input — same height, hairline, `{rounded.md}`, `body-md`, same focus treatment — so a closed select and a text field in one form row are indistinguishable until you open one. Its only addition is a 16px mute chevron, which turns over on open. The **filter dress** is the chip described below. Inside, the panel takes the overlay shell and its options are *controls*: `{rounded.md}` 6px, `body-sm`, `muted` fill on focus, a right-aligned check on the chosen one — identical to a menu, because a select panel and a menu are the same object with different jobs. **Selection is a weight shift, never a colour**: the chosen option goes ink at 500. Group headers are `micro`, like every other data-region label. The panel opens at least as wide as its trigger, grows to fit its content, and scales out of the trigger's own corner so the two read as one control. A leading ornament — a status dot, an icon — sits *beside* the option's text, never inside it. **There is no native `<select>` left in the product.** The OS picker was kept for a while on the plain-HTML forms, on the grounds that a staff desktop can live with it; what that actually bought was two dropdowns on one screen opening two different objects, one of them carrying no token from this system. A drawn select submits through a hidden native field, so a `method="get"` form loses nothing by using it.
 
 **Filter rows.** A list screen's filters are a **row of chips above the table**, not a card of labelled fields with an Apply button: a filter *reports* a value where a form field *asks* for one, and it has to be readable from across the row. So the field's name lives inside the control and an unset filter shows only its name; a set one fills with `canvas-soft` — the selected-chip language of the sidebar and the segmented control — steps the name back to mute and puts the value in ink at 500. Filters apply on the click that made them and are **URL state**, so a filtered list can be bookmarked and sent on. A `Clear` ghost closes the chips when anything is set.
 
@@ -467,25 +543,43 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 **The grid is Monday-first, always six rows, and has no holes in it.** Every cell carries a real day — the spill from the neighbouring months included, muted but fully selectable, and clicking one brings its month into view. Blanks were wrong twice over: a half-empty first row reads as a rendering fault, and a range crossing a month boundary broke into two bands with a gap where the week actually continues. Day cells are **36px** rather than the portal's 32px control: seven of them sit shoulder to shoulder, and at 32px the numerals read squashed. Weeks are separated by a 3px vertical gap and nothing horizontal — the band across a week stays one continuous strip, while stacked weeks stop reading as a solid block. The numeral is optically centred and stays centred — the today mark is taken out of the flow, never stacked under it.
 
-**A day rests at one of three weights, and they are not the same three in each theme.** Spill, resting, and emphasised (today, hover, a chosen end) must all be tellable apart. Light gets that from `mute` → `copy` → `ink` directly; **dark cannot**, because `copy` is `{colors.canvas-soft}` against a `{colors.canvas}` foreground and the two are 3% apart — so a dark resting day steps down to `muted-foreground` and the spill steps down again to 60% of it. This is the same asymmetry the sidebar and the segmented control already carry (see *Portal nav items*), and the calendar is the third place it applies. A day's colour is therefore resolved to **one** class, never layered: a base utility and a `dark:` one for the same property both survive `tailwind-merge` and let source order pick the winner.
+**A day is one of two shades: the month's own, and the spill.** The grid tried three — spill, resting, and emphasised (today, hover, a chosen end) on `mute` → `copy` → `ink` — and the bottom two were indistinguishable in use: `copy` and `mute` are 1.8:1 apart on white, which is not enough for two 14px numerals sitting one cell apart, while the step above them was twice as wide. So the month's own days take `ink` outright and the spill stays `mute`: **3.7:1 between them in light, 3.2:1 in dark**, with both shades still clearing AA. Emphasis does not need a third shade, because none of the emphasised states were relying on it — today has its dot and its weight, a hovered day has the surface, an end mid-pick has its drawn chip, a chosen end is a fill. **Dark takes the spill at 80%** of `muted-foreground`, which there is already lifted toward `{colors.canvas-soft}` and would otherwise land too near white on an ink ground. A day's colour is resolved to **one** class, never layered: a base utility and a `dark:` one for the same property both survive `tailwind-merge` and let source order pick the winner.
 
 Visually the rest is existing language: the band between the ends is `canvas-soft`; the two ends are the action fill (ink on the operations surfaces, never teal), and **both selected treatments pin their own hover** — the row's generic hover colour is not a conflict a class merger resolves, and left unpinned it lands ink text on the ink fill; a selection still in progress shows its far end as a **drawn white chip with a hairline** — pagination's "you are here" — so provisional and committed never look alike; **today is a dot beneath the numeral**, not a colour. A footer bookends the grid on the same hairline, naming the range or, mid-pick, the end already chosen.
 
-**Single date entry** still uses native `<input type="date">` with the input treatment. The public availability calendar (A1) is a different component from the range picker above — it carries per-night price and availability — and must be specified here before it is built.
+**Single date entry** is the same grid in the form dress — the range picker's twin, not a different control. Closed, it is an Input to the pixel: same height, hairline, `{rounded.md}`, `body-md`, same focus treatment, so a date field and a text field in one form row are indistinguishable until you open one. **Its ornament is a calendar glyph, not the select's chevron** — a chevron promises a list, and the two controls sit in the same forms, so the glyph is the one honest place to say which is which. Open, it is the overlay shell around **one** month of the shared grid; a second month would be offering a span this control cannot express. The value reads as a date and not as digits — `12 Sept 2026`, the phrasing the range chip and the booking summary already use — and typing is not offered, because the whole reason the control exists is that a calendar cannot express 31 February, a transposed month, or a day outside the booking window, where a text field can express all three and would need each of them validated and explained.
 
-**Portal forms.** A form is one card, never a stack of sibling cards: sections divide with hairline rules and take `micro` headers in mute. Fields size to their content (a two-digit count gets ~150px, not a row). The itemised price sits beside the form in a sticky card — figures `tabular-nums`, total at `display-sm` — carrying the screen's one primary button. Native selects draw their own chevron (`appearance-none` + 16px mute chevron). Stat readouts render as `micro` label over `display-xs`/`display-sm` figure.
+**`min`/`max` survive as bounds on the grid.** A day outside the window is drawn and not offered — visible, so a reader can see the 3rd exists and is simply not bookable, rather than finding a hole in the week — and a month arrow retires once there is nothing selectable past it. Keyboard motion clamps at the edge instead of stopping dead. The footer carries at most two things, on the range picker's hairline: a **Today** shortcut, offered only when today is inside the window and is not already the answer, and **Clear** on the fields that may be empty. A required field is never clearable, so it always holds a value.
+
+The native `<input type="date">` this replaced was ours only until it was clicked: the closed field carried the input treatment, and then Chrome, Safari and Firefox each drew a different calendar, none of them agreeing with the two-month picker one screen away on the bookings filter.
+
+**The public availability calendar (A1)** is a different component from the range picker above — it carries per-night price and availability — and must be specified here before it is built.
+
+**Portal forms.** A form is one card, never a stack of sibling cards: sections divide with hairline rules and take `micro` headers in mute. Fields size to their content (a two-digit count gets ~150px, not a row). The itemised price sits beside the form in a sticky card — figures `tabular-nums`, total at `display-sm` — carrying the screen's one primary button. Stat readouts render as `micro` label over `display-xs`/`display-sm` figure.
 
 **Status badges.** Pill, `caption` 12px at weight 500, `{spacing.xxs} {spacing.sm}` padding, tint + deep text. Small and quiet — a badge is metadata, not a button. Pills appear nowhere else.
+
+**Notices.** A sentence the reader needs before acting — what a transfer hold means, what a screen does *not* calculate, what is collected on arrival — in the `info` blue at `{rounded.md}`, with an `Info` mark. It is the badge chips' tint/deep construction at panel scale, and it is **not a card**: cards take no tint, and a notice is a different object. `info` is the fourth status hue and the only one that is never an outcome — the other three report how something turned out, this one says what to know first. It is a **light sky blue** (≈208°, 95% S, 92% L): high chroma at *high* lightness, which is what makes a panel read bright and friendly rather than administrative. Chroma is what stops it looking like another gray; lightness is what stops it looking heavy — an earlier pass darkened the ground to give it presence and got a corporate blue instead. `info-deep` sits at the tint's own hue rather than a navy, so the panel reads as one colour, and holds 5.4 on it. The mark carries no colour of its own: the icon takes `currentColor`.
+
+**A notice takes its radius from where it sits, not from what it is.** The radius scale measures *scale* — 6px controls, 10px cards — so a notice nested inside a card or a dialog is an inset panel at `{rounded.md}` with `{spacing.md}` padding, and one standing on the page ground is card-scale at `{rounded.lg}` with `{spacing.lg}`. Both readings fail if you pick one and apply it everywhere: 10px inside a 10px card reads as a mis-drawn edge, and inside a 14px overlay the geometry stops being concentric, while 6px in a page slot beside real cards reads as a control that grew. Nested is the default, because most notices are. Still kept off cyan deliberately — a cyan panel reads teal on an ink ground, and the operations surfaces do not carry teal; going bluer moved away from that edge, not toward it.
+
+**A notice is not an alert.** Its mark is `aria-hidden` and it carries no ARIA role — the sentence already says everything the mark does. What interrupts a screen reader is the `role="alert"` error line beside the field that failed, and that stays the `negative` pair.
+
+**Gray is still the panel for figures.** The `canvas-soft` inset holds grouped stats and fine print attached to a number — a deposit line, a variance summary. The two were one treatment until the notices took the colour; if a panel is a table of values rather than a sentence that changes what someone does, it stays gray.
 
 **Tables (the portal's signature surface).** A hairline-bounded container at `{rounded.lg}` with `overflow-hidden`; header row on `canvas-soft` in `micro` mute; body rows `body-sm` with `divider` rules; cells pad `{spacing.md} {spacing.lg}` vertically tight. Reference and money columns set `tabular-nums`. Row hover is a whisper of `canvas-soft`. This is the payment queue, arrivals list, and every list screen.
 
 **Table pagination.** The footer bookends the header: the same `canvas-soft` strip, the same `divider` hairline, *inside* the table's container so one boundary and one radius hold the whole surface. It reads as two clusters. **Left — where you are:** the range in `body-sm` mute ("1–10 of 18 accounts"), which stays even when there is a single page because the count is useful, then a vertical hairline and the optional "Rows per page" select, labelled in the same `body-sm` mute so the whole left cluster reads as one quiet line rather than a shouted `micro` label beside a sentence. A page-number *entry* field is deliberately not offered: the range is the answer to "how much is here", and the chips are the way to move. **Right — how to move:** the page chips, flanked by single-step arrows and, from `sm` up, double-chevron jumps to the first and last page. **Figures here are proportional, not `tabular-nums`** — the tabular rule serves columns that must line up vertically, and nothing in this footer is in a column: the range reads as a sentence, the page numbers are centred in their own chips. The arrows are **drawn controls** — hairline-bounded chips on the card fill, like every other button in the portal — while the numbers are bare, so stepping and jumping never look like the same control; at the ends the arrows fade rather than disappear. **The current page is a white chip with a hairline** — "where am I" as a quiet surface shift, the sidebar's and segmented control's language — and deliberately *without* `shadow-chip`, which stays the segmented control's alone. Idle pages are `copy`, hover lifts them to the card fill. An ellipsis only ever stands in for two or more pages, and the control's slot count is constant, so it never changes width as you page. Below `sm` the jumps and the hairline drop out and the two clusters stack.
 
+**Empty states.** A list that comes back with nothing keeps the table's place with the empty-state card, and it answers two different questions depending on why it is empty. **Nothing here yet** names the record type and says where records come from, offering the screen's create action as a `tertiary` button — the filled primary stays on the control line. **Nothing matched** names the filters as the cause and offers the way out, and that escape is worded identically on every screen: a `tertiary` button reading **"Clear filters"**, linking to the screen's own route with no query, under the description "Try a wider date range, or clear the filters to see everything." Not a bare underlined link, and not a per-screen variant naming the field it clears ("Clear the date filter") — a screen with one filter today grows a second one later, and staff who learn the escape on one list should recognise it on the next. The plural holds even where a screen filters on one thing.
+
 **QR block.** White card, centred QR ≥ 200px with default quiet zone, booking reference in `display-sm` beneath, guidance in `body-sm`.
+
+**The operations lockup.** A mark, then "Palm Villa" in `micro` mute over "Operations" at 14px/600 — one component (`PortalBrand`) for the three places it appears: the sidebar's brand block, the mobile drawer's, and the sign-in screen. The wordmark is 14px at 600, not `display-xs`: the lockup is chrome beside a 28px mark, not a heading, and at 17px the two lines outweighed the thing they sit next to. `micro` stays at 11px — the system's floor — and the pair still reads smaller, because the dominant line is what came down. The two lines are pulled `xxs` tighter than their line-heights leave them, so they lock up as one object rather than reading as a label and a heading that happen to be stacked. The mark is an ink square at `{rounded.md}` with the ground knocked out of it, inverting with the theme: the operations surfaces carry no teal, and a solid fill reads as a mark rather than a control here, where every chip is `canvas-soft`. It is placeholder artwork — real artwork replaces the glyph, not the construction.
 
 **Portal topbar.** 56px tall — the 36px controls inside need air, at 48px they read as suffocated — filled with the page ground and separated by a bottom hairline. The sidebar's brand block takes the same height and the same bottom hairline, so **one unbroken rule runs across the full width**, separating the brand from both the navigation and the content — the sidebar's construction continued across the top. Breadcrumbs sit left in `body-sm` mute with chevron separators, the current crumb in ink at 500; the tools that belong to no single screen (search, notifications, theme) sit right. It is sticky, and it **never carries the page title** — that stays the screen's single `h1` beneath it. Below `lg` it also holds the drawer trigger.
 
-**Portal nav items.** Every item pairs a 16px icon with its label. The active item is a `canvas-soft` chip with ink text at 500 — a quiet surface shift on the white ground, never a colour; hover is the same chip at a whisper. Icons render in `mute` and lift to ink with the chip — they follow the item's state, never carry the brand hue, and never appear without a label in the sidebar. **Every item belongs to a labelled group** — there is no ungrouped lead item.
+**Portal nav items.** Every item pairs a 16px icon with its label. The active item is a `canvas-soft` chip with ink text at 500 — a quiet surface shift on the white ground, never a colour; hover is the same chip at a whisper. Icons render in `mute` and lift to ink with the chip — they follow the item's state, never carry the brand hue, and never appear without a label in the sidebar. **Every item belongs to a labelled group** — there is no ungrouped item, at either end of the list, and no hairline inside the nav: the labels are the structure, and a rule between them would be a second one saying the same thing. **The groups name areas of the work, not permission levels.** A group may hold a single item — Overview and Property both do — where the area is real and will fill; the test is whether the label names something, not how many screens are under it yet. Filing a lone screen into a neighbouring group to avoid a one-item label is the wrong trade when the groups mean different things: Units is a daily operations screen, and moving it under Admin would have said only administrators open it. What belongs to no area at all closes the list under **Others**: Settings lives there, because it is where anyone signed in manages their own account, and Admin would likewise have implied a permission it does not need.
 
 Group headers are `micro` in `mute`, and always sit **one step below the items they label** — they organise the nav, they do not compete with it. Light gets that from the roles directly (`mute` label under `copy` items); dark takes `muted-foreground` at 75%, because there the label and item roles would otherwise resolve to the same value. The result is one contrast ladder in both themes: label ≈ 5:1, idle ≈ 8–9:1, selected 18:1, with the label still clearing AA at 11px.
 
@@ -507,7 +601,21 @@ Idle items are `copy` in light but step down to **`muted-foreground` in dark**. 
 
 **Textareas.** The input treatment at multiple lines — same hairline, radius, type and focus — sized to their content rather than fixed.
 
-**Avatars.** Circular, 32px by default, `muted` fill with initials at `caption`/500. The sanctioned exception to "pills are badges only", which concerns rectangles becoming pills, not identity marks. Never a brand fill — an avatar identifies a person, it is not an accent.
+**Avatars.** Circular, 32px by default (24px in a table row, whose 32px height a full-size face would set), initials at `caption`/500. The sanctioned exception to "pills are badges only", which concerns rectangles becoming pills, not identity marks.
+
+**A face carries its person's colour, and the colour is derived, not chosen.** The fill is one of seven *identity* hues indexed from the account id, in the same tint + deep-text construction as a status chip. Derived means the same person is the same colour on every screen and in every session, which is the only reason the colour is worth anything: it makes a name you already know findable in a list before you have read it. It follows that **the order of the identity hues is load bearing** — append to the set, never reorder or remove, or every face in the product repaints. Seed on the **account id**, never the name or the email: both are editable, and correcting a typo in someone's surname should not change their colour. An avatar with no seed stays neutral `canvas-soft`, which is what a placeholder standing in for nobody should look like.
+
+**The identity set runs right around the wheel, with one hole in it.** Seven stops — sky, blue, violet, fuchsia, rose, orange, lime — and **no teal**, because teal on a staff surface is the one thing the monochrome ops rule actually forbids: it is the customer's colour. (`sky`'s dark-mix hue is a touch bluer than its light tint for exactly that reason — a cyan mix read teal on the ink ground.)
+
+**The other meaningful hues are sat beside, not avoided.** Lime is a yellow-green where positive is mint, rose a pink where negative is red; no identity token is ever literally a status token. **`orange` is the deliberate exception** — it shares its hue with `warning` (amber ≈32°, orange ≈25°) rather than sitting beside it, so there the separation rests entirely on the fill and the form: a peach tint at visibly higher chroma against warning's cream, in a circle rather than a pill. The two do not meet on any screen today; a "verified by" line beside an awaiting-payment chip would be the first, and is the thing to check if it ever reads wrong. Separation is carried by **form** at least as much as hue — an identity mark is a circle with two letters, a status is a pill with a word — and identity fills sit lighter and less chromatic than the status tints, so a face reads as a face. Confining the set to the arc the status hues leave unclaimed was the first attempt and it is the wrong trade: it bought a theoretical safety nobody was at risk from and cost the set its whole point, producing five near-identical blues that could not tell five people apart.
+
+Seven rather than eight for the same reason — stops land ≈35–45° apart, and an eighth (indigo, between blue and violet) crowded three of them into one periwinkle. **A hue that cannot be named at 24px is not in the set.**
+
+**In dark, identity mixes at 40% where a status chip mixes at 26%.** Both sets are built the same way there — the hue over `ink-deep` — and at the same percentage they stopped being distinguishable: `avatar-orange` and `badge-warning` landed 0.01 apart in oklab lightness with the same b, and rose/negative and lime/positive were barely better. Light does that job through the tint it picks; dark needed identity to be the brighter, more chromatic of the two, which is the same thing the light fills say. Measured deep-on-fill in dark: 6.6:1 (lime) to 10.4:1 (violet).
+
+**Identity is not brand**, so unlike the action roles these do *not* flip on the operations surfaces: the portal is the only place they are used.
+
+Never a **brand** fill — an avatar identifies a person, it is not an accent, and the lagoon hue stays the customer surface's.
 
 **Skeletons.** `muted` at the control radius, shaped to match the content arriving, pulsing gently and static under reduced motion. Never a shimmer sweep: that is decoration, and it does not survive the theme flip cleanly.
 
@@ -519,6 +627,7 @@ Idle items are `copy` in light but step down to **`muted-foreground` in dark**. 
 - Elsewhere spend the hue as text and small brand moments (`brand-deep` for text, raw `brand` for graphic dots/logo).
 - Label data regions in `micro` uppercase mute — tables, form sections, stats, eyebrows.
 - Keep radii small: 6px controls, 10px cards, 14px overlays, pills for badges only.
+- Reach for a notice when a sentence changes what someone does next; leave gray for panels of figures.
 - Set `tabular-nums` on every number that sits in a column or a total.
 - Reach for theme roles (`background`, `card`, `copy`, `border`, `primary`) in application code, never raw palette tokens.
 
@@ -526,6 +635,7 @@ Idle items are `copy` in light but step down to **`muted-foreground` in dark**. 
 - Don't fill bands, cards or any surface larger than a button with the lagoon hue — the primary button (and the badge chip) are its only fills.
 - Don't fill a button with ink **on the customer surface**; there, ink is text and the dark surfaces, and a black button reads as someone else's brand. The operations surfaces are the deliberate exception — their whole register is monochrome, so ink (white in dark) *is* their primary.
 - Don't use aqua as a success state; success is the `positive` pair.
+- Don't spend the `info` blue for emphasis, decoration or a bit of colour on a dull screen. It means "know this before you act" — a second blue panel on a screen halves what the first one is worth, and a blue that means nothing is the fastest way to teach staff to stop reading them.
 - Don't let Fraunces off display headlines — public `display-md`+ and the portal's `h1` page title only; never on the field surface, never for body or UI text. And no third family, anywhere.
 - Don't build coloured band alternation; sections separate with hairlines on white.
 - Don't put a shadow on anything that is not an overlay. Cards, tables and chips are hairline-bounded and flat; `shadow-overlay` exists only for things that genuinely float (dialogs, menus, popovers, drawers, tooltips, toasts). The segmented control's active chip (`shadow-chip`) is the one exception — don't reuse it elsewhere.

@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 
+import { PortalBrand } from '@/components/portal/portal-brand'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -24,8 +25,7 @@ export function LoginForm({ next }: { next?: string }) {
   return (
     <div className="w-full max-w-[360px]">
       <div className="mb-lg">
-        <p className="micro-label text-muted-foreground">Palm Villa</p>
-        <p className="text-display-xs text-foreground">Operations</p>
+        <PortalBrand />
       </div>
 
       <Card>

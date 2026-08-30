@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Menu } from 'lucide-react'
 
 import { PortalAccount, type PortalAccountUser } from '@/components/portal/portal-account'
+import { PortalBrand } from '@/components/portal/portal-brand'
 import { PortalNav, PortalNavFooterLinks } from '@/components/portal/portal-nav'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
@@ -40,9 +41,8 @@ export function PortalMobileNav({ account }: { account: PortalAccountUser | null
         <SheetTitle className="sr-only">Portal navigation</SheetTitle>
 
         {/* Matches the sidebar's brand block, hairline included. */}
-        <div className="flex h-14 shrink-0 flex-col justify-center border-b border-divider px-xl">
-          <p className="micro-label text-muted-foreground">Palm Villa</p>
-          <p className="text-display-xs text-foreground">Operations</p>
+        <div className="flex h-14 shrink-0 items-center border-b border-divider px-xl">
+          <PortalBrand />
         </div>
 
         {/* Delegation target: every interactive thing inside is itself a link. */}

@@ -6,6 +6,7 @@ import { KeyRound, LogOut } from 'lucide-react'
 import { signOutAction } from '@/app/(auth)/actions'
 import { ChangePasswordDialog } from '@/components/portal/change-password-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { initials } from '@/components/ui/avatar-identity'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,9 @@ import {
  */
 
 export interface PortalAccountUser {
+  /** The account id — the avatar's seed, so this chip and the staff table
+      agree on the signed-in user's colour. */
+  id: string
   name: string
   email: string
 }
@@ -35,7 +39,7 @@ export function PortalAccount({ user }: { user: PortalAccountUser }) {
       <DropdownMenu>
         <DropdownMenuTrigger className="flex w-full items-center gap-sm rounded-md px-md py-sm text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=open]:bg-muted">
           <Avatar>
-            <AvatarFallback>{initials(user.name)}</AvatarFallback>
+            <AvatarFallback seed={user.id}>{initials(user.name)}</AvatarFallback>
           </Avatar>
           <div className="min-w-0">
             <p className="truncate text-body-sm text-foreground">{user.name}</p>
@@ -64,21 +68,4 @@ export function PortalAccount({ user }: { user: PortalAccountUser }) {
       <ChangePasswordDialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen} />
     </>
   )
-}
-
-/** "Nur Amalina" → "NA"; a lone name keeps its first two letters. */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  const first = parts[0]
-  const last = parts[parts.length - 1]
-
-  if (!first) {
-    return 'PV'
-  }
-
-  if (parts.length === 1 || !last) {
-    return first.slice(0, 2).toUpperCase()
-  }
-
-  return `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase()
 }

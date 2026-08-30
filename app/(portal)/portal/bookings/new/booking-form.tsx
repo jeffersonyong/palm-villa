@@ -8,7 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect } from '@/components/ui/native-select'
+import { Notice } from '@/components/ui/notice'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { Unit } from '@/lib/db/inventory'
 import type { PropertyConfig } from '@/lib/domain/config'
 import { formatStayDate } from '@/lib/domain/dates'
@@ -117,10 +124,10 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
         </p>
 
         {isTransfer ? (
-          <p className="mt-md rounded-md bg-muted p-md text-body-sm text-copy">
+          <Notice className="mt-md">
             The unit is held for this booking now. It stays held until someone confirms the transfer
             landed, so this booking needs working off the verification queue.
-          </p>
+          </Notice>
         ) : null}
 
         {isTransfer ? (
@@ -158,19 +165,18 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
           <SectionHeading>Unit</SectionHeading>
           <div className="mt-md grid gap-sm">
             <Label htmlFor="unitId">{units.length} free for these dates</Label>
-            <NativeSelect
-              className="max-w-[360px]"
-              id="unitId"
-              name="unitId"
-              value={unitId}
-              onChange={(event) => setUnitId(event.target.value)}
-            >
-              {units.map((unit) => (
-                <option key={unit.id} value={unit.id}>
-                  {unit.ref} — {unit.unitTypeName}
-                </option>
-              ))}
-            </NativeSelect>
+            <Select name="unitId" value={unitId} onValueChange={setUnitId}>
+              <SelectTrigger id="unitId" className="max-w-[360px]">
+                <SelectValue placeholder="Choose a unit" />
+              </SelectTrigger>
+              <SelectContent>
+                {units.map((unit) => (
+                  <SelectItem key={unit.id} value={unit.id}>
+                    {unit.ref} — {unit.unitTypeName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <FieldError message={state.fieldErrors?.unitId} />
           </div>
         </section>
@@ -261,16 +267,19 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
           <SectionHeading>Payment</SectionHeading>
           <div className="mt-md grid gap-sm">
             <Label htmlFor="paymentMethod">Method</Label>
-            <NativeSelect
-              id="paymentMethod"
+            <Select
               name="paymentMethod"
-              className="w-[280px]"
               value={paymentMethod}
-              onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
+              onValueChange={(next) => setPaymentMethod(next as PaymentMethod)}
             >
-              <option value="cash">Cash — collected now</option>
-              <option value="bank_transfer">Bank transfer — verify later</option>
-            </NativeSelect>
+              <SelectTrigger id="paymentMethod" className="w-[280px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash — collected now</SelectItem>
+                <SelectItem value="bank_transfer">Bank transfer — verify later</SelectItem>
+              </SelectContent>
+            </Select>
             <p className="text-caption text-muted-foreground">
               {paymentMethod === 'cash'
                 ? 'The booking is confirmed as soon as it is created.'
@@ -315,10 +324,10 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
                 </span>
               </div>
 
-              <p className="mt-lg rounded-md bg-muted p-md text-body-sm text-copy">
+              <Notice className="mt-lg">
                 Plus BND {formatCents(quote.securityDeposit)} refundable security deposit, collected
                 on arrival.
-              </p>
+              </Notice>
             </>
           ) : (
             <p className="mt-lg rounded-md bg-negative-tint p-md text-body-sm text-negative-deep">

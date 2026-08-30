@@ -15,7 +15,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast-store'
 import type { Booking } from '@/lib/db/bookings'
@@ -166,23 +172,25 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
             <SectionHeading>Unit</SectionHeading>
             <div className="mt-md grid gap-sm">
               <Label htmlFor="unitId">{units.length} available for these dates</Label>
-              <NativeSelect
-                className="max-w-[360px]"
-                id="unitId"
-                name="unitId"
-                value={selectedUnit ? unitId : ''}
-                onChange={(event) => setUnitId(event.target.value)}
-              >
-                {/* Rendered only while nothing valid is selected, so the
-                    control never shows a unit the form is not actually using. */}
-                {selectedUnit ? null : <option value="">Choose a unit</option>}
-                {units.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.ref} — {unit.unitTypeName}
-                    {unit.id === booking.unitId ? ' (current)' : ''}
-                  </option>
-                ))}
-              </NativeSelect>
+              {/* The empty value is the placeholder, not an option in the
+                  list: the control never offers a unit the form is not
+                  actually using, and `SelectValue`'s mute placeholder says so —
+                  which is the job the "Choose a unit" row used to do, without
+                  pretending to be a choice. Empty string rather than
+                  `undefined`, so the select stays controlled either way. */}
+              <Select name="unitId" value={selectedUnit ? unitId : ''} onValueChange={setUnitId}>
+                <SelectTrigger id="unitId" className="max-w-[360px]">
+                  <SelectValue placeholder="Choose a unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((unit) => (
+                    <SelectItem key={unit.id} value={unit.id}>
+                      {unit.ref} — {unit.unitTypeName}
+                      {unit.id === booking.unitId ? ' (current)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {!isCurrentUnitAvailable ? (
                 <p className="text-body-sm text-copy">
                   {booking.unitRef} is not free for these dates — another booking has it for part of

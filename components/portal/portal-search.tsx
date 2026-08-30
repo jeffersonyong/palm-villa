@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
 
-import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -12,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Notice } from '@/components/ui/notice'
 
 /**
  * Global search — the affordance, not the feature.
@@ -77,10 +77,10 @@ export function PortalSearch() {
 
           <Input autoFocus placeholder="Search bookings, guests, payments…" disabled />
 
-          <Card surface="inset" className="text-body-sm text-muted-foreground">
+          <Notice>
             Nothing is wired behind this box yet — it is here so the shortcut and its place in the
             bar are settled before the screens that need it are built.
-          </Card>
+          </Notice>
         </DialogContent>
       </Dialog>
     </>

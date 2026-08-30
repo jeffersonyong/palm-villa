@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -116,17 +117,14 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
             title={hasRange ? 'No cash recorded in these dates' : 'No cash recorded yet'}
             description={
               hasRange
-                ? 'Try a wider range, or clear the filter to see everything.'
+                ? 'Try a wider date range, or clear the filters to see everything.'
                 : 'Cash taken at the desk appears here as soon as it is recorded.'
             }
             action={
               hasRange ? (
-                <Link
-                  href="/portal/payments/cash"
-                  className="text-body-sm text-foreground underline"
-                >
-                  Clear the date filter
-                </Link>
+                <Button asChild variant="tertiary">
+                  <Link href="/portal/payments/cash">Clear filters</Link>
+                </Button>
               ) : undefined
             }
           />

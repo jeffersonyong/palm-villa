@@ -35,6 +35,97 @@
   --color-negative: #d03238;
   --color-negative-deep: #9f1d24;
   --color-negative-tint: #fbe9ea;
+  /* `info` is the fourth status hue and the only one that is never an
+     outcome: it marks something the reader needs to know before acting,
+     where the other three report how something turned out.
+
+     A light sky blue at ≈208°. Getting here took three passes, and the thing
+     that kept being wrong was *which* dial to turn. A steel blue at 69%
+     saturation read as one more gray on a page built from gray hairlines, so
+     the chroma went up. That fixed the hue but not the presence, so the
+     ground came down in lightness — and at 89% L it had gone heavy and
+     serious, a corporate blue rather than a friendly one.
+
+     What a light panel actually wants is high chroma at *high* lightness:
+     95% S at 92% L, which is bright and unmistakably blue without weighing
+     anything down. The hue moved with it, from 216° to 208° — the same shift
+     that separates a navy from a sky, and the reason the panel reads cheerful
+     rather than administrative.
+
+     208° is as far toward cyan as this is allowed to go. Past ≈200° the fill
+     starts reading teal, and teal is the customer's colour — the one hue the
+     operations surfaces do not carry.
+
+     `info-deep` came up with the ground, from a navy to a mid blue at the
+     tint's own hue, so the panel reads as one colour rather than dark text
+     dropped onto a light chip. It holds 5.4 on the tint, comfortably past AA
+     for 13px text. There is no separate mark colour: the icon takes
+     `currentColor` — it is the sentence's own punctuation, not a second
+     element with its own weight.
+
+     Still deliberately off cyan: a cyan panel reads teal on an ink ground,
+     and teal is the customer's colour, which the operations surfaces do not
+     carry. Going bluer took it further from that edge, not nearer. */
+  --color-info: #1c80dd;
+  --color-info-deep: #0f5ea8;
+  --color-info-tint: #d8ecfe;
+
+  /* Identity — says *who*, never *what state*. The avatar hue set: seven stops
+     right around the wheel, with one deliberate hole where teal would be.
+     Teal is absent because teal on a staff surface is the one thing the
+     monochrome ops rule actually forbids — it is the customer's colour.
+
+     The four hues the product already spends on meaning (positive, warning,
+     negative, and the aqua of checked-in) are *sat beside, not avoided*: lime
+     is a yellow-green where positive is mint, rose a pink where negative is
+     red. Separation is carried by form as much as hue — an identity mark is a
+     circle with two letters, a status is a pill with a word — which is what
+     lets the set be wide enough to tell seven people apart. Avoiding those
+     arcs outright was the first attempt, and it bought nothing but five
+     near-identical blues.
+
+     `orange` is the one that shares its hue with a status rather than sitting
+     beside it — warning is amber at ≈32° and this is ≈25°. It is a deliberate
+     call, and the separation it rests on is the fill, not the hue: a peach
+     tint against warning's cream, at a visibly higher chroma. The two do not
+     meet on any screen today; the first place they would is a "verified by"
+     line beside an awaiting-payment chip, which is the thing to look at if
+     this ever reads wrong. The tokens are still never literally equal —
+     `identity-orange-deep` is orange-800, not `{--color-warning-deep}`.
+
+     Seven rather than eight for the same reason: stops land ≈35–45° apart, and
+     an eighth (indigo, between blue and violet) crowded three of them into one
+     periwinkle. A hue that cannot be named at 24px is not in the set.
+
+     `sky`'s mid is a touch bluer than its tint on purpose: the mid is only
+     ever the dark theme's mix source, and a cyan one came out reading teal on
+     an ink ground — which is the single hue this set is not allowed to have.
+
+     Fills sit above the status tints in lightness at a much lower chroma, so a
+     face reads lighter and more saturated than any chip near it. The set is
+     *ordered*: a person's colour is an index derived from their account id, so
+     hues are appended, never reordered — reordering repaints every face. */
+  --color-identity-sky: #0ea5e9;
+  --color-identity-sky-deep: #155e75;
+  --color-identity-sky-tint: #c3eefa;
+  --color-identity-blue: #2563eb;
+  --color-identity-blue-deep: #1e40af;
+  --color-identity-blue-tint: #cde3fe;
+  --color-identity-violet: #7c3aed;
+  --color-identity-violet-deep: #5b21b6;
+  --color-identity-violet-tint: #e0dafe;
+  --color-identity-fuchsia: #c026d3;
+  --color-identity-fuchsia-deep: #86198f;
+  --color-identity-fuchsia-tint: #f8dcff;
+  --color-identity-rose: #f43f5e;
+  --color-identity-rose-deep: #9f1239;
+  --color-identity-rose-tint: #ffd9dd;
+  --color-identity-orange: #f97316;
+  --color-identity-orange-deep: #9a3412;
+  --color-identity-orange-tint: #fee2c0;
+  --color-identity-lime: #84cc16;
+  --color-identity-lime-deep: #3f6212;
+  --color-identity-lime-tint: #e3fbb4;
 
   /* Type — Inter carries every surface; hierarchy is size, weight
      (400/500/600) and negative tracking at display sizes. `micro-label` (a
@@ -310,6 +401,81 @@
 
   --badge-neutral: var(--muted);
   --badge-neutral-foreground: var(--copy);
+
+  /* Notice panels. The badge chips' construction at panel scale: a soft tint
+     with deep same-hue text in light, a hue-tinted dark panel with light text
+     in dark. A role rather than the raw tint token, because a raw `*-tint`
+     fill does not survive the theme flip — it stays pale on an ink ground.
+
+     Dark mixes at 32% rather than the badges' 26–28%: a chip is a word wide
+     and reads its hue from the text sitting in it, where a panel is a band
+     across the screen and a mix that suits a chip goes flat at that size.
+     Text stays ≈10:1 on it. */
+  --notice-info: light-dark(
+    var(--color-info-tint),
+    color-mix(in oklab, var(--color-info) 32%, var(--color-ink-deep))
+  );
+  --notice-info-foreground: light-dark(var(--color-info-deep), var(--color-canvas-soft));
+
+  /* Identity marks. Light: tint fill + deep text. Dark: the mid hue mixed over
+     the card with light text — the status chips' inversion, so the two sets stay
+     one family.
+
+     But at the chips' own 26% the two sets stopped being *distinguishable*:
+     avatar-orange and badge-warning landed 0.01 apart in oklab L with the same
+     b, and rose/negative and lime/positive were barely better. Light keeps them
+     apart through the tint it picks; dark builds both the same way and had
+     nothing doing that job. So identity mixes at **40%** — brighter and more
+     chromatic than any status chip near it, which is the same thing the light
+     fills say. Text stays `canvas-soft` and still clears AA on all seven.
+
+     Unlike the action roles these deliberately do NOT flip on
+     `data-surface='ops'`: identity is not brand, and the portal is the only
+     place they are used. */
+  --avatar-sky: light-dark(
+    var(--color-identity-sky-tint),
+    color-mix(in oklab, var(--color-identity-sky) 40%, var(--color-ink-deep))
+  );
+  --avatar-sky-foreground: light-dark(var(--color-identity-sky-deep), var(--color-canvas-soft));
+  --avatar-blue: light-dark(
+    var(--color-identity-blue-tint),
+    color-mix(in oklab, var(--color-identity-blue) 40%, var(--color-ink-deep))
+  );
+  --avatar-blue-foreground: light-dark(var(--color-identity-blue-deep), var(--color-canvas-soft));
+  --avatar-violet: light-dark(
+    var(--color-identity-violet-tint),
+    color-mix(in oklab, var(--color-identity-violet) 40%, var(--color-ink-deep))
+  );
+  --avatar-violet-foreground: light-dark(
+    var(--color-identity-violet-deep),
+    var(--color-canvas-soft)
+  );
+  --avatar-fuchsia: light-dark(
+    var(--color-identity-fuchsia-tint),
+    color-mix(in oklab, var(--color-identity-fuchsia) 40%, var(--color-ink-deep))
+  );
+  --avatar-fuchsia-foreground: light-dark(
+    var(--color-identity-fuchsia-deep),
+    var(--color-canvas-soft)
+  );
+  --avatar-rose: light-dark(
+    var(--color-identity-rose-tint),
+    color-mix(in oklab, var(--color-identity-rose) 40%, var(--color-ink-deep))
+  );
+  --avatar-rose-foreground: light-dark(var(--color-identity-rose-deep), var(--color-canvas-soft));
+  --avatar-orange: light-dark(
+    var(--color-identity-orange-tint),
+    color-mix(in oklab, var(--color-identity-orange) 40%, var(--color-ink-deep))
+  );
+  --avatar-orange-foreground: light-dark(
+    var(--color-identity-orange-deep),
+    var(--color-canvas-soft)
+  );
+  --avatar-lime: light-dark(
+    var(--color-identity-lime-tint),
+    color-mix(in oklab, var(--color-identity-lime) 40%, var(--color-ink-deep))
+  );
+  --avatar-lime-foreground: light-dark(var(--color-identity-lime-deep), var(--color-canvas-soft));
 }
 
 /* Choosing dark is the only override. Because every role resolves through
@@ -413,6 +579,22 @@
   --color-badge-active-foreground: var(--badge-active-foreground);
   --color-badge-neutral: var(--badge-neutral);
   --color-badge-neutral-foreground: var(--badge-neutral-foreground);
+  --color-notice-info: var(--notice-info);
+  --color-notice-info-foreground: var(--notice-info-foreground);
+  --color-avatar-sky: var(--avatar-sky);
+  --color-avatar-sky-foreground: var(--avatar-sky-foreground);
+  --color-avatar-blue: var(--avatar-blue);
+  --color-avatar-blue-foreground: var(--avatar-blue-foreground);
+  --color-avatar-violet: var(--avatar-violet);
+  --color-avatar-violet-foreground: var(--avatar-violet-foreground);
+  --color-avatar-fuchsia: var(--avatar-fuchsia);
+  --color-avatar-fuchsia-foreground: var(--avatar-fuchsia-foreground);
+  --color-avatar-rose: var(--avatar-rose);
+  --color-avatar-rose-foreground: var(--avatar-rose-foreground);
+  --color-avatar-orange: var(--avatar-orange);
+  --color-avatar-orange-foreground: var(--avatar-orange-foreground);
+  --color-avatar-lime: var(--avatar-lime);
+  --color-avatar-lime-foreground: var(--avatar-lime-foreground);
 }
 
 /* `dark:` follows exactly the same resolution the tokens do: dark is an

@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import type { StayDateRange } from '@/components/ui/calendar'
 import { Checkbox } from '@/components/ui/checkbox'
+import { initials } from '@/components/ui/avatar-identity'
+import { DateField } from '@/components/ui/date-field'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import {
   Dialog,
@@ -252,6 +254,7 @@ export function DropdownDemos() {
   const [unit, setUnit] = useState('studio')
   const [statuses, setStatuses] = useState<readonly string[]>([])
   const [range, setRange] = useState<StayDateRange | null>(null)
+  const [day, setDay] = useState<string | null>('2026-09-12')
 
   return (
     <div className="space-y-xl">
@@ -299,25 +302,78 @@ export function DropdownDemos() {
 
         <DateRangePicker label="Staying" value={range} onChange={setRange} />
       </Row>
+
+      <Row
+        title="Date field — one day, in the form dress"
+        note="The same grid the filter chip opens, in the trigger the form uses: an Input with a calendar glyph rather than a chevron, because this opens a month and not a list. The browser's own date picker is never shown — a day outside the window is drawn and not offered, and the value reads as a date rather than as digits."
+      >
+        <div className="grid w-[200px] gap-sm">
+          <Label htmlFor="demo-arrives">Arrives</Label>
+          <DateField
+            id="demo-arrives"
+            value={day}
+            onChange={setDay}
+            min="2026-09-01"
+            max="2026-10-31"
+            clearable
+          />
+        </div>
+      </Row>
     </div>
   )
 }
 
+/** Ids picked so the seven tones come out in palette order, not by luck. */
+const AVATAR_SAMPLE = [
+  { id: 'a-6', name: 'Hajah Rosnah' },
+  { id: 'a-2', name: 'Siti Nurul' },
+  { id: 'a-7', name: 'Nur Amalina' },
+  { id: 'a-3', name: 'Danial Iskandar' },
+  { id: 'a-9', name: 'Pengiran Vahid' },
+  { id: 'a-5', name: 'Aminah Haji' },
+  { id: 'a-1', name: 'Mohammad Faiz' },
+]
+
 export function AvatarDemo() {
   return (
-    <div className="flex items-center gap-lg">
-      <Avatar className="size-6">
-        <AvatarFallback>JY</AvatarFallback>
-      </Avatar>
-      <Avatar>
-        <AvatarFallback>PV</AvatarFallback>
-      </Avatar>
-      <Avatar className="size-10">
-        <AvatarFallback>SN</AvatarFallback>
-      </Avatar>
-      <p className="text-body-sm text-muted-foreground">
-        24 / 32 / 40px. Muted ground, caption initials — never a brand fill.
-      </p>
+    <div className="flex flex-col gap-lg">
+      <div className="flex items-center gap-lg">
+        <Avatar className="size-6">
+          <AvatarFallback seed="a-7">{initials('Nur Amalina')}</AvatarFallback>
+        </Avatar>
+        <Avatar>
+          <AvatarFallback seed="a-7">{initials('Nur Amalina')}</AvatarFallback>
+        </Avatar>
+        <Avatar className="size-10">
+          <AvatarFallback seed="a-7">{initials('Nur Amalina')}</AvatarFallback>
+        </Avatar>
+        <p className="text-body-sm text-muted-foreground">
+          24 / 32 / 40px. Caption initials, tint ground, deep same-hue text — never a brand fill.
+        </p>
+      </div>
+      <div className="flex items-center gap-lg">
+        <span className="flex items-center gap-sm">
+          {AVATAR_SAMPLE.map((person) => (
+            <Avatar key={person.id}>
+              <AvatarFallback seed={person.id}>{initials(person.name)}</AvatarFallback>
+            </Avatar>
+          ))}
+        </span>
+        <p className="max-w-[46ch] text-body-sm text-muted-foreground">
+          The identity set: seven hues around the wheel, teal excepted — that one is the
+          customer&rsquo;s. Each sits clearly off the status hue nearest it, and the form does the
+          rest: a face is a circle with two letters, a status is a pill with a word. A
+          person&rsquo;s hue is derived from their account id, so it never changes.
+        </p>
+      </div>
+      <div className="flex items-center gap-lg">
+        <Avatar>
+          <AvatarFallback>PV</AvatarFallback>
+        </Avatar>
+        <p className="text-body-sm text-muted-foreground">
+          Unseeded stays neutral — a placeholder standing in for nobody.
+        </p>
+      </div>
     </div>
   )
 }

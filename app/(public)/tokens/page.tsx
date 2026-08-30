@@ -11,6 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { DateField } from '@/components/ui/date-field'
 import { Input } from '@/components/ui/input'
 import { ThemeToggle } from '@/components/theme-toggle'
 
@@ -135,6 +136,9 @@ const semanticColors: Swatch[] = [
     swatch: 'bg-negative-tint',
     note: 'Negative chip ground.',
   },
+  { token: 'info', hex: '#1c80dd', swatch: 'bg-info', note: 'Notice mark. Kept off cyan.' },
+  { token: 'info-deep', hex: '#0f5ea8', swatch: 'bg-info-deep', note: 'Notice text.' },
+  { token: 'info-tint', hex: '#d8ecfe', swatch: 'bg-info-tint', note: 'Notice ground.' },
 ]
 
 /** Theme-aware roles: these are what application code should reach for. */
@@ -426,7 +430,9 @@ export default function TokensPage() {
             <h3 className="micro-label text-muted-foreground">Inputs</h3>
             <div className="mt-md flex max-w-[420px] flex-col gap-sm">
               <Input placeholder="Guest name" />
-              <Input type="date" defaultValue="2026-09-12" className="w-[164px]" />
+              {/* The date field wears the same treatment: closed, it is an
+                  Input with a calendar glyph — see Dropdowns for the panel. */}
+              <DateField defaultValue="2026-09-12" className="w-[180px]" />
             </div>
           </div>
 

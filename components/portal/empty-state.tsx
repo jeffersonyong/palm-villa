@@ -8,6 +8,10 @@ import { cn } from '@/lib/utils'
  * screen does not collapse when a filter matches nothing. Any `action` is a
  * tertiary or ghost button — an empty state is not where a screen spends its
  * one filled-primary button.
+ *
+ * A filtered-empty state's escape is worded the same on every screen — a
+ * tertiary "Clear filters" linking to the bare route, never a per-screen
+ * variant naming the field it clears. See design.md, Components.
  */
 
 interface EmptyStateProps {

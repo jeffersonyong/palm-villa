@@ -4,6 +4,8 @@ import { useActionState, useEffect, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { initials } from '@/components/ui/avatar-identity'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -127,10 +129,25 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
             {visibleStaff.map((account) => (
               <TableRow key={account.id}>
                 <TableCell className="font-medium text-foreground">
-                  {account.displayName}
-                  {account.id === currentUserId ? (
-                    <span className="ml-sm text-caption text-muted-foreground">you</span>
-                  ) : null}
+                  {/* The only screen in the portal that shows several people at
+                      once, and so the only one where an identity colour has
+                      anything to do: it is what makes a name you already know
+                      findable in the list before you have read it. 24px, the
+                      denser of the two avatar sizes, because a table row is
+                      32px and a 32px face would set the row's height. */}
+                  <span className="flex items-center gap-sm">
+                    <Avatar className="size-6">
+                      <AvatarFallback seed={account.id}>
+                        {initials(account.displayName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="min-w-0 truncate">
+                      {account.displayName}
+                      {account.id === currentUserId ? (
+                        <span className="ml-sm text-caption text-muted-foreground">you</span>
+                      ) : null}
+                    </span>
+                  </span>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{account.email}</TableCell>
                 <TableCell>

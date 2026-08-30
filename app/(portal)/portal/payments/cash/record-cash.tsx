@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Notice } from '@/components/ui/notice'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast-store'
 import { formatCents } from '@/lib/domain/money'
@@ -149,10 +150,10 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
             </div>
           ) : null}
 
-          <p className="rounded-md bg-muted p-md text-caption text-copy">
+          <Notice>
             This records the cash. It does not calculate a balance — the daily cash-up against
             banked amounts is a separate screen.
-          </p>
+          </Notice>
 
           {state.status === 'error' && state.message && !needsReason ? (
             <p className="text-body-sm text-destructive">{state.message}</p>

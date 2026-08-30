@@ -3,6 +3,7 @@ import { PortalAccount, type PortalAccountUser } from '@/components/portal/porta
 import { PortalNav, PortalNavFooterLinks } from '@/components/portal/portal-nav'
 import { PortalTopbar } from '@/components/portal/portal-topbar'
 import { OperationsSurface } from '@/components/operations-surface'
+import { PortalBrand } from '@/components/portal/portal-brand'
 
 /**
  * Portal chrome: left nav on the white ground, a topbar for what belongs to no
@@ -19,7 +20,7 @@ import { OperationsSurface } from '@/components/operations-surface'
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const user = await getAuthenticatedUser()
   const account: PortalAccountUser | null = user
-    ? { name: user.displayName, email: user.email }
+    ? { id: user.id, name: user.displayName, email: user.email }
     : null
 
   return (
@@ -30,9 +31,8 @@ export default async function PortalLayout({ children }: { children: React.React
         {/* Exactly the topbar's height with the same bottom hairline, so the
             rule runs unbroken across both and separates the brand from the
             navigation (design.md §Components — Portal topbar). */}
-        <div className="flex h-14 shrink-0 flex-col justify-center border-b border-divider px-xl">
-          <p className="micro-label text-muted-foreground">Palm Villa</p>
-          <p className="text-display-xs text-foreground">Operations</p>
+        <div className="flex h-14 shrink-0 items-center border-b border-divider px-xl">
+          <PortalBrand />
         </div>
 
         <PortalNav />

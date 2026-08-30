@@ -3,9 +3,16 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/portal/page-header'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { DateField } from '@/components/ui/date-field'
 import { Label } from '@/components/ui/label'
-import { NativeSelect } from '@/components/ui/native-select'
+import { Notice } from '@/components/ui/notice'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { countAvailableByType, findAvailableUnits } from '@/lib/db/bookings'
 import { getUnitCounts } from '@/lib/db/inventory'
 import { palmVillaConfig } from '@/lib/domain/config'
@@ -25,10 +32,16 @@ export const metadata: Metadata = {
  * can keep a set of dates open in a tab, or share the link. Everything up to
  * the price panel is a server component; only the form island is interactive.
  *
- * Native date inputs are used deliberately: design.md specs no calendar or
- * date-picker component, so building one would be unsanctioned styling. Two
- * date fields on a desktop staff screen do not need one.
+ * Check-in and check-out stay two fields rather than one range control: the
+ * range picker's ends are inclusive, and these two are the half-open occupancy
+ * pair the database is asked about, so collapsing them would either change what
+ * the form means or need a conversion sitting invisibly inside it. Both are
+ * `DateField`, so they open this system's calendar rather than the browser's,
+ * and the booking window is enforced on the grid instead of after the fact.
  */
+
+/** The "no unit type filter" option's value. See the select below. */
+const ANY_UNIT_TYPE = 'any'
 
 interface PageProps {
   searchParams: Promise<{ from?: string; to?: string; type?: string }>
@@ -72,56 +85,68 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
         description="Walk-in only — the guest is here and pays now (prd.md §9.4)."
       />
 
-      <Card className="mt-xl">
-        <form method="get" className="flex flex-wrap items-end gap-lg">
-          <div className="grid w-[164px] gap-sm">
-            <Label htmlFor="from">Check-in</Label>
-            <Input
-              id="from"
-              name="from"
-              type="date"
-              defaultValue={checkIn || today}
-              min={today}
-              max={addDays(today, config.maxAdvanceBookingDays)}
-            />
-          </div>
+      {/* The control line is undrawn. It asks what to show, the way a list
+          screen's filter chips do, and a box around it opened the page with a
+          panel of chrome before the booking had been started; without one the
+          fields line up with the page title. The counts below it *are* drawn,
+          because they are a different thing — the answer, not the question —
+          and a card is what tells the two apart now that the row has no edge
+          of its own. Everything from the header down is then one rhythm at
+          `xl`: the counts were briefly pulled closer to the row that produced
+          them, but with a card of their own they are a peer of the form below,
+          and the tighter gap read as a slip rather than as grouping. */}
+      <form method="get" className="mt-xl flex flex-wrap items-end gap-lg">
+        <div className="grid w-[164px] gap-sm">
+          <Label htmlFor="from">Check-in</Label>
+          <DateField
+            id="from"
+            name="from"
+            defaultValue={checkIn || today}
+            min={today}
+            max={addDays(today, config.maxAdvanceBookingDays)}
+          />
+        </div>
 
-          <div className="grid w-[164px] gap-sm">
-            <Label htmlFor="to">Check-out</Label>
-            <Input
-              id="to"
-              name="to"
-              type="date"
-              defaultValue={checkOut || addDays(today, 1)}
-              min={addDays(today, 1)}
-              max={addDays(today, config.maxAdvanceBookingDays + 1)}
-            />
-          </div>
+        <div className="grid w-[164px] gap-sm">
+          <Label htmlFor="to">Check-out</Label>
+          <DateField
+            id="to"
+            name="to"
+            defaultValue={checkOut || addDays(today, 1)}
+            min={addDays(today, 1)}
+            max={addDays(today, config.maxAdvanceBookingDays + 1)}
+          />
+        </div>
 
-          <div className="grid gap-sm">
-            <Label htmlFor="type">Unit type</Label>
-            <NativeSelect
-              className="w-[264px]"
-              id="type"
-              name="type"
-              defaultValue={unitTypeId ?? ''}
-            >
-              <option value="">Any type</option>
+        <div className="grid gap-sm">
+          <Label htmlFor="type">Unit type</Label>
+          {/* `ANY_UNIT_TYPE` rather than an empty value: a select option must
+              carry a non-empty value, and the page already treats an
+              unrecognised `type` as "no filter", so the sentinel never reaches
+              the query. */}
+          <Select name="type" defaultValue={unitTypeId ?? ANY_UNIT_TYPE}>
+            <SelectTrigger id="type" className="w-[264px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY_UNIT_TYPE}>Any type</SelectItem>
               {config.unitTypes.map((type) => (
-                <option key={type.id} value={type.id}>
+                <SelectItem key={type.id} value={type.id}>
                   {type.name} — BND {formatCents(type.baseRatePerNight)}
-                </option>
+                </SelectItem>
               ))}
-            </NativeSelect>
-          </div>
+            </SelectContent>
+          </Select>
+        </div>
 
-          <Button type="submit" variant="tertiary">
-            Check availability
-          </Button>
-        </form>
+        <Button type="submit" variant="tertiary">
+          Check availability
+        </Button>
+      </form>
 
-        {hasDates && (
-          <dl className="mt-lg grid grid-cols-2 gap-lg border-t border-divider pt-lg sm:grid-cols-4">
+      {hasDates && (
+        <Card className="mt-xl">
+          <dl className="grid grid-cols-2 gap-lg sm:grid-cols-4">
             {config.unitTypes.map((type) => {
               const free = availableByType[type.id] ?? 0
               const total = totalByType[type.id] ?? 0
@@ -137,18 +162,15 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
               )
             })}
           </dl>
-        )}
-      </Card>
+        </Card>
+      )}
 
       <section className="mt-xl">
         {!hasDates ? (
-          <Card surface="inset" className="p-lg">
-            <p className="text-body-md text-copy">
-              Choose check-in and check-out dates to see what is free. Check-out must be at least
-              one night after check-in, and bookings open up to {config.maxAdvanceBookingDays} days
-              ahead.
-            </p>
-          </Card>
+          <Notice placement="page">
+            Choose check-in and check-out dates to see what is free. Check-out must be at least one
+            night after check-in, and bookings open up to {config.maxAdvanceBookingDays} days ahead.
+          </Notice>
         ) : availableUnits.length === 0 ? (
           <Card surface="inset" className="p-lg">
             <p className="text-body-md text-copy">
