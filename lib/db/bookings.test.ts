@@ -42,10 +42,38 @@ describe('listBookings', () => {
 
     await transitionBooking(doomed.id, 'cancel')
 
-    const cancelled = await listBookings({ status: 'cancelled' })
+    const cancelled = await listBookings({ statuses: ['cancelled'] })
 
     expect(cancelled.map((booking) => booking.reference)).toEqual([doomed.reference])
     expect(cancelled.map((booking) => booking.reference)).not.toContain(confirmed.reference)
+  })
+
+  test('filters by several statuses at once', async () => {
+    const confirmed = await givenBooking({
+      unitRef: '3B-01',
+      checkIn: TODAY,
+      checkOut: '2026-08-30',
+    })
+    const doomed = await givenBooking({ unitRef: '3B-02', checkIn: TODAY, checkOut: '2026-08-30' })
+    const arrived = await givenBooking({ unitRef: '3B-03', checkIn: TODAY, checkOut: '2026-08-30' })
+
+    await transitionBooking(doomed.id, 'cancel')
+    await transitionBooking(arrived.id, 'check_in')
+
+    const listed = await listBookings({ statuses: ['cancelled', 'checked_in'] })
+
+    expect(listed.map((booking) => booking.reference).sort()).toEqual(
+      [doomed.reference, arrived.reference].sort(),
+    )
+    expect(listed.map((booking) => booking.reference)).not.toContain(confirmed.reference)
+  })
+
+  test('an empty status list is no filter, not an empty screen', async () => {
+    // Clearing the last chip off the filter row must show everything again.
+    await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
+    await givenBooking({ unitRef: '3B-02', checkIn: TODAY, checkOut: '2026-08-30' })
+
+    expect(await listBookings({ statuses: [] })).toHaveLength(2)
   })
 
   test('sorts by check-in, then reference', async () => {

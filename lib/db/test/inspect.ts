@@ -3,11 +3,15 @@ import { dataClient } from '@/lib/supabase/data'
 /**
  * Direct reads for assertions the query layer has no reason to expose.
  *
- * `lib/db` deliberately offers no "list every guest" or "read the audit trail"
- * function, because no screen needs one. These tests still have to check that a
- * rolled-back booking left no guest behind and that a transition wrote its
- * audit event, so the reads live here rather than widening the query layer's
- * surface to suit its own tests.
+ * `lib/db` deliberately offers no "list every guest" function, because no
+ * screen needs one, and these tests still have to check that a rolled-back
+ * booking left no guest behind.
+ *
+ * The audit read is a near-duplicate of `listAuditEvents` in lib/db/audit.ts,
+ * which the booking detail screen's history panel uses, and stays separate on
+ * purpose: it reads oldest-first, because a test asserting a sequence of events
+ * should read in the order they happened, and it does not scope by property or
+ * entity type, so a test cannot pass by filtering away the row it broke.
  */
 
 export async function givenGuestNames(): Promise<string[]> {

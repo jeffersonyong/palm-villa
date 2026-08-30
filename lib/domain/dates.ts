@@ -96,3 +96,90 @@ export function addDays(date: StayDate, days: number): StayDate {
 
   return shifted.toISOString().slice(0, 10)
 }
+
+/**
+ * Formats an instant for display, e.g. `15 Sept 2026, 07:30`.
+ *
+ * In the property's timezone, deliberately, and not the reader's: an audit
+ * trail exists so people can agree on when something happened, and rendering
+ * the same event on two different days depending on who opened the screen
+ * would defeat it. Stay dates format in UTC for the opposite reason — those are
+ * calendar dates, not instants.
+ *
+ * 24-hour, because a front office reading times off a screen should never have
+ * to work out whether 1:05 is lunch or the small hours.
+ */
+export function formatTimestamp(timestamp: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: PROPERTY_TIME_ZONE,
+  }).format(new Date(timestamp))
+}
+
+/**
+ * Formats an inclusive span of stay dates for a label, e.g. `1 – 7 Sept 2026`.
+ *
+ * Shared parts are written once — the reader already knows the month and year
+ * from the other end of the dash — which is what keeps a two-date value short
+ * enough to sit inside a filter chip. The year is always present: a staff
+ * member scanning a filtered list needs to know they are looking at next
+ * January, and "this year is implied" stops being true the moment someone
+ * bookmarks the URL.
+ *
+ * Both ends are inclusive. Occupancy ranges elsewhere are half-open — see
+ * `nightsBetween` — but a span a person picked off a calendar is the days they
+ * pointed at, and rendering the last one as the day after would be a lie.
+ */
+export function formatStayRange(start: StayDate, end: StayDate): string {
+  const from = parseStayDate(start)
+  const to = parseStayDate(end)
+
+  if (from > to) {
+    throw new Error(`Range ends before it starts: ${from} to ${to}.`)
+  }
+
+  if (from === to) {
+    return formatRangeEnd(from)
+  }
+
+  return `${formatRangeStart(from, to)} – ${formatRangeEnd(to)}`
+}
+
+/**
+ * The opening half of a range: only the parts the closing half does not
+ * already supply.
+ */
+function formatRangeStart(from: StayDate, to: StayDate): string {
+  if (from.slice(0, 7) === to.slice(0, 7)) {
+    return formatDayNumber(from)
+  }
+
+  if (from.slice(0, 4) === to.slice(0, 4)) {
+    return formatDayAndMonth(from)
+  }
+
+  return formatRangeEnd(from)
+}
+
+function formatWith(date: StayDate, options: Intl.DateTimeFormatOptions): string {
+  return new Intl.DateTimeFormat('en-GB', { ...options, timeZone: 'UTC' }).format(
+    new Date(`${date}T00:00:00Z`),
+  )
+}
+
+function formatDayNumber(date: StayDate): string {
+  return formatWith(date, { day: 'numeric' })
+}
+
+function formatDayAndMonth(date: StayDate): string {
+  return formatWith(date, { day: 'numeric', month: 'short' })
+}
+
+function formatRangeEnd(date: StayDate): string {
+  return formatWith(date, { day: 'numeric', month: 'short', year: 'numeric' })
+}

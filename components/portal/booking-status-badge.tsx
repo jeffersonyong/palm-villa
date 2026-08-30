@@ -31,9 +31,22 @@ const STATUS_PRESENTATION = {
   { label: string; tone: 'positive' | 'warning' | 'negative' | 'active' | 'neutral' }
 >
 
+/** The semantic tones design.md allows a status to carry. */
+export type BookingStatusTone = (typeof STATUS_PRESENTATION)[BookingStatus]['tone']
+
 /** The staff-facing name for a status, for filter options and prose. */
 export function bookingStatusLabel(status: BookingStatus): string {
   return STATUS_PRESENTATION[status].label
+}
+
+/**
+ * The tone a status carries, for the places that show its colour at something
+ * other than badge scale — the filter row's option dots, so far. Read off the
+ * same table as the badge rather than restated, which is the whole point of the
+ * table being here.
+ */
+export function bookingStatusTone(status: BookingStatus): BookingStatusTone {
+  return STATUS_PRESENTATION[status].tone
 }
 
 export function BookingStatusBadge({ status }: { status: BookingStatus }) {

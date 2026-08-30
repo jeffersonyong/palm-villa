@@ -308,7 +308,21 @@ Framed to the client as a **checkout timer**, not a reservation: the unit is hel
 **[C]** The deposit paid is forfeited on cancellation or no-show.
 **[O]** Ambiguous which deposit this refers to. The BND 100 security deposit is collected on arrival, so a no-show never pays it. This most likely means the prepayment. **The two must be named distinctly in the product** (for example "booking payment" and "security deposit") before the ambiguity propagates into the schema.
 
-**Partly addressed.** The naming demand is met: the schema names the refundable BND 100 `security_deposit_cents` and never a bare `deposit`, and the booking payment is a separate concept per the §6.2 entity list. **N5 itself remains open** — which of the two is forfeited is still unanswered, and no cancellation or forfeiture behaviour is built, so nothing yet depends on it.
+**Partly addressed.** The naming demand is met: the schema names the refundable BND 100 `security_deposit_cents` and never a bare `deposit`, and the booking payment is a separate concept per the §6.2 entity list. **N5 itself remains open** — which of the two is forfeited is still unanswered. Cancellation is now built (capability B3) and deliberately moves no money: it releases the unit, records who cancelled it, when and why, and states on screen that settlement happens outside the system. Nothing in the schema or the code depends on the answer, so N5 can still be answered either way — but it is now the one thing standing between the cancel screen and being complete.
+
+### 9.6 Amendment
+
+The PRD has never stated rules for changing a booking after it exists — §4 grants Front Office `booking.amend` and nothing defines what may be amended. The following are **[A]** assumptions made when capability B3 was built, and are the ones to put in front of the client.
+
+**[A] What can be changed:** dates, unit, party size, sofa beds, late check-out, and the guest's name, phone and vehicle. Every change reprices through the same engine as creation; the price charged is always the one the server derives, never one submitted by a screen.
+
+**[A] Which bookings can be changed:** anything not yet checked in and not closed — `draft`, `held`, `awaiting_payment_verification`, `confirmed`. Closed bookings (`completed`, `expired`, `cancelled`, `no_show`) are kept as a record.
+
+**[O] Amending a booking whose guest has already checked in is not supported.** Extending an in-house guest by a night is a real front-office need, and this is the one exclusion likely to be felt in practice. It is excluded rather than half-built because §9.1's two-month advance window is implemented as "check-in cannot be in the past", so repricing a stay that has already begun is refused by the pricing engine. Enabling it means deciding what a mid-stay reprice charges for nights already taken — a pricing question, not an interface one. **To confirm with the client.**
+
+**[A] A cancellation requires a typed reason; an amendment's is optional.** B3 promises who, what and when. The reason adds why, and the two differ because an amendment already records both sides of every field it touched, whereas a cancellation would otherwise record only that it happened — and §9.5 forfeits a payment on one.
+
+**[A] Money is not moved by either action.** An amendment that changes the price states the difference and says to collect or refund it outside the system; a cancellation calculates no refund or forfeiture at all. This is a direct consequence of **N5 being open** (§9.5): the platform cannot state a forfeiture policy it has not been given. It is also consistent with architecture.md §6.4, where a v1 refund is a recorded instruction executed by a person in a banking app, never an automated movement.
 
 ---
 
@@ -506,13 +520,14 @@ Card gateway, automated statement matching, WhatsApp Business API, full tenancy 
 | N2 | Is stated max pax a hard cap, or a threshold above which the 7 per person charge applies? |
 | N3 | Age band boundary for day passes (1 to 12 and 12 and above overlap). Pricing under age 1? |
 | N4 | Family bundle rule for combinations other than 2+1 and 2+2? |
-| N5 | Which deposit is forfeited on cancellation: booking payment or security deposit? |
+| N5 | Which deposit is forfeited on cancellation: booking payment or security deposit? **The cancel screen is built and waiting on this** — it moves no money today and says so on screen (§9.6). |
 | N6 | Standard check-in time, so "early check-in" is definable? |
 | N7 | Agreed hold duration for unpaid bookings? |
 | N8 | Total sofa beds available across the property? |
 | N9 | Can guests choose or request a bed configuration? |
 | N10 | How are units labelled on the doors? Nothing in this document records the building's real unit numbering, so the schema seeds a provisional scheme (`3B-01`) purely so units are distinguishable on screen. Staff will not recognise it. |
 | N11 | Which permission gates the check-in action? §4's canonical set has no string for it, so Security currently holds `booking.view` alone and cannot be granted check-in without one being defined. |
+| N12 | May a booking be amended after the guest has checked in, and if so what does a mid-stay reprice charge for nights already taken? See §9.6. |
 
 ### Non-blocking, configurable later
 

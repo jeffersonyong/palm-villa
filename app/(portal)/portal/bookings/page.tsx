@@ -2,14 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 
-import { BookingStatusBadge, bookingStatusLabel } from '@/components/portal/booking-status-badge'
+import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { NativeSelect } from '@/components/ui/native-select'
 import {
   Table,
   TableBody,
@@ -19,10 +15,14 @@ import {
   TableHeaderRow,
   TableRow,
 } from '@/components/ui/table'
+import { hasPermission } from '@/lib/auth/permissions'
+import { getActor } from '@/lib/auth/require-permission'
 import { listBookings, type BookingListFilter } from '@/lib/db/bookings'
 import { BOOKING_STATUSES, type BookingStatus } from '@/lib/domain/booking-state'
-import { formatStayDate, isStayDate, nightsBetween } from '@/lib/domain/dates'
+import { addDays, formatStayDate, isStayDate, nightsBetween } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
+
+import { BookingsFilters } from './bookings-filters'
 
 export const metadata: Metadata = {
   title: 'Bookings',
@@ -35,106 +35,127 @@ export const metadata: Metadata = {
  * scan, read. The calendar view of the same data is a later slice.
  *
  * Filters are URL state, so a staff member can keep "everything awaiting
- * payment" open in a tab, bookmark it, or send the link to someone else. The
- * form is a plain GET, which means the whole screen is server-rendered and
- * there is no client-side filtering to drift out of step with the data.
+ * payment" open in a tab, bookmark it, or send the link to someone else. They
+ * are read and validated here and applied in the query, so there is no
+ * client-side filtering to drift out of step with the data; the filter row
+ * itself is a small island that does nothing but write those params.
+ *
+ * Rows open the booking's own screen. The link is stretched across the row from
+ * the reference cell rather than the row being made clickable in JavaScript,
+ * which keeps this a server component with no island on it at all — and keeps
+ * the row keyboard-reachable, middle-clickable and openable in a new tab, none
+ * of which an onClick handler would give for free.
  */
 
 interface PageProps {
-  searchParams: Promise<{ status?: string; from?: string; to?: string }>
+  /** `status` repeats, one param per chosen status. */
+  searchParams: Promise<{ status?: string | string[]; from?: string; to?: string }>
 }
 
 function isBookingStatus(value: string): value is BookingStatus {
   return (BOOKING_STATUSES as readonly string[]).includes(value)
 }
 
+/**
+ * The chosen statuses, in the canonical order rather than the URL's.
+ *
+ * Repeated params (`?status=confirmed&status=checked_in`) rather than one
+ * comma-joined value: it is what a browser does with a multi-valued field, what
+ * `URLSearchParams` reads back without help, and it keeps each value a whole
+ * token so a stray comma cannot invent a third status. Unknown values are
+ * dropped rather than erroring — a hand-edited URL should narrow the list, not
+ * break the screen.
+ */
+function readStatuses(value: string | string[] | undefined): readonly BookingStatus[] {
+  const raw = value === undefined ? [] : Array.isArray(value) ? value : [value]
+  const chosen = new Set(raw.filter(isBookingStatus))
+
+  return BOOKING_STATUSES.filter((status) => chosen.has(status))
+}
+
 export default async function BookingsListPage({ searchParams }: PageProps) {
   const params = await searchParams
+  const actor = await getActor()
+
+  // Render is gated per-permission server-side (architecture.md §3), matching
+  // the booking detail screen. `booking.view` is what Security holds and
+  // nothing else, so it is the permission the list has to answer to.
+  if (!actor || !hasPermission(actor.permissions, 'booking.view')) {
+    return (
+      <>
+        <PageHeader title="Bookings" />
+        <EmptyState
+          className="mt-xl"
+          title="You don't have access to this screen"
+          description={
+            'Seeing bookings needs the "View bookings" permission. Ask an administrator if this is part of your job.'
+          }
+        />
+      </>
+    )
+  }
 
   // Anything unusable — a hand-edited URL, half a date pair, a reversed range —
   // falls back to no filter rather than erroring. A staff member who mistypes a
   // date should see the full list, not a stack trace.
-  const status = params.status && isBookingStatus(params.status) ? params.status : undefined
+  const statuses = readStatuses(params.status)
 
   const hasRange =
     Boolean(params.from && params.to) &&
     isStayDate(params.from!) &&
     isStayDate(params.to!) &&
-    params.from! < params.to!
+    params.from! <= params.to!
 
-  const range = hasRange ? { start: params.from!, end: params.to! } : undefined
+  const from = hasRange ? params.from! : undefined
+  const to = hasRange ? params.to! : undefined
 
-  const filter: BookingListFilter = { status, overlaps: range }
+  // `from` and `to` are **inclusive** — the first and last day the filter row's
+  // calendar shows as selected — because that is what the person clicking them
+  // meant. The query range is half-open, matching the occupancy convention the
+  // exclusion constraint uses (architecture.md §5.2), so the last day is pushed
+  // out by one here. This conversion belongs at the boundary and nowhere else:
+  // a single-day filter is `[d, d+1)`, which is exactly "stays touching d".
+  const range = from && to ? { start: from, end: addDays(to, 1) } : undefined
+
+  const filter: BookingListFilter = { statuses, overlaps: range }
   const bookings = await listBookings(filter)
-  const isFiltered = Boolean(status || range)
+  const isFiltered = statuses.length > 0 || Boolean(range)
 
   return (
     <>
       <PageHeader
         title="Bookings"
         description="Every booking across all streams — the single source of truth."
-        actions={
+      />
+
+      {/* One control row: what is being shown on the left, and what can be done
+          about it on the right. The chips name their field and report their
+          value, so the state of the list is legible without opening anything;
+          the count sits next to the create action because the two together are
+          the whole answer to "what is here, and what now". The screen's one
+          primary fill lives here rather than in the header — design.md allows
+          one per screen region, and this row is now that region. */}
+      <div className="mt-xl flex flex-wrap items-center gap-md">
+        <BookingsFilters statuses={statuses} from={from} to={to} />
+
+        <div className="ml-auto flex items-center gap-lg">
+          <h2 id="results-heading" className="micro-label text-muted-foreground">
+            {bookings.length} {bookings.length === 1 ? 'booking' : 'bookings'}
+            {isFiltered ? ' matching' : ''}
+          </h2>
+
           <Button asChild>
             <Link href="/portal/bookings/new">
               <Plus aria-hidden />
               New booking
             </Link>
           </Button>
-        }
-      />
+        </div>
+      </div>
 
-      <Card className="mt-xl">
-        <form method="get" className="flex flex-wrap items-end gap-lg">
-          <div className="grid gap-sm">
-            <Label htmlFor="status">Status</Label>
-            <NativeSelect
-              className="w-[232px]"
-              id="status"
-              name="status"
-              defaultValue={status ?? ''}
-            >
-              <option value="">Any status</option>
-              {BOOKING_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {bookingStatusLabel(value)}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-
-          {/* Labelled as "staying" rather than "from / to" because the filter
-              matches stays that overlap the range, not stays that begin in it. */}
-          <div className="grid w-[164px] gap-sm">
-            <Label htmlFor="from">Staying from</Label>
-            <Input id="from" name="from" type="date" defaultValue={params.from ?? ''} />
-          </div>
-
-          <div className="grid w-[164px] gap-sm">
-            <Label htmlFor="to">Staying until</Label>
-            <Input id="to" name="to" type="date" defaultValue={params.to ?? ''} />
-          </div>
-
-          <Button type="submit" variant="tertiary">
-            Apply
-          </Button>
-
-          {isFiltered ? (
-            <Button asChild variant="ghost">
-              <Link href="/portal/bookings">Clear</Link>
-            </Button>
-          ) : null}
-        </form>
-      </Card>
-
-      <section aria-labelledby="results-heading" className="mt-xl">
-        <h2 id="results-heading" className="micro-label text-muted-foreground">
-          {bookings.length} {bookings.length === 1 ? 'booking' : 'bookings'}
-          {isFiltered ? ' matching' : ''}
-        </h2>
-
+      <section aria-labelledby="results-heading" className="mt-md">
         {bookings.length === 0 ? (
           <EmptyState
-            className="mt-md"
             title={isFiltered ? 'No bookings match these filters' : 'No bookings yet'}
             description={
               isFiltered
@@ -154,7 +175,7 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
             }
           />
         ) : (
-          <Table containerClassName="mt-md">
+          <Table>
             <TableHeader>
               <TableHeaderRow>
                 <TableHead>Reference</TableHead>
@@ -169,9 +190,18 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
             </TableHeader>
             <TableBody>
               {bookings.map((booking) => (
-                <TableRow key={booking.id}>
+                <TableRow key={booking.id} className="relative focus-within:bg-muted/60">
                   <TableCell className="font-mono text-foreground tabular-nums">
-                    {booking.reference}
+                    {/* The stretched link: it covers the whole row, so a click
+                        anywhere opens the booking, while the anchor itself stays
+                        on the reference — which is what a screen reader should
+                        announce as the link text. */}
+                    <Link
+                      href={`/portal/bookings/${booking.reference}`}
+                      className="rounded-sm outline-none after:absolute after:inset-0 focus-visible:underline"
+                    >
+                      {booking.reference}
+                    </Link>
                   </TableCell>
                   <TableCell className="text-foreground">{booking.guestName}</TableCell>
                   <TableCell className="tabular-nums">{booking.unitRef}</TableCell>

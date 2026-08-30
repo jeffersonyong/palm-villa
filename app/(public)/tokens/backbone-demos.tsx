@@ -1,11 +1,14 @@
 'use client'
 
 import { CalendarDays, Check, Copy, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import type { StayDateRange } from '@/components/ui/calendar'
 import { Checkbox } from '@/components/ui/checkbox'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import {
   Dialog,
   DialogClose,
@@ -26,7 +29,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
+import { MultiSelectFilter } from '@/components/ui/multi-select-filter'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Sheet,
   SheetContent,
@@ -106,9 +120,10 @@ export function OverlayDemos() {
           </SheetTrigger>
           <SheetContent side="right">
             <SheetHeader>
-              <SheetTitle>Booking PV-2041</SheetTitle>
+              <SheetTitle>Filters</SheetTitle>
               <SheetDescription>
-                Detail panels open here rather than navigating away from a list.
+                Transient panels and the mobile nav. A record with its own actions gets a route, not
+                a drawer — see design.md, Detail screens.
               </SheetDescription>
             </SheetHeader>
           </SheetContent>
@@ -229,6 +244,61 @@ export function FormControlDemo() {
         <Label htmlFor="demo-notes">Notes</Label>
         <Textarea id="demo-notes" placeholder="Anything the next shift should know…" />
       </div>
+    </div>
+  )
+}
+
+export function DropdownDemos() {
+  const [unit, setUnit] = useState('studio')
+  const [statuses, setStatuses] = useState<readonly string[]>([])
+  const [range, setRange] = useState<StayDateRange | null>(null)
+
+  return (
+    <div className="space-y-xl">
+      <Row
+        title="Select — the form dress"
+        note="The trigger is an Input with a chevron: same height, hairline, radius and focus, so a closed select and a text field in one form row are indistinguishable until you open one. The panel is the overlay shell and its items are controls; the checked item goes ink at 500, never a fill."
+      >
+        <div className="grid w-[232px] gap-sm">
+          <Label htmlFor="demo-unit">Unit type</Label>
+          <Select value={unit} onValueChange={setUnit}>
+            <SelectTrigger id="demo-unit">
+              <SelectValue placeholder="Choose a unit type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectLabel>Short stay</SelectLabel>
+                <SelectItem value="studio">Studio</SelectItem>
+                <SelectItem value="one-bed">One bedroom</SelectItem>
+                <SelectItem value="two-bed">Two bedroom</SelectItem>
+              </SelectGroup>
+              <SelectSeparator />
+              <SelectItem value="penthouse" disabled>
+                Penthouse — not yet let
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </Row>
+
+      <Row
+        title="Filter row"
+        note="The same shell in the filter dress: the field name lives inside the control, an unset filter shows only its name, and a set one fills with canvas-soft and puts its value in ink. Status takes several answers and stays open while you pick them; the date range takes two clicks and closes — there is no Apply on either."
+      >
+        <MultiSelectFilter
+          label="Status"
+          options={[
+            { value: 'Confirmed', label: 'Confirmed' },
+            { value: 'Awaiting payment', label: 'Awaiting payment' },
+            { value: 'Checked in', label: 'Checked in' },
+            { value: 'Cancelled', label: 'Cancelled' },
+          ]}
+          selected={statuses}
+          onChange={setStatuses}
+        />
+
+        <DateRangePicker label="Staying" value={range} onChange={setRange} />
+      </Row>
     </div>
   )
 }
