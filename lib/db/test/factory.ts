@@ -5,6 +5,7 @@ import { bnd } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
 
 import { createWalkInBooking, type Booking, type CreateWalkInBookingInput } from '../bookings'
+import type { PaymentMethod } from '@/lib/domain/payment'
 import { currentPropertyId } from '../property'
 
 /**
@@ -49,6 +50,13 @@ export interface BookingSpec {
   vehicleRegistration?: string | null
   chargeableGuests?: number
   exemptGuests?: number
+  /**
+   * Defaults to cash, which confirms the booking outright — so every test
+   * written before payments existed keeps producing exactly the booking it
+   * used to. A transfer booking is the payment tests' business; see
+   * `givenTransferBooking`.
+   */
+  paymentMethod?: PaymentMethod
 }
 
 /**
@@ -74,6 +82,7 @@ export async function bookingInput(spec: BookingSpec): Promise<CreateWalkInBooki
     lines,
     total: totalOf(lines),
     securityDeposit: bnd(100),
+    paymentMethod: spec.paymentMethod ?? 'cash',
     // Tests act as no one; the auth slice's own tests cover real actors.
     actorId: null,
   }

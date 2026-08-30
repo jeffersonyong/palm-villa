@@ -111,6 +111,10 @@ export async function createWalkInBookingAction(
     lines: priced.lines,
     total: priced.total,
     securityDeposit: priced.securityDeposit,
+    // Stated rather than inferred, and still the only option this form offers.
+    // The bank-transfer path exists in the write layer already; the control
+    // that lets a clerk choose it lands with the payments screens.
+    paymentMethod: 'cash',
     actorId: actor.userId,
   })
 

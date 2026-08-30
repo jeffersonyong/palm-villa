@@ -1,5 +1,6 @@
 import type { DateRange } from '@/lib/domain/availability'
 import { transition, type BookingEvent, type BookingStatus } from '@/lib/domain/booking-state'
+import type { PaymentMethod } from '@/lib/domain/payment'
 import { palmVillaConfig, type PropertyConfig } from '@/lib/domain/config'
 import { addDays, type StayDate } from '@/lib/domain/dates'
 import type { BookingLine } from '@/lib/domain/lines'
@@ -358,6 +359,14 @@ export interface CreateWalkInBookingInput {
   total: Cents
   securityDeposit: Cents
   /**
+   * How the guest is paying, which decides where the booking lands.
+   *
+   * Required, not defaulted, for the same reason `actorId` is: whether a
+   * booking is paid or merely promised is the most consequential fact about
+   * it, and a caller with no opinion should have to say so out loud.
+   */
+  paymentMethod: PaymentMethod
+  /**
    * auth.users.id of the staff member acting, from requirePermission()'s
    * Actor — lands on the audit event. Required, not defaulted: a caller that
    * has no actor should have to say `null` out loud (tests do).
@@ -378,6 +387,24 @@ export type CreateBookingResult =
  * path cannot drift from architecture.md §5.3's rule that no code sets status
  * directly.
  *
+ * "Pays immediately" covers both methods the property takes (prd.md §10.1
+ * [C]). Cash is counted at the desk and the booking is confirmed. A transfer
+ * is sent from the guest's phone while they stand there, which is payment made
+ * but not yet payment seen, so the booking lands in the verification queue and
+ * someone checks the bank (§10.4). Neither is the booked-ahead, pay-on-arrival
+ * case §9.4 excludes: in both, the guest has actually paid.
+ *
+ * ── A transfer booking holds its unit before the money lands ───────────────
+ *
+ * Its occupancy row is neither expired nor cancelled, so the exclusion
+ * constraint counts it, which sits awkwardly beside §9.1 [C] "unpaid bookings
+ * do not hold inventory". §9.3 [A] sanctions exactly this window as a checkout
+ * timer — but the duration is §18 N7, open, and the expiry job in
+ * architecture.md §6.3 does not exist yet. So nothing expires a pending
+ * transfer today: it holds the unit until it is verified or a staff member
+ * cancels it. The queue sorts oldest-first and shows the wait so this is
+ * visible rather than silent.
+ *
  * ── There is deliberately no availability check here ───────────────────────
  *
  * The fixture layer re-checked the range before writing, and said in its own
@@ -393,7 +420,13 @@ export async function createWalkInBooking(
   config: PropertyConfig = palmVillaConfig,
 ): Promise<CreateBookingResult> {
   const propertyId = await currentPropertyId()
-  const created = transition('draft', 'pay_in_full')
+
+  // Cash settles the booking in the same action; a transfer has been sent but
+  // not seen, so it goes to the verification queue instead. Both statuses come
+  // out of the machine rather than being written down here — architecture.md
+  // §5.3 keeps the transition table in exactly one place.
+  const event: BookingEvent = input.paymentMethod === 'cash' ? 'pay_in_full' : 'submit_payment'
+  const created = transition('draft', event)
 
   if (!created.ok) {
     throw new Error(`Walk-in transition rejected: ${created.error.message}`)
@@ -413,6 +446,7 @@ export async function createWalkInBooking(
     p_total_cents: input.total,
     p_security_deposit_cents: input.securityDeposit ?? config.securityDeposit,
     p_lines: input.lines,
+    p_payment_method: input.paymentMethod,
     p_actor_id: input.actorId,
   })
 
@@ -421,7 +455,7 @@ export async function createWalkInBooking(
   }
 
   const result = data as
-    | { ok: true; booking_id: string; reference: string }
+    | { ok: true; booking_id: string; reference: string; payment_id: string }
     | { ok: false; error: 'unit_unavailable' | 'unit_not_found' }
 
   if (!result.ok) {
