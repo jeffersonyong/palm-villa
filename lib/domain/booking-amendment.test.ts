@@ -59,11 +59,7 @@ describe('describeAmendment', () => {
       total: 60000,
     })
 
-    expect(changes.map((change) => change.field)).toEqual([
-      'unitRef',
-      'chargeableGuests',
-      'total',
-    ])
+    expect(changes.map((change) => change.field)).toEqual(['unitRef', 'chargeableGuests', 'total'])
   })
 
   test('orders the changes so the price consequence reads last', () => {
@@ -102,7 +98,6 @@ describe('describeAmendment', () => {
     })
 
     expect(changes.map((change) => change.field)).toEqual(['chargeableGuests', 'exemptGuests'])
-    expect(changes[0].label).toBe('Chargeable guests')
-    expect(changes[1].label).toBe('Exempt guests')
+    expect(changes.map((change) => change.label)).toEqual(['Chargeable guests', 'Exempt guests'])
   })
 })

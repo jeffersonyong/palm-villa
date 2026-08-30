@@ -23,6 +23,15 @@ import { currentPropertyId } from './property'
  * write then refuses.
  */
 
+/**
+ * Which revenue stream a booking belongs to (prd.md §1).
+ *
+ * A read-model type rather than a domain one: nothing in lib/domain branches on
+ * it yet, and `booking_summary` joins day passes out by construction, so today
+ * every row this module returns is a `short_stay`.
+ */
+export type BookingStream = 'short_stay' | 'day_pass' | 'tenancy'
+
 /** A booking as the portal's screens read it. */
 export interface Booking {
   id: string
@@ -30,6 +39,12 @@ export interface Booking {
   reference: string
   unitId: string
   unitRef: string
+  /**
+   * The unit type's slug, which is also its id in `PropertyConfig.unitTypes` —
+   * `priceStay` needs it to reprice an amendment.
+   */
+  unitTypeId: string
+  stream: BookingStream
   range: DateRange
   status: BookingStatus
   guestName: string
@@ -46,12 +61,23 @@ export interface Booking {
    */
   securityDeposit: Cents
   createdAt: string
+  /**
+   * Optimistic-concurrency token for `amendBooking`, maintained by the
+   * `booking_touch_updated_at` trigger.
+   *
+   * Carried as an opaque string and NEVER parsed into a `Date`: Postgres keeps
+   * microseconds and a JavaScript `Date` does not, so a round trip through one
+   * would silently stop matching the row it came from and every amendment
+   * would be refused as stale.
+   */
+  updatedAt: string
 }
 
 interface BookingSummaryRow {
   id: string
   reference: string
   status: BookingStatus
+  stream: BookingStream
   guest_name: string
   guest_phone: string
   vehicle_registration: string | null
@@ -62,15 +88,17 @@ interface BookingSummaryRow {
   created_at: string
   unit_id: string
   unit_ref: string
+  unit_type_slug: string
   check_in: StayDate
   check_out: StayDate
   lines: BookingLine[]
+  updated_at: string
 }
 
 const SUMMARY_COLUMNS =
-  'id, reference, status, guest_name, guest_phone, vehicle_registration, ' +
+  'id, reference, status, stream, guest_name, guest_phone, vehicle_registration, ' +
   'chargeable_guests, exempt_guests, total_cents, security_deposit_cents, ' +
-  'created_at, unit_id, unit_ref, check_in, check_out, lines'
+  'created_at, updated_at, unit_id, unit_ref, unit_type_slug, check_in, check_out, lines'
 
 function toBooking(row: BookingSummaryRow): Booking {
   return {
@@ -78,6 +106,8 @@ function toBooking(row: BookingSummaryRow): Booking {
     reference: row.reference,
     unitId: row.unit_id,
     unitRef: row.unit_ref,
+    unitTypeId: row.unit_type_slug,
+    stream: row.stream,
     range: { start: row.check_in, end: row.check_out },
     status: row.status,
     guestName: row.guest_name,
@@ -89,12 +119,19 @@ function toBooking(row: BookingSummaryRow): Booking {
     total: row.total_cents,
     securityDeposit: row.security_deposit_cents,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }
 }
 
 export interface AvailabilityQuery {
   range: DateRange
   unitTypeId?: string
+  /**
+   * The booking being amended, whose own occupancy should not count against
+   * it. Without this an amend form offers every unit except the one the guest
+   * is already in, and saving the form unchanged becomes impossible.
+   */
+  excludeBookingId?: string
 }
 
 /**
@@ -111,6 +148,7 @@ export async function findAvailableUnits(query: AvailabilityQuery): Promise<read
     p_start: query.range.start,
     p_end: query.range.end,
     p_unit_type_slug: query.unitTypeId ?? null,
+    p_exclude_booking_id: query.excludeBookingId ?? null,
   })
 
   if (error) {
@@ -210,6 +248,30 @@ export async function getBookingByReference(reference: string): Promise<Booking 
 
   if (error) {
     throw new Error(`Could not read booking ${normalised}: ${error.message}`)
+  }
+
+  return data ? toBooking(data as unknown as BookingSummaryRow) : null
+}
+
+/**
+ * One booking by its id.
+ *
+ * The reference is what staff type and what the detail route is keyed on; the
+ * id is what actions carry, because a reference could in principle be
+ * reallocated and an id never is.
+ */
+export async function getBookingById(id: string): Promise<Booking | null> {
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await dataClient()
+    .from('booking_summary')
+    .select(SUMMARY_COLUMNS)
+    .eq('property_id', propertyId)
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(`Could not read booking ${id}: ${error.message}`)
   }
 
   return data ? toBooking(data as unknown as BookingSummaryRow) : null
@@ -416,11 +478,17 @@ export type TransitionBookingResult =
  * in the system: an illegal move, a terminal booking, or a booking that moved
  * underneath the caller are all two staff members working at once, which is a
  * sentence on screen.
+ *
+ * `reason` lands in the audit event's `after` payload. It is required by the
+ * cancel screen and unused by everything else: prd.md §9.5 forfeits a payment
+ * on cancellation, and the first question in a dispute about that is what the
+ * booking was cancelled for.
  */
 export async function transitionBooking(
   bookingId: string,
   event: BookingEvent,
   actorId: string | null = null,
+  reason: string | null = null,
 ): Promise<TransitionBookingResult> {
   const propertyId = await currentPropertyId()
 
@@ -453,6 +521,7 @@ export async function transitionBooking(
     p_to_status: next.status,
     p_event: event,
     p_actor_id: actorId,
+    p_reason: reason,
   })
 
   if (applyError) {
@@ -473,4 +542,121 @@ export async function transitionBooking(
   }
 
   return { ok: true, status: result.status }
+}
+
+export interface AmendBookingInput {
+  bookingId: string
+  /**
+   * The `updatedAt` the form was opened against — passed straight through as
+   * the string it arrived as. See the note on `Booking.updatedAt`.
+   */
+  expectedUpdatedAt: string
+  unitId: string
+  range: DateRange
+  guestName: string
+  guestPhone: string
+  vehicleRegistration: string | null
+  chargeableGuests: number
+  exemptGuests: number
+  lines: readonly BookingLine[]
+  total: Cents
+  securityDeposit: Cents
+  /** Optional free text, recorded on the audit event. */
+  reason: string | null
+  /** From requirePermission()'s Actor. Required, not defaulted. */
+  actorId: string | null
+}
+
+export interface AmendBookingError {
+  code: 'not_found' | 'changed' | 'unit_unavailable' | 'unit_not_found'
+  /** Written for a staff member to read on screen, not for a log. */
+  message: string
+}
+
+export type AmendBookingResult =
+  { ok: true; booking: Booking } | { ok: false; error: AmendBookingError }
+
+/**
+ * Applies an amendment to a booking.
+ *
+ * An amendment is not a state transition — the status does not move when the
+ * dates do — so this does not go through `transitionBooking`. What it shares
+ * with the walk-in path is the transaction boundary: the guest row, the booking
+ * row, the occupancy row, the priced lines and the audit event are moved
+ * together by `amend_booking()` or not at all, because a booking whose
+ * occupancy moved but whose lines did not is a guest charged for a stay they
+ * are not having.
+ *
+ * ── There is deliberately no availability check here ────────────────────────
+ *
+ * As with `createWalkInBooking`, the exclusion constraint is the only thing
+ * that decides whether the new dates are free. A losing race comes back as
+ * `unit_unavailable` with the booking exactly as it was.
+ *
+ * Whether the booking's *status* may be amended at all is `canAmend()` in
+ * lib/domain/booking-state.ts, checked by the caller before it gets here.
+ */
+export async function amendBooking(input: AmendBookingInput): Promise<AmendBookingResult> {
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await dataClient().rpc('amend_booking', {
+    p_property_id: propertyId,
+    p_booking_id: input.bookingId,
+    p_expected_updated_at: input.expectedUpdatedAt,
+    p_unit_id: input.unitId,
+    p_check_in: input.range.start,
+    p_check_out: input.range.end,
+    p_guest_name: input.guestName,
+    p_guest_phone: input.guestPhone,
+    p_vehicle_registration: input.vehicleRegistration,
+    p_chargeable_guests: input.chargeableGuests,
+    p_exempt_guests: input.exemptGuests,
+    p_total_cents: input.total,
+    p_security_deposit_cents: input.securityDeposit,
+    p_lines: input.lines,
+    p_reason: input.reason,
+    p_actor_id: input.actorId,
+  })
+
+  if (error) {
+    throw new Error(`Could not amend the booking: ${error.message}`)
+  }
+
+  const result = data as
+    | { ok: true }
+    | { ok: false; error: 'not_found' | 'changed' | 'unit_unavailable' | 'unit_not_found' }
+
+  if (!result.ok) {
+    return { ok: false, error: await describeAmendFailure(result.error, input.unitId) }
+  }
+
+  const booking = await getBookingById(input.bookingId)
+
+  if (!booking) {
+    // Not reachable: the function committed against this id. Guarded rather
+    // than asserted, because a null here would reach the detail screen as a
+    // blank booking immediately after a successful save.
+    throw new Error(`Booking ${input.bookingId} was amended but could not be read back.`)
+  }
+
+  return { ok: true, booking }
+}
+
+/** Turns an amendment refusal into something a staff member can act on. */
+async function describeAmendFailure(
+  code: AmendBookingError['code'],
+  unitId: string,
+): Promise<AmendBookingError> {
+  if (code === 'not_found') {
+    return { code, message: 'That booking no longer exists.' }
+  }
+
+  if (code === 'changed') {
+    return {
+      code,
+      message: 'Someone else changed this booking while you were working on it. Reload and retry.',
+    }
+  }
+
+  return describeWriteFailure(code, unitId)
 }
