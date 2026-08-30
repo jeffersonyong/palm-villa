@@ -24,8 +24,10 @@ import { cn } from '@/lib/utils'
  * language. It carries a hairline rather than `shadow-chip`, which design.md
  * reserves for the segmented control.
  *
- * Counts are `tabular-nums`, like every other number in the portal, so the
- * range does not jitter as you page.
+ * Figures here are proportional, not `tabular-nums`: the portal's tabular
+ * rule exists so columns of data line up vertically, and nothing here is in
+ * a column — the range reads as a sentence and the page numbers are centred
+ * in their own chips (design.md §Components).
  */
 
 const DEFAULT_PAGE_SIZES = [10, 25, 50] as const
@@ -74,10 +76,7 @@ export function Pagination({
       )}
     >
       <p className="text-body-sm text-muted-foreground">
-        <span className="tabular-nums">
-          {from}–{to}
-        </span>{' '}
-        of <span className="tabular-nums">{total}</span> {itemLabel}
+        {from}–{to} of {total} {itemLabel}
       </p>
 
       <div className="flex flex-wrap items-center gap-md">
@@ -194,7 +193,6 @@ function PageButton({
       onClick={onClick}
       className={cn(
         stepClasses,
-        'tabular-nums',
         isCurrent
           ? 'border border-border bg-card font-medium text-foreground'
           : 'text-copy hover:bg-card hover:text-foreground',
