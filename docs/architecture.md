@@ -139,7 +139,23 @@ States per PRD §9.2: `draft → held → awaiting_payment_verification → conf
 
 Legality is decided in TypeScript by `transition()`; persistence is `transition_booking()`, which makes the status write and its audit event atomic and updates `where status = <the status the caller read>`. Zero rows updated means the booking moved underneath the caller — two staff members acting on it at once — which is returned as a message, not a lost write. The booking write path (`create_walk_in_booking()`) is passed the status the state machine already derived; the schema never chooses one.
 
-### 5.4 Rent periods
+### 5.4 Amendment
+
+**An amendment is not a state transition.** A booking's status does not move when its dates, unit, party or guest details change, so there is no `amend` event in the machine and `transition_booking()` is not the write path. What §5.3 governs is *which* statuses may be amended at all, and that stays in the same module: `canAmend()` in `lib/domain/booking-state.ts`, never re-decided in SQL or in a screen.
+
+`checked_in` is excluded. The guest is in the unit, and `priceStay` refuses a check-in date in the past, so an in-progress stay cannot be repriced without a deliberate exception to the pricing engine — see PRD §9.6.
+
+Persistence is `amend_booking()`, a single transaction over the guest row, the booking row, the occupancy row, the priced lines and the audit event. The transaction boundary exists for the same reason `create_walk_in_booking()`'s does: PostgREST has no multi-statement transaction, and a booking whose occupancy moved but whose lines did not is a guest charged for a stay they are not having. Lines are **replaced wholesale**, not reconciled — PRD §8 makes the lines the price, so the honest representation of a reprice is the new set.
+
+The occupancy update is the statement that wins or loses the race against the §5.2 constraint, exactly as the insert is on creation. A row does not conflict with itself, so extending a stay in the same unit is legal by construction; only a neighbouring booking can refuse it, and the refusal returns `unit_unavailable` with nothing written.
+
+**Concurrency guard.** §5.3's `where status = <the status the caller read>` cannot work here, because an amendment leaves the status alone. `booking.updated_at` takes its place — already maintained by the `booking_touch_updated_at` trigger, exposed through `booking_summary`, and compared exactly. It is carried from the read to the write **as an opaque string and never parsed into a `Date`**: Postgres keeps microseconds and JavaScript's `Date` does not, so a round trip through one would refuse every save as stale.
+
+**Guest edits are in place, conditionally.** Correcting a name updates the `guest` row, which is correct only while every booking owns a guest row of its own — `create_walk_in_booking()` guarantees that today by inserting a fresh guest per booking and deliberately not de-duplicating. When a guest slice consolidates guests, editing a name here would rewrite it across that person's whole history, and this must become a booking-level override instead.
+
+**Cancellation** is an ordinary transition and needed no new write path. `transition_booking()` gained an optional `p_reason`, recorded in the audit event's `after` payload (omitted rather than null when absent) — the audit `before`/`after` are jsonb precisely so a fact about an event can be added without a schema change. No refund or forfeiture is computed anywhere; PRD §18 N5 is open and §9.6 records why nothing depends on it.
+
+### 5.5 Rent periods
 
 `rent_period` is one row per period per tenancy (due date, amount, status, paid date, method, reference) — never a boolean on the tenancy (PRD §16 rationale).
 

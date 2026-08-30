@@ -106,9 +106,10 @@ export function OverlayDemos() {
           </SheetTrigger>
           <SheetContent side="right">
             <SheetHeader>
-              <SheetTitle>Booking PV-2041</SheetTitle>
+              <SheetTitle>Filters</SheetTitle>
               <SheetDescription>
-                Detail panels open here rather than navigating away from a list.
+                Transient panels and the mobile nav. A record with its own actions gets a route, not
+                a drawer — see design.md, Detail screens.
               </SheetDescription>
             </SheetHeader>
           </SheetContent>
