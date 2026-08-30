@@ -93,6 +93,16 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
 
   const selectedUnit = units.find((unit) => unit.id === unitId)
 
+  /**
+   * The guest's current unit can be unavailable for a newly requested range —
+   * a neighbouring booking has it from part-way through. The select then has no
+   * option matching the state, and a browser silently displays its first option
+   * instead: the screen would show one unit, price another, and refuse to save
+   * with a message about choosing a unit that already looks chosen. Naming the
+   * situation is the only honest way out of it.
+   */
+  const isCurrentUnitAvailable = units.some((unit) => unit.id === booking.unitId)
+
   const quote = selectedUnit
     ? priceStay(
         {
@@ -122,6 +132,8 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
 
   const after: AmendmentSnapshot = {
     unitRef: selectedUnit?.ref ?? booking.unitRef,
+    // Only ever read while a unit is selected — Save is gated on the quote,
+    // which needs one.
     checkIn,
     checkOut,
     chargeableGuests,
@@ -158,9 +170,12 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
                 className="max-w-[360px]"
                 id="unitId"
                 name="unitId"
-                value={unitId}
+                value={selectedUnit ? unitId : ''}
                 onChange={(event) => setUnitId(event.target.value)}
               >
+                {/* Rendered only while nothing valid is selected, so the
+                    control never shows a unit the form is not actually using. */}
+                {selectedUnit ? null : <option value="">Choose a unit</option>}
                 {units.map((unit) => (
                   <option key={unit.id} value={unit.id}>
                     {unit.ref} — {unit.unitTypeName}
@@ -168,6 +183,15 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
                   </option>
                 ))}
               </NativeSelect>
+              {!isCurrentUnitAvailable ? (
+                <p className="text-body-sm text-copy">
+                  {booking.unitRef} is not free for these dates — another booking has it for part of
+                  the range.
+                  {/* The instruction drops away once it has been acted on; the
+                      fact behind it stays, because it is why the guest moved. */}
+                  {selectedUnit ? null : ' Move the guest to another unit, or change the dates.'}
+                </p>
+              ) : null}
               <FieldError message={state.fieldErrors?.unitId} />
             </div>
           </section>
@@ -277,7 +301,7 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
               {formatStayDate(checkIn)} → {formatStayDate(checkOut)}
             </p>
             <p className="mt-xxs text-body-sm text-muted-foreground">
-              {after.unitRef} · {chargeableGuests + exemptGuests}{' '}
+              {selectedUnit?.ref ?? 'no unit chosen'} · {chargeableGuests + exemptGuests}{' '}
               {chargeableGuests + exemptGuests === 1 ? 'guest' : 'guests'}
             </p>
 
