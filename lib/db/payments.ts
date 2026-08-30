@@ -136,6 +136,19 @@ function toPayment(row: PaymentSummaryRow): Payment {
 export interface PaymentListFilter {
   statuses?: readonly PaymentStatus[]
   methods?: readonly PaymentMethod[]
+  /**
+   * Collected on or after this date, and before the day after `collectedTo` —
+   * both ends inclusive, as the calendar shows them. The half-open conversion
+   * happens at the page boundary, matching how the bookings list handles its
+   * own range (architecture.md §5.2).
+   */
+  collectedFrom?: string
+  collectedBefore?: string
+  /**
+   * A log reads newest first; a queue reads oldest first. Both are this same
+   * query, so which end is "the top" is the caller's to say.
+   */
+  newestFirst?: boolean
 }
 
 /**
@@ -163,7 +176,17 @@ export async function listPayments(filter: PaymentListFilter = {}): Promise<read
     query = query.in('method', filter.methods)
   }
 
-  const { data, error } = await query.order('created_at', { ascending: true })
+  if (filter.collectedFrom) {
+    query = query.gte('collected_at', filter.collectedFrom)
+  }
+
+  if (filter.collectedBefore) {
+    query = query.lt('collected_at', filter.collectedBefore)
+  }
+
+  const { data, error } = await query.order(filter.newestFirst ? 'collected_at' : 'created_at', {
+    ascending: !filter.newestFirst,
+  })
 
   if (error) {
     throw new Error(`Could not list payments: ${error.message}`)
