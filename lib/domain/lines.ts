@@ -44,3 +44,33 @@ export function line(
 export function totalOf(lines: readonly BookingLine[]): Cents {
   return sumCents(lines.map((entry) => entry.amount))
 }
+
+/**
+ * The priced extras a booking bought, read back off its lines.
+ *
+ * Sofa beds and the early/late hours are not columns on `booking` — they exist
+ * only as `booking_line` quantities, so an amend form has nowhere else to read
+ * them from when it prefills. Deriving them here rather than in the form keeps
+ * the mapping in the module that owns line shape, next to `line()` which wrote
+ * them.
+ *
+ * `extra_person` is deliberately absent: its quantity is people × nights, a
+ * product of the party size and the range rather than something a form
+ * collects. It is recomputed from those inputs, never read back.
+ */
+export interface BookingExtras {
+  sofaBeds: number
+  earlyCheckInHours: number
+  lateCheckOutHours: number
+}
+
+export function extrasFromLines(lines: readonly BookingLine[]): BookingExtras {
+  const quantityOf = (type: BookingLineType): number =>
+    lines.find((entry) => entry.type === type)?.quantity ?? 0
+
+  return {
+    sofaBeds: quantityOf('sofa_bed'),
+    earlyCheckInHours: quantityOf('early_check_in'),
+    lateCheckOutHours: quantityOf('late_check_out'),
+  }
+}

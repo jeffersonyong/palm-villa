@@ -145,3 +145,30 @@ export function transition(status: BookingStatus, event: BookingEvent): Transiti
 
   return { ok: true, status: next }
 }
+
+/**
+ * Statuses whose booking may still be amended.
+ *
+ * Amendment is NOT a transition — a booking's status does not move when its
+ * dates or guest change — so it is not in the map above and there is no
+ * `amend` event. What belongs here is the *legality* question, because it is a
+ * fact about the machine and architecture.md §5.3 keeps those in one module.
+ *
+ * `checked_in` is excluded even though the machine can still move out of it:
+ * the guest is in the unit, so the stay has begun, and `priceStay` refuses a
+ * check-in date in the past — an in-progress stay cannot be repriced without a
+ * deliberate exception in the pricing engine. Extending a guest already in
+ * house is a real front-office need and its own decision (prd.md §9.6), not
+ * something to smuggle in behind an edit form.
+ */
+const AMENDABLE: readonly BookingStatus[] = [
+  'draft',
+  'held',
+  'awaiting_payment_verification',
+  'confirmed',
+]
+
+/** True when the booking's details can still be changed. */
+export function canAmend(status: BookingStatus): boolean {
+  return AMENDABLE.includes(status)
+}

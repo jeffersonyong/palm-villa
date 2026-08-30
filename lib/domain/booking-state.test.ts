@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 import {
   allowedEvents,
   BOOKING_STATUSES,
+  canAmend,
   isTerminal,
   transition,
   type BookingEvent,
@@ -180,6 +181,43 @@ describe('exhaustive sweep', () => {
 
       for (const event of ALL_EVENTS) {
         expect(transition(status, event).ok).toBe(allowed.includes(event))
+      }
+    }
+  })
+})
+
+/**
+ * Amendment is not a transition — the status does not move — but which statuses
+ * may be amended is still a fact about the machine, so it lives here with the
+ * rest of them rather than in the screen that asks.
+ */
+describe('canAmend', () => {
+  test('permits the statuses whose stay has not started', () => {
+    expect(canAmend('draft')).toBe(true)
+    expect(canAmend('held')).toBe(true)
+    expect(canAmend('awaiting_payment_verification')).toBe(true)
+    expect(canAmend('confirmed')).toBe(true)
+  })
+
+  test('refuses a booking whose guest is already in the unit', () => {
+    // priceStay refuses a check-in in the past, so an in-progress stay cannot
+    // be repriced. Extending a checked-in guest is its own decision (prd.md
+    // §9.6) and deliberately not this one.
+    expect(canAmend('checked_in')).toBe(false)
+  })
+
+  test('refuses every terminal status', () => {
+    for (const status of ALL_STATUSES) {
+      if (isTerminal(status)) {
+        expect(canAmend(status)).toBe(false)
+      }
+    }
+  })
+
+  test('never permits a status the machine cannot move out of', () => {
+    for (const status of ALL_STATUSES) {
+      if (canAmend(status)) {
+        expect(allowedEvents(status).length).toBeGreaterThan(0)
       }
     }
   })
