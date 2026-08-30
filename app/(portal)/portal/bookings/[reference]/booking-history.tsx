@@ -14,6 +14,11 @@ import { formatTimestamp } from '@/lib/domain/dates'
  * `booking-status-badge` — one table, one place. The F4 audit screen will want
  * this map too; it moves to a shared module when there is a second caller, not
  * before.
+ *
+ * Events on the booking's **payments** are folded in by the page. They carry
+ * `entity_type = 'payment'`, so a trail built only from the booking's own
+ * events would show it reaching `confirmed` with no record of what was
+ * actually banked — the lie by omission this component is written to avoid.
  */
 
 const ACTION_LABELS: Record<string, string> = {
@@ -28,6 +33,11 @@ const ACTION_LABELS: Record<string, string> = {
   'booking.expire': 'Hold expired',
   'booking.mark_no_show': 'Marked no-show',
   'booking.hold': 'Held',
+  'payment.recorded': 'Bank transfer awaited',
+  'payment.cash_recorded': 'Cash recorded',
+  'payment.verified': 'Payment verified',
+  'payment.amount_overridden': 'Confirmed at an amount other than the total',
+  'payment.matched_manually': 'Matched to this booking by hand',
 }
 
 /**
@@ -38,7 +48,7 @@ const ACTION_LABELS: Record<string, string> = {
  * would make the trail lie by omission.
  */
 function actionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action.replace(/^booking\./, '').replace(/_/g, ' ')
+  return ACTION_LABELS[action] ?? action.replace(/^(booking|payment)\./, '').replace(/_/g, ' ')
 }
 
 /** The typed note a staff member left, when the action asked for one. */
