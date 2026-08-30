@@ -1,6 +1,6 @@
 'use client'
 
-import { X } from 'lucide-react'
+import { FunnelX } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 
@@ -109,7 +109,9 @@ export function BookingsFilters({ statuses, from, to }: BookingsFiltersProps) {
 
       {isFiltered ? (
         <Button variant="ghost" onClick={() => apply([], null)}>
-          <X aria-hidden />
+          {/* A funnel struck through, not a bare cross: this clears the whole
+              filter set, where a cross elsewhere in the row clears one field. */}
+          <FunnelX aria-hidden />
           Clear
         </Button>
       ) : null}
