@@ -7,13 +7,23 @@ import { requirePermission } from '@/lib/auth/require-permission'
 import { createWalkInBooking } from '@/lib/db/bookings'
 import { isStayDate } from '@/lib/domain/dates'
 import { palmVillaConfig } from '@/lib/domain/config'
+import type { PaymentMethod } from '@/lib/domain/payment'
 import { priceStay } from '@/lib/domain/pricing/stay'
 
 /**
  * Walk-in booking creation (prd.md §9.4, capability B2).
  *
- * The guest is present and pays on the spot, so the booking is created and paid
- * in one action and no unit is ever held against an unpaid promise.
+ * The guest is present and pays on the spot, in one of the two ways the
+ * property takes money (prd.md §10.1 [C]). Cash is counted at the desk and the
+ * booking is confirmed outright. A bank transfer is sent from the guest's
+ * phone while they stand there — payment made, but not yet payment seen — so
+ * the booking lands in the verification queue and someone checks the bank
+ * (§10.3). Neither is the booked-ahead, pay-on-arrival case §9.4 excludes from
+ * v1: in both, the guest has actually paid.
+ *
+ * The one asterisk, recorded in createWalkInBooking()'s own doc block and in
+ * prd.md §9.1: a transfer booking does hold its unit before the money lands,
+ * and nothing expires it, because the hold duration is §18 N7 and still open.
  */
 
 const stayDate = z.string().refine(isStayDate, 'Enter a valid date.')
@@ -38,6 +48,7 @@ const walkInBookingSchema = z.object({
   guestName: z.string().trim().min(1, 'Enter the guest name.').max(120),
   guestPhone: z.string().trim().min(1, 'Enter a contact number.').max(40),
   vehicleRegistration: z.string().trim().max(20).optional(),
+  paymentMethod: z.enum(['cash', 'bank_transfer']),
 })
 
 export interface WalkInBookingState {
@@ -52,6 +63,8 @@ export interface WalkInBookingState {
     checkOut: string
     total: number
     securityDeposit: number
+    /** Decides what the confirmation panel says, and which badge it wears. */
+    paymentMethod: PaymentMethod
   }
 }
 
@@ -111,10 +124,7 @@ export async function createWalkInBookingAction(
     lines: priced.lines,
     total: priced.total,
     securityDeposit: priced.securityDeposit,
-    // Stated rather than inferred, and still the only option this form offers.
-    // The bank-transfer path exists in the write layer already; the control
-    // that lets a clerk choose it lands with the payments screens.
-    paymentMethod: 'cash',
+    paymentMethod: input.paymentMethod,
     actorId: actor.userId,
   })
 
@@ -126,6 +136,10 @@ export async function createWalkInBookingAction(
   // `useActionState` only re-renders the client island — so without this a clerk
   // taking two bookings in a row sees the pre-booking figures on the second one.
   revalidatePath('/portal/bookings/new')
+  revalidatePath('/portal/bookings')
+  // A transfer booking lands in the queue and on the dashboard's counter.
+  revalidatePath('/portal/payments')
+  revalidatePath('/portal')
 
   return {
     status: 'created',
@@ -136,6 +150,7 @@ export async function createWalkInBookingAction(
       checkOut: result.booking.range.end,
       total: result.booking.total,
       securityDeposit: result.booking.securityDeposit,
+      paymentMethod: input.paymentMethod,
     },
   }
 }
