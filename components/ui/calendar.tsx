@@ -337,7 +337,12 @@ function MonthGrid({
   const cells = monthGrid(month)
 
   return (
-    <table className="mt-xs border-separate border-spacing-0">
+    <table
+      // Weeks are separated by a small vertical gap and nothing horizontal:
+      // the band across a week has to stay one continuous strip, but stacked
+      // weeks read as a solid block without a little air between them.
+      className="mt-xs border-separate border-spacing-x-0 border-spacing-y-[3px]"
+    >
       <thead>
         <tr>
           {WEEKDAYS.map((weekday) => (
