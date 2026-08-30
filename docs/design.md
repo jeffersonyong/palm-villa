@@ -163,7 +163,7 @@ components:
     borderColor: "{colors.ink} @ 12%"
     typography: "{typography.body-md}"
     rounded: "{rounded.md}"
-    padding: "{spacing.sm} {spacing.md}"
+    padding: "{spacing.xs} {spacing.md}"
   card:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
@@ -249,7 +249,7 @@ components:
     textColor: "{colors.body}"
     typography: "{typography.body-sm}"
     rounded: "{rounded.sm}"
-    padding: "{spacing.xs} {spacing.md}"
+    padding: "0 {spacing.md}"
   avatar:
     backgroundColor: "{colors.canvas-soft}"
     textColor: "{colors.ink}"
@@ -417,7 +417,7 @@ The `micro` token is what makes surfaces read as engineered: everywhere a label 
 | Desktop | ≥ 1024px | Portal nav expands; grids full. |
 
 ### Control heights & touch targets
-Standard control height is **36px** (buttons, inputs, selects) on desktop surfaces. On **field screens** every interactive element is ≥ 48px tall and row-level primary actions render full-width in the `touch` size.
+Standard control height is **36px** (buttons, inputs, selects) on the customer surface. The **portal** tightens the same controls to **32px** — next to its 30px nav rows, 36px controls read padded — via the `--spacing-control` override on the operations register, so buttons, inputs and tab tracks stay one height. On **field screens** every interactive element is ≥ 48px tall and row-level primary actions render full-width in the `touch` size.
 
 ## Elevation & Depth
 
@@ -436,11 +436,11 @@ Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion
 
 ## Components
 
-**Buttons.** `primary` (the action colour: lagoon on the customer surface, ink/white on the operations surfaces — see *Two accents, one system*), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour.
+**Buttons.** `primary` (the action colour: lagoon on the customer surface, ink/white on the operations surfaces — see *Two accents, one system*), `secondary` (faint gray fill), `tertiary` (white, hairline), `ghost`, `destructive`, and `inverted` (the `primary-invert` construction for dark surfaces). Radius `{rounded.md}` 6px; height 36px (portal 32px, field `touch` ≥ 48px); label `button-md` 13px/500. One primary fill per screen region. Focus is a 2px ring in the action colour. A primary **create** action leads with a plus glyph — "+ New booking" — never a bare verb-noun label.
 
 **Cards.** One card idiom: white, `{rounded.lg}` 10px, 1px hairline, no shadow. `card-inset` is the faint gray panel *inside* a card (fine print, deposit notes, grouped stats) at `{rounded.md}`. `card-dark` (ink) is the public site's promotional moment, used at most twice per page. There are no tinted feature cards — colour is not a card treatment. Interactive cards signal hover by strengthening the hairline and a 1px lift, never a shadow.
 
-**Inputs.** White, hairline, `{rounded.md}` 6px, `body-md` 14px, height 36px, horizontal padding `{spacing.md}`. Focus: the border strengthens to the action colour plus a faint same-hue halo (`ring`) — decisive, not a glow. Labels are `body-sm-strong` ink. Field-screen inputs use the `touch` size.
+**Inputs.** White, hairline, `{rounded.md}` 6px, `body-md` 14px, height 36px (portal 32px), horizontal padding `{spacing.md}`. Focus: the border strengthens to the action colour plus a faint same-hue halo (`ring`) — decisive, not a glow. Labels are `body-sm-strong` ink. Field-screen inputs use the `touch` size.
 
 **Date entry — no calendar component is specified.** Surfaces needing dates use native `<input type="date">` with the input treatment. Adequate for the portal; **not** adequate for the public availability calendar (A1), which must be specified here before it is built.
 
@@ -464,7 +464,7 @@ Idle items are `copy` in light but step down to **`muted-foreground` in dark**. 
 
 **Drawers.** The mobile portal nav is a left drawer, 280px, sliding over the scrim, closing on navigation. It fills with the page ground — the same surface the sidebar sits on, so the nav reads identically in both places. Edge-anchored, so no radius.
 
-**Tabs — a segmented control, not underlines.** A `muted` track at `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a white card chip drawn in with a hairline at `{rounded.sm}` (concentric inside the track). Labels `body-sm`, ink and 500 when active. The same principle as the sidebar's active item — *where am I* is a quiet surface shift, never the action colour; here the track supplies the gray, so the active segment lifts out of it in white. No underline tabs, no pill tabs.
+**Tabs — a segmented control, not underlines.** A `muted` track at control height and `{rounded.md}` with `{spacing.xxs}` padding; the active segment is a white card chip drawn in with a hairline at `{rounded.sm}` (concentric inside the track), stretched to the track's full inner height — a chip floating with track above and below it breaks the concentric geometry. Labels `body-sm`, ink and 500 when active. The same principle as the sidebar's active item — *where am I* is a quiet surface shift, never the action colour; here the track supplies the gray, so the active segment lifts out of it in white. No underline tabs, no pill tabs.
 
 **Checkboxes.** 16px, `{rounded.sm}` 4px (6px reads as a circle at that size), hairline on white; checked fills with the action colour. Small enough that the fill does not count against the one-primary-per-region rule.
 

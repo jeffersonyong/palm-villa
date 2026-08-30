@@ -325,6 +325,13 @@
     color-mix(in oklab, var(--color-canvas) 12%, var(--color-ink-deep))
   );
   --accent-foreground: light-dark(var(--color-ink), var(--color-canvas));
+
+  /* The dense subset tightens the standard control: next to the sidebar's
+     30px rows, 36px buttons read padded; 32px reads like the same tool
+     (design.md §Control heights). Field screens are unaffected — everything
+     interactive there uses the ≥48px `touch` size, which keys off
+     `--spacing-touch`. */
+  --spacing-control: 32px;
 }
 
 @theme inline {

@@ -5,8 +5,9 @@ import { cn } from '@/lib/utils'
  * - white, neutral hairline, 6px radius, `body-md` (§Components)
  * - focus strengthens the border to ink with a faint ink halo — the reference
  *   treatment, not a coloured glow
- * - 36px control height, matching Button; the `touch` size carries the field
- *   surface's ≥48px target and one step more padding
+ * - `h-control` height matching Button (36px standard, 32px on the
+ *   operations portal); the `touch` size carries the field surface's ≥48px
+ *   target and one step more padding
  */
 function Input({
   className,
@@ -24,7 +25,11 @@ function Input({
         'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/10',
         'aria-invalid:border-destructive aria-invalid:ring-destructive/20',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        inputSize === 'touch' ? 'min-h-touch px-lg py-md' : 'h-control px-md py-sm',
+        // py-xs, not py-sm: the height is fixed by h-control, so vertical pad
+        // only constrains the content box — at the operations surfaces' 32px
+        // control an 8px pad would squeeze it below body-md's 21px line
+        // height and clip descenders.
+        inputSize === 'touch' ? 'min-h-touch px-lg py-md' : 'h-control px-md py-xs',
         className,
       )}
       {...props}
