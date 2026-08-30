@@ -24,6 +24,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Pagination } from '@/components/ui/pagination'
+import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
 import { toast } from '@/components/ui/toast-store'
 import { generateTempPassword } from '@/lib/auth/temp-password'
 import {
@@ -62,6 +64,9 @@ import {
 
 const initialState: RoleAdminState = { status: 'idle' }
 
+/** Ten rows keeps the table inside one screen on a front-desk laptop. */
+const DEFAULT_PAGE_SIZE = 10
+
 interface StaffTabProps {
   staff: readonly StaffAccount[]
   roles: readonly RoleWithPermissions[]
@@ -72,10 +77,17 @@ type RowDialog = 'roles' | 'password' | 'status' | 'delete'
 
 export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
   const [activeRow, setActiveRow] = useState<{ userId: string; dialog: RowDialog } | null>(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
   const activeAccount = activeRow
     ? (staff.find((account) => account.id === activeRow.userId) ?? null)
     : null
+
+  // Clamped on render rather than corrected after the fact: deleting the last
+  // account on the last page shrinks the table underneath the held page.
+  const currentPage = clampPage(page, pageCountFor(staff.length, pageSize))
+  const visibleStaff = staff.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
     <div className="grid gap-lg">
@@ -85,7 +97,21 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
           description="Create the first account and hand over its temporary password."
         />
       ) : (
-        <Table>
+        <Table
+          footer={
+            <Pagination
+              page={currentPage}
+              pageSize={pageSize}
+              total={staff.length}
+              itemLabel="accounts"
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size)
+                setPage(1)
+              }}
+            />
+          }
+        >
           <TableHeader>
             <TableHeaderRow>
               <TableHead>Name</TableHead>
@@ -98,7 +124,7 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
             </TableHeaderRow>
           </TableHeader>
           <TableBody>
-            {staff.map((account) => (
+            {visibleStaff.map((account) => (
               <TableRow key={account.id}>
                 <TableCell className="font-medium text-foreground">
                   {account.displayName}
