@@ -10,7 +10,8 @@ The `docs/` folder is the source of truth. Each doc is **normative for its domai
 
 | Doc | Owns | Notes |
 |---|---|---|
-| [docs/prd.md](docs/prd.md) | Business rules, pricing, booking flows, roles, phasing, open questions | Requirements are tagged **[C]** confirmed / **[A]** assumed / **[O]** open. Never silently resolve an [O] item — flag it or check the open-questions table (§18) first. |
+| [docs/prd.md](docs/prd.md) | Business rules, pricing, booking flows, roles, phasing | Requirements are tagged **[C]** confirmed / **[A]** assumed / **[O]** open. Never silently resolve an [O] item — flag it or check the register first. |
+| [docs/open-questions.md](docs/open-questions.md) | Everything unanswered, and what each one is holding up | The single register. An answer is written into whichever doc owns the decision **and** moved to the register's Answered section — never left only in one place. |
 | [docs/architecture.md](docs/architecture.md) | Stack, app structure, data model, security, infra | **Supersedes the PRD's technical sketches where they differ.** |
 | [docs/design.md](docs/design.md) | Design tokens, typography, components, do's/don'ts | Frontmatter is the machine-readable token set. |
 | [docs/scope-of-capabilities.md](docs/scope-of-capabilities.md) | Client-facing scope baseline (A1–G7 capability refs) | Defines what is in and out of v1. If it's not listed there, it's not in the quoted delivery. |
@@ -57,7 +58,7 @@ Docs are living documents and must evolve with the project:
 
 - **[changelog.md](changelog.md) is updated only when a slice of work is complete — not per commit.** A dated entry (newest first) with what was added/changed/decided and why. Link the doc or PR; don't restate detail. This is the running narrative of how the project evolved, not a commit log.
 - **Update `docs/` after every major milestone or significant addition** — a phase completing, a schema-shaping decision, a scope change, or an [O]/[A] item being resolved with the client. The change belongs in the same PR as the work, in whichever doc is normative for it.
-- When the client answers an open question, move it out of PRD §18, update its [O]/[A] tag to [C], and propagate the decision to the relevant section — don't leave the answer only in a chat thread.
+- When the client answers an open question, move it to the Answered section of [open-questions.md](docs/open-questions.md), update its [O]/[A] tag to [C] where it arises in the PRD, and propagate the decision to the relevant section — don't leave the answer only in a chat thread, or only in the register.
 - If implementation is forced to diverge from architecture.md, update architecture.md in the same PR with the reasoning — the doc stays normative only if it stays true.
 - Scope changes agreed with the client get a capability ref added to (or struck from) scope-of-capabilities.md, so the scope baseline stays honest.
 - Keep docs concise: record decisions and rationale, not narration. Prefer editing the existing section over appending changelogs.
