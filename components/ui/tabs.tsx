@@ -41,10 +41,15 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        'inline-flex flex-1 items-center justify-center gap-sm rounded-sm px-md text-body-sm whitespace-nowrap text-copy transition-colors outline-none',
-        'hover:text-foreground',
+        'inline-flex flex-1 items-center justify-center gap-sm rounded-sm px-md text-body-sm whitespace-nowrap transition-colors outline-none',
+        // Idle labels step down to `muted-foreground` in dark, exactly like
+        // the sidebar's idle items (portal-nav.tsx): `copy` sits well below
+        // `foreground` in light but only 3% apart in dark, where idle would
+        // read as bright as the selected segment.
+        'text-copy dark:text-muted-foreground',
+        'hover:text-foreground dark:hover:text-foreground',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-muted',
-        'data-[state=active]:bg-card data-[state=active]:font-medium data-[state=active]:text-foreground data-[state=active]:shadow-chip',
+        'data-[state=active]:bg-card data-[state=active]:font-medium data-[state=active]:text-foreground data-[state=active]:shadow-chip dark:data-[state=active]:text-foreground',
         'disabled:pointer-events-none disabled:opacity-50',
         '[&_svg]:size-4 [&_svg]:shrink-0',
         className,
