@@ -21,7 +21,6 @@ import { toast } from '@/components/ui/toast-store'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Permission } from '@/lib/auth/permissions'
 import type { RoleWithPermissions, StaffAccount } from '@/lib/db/staff'
-import { cn } from '@/lib/utils'
 
 import { setRolePermissionsAction, type RoleAdminState } from './actions'
 import { PERMISSION_GROUPS, PERMISSION_LABELS } from './permission-labels'
@@ -101,9 +100,6 @@ interface RolesTabProps {
 export function RolesTab({ roles, staff }: RolesTabProps) {
   const [drafts, setDrafts] = useState(() => draftsFromRoles(roles))
   const [failures, setFailures] = useState<readonly string[]>([])
-  // Highlighting the hovered column is what makes a five-wide row readable;
-  // the row half of the cross is the table's own hover.
-  const [hotRoleId, setHotRoleId] = useState<string | null>(null)
   const [isSaving, startSaving] = useTransition()
 
   if (roles.length === 0) {
@@ -185,137 +181,135 @@ export function RolesTab({ roles, staff }: RolesTabProps) {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-wrap items-center justify-between gap-lg pb-lg">
-        <p className="text-body-sm text-muted-foreground">
-          {dirtyRoles.length === 0
-            ? `${PERMISSION_COUNT} permissions across ${roles.length} roles.`
-            : `Unsaved changes to ${listNames(dirtyRoles.map((role) => role.name))}.`}
-        </p>
+      {/* One width for the whole cluster, declared once here and inherited by
+          every block inside it: the status line, Save, the failure callout and
+          the table all share the matrix's right edge. Save was previously in a
+          full-width `justify-between` row, which pinned it to the *panel's*
+          edge while the table stopped short of it — two different rulers, and
+          the button read as floating loose of the thing it acts on. 962 is the
+          declared columns (280 + 5 × 136) plus the container's two hairlines,
+          since a bordered box is measured border-box. */}
+      <div className="w-[962px] max-w-full">
+        <div className="flex flex-wrap items-center justify-between gap-lg pb-lg">
+          <p className="text-body-sm text-muted-foreground">
+            {dirtyRoles.length === 0
+              ? `${PERMISSION_COUNT} permissions across ${roles.length} roles.`
+              : `Unsaved changes to ${listNames(dirtyRoles.map((role) => role.name))}.`}
+          </p>
 
-        <Button variant="secondary" onClick={save} disabled={dirtyRoles.length === 0 || isSaving}>
-          {isSaving
-            ? 'Saving…'
-            : dirtyRoles.length > 1
-              ? `Save ${dirtyRoles.length} roles`
-              : 'Save'}
-        </Button>
-      </div>
+          <Button variant="secondary" onClick={save} disabled={dirtyRoles.length === 0 || isSaving}>
+            {isSaving
+              ? 'Saving…'
+              : dirtyRoles.length > 1
+                ? `Save ${dirtyRoles.length} roles`
+                : 'Save'}
+          </Button>
+        </div>
 
-      {failures.length > 0 ? (
-        <Callout role="alert" className="mb-lg">
-          <span>
-            {failures.map((failure) => (
-              <span key={failure} className="block">
-                {failure}
-              </span>
-            ))}
-          </span>
-        </Callout>
-      ) : null}
-
-      {/* The matrix is a dense object, not a full-bleed list. Auto layout hands
-          the slack to the widest column — the permission names took ~550px of a
-          1500px panel and left every tick a hand's width from the label it
-          belongs to — so the columns are declared and the layout is fixed:
-          280 + 5 × 136 = 960, which is also the container's cap. Below it the
-          columns scroll sideways and the names stay pinned. */}
-      <Table
-        scrollX
-        className="min-w-[960px] table-fixed"
-        containerClassName="max-w-[960px]"
-        onMouseLeave={() => setHotRoleId(null)}
-      >
-        <TableHeader>
-          <TableHeaderRow>
-            <TableHead className="sticky left-0 z-10 w-[280px] bg-muted">Permission</TableHead>
-            {roles.map((role) => (
-              <TableHead
-                key={role.id}
-                className={cn(
-                  'w-[136px] px-sm text-center align-bottom whitespace-nowrap',
-                  hotRoleId === role.id && 'bg-secondary-hover',
-                )}
-                onMouseEnter={() => setHotRoleId(role.id)}
-              >
-                <span className="block text-foreground">{role.name}</span>
-                <span className="mt-xxs block text-caption font-normal tracking-normal whitespace-nowrap normal-case tabular-nums">
-                  {headCountByRoleId.get(role.id) === 1
-                    ? '1 person'
-                    : `${headCountByRoleId.get(role.id) ?? 0} people`}
+        {failures.length > 0 ? (
+          <Callout role="alert" className="mb-lg">
+            <span>
+              {failures.map((failure) => (
+                <span key={failure} className="block">
+                  {failure}
                 </span>
-              </TableHead>
-            ))}
-          </TableHeaderRow>
-        </TableHeader>
-
-        <TableBody>
-          {PERMISSION_GROUPS.map((group) => (
-            <Fragment key={group.label}>
-              {/* The group's name in the labelling voice, on white with the
-                  divider above it — FormSection's grammar, not a second gray
-                  strip (design.md — no band alternation). `border-b-0` because
-                  `divide-y` rules each row along its *bottom*: left alone, the
-                  label would carry a rule under it as well as the one above and
-                  read as a boxed heading rather than a heading. */}
-              <TableRow className="border-b-0 hover:bg-transparent">
-                <TableRowHead
-                  scope="rowgroup"
-                  className="sticky left-0 z-10 bg-card pt-lg pb-xs micro-label text-muted-foreground"
-                >
-                  {group.label}
-                </TableRowHead>
-                <TableCell colSpan={roles.length} className="pt-lg pb-xs" />
-              </TableRow>
-
-              {group.permissions.map((permission) => (
-                <TableRow key={permission} className="group">
-                  <TableRowHead className="sticky left-0 z-10 bg-card group-hover:bg-muted/60">
-                    {PERMISSION_LABELS[permission]}
-                  </TableRowHead>
-
-                  {roles.map((role) => {
-                    const isLocked = isLockedCell(role, permission)
-
-                    return (
-                      <TableCell
-                        key={role.id}
-                        className={cn('px-md text-center', hotRoleId === role.id && 'bg-muted/60')}
-                        onMouseEnter={() => setHotRoleId(role.id)}
-                        onFocus={() => setHotRoleId(role.id)}
-                      >
-                        {isLocked ? (
-                          <Tooltip>
-                            <TooltipTrigger
-                              // Focusable so the reason is reachable from the
-                              // keyboard, but not a control — there is nothing
-                              // to toggle.
-                              className="inline-flex rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-                              aria-label={`${PERMISSION_LABELS[permission]} — ${role.name}, always granted`}
-                            >
-                              <Lock className="size-4 text-muted-foreground" aria-hidden />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              Admin always keeps this — without it, nobody could undo a change here.
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <Checkbox
-                            checked={drafts.get(role.id)?.has(permission) ?? false}
-                            onCheckedChange={(checked) =>
-                              togglePermission(role.id, permission, checked === true)
-                            }
-                            aria-label={`${PERMISSION_LABELS[permission]} — ${role.name}`}
-                          />
-                        )}
-                      </TableCell>
-                    )
-                  })}
-                </TableRow>
               ))}
-            </Fragment>
-          ))}
-        </TableBody>
-      </Table>
+            </span>
+          </Callout>
+        ) : null}
+
+        {/* The matrix is a dense object, not a full-bleed list. Auto layout hands
+            the slack to the widest column — the permission names took ~550px of a
+            1500px panel and left every tick a hand's width from the label it
+            belongs to — so the columns are declared and the layout is fixed at
+            280 + 5 × 136 = 960, inside the cluster width above. `max-w-full`
+            there is what makes the columns scroll when the panel really is too
+            narrow, and the identifying column pins while they do. */}
+        <Table scrollX className="w-[960px] table-fixed" containerClassName="w-full">
+          <TableHeader>
+            <TableHeaderRow>
+              <TableHead className="sticky left-0 z-10 w-[280px] bg-muted">Permission</TableHead>
+              {roles.map((role) => (
+                <TableHead
+                  key={role.id}
+                  className="w-[136px] px-sm text-center align-bottom whitespace-nowrap"
+                >
+                  <span className="block text-foreground">{role.name}</span>
+                  <span className="mt-xxs block text-caption font-normal tracking-normal whitespace-nowrap normal-case tabular-nums">
+                    {headCountByRoleId.get(role.id) === 1
+                      ? '1 person'
+                      : `${headCountByRoleId.get(role.id) ?? 0} people`}
+                  </span>
+                </TableHead>
+              ))}
+            </TableHeaderRow>
+          </TableHeader>
+
+          <TableBody>
+            {PERMISSION_GROUPS.map((group) => (
+              <Fragment key={group.label}>
+                {/* The group's name in the labelling voice, on white with the
+                    divider above it — FormSection's grammar, not a second gray
+                    strip (design.md — no band alternation). `border-b-0` because
+                    `divide-y` rules each row along its *bottom*: left alone, the
+                    label would carry a rule under it as well as the one above and
+                    read as a boxed heading rather than a heading. */}
+                <TableRow className="border-b-0 hover:bg-transparent">
+                  <TableRowHead
+                    scope="rowgroup"
+                    className="sticky left-0 z-10 bg-card pt-lg pb-xs micro-label text-muted-foreground"
+                  >
+                    {group.label}
+                  </TableRowHead>
+                  <TableCell colSpan={roles.length} className="pt-lg pb-xs" />
+                </TableRow>
+
+                {group.permissions.map((permission) => (
+                  <TableRow key={permission} className="group">
+                    <TableRowHead className="sticky left-0 z-10 bg-card group-hover:bg-muted/60">
+                      {PERMISSION_LABELS[permission]}
+                    </TableRowHead>
+
+                    {roles.map((role) => {
+                      const isLocked = isLockedCell(role, permission)
+
+                      return (
+                        <TableCell key={role.id} className="px-md text-center">
+                          {isLocked ? (
+                            <Tooltip>
+                              <TooltipTrigger
+                                // Focusable so the reason is reachable from the
+                                // keyboard, but not a control — there is nothing
+                                // to toggle.
+                                className="inline-flex rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                                aria-label={`${PERMISSION_LABELS[permission]} — ${role.name}, always granted`}
+                              >
+                                <Lock className="size-4 text-muted-foreground" aria-hidden />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Admin always keeps this — without it, nobody could undo a change
+                                here.
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <Checkbox
+                              checked={drafts.get(role.id)?.has(permission) ?? false}
+                              onCheckedChange={(checked) =>
+                                togglePermission(role.id, permission, checked === true)
+                              }
+                              aria-label={`${PERMISSION_LABELS[permission]} — ${role.name}`}
+                            />
+                          )}
+                        </TableCell>
+                      )
+                    })}
+                  </TableRow>
+                ))}
+              </Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </TooltipProvider>
   )
 }
