@@ -6,6 +6,105 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-31 — the portal becomes a shell: one surface, and no bar across the top
+
+v1.1 gave the system three tones and the portal used two of them — a `canvas-sunk` ground and white cards. That is enough for a page of cards and not enough for a tool. The sidebar and the content region were the *same* surface, separated only by a hairline, so the chrome never read as chrome; and content simply stopped partway down the viewport where the last table ended, with the ground continuing beneath it. This slice recuts the operations layout. [design.md](docs/design.md) carries the direction; the v1.2 shell-recut note at the top records what changed and what was tried and rejected.
+
+The public surface has no shell and is untouched. No schema, no action contract and no new dependency changed.
+
+### Changed
+- **The ladder goes to four rungs** — app background → panel → container → card — which is what a chrome-plus-content layout needs and what three could not express. Light climbs two and then alternates (`canvas-sunk` → `canvas`, down to `canvas-soft` for a container, back to white for the cards on it, because white is the ceiling). **Dark had to be widened to hold four**, and it was widened at the top: v1.1's ladder spanned #111111–#1c1c1c, about four points of lightness, and a fourth rung inserted into that would have put adjacent surfaces two points apart. So the card ceiling rose to a new `ink-raised` #242424, `ink-deep` stayed exactly where it was and became the container, and `ink-panel` #161616 was added for the panel — which is why `muted` in dark went *lighter* while every mix built on `ink-deep` kept its base value. The chip, notice and avatar mixes moved with the card; their measured contrasts shift by a fraction of a point and all stay clear of AA.
+- **The operations layout has one elevated surface, and only one.** The **navigation column is not a container** — no fill, no border, no radius, no shadow — and sits directly on the app background. The **content panel** is the single sheet: `surface-panel` with one hairline, **bottom-anchored and bleeding past the viewport**. A gutter at the top, left and right and none at the bottom; rounded top corners, square bottom corners off-screen; no bottom border, because a hairline ruled across the foot of the screen contradicts the bleed and makes a long table look like it ends there. **The panel owns the scroll**, not the window, so the sidebar never scrolls away and the panel's header sticks to the top of the *content*. The shell is `h-dvh`, not `h-screen` — `100vh` runs under a phone's browser chrome and there is no window scroll here to absorb it.
+- **The neutral ramp went achromatic**: `ink` #131417 → #111111, and the dark tones with it. The blue cast was doing nothing a system this quiet wanted.
+- **The app background came up from #efefef to #f3f3f3.** At 239 it read heavy behind a sidebar that has no container of its own — a different job from the one it had as a page ground under cards. The value is bounded from both sides rather than chosen: the step up to the panel has to stay the layout's strongest boundary (0.036 in oklab L against 0.024 for container→card inside the panel, so the outer edge still leads at 1.5×, and past #f4f4f4 it stops leading), and it has to stay clear of `canvas-soft`, which it meets on every nav hover (0.012 now, and 0.006 at #f5f5f5, which is no longer a hover).
+- The sidebar widened 220 → 260px, and its insets were rationalised to one per level — the brand mark inset once, the nav rows twice — chosen so the mark, the icons and the account avatar share one 16px left edge.
+
+### Added
+- `PortalPanel` — the content sheet, as two nested boxes: the outer owns the shape and clips (which is what stops the sticky header painting square corners over the rounded ones), the inner owns the scroll. A server component, and it stays one.
+- `PortalPanelHeader` and `PortalTools` — the breadcrumb hard left, the screen-agnostic tools hard right, neither constrained to the content's `max-w`. Separated from the content by one permanent full-width hairline and nothing else: no shadow, no blur, no fill change, scrolled or not. An early version revealed the hairline on scroll via an IntersectionObserver; a header is a bar, not a line of text that acquires an edge once you move, so the sentinel, the observer and the client boundary went with it.
+- `SectionCard` — a card that names itself, the `micro` heading inside it, exactly as `FormSection` does inside a form. The record screens had been floating those headings on the panel *above* their cards, where a label with no surface of its own detaches and the card below looks untitled.
+- `--spacing-panel-header` (56px), so everything else that sticks inside the panel can clear it.
+
+### Removed
+- **The portal topbar.** A full-width bar carrying a breadcrumb and three tools, which spanned the whole application and severed the sidebar from the content it navigates — the nav column and the screen sat on opposite sides of a rule belonging to neither. All of it moved inside the panel, spanning the panel's width alone.
+- An intermediate pass that gave the sidebar a surface of its own and floated both columns inside a rounded shell — a fifth rung, a 20px container radius and a bottom gutter. It read as **two documents side by side** rather than one tool with its chrome beside it, and the bottom gutter closed the panel off at the fold. Recorded in design.md because it is the obvious first answer to "give the layout more structure", and the fix for that is fewer surfaces, not more.
+
+### Fixed
+- **The browser chrome colour had come loose from the page ground.** `lib/theme.ts` and the static `themeColor` in `app/layout.tsx` are the only literals of a design token outside `globals.css` — they exist because a `<meta>` attribute cannot read a custom property — and their own comment says both must move whenever the ground does. They moved when the ground dropped from white to `canvas-sunk` and did not move again when `canvas-sunk` itself came up, leaving the phone's status bar a visible step darker than the page under it. Both now read #f3f3f3.
+
+---
+
+## 2026-08-31 — the Roles tab becomes a matrix
+
+The Roles tab (capability F2) showed one role at a time: a segmented switcher above a three-column grid of sixteen checkboxes. Its mechanics were sound and its shape answered the wrong question. The screen exists to settle "who can verify a payment?" and "does Housekeeping see identity documents?" — comparative questions a switcher can only answer by being visited five times and remembered. Sixteen permissions across five roles is eighty cells of fixed, comparable data, and it fits on one screen. [design.md §Components](docs/design.md) records the matrix-table pattern.
+
+This is a layout recut. No schema, no action contract, no permission string, and no new dependency changed.
+
+### Changed
+- **Permissions are rows, roles are columns**, on the portal's signature table — the surface the Staff tab beside it already used, while Roles wrapped a grid in a card. The switcher it replaces also stacked a second segmented control directly under the page's own, where the second one was really a column header in disguise. The 5/4/2/2/3 permission groups that left holes in a 3-up grid at every breakpoint are now group rows in a single list.
+- **Every draft is visible, and Save covers all of them.** The old shape kept a draft per role but showed one, so edits to a hidden role could be lost with no warning — ticked, switched away from, gone on the next navigation. The status line now names every changed role and the button counts them ("Save 2 roles"). Each role is still its own action call, so each lands as one transaction with its own audit event; a failure part-way is reported per role and leaves those roles dirty, rather than being swallowed.
+- **The Admin `config.manage` lock is a lock**, with a tooltip saying why, instead of a dimmed checkbox that reads as a bug to non-technical staff. The server-side guard is unchanged.
+- **A head count sits under each role name** — the staff list was already fetched for the other tab, and editing a role should say how many people it reaches.
+
+### Added
+- `TableRowHead` — the identifying column of a matrix table, a `<th scope="row">` at cell metrics.
+- `Table scrollX` — columns scroll sideways inside the container instead of being clipped, for a table that is wide by nature. A boolean rather than a `containerClassName` override, so which overflow utility wins is not left to stylesheet order.
+
+---
+
+## 2026-08-31 — the pages catch up with the primitives
+
+A component inventory read every class string in the portal against design.md and found the shared primitives on-spec almost everywhere — and the pages not moving with them, because the pages were not using them. Five local copies of an error line on three colour tokens (two failing contrast in dark), six hand-rolled error callouts, eight hand-rolled form sections, three stretched-row links, two byte-identical summary cards. A token change stops at a copy. This slice adds the missing primitives, routes every copy through them, and fixes the three places a primitive itself was off the frontmatter. [design.md §Components](docs/design.md) records the new pieces.
+
+### Added
+- `FieldError` — the one error line: `body-sm`, `negative-text`, `role="alert"`. Replaces ~20 sites on `destructive`, `negative-deep` and two sizes.
+- `Callout` — the notice construction with an outcome hue (`negative`, `positive`), the same mark and placement rule. Replaces six hand-rolled panels.
+- `FormSection`, `NumberField`, `TextField`, `QuoteSummary`/`QuoteLines` — the booking forms' chrome, declared once. The two forms stay deliberate siblings; only what had become identical moved.
+- `TableRowLink` and `TableRow interactive` — the stretched row link, built once.
+- `secondary-hover` role; the secondary button had been borrowing the hairline colour as a hover fill.
+
+### Fixed
+- design.md's `menu-item` block said dropdown options were mute; they render ink, which is correct — an option is the menu's content, not a label on it. The doc was the stale half.
+
+### Changed
+- `Notice` on the page takes `{spacing.card}` (was 16px); `Popover` and `Toast` take the overlay shell's `{spacing.xl}` (were 16px). `Dialog` had been the only overlay honouring it.
+- The theme toggle is the segmented control (`muted` track, `shadow-lift` chip) instead of its own 12px/9px geometry with an ink fill on the current mode.
+- Pagination arrows hover with the tertiary fill step, not a second hairline weight.
+- **Icon-only buttons have two sizes instead of five.** `control` for a square that sits in a row with other controls (it moves with the surface), and a new fixed `control-sm` 28px for one that is chrome on something else — an overlay's close, a calendar's month arrows, the theme toggle's pips. The ad-hoc 24 / 26 / 28 / 32 / 34 are gone; only the toast's close changes size (24 → 28).
+- **A section heading takes its voice from where it sits.** Inside the object it names it is a label and takes `micro`; outside it, on the page ground above a card or table, it is a heading and takes `display-xs`. Both were in use with no rule choosing; nothing moved when the rule was written, but the next screen has an answer.
+- Menu panels (select, dropdown, multi-select) take `{rounded.lg}` 12px; dialogs, popovers and toasts keep 16px. The overlay shell now has two scales, and which one a thing takes follows from its padding: a menu's items reach to within 4px of the edge, so a 16px corner left them floating in it. **A menu is a card that floats; a dialog is a surface.**
+- The sidebar's active chip takes the control radius (6px); the 10px `rounded.nav` token is retired. It served one component and read as a soft pill beside the 6px controls and the tab chip that answer the same question.
+- Tailwind's own radius and shadow scales are cleared in `@theme`, so off-scale utilities (`rounded-2xl`, `shadow-md`, bare `rounded`) no longer exist. The unused `--radius` variable is gone — there was never a shadcn-style derivation to replace; the named radii were already explicit.
+
+## 2026-08-31 — Geist
+
+The type face moved from Inter to Geist on every surface, and Geist Mono replaced the operating system's mono stack for booking references, bank references and one-time passwords. Nothing else in the type system moved — sizes, weights, line-heights and tracking are the same tokens — and Fraunces stays on the customer surface's display headlines. [design.md §Typography](docs/design.md) carries the reasoning; the short form is that Inter was the safe reading of "modern product software" and Geist is the specific one, and a booking reference now sets at one width on every staff machine.
+
+### Changed
+- `--font-sans` → Geist and `--font-mono` → Geist Mono, both loaded once in the root layout via `next/font/google`. Inter is no longer loaded.
+
+## 2026-08-31 — the ground drops away
+
+The surface system was one plane and a hairline. Two planes, really — white ground, white card — with every boundary in the product drawn at the same 12% ink, so nothing on a dense screen said which surface was in front and the portal read as a wireframe of itself. Every fix attempted from inside that constraint (nesting tiles, clustering rhythm, recessing empty states) was working around the thing rather than at it.
+
+This slice recuts the surface grammar to **three neutral tones layered lightest on top** and follows the consequences everywhere they land. The action colours, the semantic hues, the identity set, Fraunces-on-the-customer-surface and the theming architecture are untouched. [design.md](docs/design.md) carries the full direction; the v1.1 recut note at the top records what survived.
+
+### Changed
+- **Ground, panel, card.** `canvas-sunk` #EFEFEF is the page, `canvas-soft` #F7F7F7 the panel, `canvas` #FFFFFF the card — each a step up from the last and bounded by a single `hairline` #E8E8E8. The rule that falls out is the useful one: **an object is whichever tone is a step away from what it sits on**, so a component takes its fill from context rather than owning one. That is why the two hairline weights collapsed to one in light (the tones now do the ranking a second weight was duplicating), and why several things inverted below.
+- **"Where am I" inverted.** The active nav item was a gray chip sinking into a white ground; against the new ground that same chip would be a *darker* patch, which reads as pressed rather than current. It is now a card-white chip **rising** out of the sidebar at 10px, carrying the page's entire shadow budget — `shadow-lift`, one `0 1px 2px` at 4% — in place of a hairline. Same construction as the segmented control, which is the point: one answer, built once. `shadow-chip` was renamed to it.
+- **Stat tiles are cards, not gray panels.** Directly contradicting last entry's decision, and for a reason that only exists now: `canvas-soft` on `canvas-sunk` is a lighter patch of nearly the same value, so the tiles had gone to smudges. The uncontained strip stands; the tone flipped. A gray panel keeps its real job — nested inside a card, where it still reads.
+- **The text ladder lost its middle rung.** Three steps became two: **ink for content, mute for what labels it**, and deliberately nothing between. The middle value sat close enough to both neighbours that a screen carrying all three read as slightly-different-gray rather than as a hierarchy. `copy` survives as a name and resolves to `foreground`; the ~15 call sites that were using it for the *other* job moved to `muted-foreground`. Mute was set by its hardest case — it clears AA on all three grounds (5.3 / 5.0 / 4.6:1), which is what ruled out the lighter gray this kind of layout invites. It also deleted the nav's light/dark asymmetry: one secondary means one rule.
+- **Badges stopped being pills.** 6px, not a capsule — at badge scale a capsule is the shape of a small button, so the component that most needed to look inert looked most like a control. Round is now only what is actually round: avatars and status dots. `--radius-pill` is gone.
+- **Status chips are derived, not hand-picked.** The four `*-tint` pastels retired in favour of `mix(<hue> 10%, canvas)`, so moving a status hue moves its chip with it. Text stays `*-deep` and **not** the full-saturation mid hue the reference construction calls for: measured, the mid hues hold 2.9–4.4:1 on their own chips against AA's 4.5 at 12px, so three of four status hues would have been unreadable. Saturation on the ground, contrast on the text.
+- **Radii nest instead of clustering**: 6px controls and chips, 10px nav items, 12px cards, 16px overlays. Card interiors went to 14px against a 12px gap between cards — at 16-against-12 a row of cards read as one evenly-spaced field rather than as separate objects.
+- **Type**: display headlines take 700 and −0.02em (both Inter and Fraunces now load the weight, since a public headline crosses the two at `sm`); `display-xs` came down 17→15px so a card title sits properly over 12px metadata; `caption` went to 500 and became the metadata voice.
+- **Icons are 1.5px**, set once in a base rule rather than across ~40 call sites. Lucide's 2px default made icons the loudest thing on a surface built from 1px rules.
+
+### Fixed
+- **Six status panels were reaching past the roles into raw palette tokens** (`bg-negative-tint`, `text-positive-deep`) — a latent bug design.md already forbids, since a raw tint does not survive the theme flip and would have stayed pale on an ink ground. They now use the theme-aware badge roles.
+- **Added `negative-text` for the inline error line.** It stands on the page ground with no fill, so it can borrow neither `destructive` (a fill colour, 3.8:1 as text in dark) nor a badge's foreground (near-white in dark, which would have rendered an error in white).
+- The two literal copies of the page-ground colour — the `theme-color` meta pair in `lib/theme.ts` and its static default in `app/layout.tsx` — moved with the ground. They are the only token literals outside `globals.css`, and they exist because a `<meta>` attribute cannot read a custom property.
+
 ## 2026-08-31 — the portal drops the serif, the tiles lose their box
 
 Two follow-ons from looking at the surface pass on real screens, plus a pair of rows that read better on one line.

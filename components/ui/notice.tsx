@@ -19,13 +19,14 @@ import { cn } from '@/lib/utils'
  * competing with it.
  *
  * **Radius follows the nesting, because the radius scale is about scale, not
- * about the component** (design.md §Geometry — 6px controls, 10px cards). A
- * notice inside a card or a dialog is an inset panel: 10px inside a 10px card
- * reads as a mis-drawn edge, and inside a 14px overlay the geometry stops
+ * about the component** (design.md §Geometry — 6px controls, 12px cards). A
+ * notice inside a card or a dialog is an inset panel: 12px inside a 12px card
+ * reads as a mis-drawn edge, and inside a 16px overlay the geometry stops
  * being concentric. A notice standing on the page ground is card-scale — it
  * sits in the slot a table or a form would fill, beside real cards, and at
  * 6px it reads as a control that grew. Padding moves with it for the same
- * reason. Nested is the default because most notices are.
+ * reason: `md` nested, the card's own `card` measure on the page. Nested is
+ * the default because most notices are.
  *
  * The mark is `aria-hidden`: it repeats what the sentence already says. A
  * notice that must interrupt a screen reader is an `alert`, which this is not
@@ -37,7 +38,7 @@ const noticeVariants = cva(
     variants: {
       placement: {
         nested: 'rounded-md p-md',
-        page: 'rounded-lg p-lg',
+        page: 'rounded-lg p-card',
       },
     },
     defaultVariants: {

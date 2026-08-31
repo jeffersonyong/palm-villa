@@ -2,39 +2,80 @@
 @import 'tw-animate-css';
 
 /* ---------------------------------------------------------------------------
-   Palm Villa design tokens — quiet-utility minimalism (design.md v1.0).
+   Palm Villa design tokens — quiet-utility minimalism (design.md v1.2).
    docs/design.md is normative: this file is the only place its frontmatter is
    transcribed. Nothing downstream should hardcode a hex, a type size or a
    radius — use the utilities generated here.
    --------------------------------------------------------------------------- */
 
 @theme {
-  /* Colour — white ground, ink actions, aqua as a text-first brand accent ---- */
+  /* Tailwind's own radius and shadow scales are cleared before ours are
+     declared, so `rounded-2xl`, `rounded-xs`, a bare `rounded` and `shadow-md`
+     do not exist here. The named steps below are the whole scale; anything
+     not on it is unreachable rather than merely unused. */
+  --radius-*: initial;
+  --shadow-*: initial;
+
+  /* Colour — a layered neutral ground, ink actions, aqua as a text-first brand
+     accent ------------------------------------------------------------------ */
   --color-brand: #2fc9c0;
   --color-brand-deep: #0e6b64;
   --color-brand-active: #7fe3dc;
   --color-brand-pale: #dff5f3;
 
-  --color-ink: #131417;
-  --color-ink-deep: #1d2025;
-  --color-body: #45494f;
-  --color-mute: #6a7076;
+  /* The neutral ramp is achromatic (recut 2026-08-31). It used to carry a
+     slight blue cast (#131417, #45494f, #6a7076, #f7f7f8) which was invisible
+     on its own but fought the surface tones the moment they were layered
+     rather than separated by hairlines alone: a warm-neutral card sitting on a
+     cool-neutral ground reads as a colour cast, not a step. Pure gray keeps the
+     ramp reading as one scale with four stops.
 
+     Dark's four surface rungs, darkest first. The ladder was widened at the top
+     in v1.2: three rungs spanning #111111–#1c1c1c is about four points of
+     lightness, and a fourth in that band would sit two points from its
+     neighbour, which is not a step anyone can see. Dark could go down to black
+     or up past the card, and only one of those had room — so the card ceiling
+     rose to `ink-raised` while `ink-deep` kept its value and became the
+     container. That is why every `color-mix` built on `ink-deep` kept its base
+     number even though `muted` in dark went lighter. */
+  --color-ink: #111111;
+  --color-ink-panel: #161616;
+  --color-ink-deep: #1c1c1c;
+  --color-ink-raised: #242424;
+  --color-mute: #6b6b6b;
+
+  /* Light's surface tones, lightest last. Depth is carried by these steps and a
+     single hairline — not by shadow (§Elevation).
+
+     `canvas-sunk` came up from #efefef to #f3f3f3 (2026-08-31): at 239 the app
+     background read heavy behind an unbounded sidebar, which is a different
+     job from the one it had when it was a page ground under cards. The lift is
+     bounded by two things and not by taste. The step up to the panel has to
+     stay the layout's *strongest* boundary — it is now 0.036 in oklab L
+     against the 0.024 of the container→card step inside the panel, so the
+     outer edge still leads at 1.5×, and much past #f4f4f4 it stops leading.
+     And it has to stay clear of `canvas-soft`: those two meet on every nav
+     hover, and at #f5f5f5 the gap is 0.006, which is no longer a hover. */
+  --color-canvas-sunk: #f3f3f3;
+  --color-canvas-soft: #f7f7f7;
   --color-canvas: #ffffff;
-  --color-canvas-soft: #f7f7f8;
 
-  /* Semantic — status meaning only, never decorative. Chips are tint
-     background + deep same-hue text; the mid hues are for icons and the
-     destructive button. */
+  /* One hairline tone for every drawn edge. */
+  --color-hairline: #e8e8e8;
+
+  /* Semantic — status meaning only, never decorative. Chips mix the mid hue
+     into the surface at 10% and set the *-deep same-hue text; the mid hues
+     also carry icons, status dots and the destructive button.
+
+     The `*-tint` tokens retired with that mix (2026-08-31): four hand-picked
+     pastels that had to be re-derived by eye whenever a hue moved, when the
+     construction they encoded is one line of `color-mix`. */
   --color-positive: #1fa552;
   --color-positive-deep: #166534;
-  --color-positive-tint: #e2f5e9;
   --color-warning: #d97706;
   --color-warning-deep: #92400e;
-  --color-warning-tint: #fdf3d9;
   --color-negative: #d03238;
   --color-negative-deep: #9f1d24;
-  --color-negative-tint: #fbe9ea;
   /* `info` is the fourth status hue and the only one that is never an
      outcome: it marks something the reader needs to know before acting,
      where the other three report how something turned out.
@@ -58,17 +99,21 @@
 
      `info-deep` came up with the ground, from a navy to a mid blue at the
      tint's own hue, so the panel reads as one colour rather than dark text
-     dropped onto a light chip. It holds 5.4 on the tint, comfortably past AA
+     dropped onto a light chip. It holds 5.6 on the panel, comfortably past AA
      for 13px text. There is no separate mark colour: the icon takes
      `currentColor` — it is the sentence's own punctuation, not a second
      element with its own weight.
 
      Still deliberately off cyan: a cyan panel reads teal on an ink ground,
      and teal is the customer's colour, which the operations surfaces do not
-     carry. Going bluer took it further from that edge, not nearer. */
+     carry. Going bluer took it further from that edge, not nearer.
+
+     The hand-picked `#d8ecfe` tint retired with the other three: the notice
+     ground is now the same `color-mix` construction as a badge chip, one step
+     stronger because a panel is a band across the screen where a chip is a
+     word wide. */
   --color-info: #1c80dd;
   --color-info-deep: #0f5ea8;
-  --color-info-tint: #d8ecfe;
 
   /* Identity — says *who*, never *what state*. The avatar hue set: seven stops
      right around the wheel, with one deliberate hole where teal would be.
@@ -97,55 +142,58 @@
      an eighth (indigo, between blue and violet) crowded three of them into one
      periwinkle. A hue that cannot be named at 24px is not in the set.
 
-     `sky`'s mid is a touch bluer than its tint on purpose: the mid is only
-     ever the dark theme's mix source, and a cyan one came out reading teal on
-     an ink ground — which is the single hue this set is not allowed to have.
+     Each hue is a **tint/deep pair and nothing else** — the fill and the text
+     that sits on it, one construction in both themes. The seven mid hues
+     retired with the dark mix (2026-08-31): they were only ever that mix's
+     source, and nothing in the product referenced them directly.
 
      Fills sit above the status tints in lightness at a much lower chroma, so a
-     face reads lighter and more saturated than any chip near it. The set is
-     *ordered*: a person's colour is an index derived from their account id, so
-     hues are appended, never reordered — reordering repaints every face. */
-  --color-identity-sky: #0ea5e9;
-  --color-identity-sky-deep: #155e75;
+     face reads lighter and more saturated than any chip near it. That is the
+     whole of what keeps identity and status apart now, in both themes. The set
+     is *ordered*: a person's colour is an index derived from their account id,
+     so hues are appended, never reordered — reordering repaints every face. */
   --color-identity-sky-tint: #c3eefa;
-  --color-identity-blue: #2563eb;
-  --color-identity-blue-deep: #1e40af;
+  --color-identity-sky-deep: #155e75;
   --color-identity-blue-tint: #cde3fe;
-  --color-identity-violet: #7c3aed;
-  --color-identity-violet-deep: #5b21b6;
+  --color-identity-blue-deep: #1e40af;
   --color-identity-violet-tint: #e0dafe;
-  --color-identity-fuchsia: #c026d3;
-  --color-identity-fuchsia-deep: #86198f;
+  --color-identity-violet-deep: #5b21b6;
   --color-identity-fuchsia-tint: #f8dcff;
-  --color-identity-rose: #f43f5e;
-  --color-identity-rose-deep: #9f1239;
+  --color-identity-fuchsia-deep: #86198f;
   --color-identity-rose-tint: #ffd9dd;
-  --color-identity-orange: #f97316;
-  --color-identity-orange-deep: #9a3412;
+  --color-identity-rose-deep: #9f1239;
   --color-identity-orange-tint: #fee2c0;
-  --color-identity-lime: #84cc16;
-  --color-identity-lime-deep: #3f6212;
+  --color-identity-orange-deep: #9a3412;
   --color-identity-lime-tint: #e3fbb4;
+  --color-identity-lime-deep: #3f6212;
 
-  /* Type — Inter carries every surface; hierarchy is size, weight
-     (400/500/600) and negative tracking at display sizes. `micro-label` (a
-     custom utility below) is the labelling voice. The display face is the one
-     sanctioned exception: public-site display headlines (`display-md`+) only,
-     one weight (600), never on portal or field surfaces (design.md
-     §Typography). */
-  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  /* Type — Geist carries every surface; hierarchy is size, weight
+     (400/500/600, plus 700 on the two display headline sizes) and negative
+     tracking at display sizes. `micro-label` (a custom utility below) is the
+     labelling voice. Geist Mono is the mono face — references and codes set in
+     `font-mono` are the same instrument in a monospaced cut, not whatever the
+     operating system ships. The display face is the one sanctioned exception:
+     public-site display headlines (`display-md`+) only, never on portal or
+     field surfaces (design.md §Typography). */
+  --font-sans: var(--font-geist), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   --font-display: var(--font-fraunces), Georgia, 'Times New Roman', serif;
 
   /* Type scale ------------------------------------------------------------- */
+  /* The two display headline sizes carry 700 and -0.02em tracking: at 34px and
+     up, 600 reads as heavy body rather than a headline, and the tracking is
+     expressed as a ratio so it stays proportional if a size moves. Below them
+     the scale stays at 600 — the portal's `display-sm` title is a heading on a
+     dense screen, not a headline, and 700 there reads shouted. */
   --text-display-xl: 44px;
   --text-display-xl--line-height: 50px;
-  --text-display-xl--font-weight: 600;
-  --text-display-xl--letter-spacing: -1.2px;
+  --text-display-xl--font-weight: 700;
+  --text-display-xl--letter-spacing: -0.88px;
 
   --text-display-lg: 34px;
   --text-display-lg--line-height: 40px;
-  --text-display-lg--font-weight: 600;
-  --text-display-lg--letter-spacing: -0.8px;
+  --text-display-lg--font-weight: 700;
+  --text-display-lg--letter-spacing: -0.68px;
 
   --text-display-md: 28px;
   --text-display-md--line-height: 34px;
@@ -157,10 +205,14 @@
   --text-display-sm--font-weight: 600;
   --text-display-sm--letter-spacing: -0.35px;
 
-  --text-display-xs: 17px;
-  --text-display-xs--line-height: 24px;
+  /* Card and section titles. 15px rather than 17px (recut 2026-08-31): a card
+     title sits directly above 12px metadata, and at 17px over 12px the pair
+     read as two unrelated registers rather than a title and its detail. 15/600
+     against 12/500 is the tighter, denser step the surface actually wants. */
+  --text-display-xs: 15px;
+  --text-display-xs--line-height: 22px;
   --text-display-xs--font-weight: 600;
-  --text-display-xs--letter-spacing: -0.17px;
+  --text-display-xs--letter-spacing: -0.15px;
 
   --text-body-lg: 16px;
   --text-body-lg--line-height: 25px;
@@ -182,21 +234,35 @@
   --text-body-sm-strong--line-height: 18px;
   --text-body-sm-strong--font-weight: 500;
 
+  /* The metadata voice: 12px/500. Weight 500 rather than 400 because caption
+     text is nearly always secondary-coloured, and at 12px in mute a 400 weight
+     goes thin before it goes quiet. */
   --text-caption: 12px;
   --text-caption--line-height: 16px;
-  --text-caption--font-weight: 400;
+  --text-caption--font-weight: 500;
 
   --text-button-md: 13px;
   --text-button-md--line-height: 20px;
   --text-button-md--font-weight: 500;
 
-  /* Radii — 6px controls, 10px cards, 14px overlays. Pills are badges only. */
+  /* Radii — nested, never uniform: 16px containers and overlays, 12px cards,
+     6px controls and status chips (the nav's active chip included), 4px the
+     concentric inner step. Each level is the one inside it plus a step, so a
+     chip inside a card inside an overlay stays concentric all the way out.
+
+     `--radius-nav` (10px) retired (2026-08-31): it served one component, and
+     a 30px chip on the ground is control-scale — see design.md §Portal nav
+     items.
+
+     `--radius-pill` retired (2026-08-31): the badge was the only rectangle
+     wearing it, and a capsule reads as a button at chip scale. Round things
+     are now only the things that are actually round — avatars and status dots
+     — which take Tailwind's built-in `rounded-full`. */
   --radius-none: 0px;
   --radius-sm: 4px;
   --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --radius-pill: 9999px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 
   /* Spacing — 4px base. Numeric utilities (p-4 = 16px) stay available; the
      named steps below exist so markup can quote design.md directly. */
@@ -210,22 +276,54 @@
   --spacing-2xl: 32px;
   --spacing-3xl: 48px;
 
-  /* Control heights: 36px on desktop surfaces, 48px minimum on field. These
-     live in the spacing namespace so `h-control` / `min-h-touch` generate. */
+  /* Named measures, in the spacing namespace so `h-control`, `p-card` and
+     `gap-gutter` generate alongside the ramp.
+
+     Spacing is tight inside a cluster and loose between clusters: `card` is a
+     card's own interior, `md` (12px) the gap between sibling cards, `gutter`
+     the distance between one cluster of them and the next. Even spacing at
+     `xl` everywhere is what makes a screen read as a wireframe — when every
+     distance is the same, nothing belongs to anything (§Layout). */
+  --spacing-card: 14px;
+  --spacing-gutter: 28px;
+
+  /* Control heights: 36px on desktop surfaces, 48px minimum on field. */
   --spacing-control: 36px;
   --spacing-touch: 48px;
 
-  /* Elevation (design.md §Elevation). Surfaces are hairline-bounded and flat;
-     the system's one shadow belongs to overlays — anything that floats. The
-     segmented control's active chip is the single sanctioned exception: a
-     faint lift in place of a drawn edge. Dark grounds swallow shade, so
-     there the lift flips to light — a white-alpha edge ring plus deeper
-     black shade — the dark-elevation convention. */
-  --shadow-overlay: 0 4px 12px -2px rgb(19 20 23 / 0.08), 0 16px 40px -8px rgb(19 20 23 / 0.16);
-  --shadow-chip:
-    0 0 0 1px light-dark(transparent, rgb(255 255 255 / 0.1)),
-    0 1px 3px 0 light-dark(rgb(19 20 23 / 0.1), rgb(0 0 0 / 0.4)),
-    0 1px 2px -1px light-dark(rgb(19 20 23 / 0.06), rgb(0 0 0 / 0.3));
+  /* The compact square: an icon-only control that is chrome rather than a
+     participant in a row of controls — an overlay's close, a calendar's month
+     arrows, the theme toggle's pips. Fixed at 28px rather than tracking
+     `--spacing-control`, because what sets it is the thing it sits in (an
+     overlay corner, a 6px track) rather than the surface's control height.
+     Anything sitting *beside* real controls takes `control` and moves with the
+     surface. See design.md §Control heights. */
+  --spacing-control-sm: 28px;
+
+  /* The operations panel's sticky header. Named because two things depend on
+     it and must not drift: the header sets its own height from it, and any
+     other sticky element inside the panel's scroll container has to clear it —
+     a summary card at `top-xl` would slide under the breadcrumb. */
+  --spacing-panel-header: 56px;
+
+  /* Elevation (design.md §Elevation). Depth is carried by the three surface
+     tones and one hairline; in-page surfaces cast nothing at all.
+
+     `--shadow-lift` is the whole shadow budget for the page: a 4% hairline of
+     shade under the one chip that answers "where am I" — the active nav item
+     and the active tab segment. It is felt, not seen. Dark grounds swallow
+     shade, so there it flips to a white-alpha edge ring over deeper black.
+
+     `--shadow-overlay` survives for things that genuinely float, recut much
+     quieter to sit in a flatter system. A menu, a select panel and a tooltip
+     open with no scrim behind them, over a white card: with tone-layering
+     unavailable (they are the same white as what they cover) and 4% shade
+     invisible at that size, the hairline would be doing the entire job of
+     saying "this is in front". That is the case the shadow exists for. */
+  --shadow-overlay: 0 2px 8px -2px rgb(0 0 0 / 0.06), 0 12px 32px -8px rgb(0 0 0 / 0.1);
+  --shadow-lift:
+    0 0 0 1px light-dark(transparent, rgb(255 255 255 / 0.08)),
+    0 1px 2px 0 light-dark(rgb(0 0 0 / 0.04), rgb(0 0 0 / 0.4));
 }
 
 /* ---------------------------------------------------------------------------
@@ -251,37 +349,83 @@
 :root {
   color-scheme: light;
 
-  --radius: var(--radius-lg);
+  /* The surface ladder — four rungs, each a step away from what it sits on
+     (app background → panel → container → card; recut v1.2, 2026-08-31).
 
-  /* Ground and surfaces. Light keeps a clean white ground — card and ground
-     share the fill and hairlines draw all the structure; canvas-soft is spent
-     on selected chips, inset panels and table header strips instead. Dark
-     keeps the two-tone order (ink ground, ink-deep card). */
-  --background: light-dark(var(--color-canvas), var(--color-ink));
-  --card: light-dark(var(--color-canvas), var(--color-ink-deep));
+     v1.1 built it from three tones, and the portal only ever showed two of
+     them: a `canvas-sunk` ground and white cards. That is enough for a page of
+     content and not enough for a layout that is part chrome — the sidebar and
+     the content region had no tone between them, so the navigation never read
+     as chrome and the content stopped wherever its last table ended.
+
+     **The navigation column is not a surface.** It has no fill, no border and
+     no radius: it sits directly on the app background, which is the one thing
+     in the operations layout that is a ground rather than an object. Giving it
+     a container of its own was the first attempt and it said the wrong thing —
+     two panels side by side read as two documents, where a tool is one
+     document with its chrome beside it. So the panel is the *only* elevated
+     surface in the shell, and it earns that by being the only thing that
+     holds content.
+
+     `--muted` in dark went *lighter* here (a #161616 mix → `ink-deep`
+     #1c1c1c) because dark's ladder was widened at the top rather than the
+     bottom: the card ceiling rose to `ink-raised` and `ink-deep` stayed put as
+     the container. */
+  --background: light-dark(var(--color-canvas-sunk), var(--color-ink));
+  --card: light-dark(var(--color-canvas), var(--color-ink-raised));
   --popover: var(--card);
-  --muted: light-dark(
-    var(--color-canvas-soft),
-    color-mix(in oklab, var(--color-ink-deep) 55%, var(--color-ink))
-  );
+  --muted: light-dark(var(--color-canvas-soft), var(--color-ink-deep));
+
+  /* Rung 1 — the content panel, and the only elevated surface in the
+     operations layout (v1.2). It is `--background`'s counterpart: rung 0 is
+     the app background, which the sidebar sits on without a container of its
+     own, and this is the sheet that holds every screen.
+
+     In light it is the card tone — the ladder alternates at its ceiling, since
+     white is as high as light goes (design.md §Color). In dark it is a real
+     rung of its own between the app background and the container. */
+  --surface-panel: light-dark(var(--color-canvas), var(--color-ink-panel));
 
   /* The segmented control's active chip. Light: the card white. Dark: a
      half-step above card — dark elevation reads through a lighter fill, but
      secondary's full step (canvas 8%) reads too bright at chip size. */
   --tab-chip: light-dark(
     var(--color-canvas),
-    color-mix(in oklab, var(--color-canvas) 4%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-canvas) 4%, var(--color-ink-raised))
   );
 
-  /* Text. `foreground` is headings and strong text, `copy` is body, and
-     `muted-foreground` is caption scale. */
+  /* Text — two steps, and deliberately nothing between them (recut
+     2026-08-31).
+
+     There were three: `foreground` for headings, `copy` for body, and
+     `muted-foreground` for captions. The middle one never earned its place.
+     `copy` sat close enough to `foreground` that the pair did not reliably
+     read as a hierarchy, and close enough to `muted-foreground` that a label
+     and its value could be told apart only by weight — so a screen carrying
+     all three read as slightly-different-gray rather than as a ladder.
+
+     Two steps say it once and say it clearly: **what a thing is, in ink; what
+     is about it, in mute.** Content — a table cell, a paragraph, a menu item,
+     an amount — is ink. Chrome and metadata — a field label, an idle nav item,
+     a screen's description, a timestamp — is mute. `copy` survives as the name
+     for the content step and resolves to `foreground`; the call sites that
+     were using it for the *other* job moved to `muted-foreground` with this
+     change.
+
+     Contrast, measured: mute holds 5.3:1 on `canvas`, 4.9:1 on `canvas-soft`
+     and 4.8:1 on the `canvas-sunk` ground — AA on all three, which is the
+     constraint that set the value. The ground is still the binding one, just
+     less binding than it was: lifting `canvas-sunk` to #f3f3f3 moved it from
+     4.6:1, so the sidebar's labels gained contrast rather than spending it.
+     Dark lifts mute to ~8.4:1 on the ink ground and stays a clear step under
+     white. */
   --foreground: light-dark(var(--color-ink), var(--color-canvas));
   --card-foreground: var(--foreground);
   --popover-foreground: var(--foreground);
-  --copy: light-dark(var(--color-body), var(--color-canvas-soft));
+  --copy: var(--foreground);
   --muted-foreground: light-dark(
     var(--color-mute),
-    color-mix(in oklab, var(--color-mute) 55%, var(--color-canvas-soft))
+    color-mix(in oklab, var(--color-mute) 50%, var(--color-canvas))
   );
 
   /* Lagoon is the action colour: a deep saturated teal fill in light, the
@@ -306,15 +450,23 @@
 
   --secondary: light-dark(
     var(--color-canvas-soft),
-    color-mix(in oklab, var(--color-canvas) 8%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-canvas) 8%, var(--color-ink-raised))
   );
   --secondary-foreground: light-dark(var(--color-ink), var(--color-canvas-soft));
+
+  /* The secondary button's hover: one step of ink into its own fill. It used
+     to borrow `border` — the hairline colour as a fill — which landed within a
+     point of this value and said nothing about what it was. */
+  --secondary-hover: light-dark(
+    color-mix(in oklab, var(--color-ink) 6%, var(--color-canvas-soft)),
+    color-mix(in oklab, var(--color-canvas) 12%, var(--color-ink-raised))
+  );
 
   /* The brand accent. `accent` is the pale aqua surface (selection highlight,
      checked-in badge); `accent-foreground` is the only aqua that carries text. */
   --accent: light-dark(
     var(--color-brand-pale),
-    color-mix(in oklab, var(--color-brand) 20%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-brand) 20%, var(--color-ink-raised))
   );
   --accent-foreground: light-dark(var(--color-brand-deep), var(--color-brand-active));
 
@@ -325,26 +477,52 @@
      has to show up on, and stays quiet enough to read through. */
   --selection: light-dark(
     color-mix(in oklab, var(--color-brand) 30%, var(--color-canvas)),
-    color-mix(in oklab, var(--color-brand) 34%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-brand) 34%, var(--color-ink-raised))
   );
   --selection-foreground: light-dark(var(--color-ink), var(--color-canvas));
 
   --destructive: var(--color-negative);
   --destructive-foreground: var(--color-canvas);
 
-  /* Elevation level 1 — a neutral hairline. Light tints down from ink, dark
-     tints up from white, so it stays a whisper on either ground. Dark sits at
-     9% — anything stronger reads as wireframe against the ink ground. */
+  /* The inline error line beside a field that failed — `role="alert"` text
+     standing on the page ground rather than sitting in a chip.
+
+     It needs its own role because neither neighbour fits: `destructive` is a
+     *fill* colour and holds only 3.8:1 as text on the dark ground, while a
+     badge's foreground is `canvas-soft` in dark, which would render an error
+     in white and strip it of the one colour saying it is an error. Light takes
+     the deep hue at 5.9:1; dark lifts the mid hue toward white for 6.6:1. */
+  --negative-text: light-dark(
+    var(--color-negative-deep),
+    color-mix(in oklab, var(--color-negative) 60%, var(--color-canvas))
+  );
+
+  /* The seam between rungs — one hairline in light, two weights in dark.
+
+     Light had two weights (12% and 7% ink) so a table's row rules could sit
+     under its outer edge. With the surface ramp carrying separation, a second
+     hairline weight is a second thing saying what the tones already say, and
+     two nearly-identical grays on one table read as a printing error rather
+     than a hierarchy. Light draws every edge it draws at all in `hairline`.
+
+     The ladder going to four rungs did not change that: the rung it added in
+     light is the panel, which is the card tone, so every seam light actually
+     draws still falls between `canvas-soft` and white. The sidebar draws no
+     seam at all — it is not a surface, so it has no edge to bound.
+
+     Dark keeps both steps: there the tones are close and the hairline is doing
+     more of the work, so 9% for a bounding edge and 7% for a rule inside it is
+     a distinction that still reads. */
   --border: light-dark(
-    color-mix(in oklab, var(--color-ink) 12%, transparent),
+    var(--color-hairline),
     color-mix(in oklab, var(--color-canvas) 9%, transparent)
   );
   --input: var(--border);
 
-  /* Table rules and nav edges are quieter than a hairline, so they get their
-     own role. */
+  /* Row rules and nav edges. One value with `border` in light; a step quieter
+     in dark. */
   --divider: light-dark(
-    color-mix(in oklab, var(--color-ink) 7%, transparent),
+    var(--color-hairline),
     color-mix(in oklab, var(--color-canvas) 7%, transparent)
   );
 
@@ -372,110 +550,183 @@
   );
   --footer-foreground: var(--color-canvas-soft);
 
-  /* Status badge chips. Light is a soft tint with deep same-hue text. Dark
-     inverts the construction: a hue-tinted dark chip with light text. The hue
-     mapping is unchanged, so the status language reads the same. */
+  /* Status badge chips — **a hue against itself, in both themes.** Light: the
+     mid hue at 10% into `canvas` under `*-deep` text. Dark: the *deep* hue at
+     30% into the card, under a light 50% tint of the *mid*. The two are
+     mirrors — pale ground / dark text, dark ground / pale text — and neither
+     reaches outside the hue for its second colour.
+
+     Dark's near-white text is what changed (2026-08-31). It used to be a 26–28%
+     hue mix under `canvas-soft`, and white-on-saturated is a harsher, louder
+     pairing than a hue on itself: the chip that most needed to sit quietly —
+     a badge is metadata, not a button — was the loudest thing on a dark row.
+     Taking the text from the hue instead makes the dark chip as quiet as the
+     light one, and lets the ground go *darker* (30% of the deep rather than 28%
+     of the mid), which is what stops a row of chips reading as a string of
+     lights on an ink table.
+
+     Copying light's construction verbatim into dark was the other candidate and
+     is wrong for the opposite reason: a pale mint chip on a #242424 card is a
+     bright patch, and four of them on one row is a christmas tree. The chip
+     should sit *in* the surface it is on, and only the hue crosses over.
+
+     Measured deep-text-on-tint in light and tint-text-on-deep in dark, at the
+     12px `caption` size where AA wants 4.5:1 — light 6.4/6.4/6.9/6.0, dark
+     7.4 (positive), 7.4 (warning), 6.3 (negative), 8.8 (checked-in).
+
+     Light used to name a hand-picked pastel per hue. The 10% mix lands within
+     a step or two of every one of them while being *derived* — move a status
+     hue and its chip follows, where before the pastel had to be re-eyed and
+     re-measured. It mixes into `canvas` rather than sitting at 10% alpha so a
+     chip is the same colour on the card, the panel and the ground; a
+     translucent chip shifted between them, which made one status look like two.
+
+     In light the text stays `*-deep` and not the mid hue. Deliberate, and the one place
+     this construction departs from the reference it came from: the mid hues
+     hold 3.2:1 (positive), 3.2:1 (warning) and 4.1:1 (info) on a 10% chip.
+     Badge text is 12px, where AA wants 4.5:1 — so "full-saturation text" is a
+     thing this system cannot spend on three of its four status hues without
+     making the status language unreadable to somebody. The `*-deep` pairs are
+     measured and documented in design.md §Accessibility. */
   --badge-positive: light-dark(
-    var(--color-positive-tint),
-    color-mix(in oklab, var(--color-positive) 28%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-positive) 10%, var(--color-canvas)),
+    color-mix(in oklab, var(--color-positive-deep) 30%, var(--color-ink-raised))
   );
-  --badge-positive-foreground: light-dark(var(--color-positive-deep), var(--color-canvas-soft));
+  --badge-positive-foreground: light-dark(
+    var(--color-positive-deep),
+    color-mix(in oklab, var(--color-positive) 50%, var(--color-canvas))
+  );
 
   --badge-warning: light-dark(
-    var(--color-warning-tint),
-    color-mix(in oklab, var(--color-warning) 26%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-warning) 10%, var(--color-canvas)),
+    color-mix(in oklab, var(--color-warning-deep) 30%, var(--color-ink-raised))
   );
-  --badge-warning-foreground: light-dark(var(--color-warning-deep), var(--color-canvas-soft));
+  --badge-warning-foreground: light-dark(
+    var(--color-warning-deep),
+    color-mix(in oklab, var(--color-warning) 50%, var(--color-canvas))
+  );
 
   --badge-negative: light-dark(
-    var(--color-negative-tint),
-    color-mix(in oklab, var(--color-negative) 28%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-negative) 10%, var(--color-canvas)),
+    color-mix(in oklab, var(--color-negative-deep) 30%, var(--color-ink-raised))
   );
-  --badge-negative-foreground: light-dark(var(--color-negative-deep), var(--color-canvas-soft));
+  --badge-negative-foreground: light-dark(
+    var(--color-negative-deep),
+    color-mix(in oklab, var(--color-negative) 50%, var(--color-canvas))
+  );
 
   --badge-active: light-dark(
-    var(--color-brand-pale),
-    color-mix(in oklab, var(--color-brand) 24%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-brand) 10%, var(--color-canvas)),
+    color-mix(in oklab, var(--color-brand-deep) 30%, var(--color-ink-raised))
   );
-  --badge-active-foreground: light-dark(var(--color-brand-deep), var(--color-brand-active));
+  --badge-active-foreground: light-dark(
+    var(--color-brand-deep),
+    color-mix(in oklab, var(--color-brand) 50%, var(--color-canvas))
+  );
 
   --badge-neutral: var(--muted);
   --badge-neutral-foreground: var(--copy);
 
-  /* Notice panels. The badge chips' construction at panel scale: a soft tint
-     with deep same-hue text in light, a hue-tinted dark panel with light text
-     in dark. A role rather than the raw tint token, because a raw `*-tint`
-     fill does not survive the theme flip — it stays pale on an ink ground.
+  /* Notice panels. The badge chips' construction at panel scale, and it follows
+     them exactly: a soft tint under deep same-hue text in light, and in dark a
+     deep-hue panel under a light 50% tint of the mid — never `canvas-soft`,
+     for the same reason the chips gave it up. A panel is the largest thing in
+     the product wearing a status hue, so white text on it was the loudest
+     instance of the pairing that was wrong at chip size.
 
-     Dark mixes at 32% rather than the badges' 26–28%: a chip is a word wide
-     and reads its hue from the text sitting in it, where a panel is a band
-     across the screen and a mix that suits a chip goes flat at that size.
-     Text stays ≈10:1 on it. */
+     Both themes mix a step stronger than the badges — 14% against the chips'
+     10% in light, 40% against 30% in dark — for the same reason in each: a
+     chip is a word wide and reads its hue from the text sitting in it, where a
+     panel is a band across the screen and a mix that suits a chip goes flat at
+     that size. Text measures 5.4:1 in light and 6.1:1 in dark. */
   --notice-info: light-dark(
-    var(--color-info-tint),
-    color-mix(in oklab, var(--color-info) 32%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-info) 14%, var(--color-canvas)),
+    color-mix(in oklab, var(--color-info-deep) 40%, var(--color-ink-raised))
   );
-  --notice-info-foreground: light-dark(var(--color-info-deep), var(--color-canvas-soft));
+  --notice-info-foreground: light-dark(
+    var(--color-info-deep),
+    color-mix(in oklab, var(--color-info) 50%, var(--color-canvas))
+  );
 
-  /* Identity marks. Light: tint fill + deep text. Dark: the mid hue mixed over
-     the card with light text — the status chips' inversion, so the two sets stay
-     one family.
+  /* Identity marks — the status chips' construction, so the two sets stay one
+     family: the tint/deep pair simply **swaps roles** between themes. Light is
+     tint ground under deep text; dark is the deep at 65% into the card under
+     the tint as text. No third value, and no white.
 
-     But at the chips' own 26% the two sets stopped being *distinguishable*:
-     avatar-orange and badge-warning landed 0.01 apart in oklab L with the same
-     b, and rose/negative and lime/positive were barely better. Light keeps them
-     apart through the tint it picks; dark builds both the same way and had
-     nothing doing that job. So identity mixes at **40%** — brighter and more
-     chromatic than any status chip near it, which is the same thing the light
-     fills say. Text stays `canvas-soft` and still clears AA on all seven.
+     The seven `identity-*` mid hues retired (2026-08-31): they existed only as
+     dark's mix source, and dark now mixes the *deep*, which it already had.
+     Nothing in the product referenced a mid directly, so an identity colour is
+     now exactly the two values it is drawn from. Same reasoning that retired
+     the semantic `*-tint` tokens: a token whose one job is gone will drift.
+
+     **65% where a status chip takes 30%, and that gap is load bearing.** Built
+     at the same percentage the two sets stop being distinguishable — measured,
+     `avatar-orange` and `badge-warning` land 0.009 apart in oklab, and
+     rose/negative and lime/positive are no better, which is the same collision
+     the old 40%-vs-26% split existed to prevent. At 65 against 30 the nearest
+     same-family pair is 0.068 apart: a face is the brighter, more chromatic of
+     the two, which is what the light tints say as well. Contrast runs 7.8:1
+     (orange) to 8.5:1 (lime).
 
      Unlike the action roles these deliberately do NOT flip on
      `data-surface='ops'`: identity is not brand, and the portal is the only
      place they are used. */
   --avatar-sky: light-dark(
     var(--color-identity-sky-tint),
-    color-mix(in oklab, var(--color-identity-sky) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-sky-deep) 65%, var(--color-ink-raised))
   );
-  --avatar-sky-foreground: light-dark(var(--color-identity-sky-deep), var(--color-canvas-soft));
+  --avatar-sky-foreground: light-dark(
+    var(--color-identity-sky-deep),
+    var(--color-identity-sky-tint)
+  );
   --avatar-blue: light-dark(
     var(--color-identity-blue-tint),
-    color-mix(in oklab, var(--color-identity-blue) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-blue-deep) 65%, var(--color-ink-raised))
   );
-  --avatar-blue-foreground: light-dark(var(--color-identity-blue-deep), var(--color-canvas-soft));
+  --avatar-blue-foreground: light-dark(
+    var(--color-identity-blue-deep),
+    var(--color-identity-blue-tint)
+  );
   --avatar-violet: light-dark(
     var(--color-identity-violet-tint),
-    color-mix(in oklab, var(--color-identity-violet) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-violet-deep) 65%, var(--color-ink-raised))
   );
   --avatar-violet-foreground: light-dark(
     var(--color-identity-violet-deep),
-    var(--color-canvas-soft)
+    var(--color-identity-violet-tint)
   );
   --avatar-fuchsia: light-dark(
     var(--color-identity-fuchsia-tint),
-    color-mix(in oklab, var(--color-identity-fuchsia) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-fuchsia-deep) 65%, var(--color-ink-raised))
   );
   --avatar-fuchsia-foreground: light-dark(
     var(--color-identity-fuchsia-deep),
-    var(--color-canvas-soft)
+    var(--color-identity-fuchsia-tint)
   );
   --avatar-rose: light-dark(
     var(--color-identity-rose-tint),
-    color-mix(in oklab, var(--color-identity-rose) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-rose-deep) 65%, var(--color-ink-raised))
   );
-  --avatar-rose-foreground: light-dark(var(--color-identity-rose-deep), var(--color-canvas-soft));
+  --avatar-rose-foreground: light-dark(
+    var(--color-identity-rose-deep),
+    var(--color-identity-rose-tint)
+  );
   --avatar-orange: light-dark(
     var(--color-identity-orange-tint),
-    color-mix(in oklab, var(--color-identity-orange) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-orange-deep) 65%, var(--color-ink-raised))
   );
   --avatar-orange-foreground: light-dark(
     var(--color-identity-orange-deep),
-    var(--color-canvas-soft)
+    var(--color-identity-orange-tint)
   );
   --avatar-lime: light-dark(
     var(--color-identity-lime-tint),
-    color-mix(in oklab, var(--color-identity-lime) 40%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-identity-lime-deep) 65%, var(--color-ink-raised))
   );
-  --avatar-lime-foreground: light-dark(var(--color-identity-lime-deep), var(--color-canvas-soft));
+  --avatar-lime-foreground: light-dark(
+    var(--color-identity-lime-deep),
+    var(--color-identity-lime-tint)
+  );
 }
 
 /* Choosing dark is the only override. Because every role resolves through
@@ -515,7 +766,7 @@
   /* Selection and accent moments go neutral with it. */
   --accent: light-dark(
     var(--color-canvas-soft),
-    color-mix(in oklab, var(--color-canvas) 12%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-canvas) 12%, var(--color-ink-raised))
   );
   --accent-foreground: light-dark(var(--color-ink), var(--color-canvas));
 
@@ -523,7 +774,7 @@
      highlight still reads on the gray strips the portal is full of. */
   --selection: light-dark(
     color-mix(in oklab, var(--color-ink) 16%, var(--color-canvas)),
-    color-mix(in oklab, var(--color-canvas) 26%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-canvas) 26%, var(--color-ink-raised))
   );
   --selection-foreground: light-dark(var(--color-ink), var(--color-canvas));
 
@@ -541,6 +792,7 @@
   --color-copy: var(--copy);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-surface-panel: var(--surface-panel);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
@@ -551,6 +803,7 @@
   --color-primary-invert-hover: var(--primary-invert-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-tab-chip: var(--tab-chip);
@@ -560,6 +813,7 @@
   --color-selection-foreground: var(--selection-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-negative-text: var(--negative-text);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-divider: var(--divider);
@@ -621,6 +875,22 @@
 
   ::selection {
     @apply bg-selection text-selection-foreground;
+  }
+
+  /* Every icon in the product is one outline family at one weight.
+     `lucide-react` draws at 2px, which at the 16px the portal uses everywhere
+     is heavier than the 1px hairlines the same screens are built from — the
+     icons read as the loudest thing on a quiet surface. 1.5px puts them back
+     in the same register as the rules beside them.
+
+     Set here rather than per-call-site because there are ~40 of them and one
+     missed prop is a visibly different icon. A CSS `stroke-width` beats the
+     SVG presentation attribute lucide writes, so this needs no provider and
+     works in server components; the one glyph that wants more weight (the
+     checkbox tick, which is 12px inside a filled 16px box) overrides it with
+     an explicit utility. */
+  .lucide {
+    stroke-width: 1.5px;
   }
 }
 

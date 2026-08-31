@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
@@ -12,6 +11,7 @@ import {
   TableHeader,
   TableHeaderRow,
   TableRow,
+  TableRowLink,
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
@@ -152,14 +152,11 @@ function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean
   const isPending = payment.status === 'pending_verification'
 
   return (
-    <TableRow className="relative focus-within:bg-muted/60">
+    <TableRow interactive>
       <TableCell className="font-mono text-foreground tabular-nums">
-        <Link
-          href={`/portal/bookings/${payment.bookingReference}`}
-          className="rounded-sm outline-none after:absolute after:inset-0 focus-visible:underline"
-        >
+        <TableRowLink href={`/portal/bookings/${payment.bookingReference}`}>
           {payment.bookingReference}
-        </Link>
+        </TableRowLink>
       </TableCell>
       <TableCell className="text-foreground">{payment.guestName}</TableCell>
       <TableCell>{payment.checkIn ? formatStayDate(payment.checkIn) : '—'}</TableCell>

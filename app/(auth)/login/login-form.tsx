@@ -4,7 +4,9 @@ import { useActionState } from 'react'
 
 import { PortalBrand } from '@/components/portal/portal-brand'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
+import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -65,12 +67,7 @@ export function LoginForm({ next }: { next?: string }) {
           </div>
 
           {state.status === 'error' && state.message ? (
-            <p
-              role="alert"
-              className="rounded-md bg-negative-tint p-md text-body-sm text-negative-deep"
-            >
-              {state.message}
-            </p>
+            <Callout role="alert">{state.message}</Callout>
           ) : null}
 
           <Button type="submit" className="w-full" disabled={isPending}>
@@ -84,12 +81,4 @@ export function LoginForm({ next }: { next?: string }) {
       </p>
     </div>
   )
-}
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) {
-    return null
-  }
-
-  return <p className="text-body-sm text-negative-deep">{message}</p>
 }

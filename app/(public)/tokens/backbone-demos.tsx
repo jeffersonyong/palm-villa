@@ -87,7 +87,7 @@ export function OverlayDemos() {
     <div className="space-y-xl">
       <Row
         title="Dialog"
-        note="rounded-xl · border-border · shadow-overlay over bg-scrim. Title is display-xs in Inter — a modal heading is a section heading, so the display face stays off it."
+        note="rounded-xl · border-border · shadow-overlay over bg-scrim. Title is display-xs in Geist — a modal heading is a section heading, so the display face stays off it."
       >
         <Dialog>
           <DialogTrigger asChild>

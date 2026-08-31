@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
  * Edge-anchored drawer, built on Radix Dialog and themed to design.md.
  *
  * An overlay by elevation (scrim + `shadow-overlay`) but not by geometry: a
- * sheet meets the viewport edges, so it drops the 14px radius — a rounded
+ * sheet meets the viewport edges, so it drops the 16px radius — a rounded
  * corner against the screen edge reads as a rendering error, not a surface.
  * Motion is a slide rather than a zoom, and still honours reduced motion.
  */
@@ -83,7 +83,7 @@ function SheetContent({
         {showCloseButton ? (
           <SheetPrimitive.Close
             data-slot="sheet-close"
-            className="absolute top-lg right-lg inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+            className="absolute top-lg right-lg inline-flex size-control-sm items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
           >
             <XIcon className="size-4" />
             <span className="sr-only">Close</span>

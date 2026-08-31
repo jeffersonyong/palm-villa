@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Notice } from '@/components/ui/notice'
@@ -101,9 +103,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
               className="w-[180px] font-mono uppercase tabular-nums"
               aria-invalid={Boolean(state.fieldErrors?.reference)}
             />
-            {state.fieldErrors?.reference ? (
-              <p className="text-caption text-destructive">{state.fieldErrors.reference}</p>
-            ) : null}
+            <FieldError message={state.fieldErrors?.reference} />
           </div>
 
           <div className="grid gap-sm">
@@ -122,7 +122,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
               />
             </div>
             {state.fieldErrors?.amount ? (
-              <p className="text-caption text-destructive">{state.fieldErrors.amount}</p>
+              <FieldError message={state.fieldErrors.amount} />
             ) : (
               <p className="text-caption text-muted-foreground">
                 Count the notes. If this is not the booking total you will be asked why.
@@ -131,7 +131,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           {needsReason ? (
-            <div className="grid gap-sm rounded-md bg-muted p-md">
+            <Card surface="inset" className="grid gap-sm">
               <Label htmlFor="amountOverrideReason">
                 This is not the amount due — why is that?
               </Label>
@@ -144,10 +144,8 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
                 defaultValue={submitted?.amountOverrideReason ?? ''}
                 aria-invalid
               />
-              <p className="text-caption text-destructive">
-                {state.message ?? 'Say why the amount differs.'}
-              </p>
-            </div>
+              <FieldError message={state.message ?? 'Say why the amount differs.'} />
+            </Card>
           ) : null}
 
           <Notice>
@@ -155,9 +153,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
             banked amounts is a separate screen.
           </Notice>
 
-          {state.status === 'error' && state.message && !needsReason ? (
-            <p className="text-body-sm text-destructive">{state.message}</p>
-          ) : null}
+          {state.status === 'error' && !needsReason ? <FieldError message={state.message} /> : null}
 
           <DialogFooter>
             <Button type="button" variant="tertiary" onClick={onClose}>

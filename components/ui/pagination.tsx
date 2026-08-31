@@ -215,8 +215,10 @@ function StepButton({
       onClick={onClick}
       className={cn(
         stepClasses,
-        'border border-border bg-card text-copy',
-        'hover:border-foreground/20 hover:text-foreground',
+        'border border-border bg-card text-muted-foreground',
+        // The tertiary button's hover: a fill step, not a heavier hairline —
+        // light draws every edge at one weight (design.md §Elevation).
+        'hover:bg-muted hover:text-foreground',
         'disabled:pointer-events-none disabled:border-divider disabled:opacity-40',
         className,
       )}
@@ -245,7 +247,7 @@ function PageButton({
         stepClasses,
         isCurrent
           ? 'border border-border bg-card font-medium text-foreground'
-          : 'text-copy hover:bg-card hover:text-foreground',
+          : 'text-muted-foreground hover:bg-card hover:text-foreground',
       )}
     >
       {page}

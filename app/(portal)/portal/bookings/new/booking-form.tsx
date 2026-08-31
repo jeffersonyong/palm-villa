@@ -3,10 +3,14 @@
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
 
+import { NumberField, TextField } from '@/components/portal/form-fields'
+import { FormSection } from '@/components/portal/form-section'
+import { QuoteLines, QuoteSummary } from '@/components/portal/quote-summary'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { FieldError } from '@/components/ui/field-error'
 import { Label } from '@/components/ui/label'
 import { Notice } from '@/components/ui/notice'
 import {
@@ -22,7 +26,6 @@ import { formatStayDate } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { priceStay } from '@/lib/domain/pricing/stay'
-import { cn } from '@/lib/utils'
 
 import { createWalkInBookingAction, type WalkInBookingState } from './actions'
 
@@ -104,13 +107,15 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
 
         <dl className="mt-lg border-t border-divider pt-lg">
           <div className="flex items-baseline justify-between gap-lg">
-            <dt className="text-body-md text-copy">{isTransfer ? 'To transfer' : 'Paid'}</dt>
+            <dt className="text-body-md text-muted-foreground">
+              {isTransfer ? 'To transfer' : 'Paid'}
+            </dt>
             <dd className="text-body-md-strong text-foreground tabular-nums">
               BND {formatCents(created.total)}
             </dd>
           </div>
           <div className="mt-sm flex items-baseline justify-between gap-lg">
-            <dt className="text-body-md text-copy">Security deposit collected</dt>
+            <dt className="text-body-md text-muted-foreground">Security deposit collected</dt>
             <dd className="text-body-md-strong text-foreground tabular-nums">
               BND {formatCents(created.securityDeposit)}
             </dd>
@@ -161,9 +166,8 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
       <input type="hidden" name="earlyCheckInHours" value={0} />
 
       <Card>
-        <section>
-          <SectionHeading>Unit</SectionHeading>
-          <div className="mt-md grid gap-sm">
+        <FormSection title="Unit">
+          <div className="grid gap-sm">
             <Label htmlFor="unitId">{units.length} free for these dates</Label>
             <Select name="unitId" value={unitId} onValueChange={setUnitId}>
               <SelectTrigger id="unitId" className="max-w-[360px]">
@@ -179,11 +183,10 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
             </Select>
             <FieldError message={state.fieldErrors?.unitId} />
           </div>
-        </section>
+        </FormSection>
 
-        <section className="mt-xl border-t border-divider pt-xl">
-          <SectionHeading>Guests</SectionHeading>
-          <div className="mt-md flex flex-wrap gap-lg">
+        <FormSection title="Guests">
+          <div className="flex flex-wrap gap-lg">
             <NumberField
               id="chargeableGuests"
               label={`Over ${config.paxExemptAgeMax}`}
@@ -204,11 +207,10 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
           <p className="mt-sm text-body-sm text-muted-foreground">
             Guests aged {config.paxExemptAgeMax} and under are not counted towards occupancy.
           </p>
-        </section>
+        </FormSection>
 
-        <section className="mt-xl border-t border-divider pt-xl">
-          <SectionHeading>Extras</SectionHeading>
-          <div className="mt-md flex flex-wrap gap-lg">
+        <FormSection title="Extras">
+          <div className="flex flex-wrap gap-lg">
             <NumberField
               id="sofaBeds"
               label="Sofa beds"
@@ -232,11 +234,10 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
               confirmed with the client (prd.md §18 N6).
             </p>
           )}
-        </section>
+        </FormSection>
 
-        <section className="mt-xl border-t border-divider pt-xl">
-          <SectionHeading>Guest</SectionHeading>
-          <div className="mt-md grid gap-lg">
+        <FormSection title="Guest">
+          <div className="grid gap-lg">
             <TextField
               id="guestName"
               label="Name"
@@ -261,11 +262,10 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
               />
             </div>
           </div>
-        </section>
+        </FormSection>
 
-        <section className="mt-xl border-t border-divider pt-xl">
-          <SectionHeading>Payment</SectionHeading>
-          <div className="mt-md grid gap-sm">
+        <FormSection title="Payment">
+          <div className="grid gap-sm">
             <Label htmlFor="paymentMethod">Method</Label>
             <Select
               name="paymentMethod"
@@ -286,137 +286,45 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
                 : 'The guest quotes the booking reference in the transfer. The booking waits in the verification queue until someone checks the bank.'}
             </p>
           </div>
-        </section>
+        </FormSection>
       </Card>
 
-      <div className="lg:sticky lg:top-xl">
-        <Card>
-          <p className="micro-label text-muted-foreground">Booking summary</p>
-          <p className="mt-sm text-body-md-strong text-foreground">
-            {formatStayDate(checkIn)} → {formatStayDate(checkOut)}
-          </p>
-          <p className="mt-xxs text-body-sm text-muted-foreground">
+      <QuoteSummary
+        eyebrow="Booking summary"
+        headline={`${formatStayDate(checkIn)} → ${formatStayDate(checkOut)}`}
+        detail={
+          <>
             {quote?.ok ? `${quote.nights} ${quote.nights === 1 ? 'night' : 'nights'} · ` : ''}
             {selectedUnit?.ref ?? 'no unit'} · {totalGuests}{' '}
             {totalGuests === 1 ? 'guest' : 'guests'}
-          </p>
+          </>
+        }
+      >
+        {quote?.ok ? (
+          <>
+            <QuoteLines lines={quote.lines} total={quote.total} />
 
-          {quote?.ok ? (
-            <>
-              <dl className="mt-lg divide-y divide-divider border-t border-divider">
-                {quote.lines.map((line) => (
-                  <div
-                    key={`${line.type}-${line.description}`}
-                    className="flex items-baseline justify-between gap-lg py-sm"
-                  >
-                    <dt className="text-body-sm text-copy">{line.description}</dt>
-                    <dd className="text-body-sm-strong text-foreground tabular-nums">
-                      {formatCents(line.amount)}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+            <Notice className="mt-lg">
+              Plus BND {formatCents(quote.securityDeposit)} refundable security deposit, collected
+              on arrival.
+            </Notice>
+          </>
+        ) : (
+          <Callout className="mt-lg">
+            {quote?.ok === false ? quote.error.message : 'Choose a unit to see the price.'}
+          </Callout>
+        )}
 
-              <div className="flex items-baseline justify-between gap-lg border-t border-divider pt-md">
-                <span className="text-body-md-strong text-foreground">Total</span>
-                <span className="text-display-sm text-foreground tabular-nums">
-                  BND {formatCents(quote.total)}
-                </span>
-              </div>
+        <Button type="submit" className="mt-lg w-full" disabled={isPending || !quote?.ok}>
+          {isPending
+            ? 'Creating…'
+            : paymentMethod === 'cash'
+              ? 'Create & take payment'
+              : 'Create & await transfer'}
+        </Button>
 
-              <Notice className="mt-lg">
-                Plus BND {formatCents(quote.securityDeposit)} refundable security deposit, collected
-                on arrival.
-              </Notice>
-            </>
-          ) : (
-            <p className="mt-lg rounded-md bg-negative-tint p-md text-body-sm text-negative-deep">
-              {quote?.ok === false ? quote.error.message : 'Choose a unit to see the price.'}
-            </p>
-          )}
-
-          <Button type="submit" className="mt-lg w-full" disabled={isPending || !quote?.ok}>
-            {isPending
-              ? 'Creating…'
-              : paymentMethod === 'cash'
-                ? 'Create & take payment'
-                : 'Create & await transfer'}
-          </Button>
-
-          {state.status === 'error' && state.message && (
-            <p role="alert" className="mt-md text-body-sm text-negative-deep">
-              {state.message}
-            </p>
-          )}
-        </Card>
-      </div>
+        {state.status === 'error' ? <FieldError className="mt-md" message={state.message} /> : null}
+      </QuoteSummary>
     </form>
-  )
-}
-
-/** The labelling voice (design.md §Typography `micro`), as section headers. */
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return <h2 className="micro-label text-muted-foreground">{children}</h2>
-}
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) {
-    return null
-  }
-
-  return <p className="text-body-sm text-negative-deep">{message}</p>
-}
-
-interface NumberFieldProps {
-  id: string
-  label: string
-  value: number
-  min: number
-  onChange: (value: number) => void
-  error?: string
-}
-
-function NumberField({ id, label, value, min, onChange, error }: NumberFieldProps) {
-  return (
-    <div className="grid w-[150px] gap-sm">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        name={id}
-        type="number"
-        inputMode="numeric"
-        min={min}
-        value={value}
-        aria-invalid={error ? true : undefined}
-        className="tabular-nums"
-        onChange={(event) => onChange(Math.max(min, Number(event.target.value) || 0))}
-      />
-      <FieldError message={error} />
-    </div>
-  )
-}
-
-interface TextFieldProps {
-  id: string
-  label: string
-  type?: string
-  autoComplete?: string
-  className?: string
-  error?: string
-}
-
-function TextField({ id, label, type = 'text', autoComplete, className, error }: TextFieldProps) {
-  return (
-    <div className={cn('grid gap-sm', className)}>
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        name={id}
-        type={type}
-        autoComplete={autoComplete}
-        aria-invalid={error ? true : undefined}
-      />
-      <FieldError message={error} />
-    </div>
   )
 }

@@ -32,7 +32,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             {/* Hidden below 640px: the links do not fit beside the brand, the
                 button and the toggle, and every destination is reachable from
                 the page itself. */}
-            <ul className="hidden items-center gap-lg text-body-sm text-copy sm:flex">
+            <ul className="hidden items-center gap-lg text-body-sm text-muted-foreground sm:flex">
               <li>
                 <Link href="/day-pass" className="transition-colors hover:text-foreground">
                   Day pass

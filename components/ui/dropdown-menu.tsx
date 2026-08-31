@@ -8,7 +8,9 @@ import { cn } from '@/lib/utils'
 /**
  * Radix DropdownMenu, themed to design.md.
  *
- * The shell is an overlay (14px, hairline, `shadow-overlay`); the items inside
+ * The shell is an overlay at menu scale (12px, hairline, `shadow-overlay` —
+ * the panel's corner is concentric with the items that reach it, rather than
+ * a dialog's 16px); the items inside
  * it are controls, so they keep the 6px control radius and the `muted` focus
  * fill. Group labels take the labelling voice (`micro`), same as table headers
  * and form section headers — a menu group is a data region like any other.
@@ -29,7 +31,7 @@ function DropdownMenuGroup({ ...props }: React.ComponentProps<typeof DropdownMen
 
 /** The floating surface. Shared with the submenu below. */
 const menuSurfaceClasses = [
-  'z-50 min-w-[180px] overflow-hidden rounded-xl border border-border bg-popover p-xs text-popover-foreground shadow-overlay',
+  'z-50 min-w-[180px] overflow-hidden rounded-lg border border-border bg-popover p-xs text-popover-foreground shadow-overlay',
   'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
   'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
   'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2',

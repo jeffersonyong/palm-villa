@@ -44,7 +44,7 @@ export function PortalSearch() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="hidden h-control w-56 items-center gap-sm rounded-md border border-border bg-card px-md text-body-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:flex"
+        className="hidden h-control w-72 items-center gap-sm rounded-md border border-border bg-card px-md text-body-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-panel md:flex"
       >
         <Search aria-hidden className="size-4 shrink-0" />
         Search
@@ -58,7 +58,7 @@ export function PortalSearch() {
         type="button"
         onClick={() => setIsOpen(true)}
         aria-label="Search"
-        className="inline-flex size-control items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:hidden"
+        className="inline-flex size-control items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-panel md:hidden"
       >
         <Search aria-hidden className="size-4" />
       </button>

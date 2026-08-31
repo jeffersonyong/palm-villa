@@ -63,15 +63,23 @@ export default async function PortalOverviewPage() {
         }
       />
 
-      {/* Four gray tiles standing on the page ground — no container. A card
-          around them was a box drawn around four boxes: the outer hairline
-          bounded nothing the tiles were not already bounding, and it made the
-          screen's first object a panel of chrome. Card-scale radius and
-          padding, because they sit in a card's slot (design.md §Components —
-          Cards). The dots carry each figure's booking state; "occupied
-          tonight" is a capacity, so it takes none. */}
+      {/* Four tiles standing on the page ground — no container. A card around
+          them was a box drawn around four boxes: the outer hairline bounded
+          nothing the tiles were not already bounding, and it made the screen's
+          first object a panel of chrome.
+
+          They are cards rather than gray panels since the ground inverted
+          (2026-08-31). A tile is an object sitting on the ground, and which
+          tone makes it one depends on the ground: against white, gray was the
+          object; against `canvas-sunk` a gray panel is a lighter patch that
+          barely separates, so the object is the card. The gray panel keeps its
+          real job — nested inside a card, where it still reads (design.md
+          §Components — Cards).
+
+          The dots carry each figure's booking state; "occupied tonight" is a
+          capacity, so it takes none. */}
       <div className="mt-xl grid grid-cols-2 gap-md lg:grid-cols-4">
-        <Card surface="inset" placement="page">
+        <Card>
           <Stat
             size="sm"
             label="Arrivals today"
@@ -79,7 +87,7 @@ export default async function PortalOverviewPage() {
             dot={<StatusDot tone="positive" />}
           />
         </Card>
-        <Card surface="inset" placement="page">
+        <Card>
           <Stat
             size="sm"
             label="Departures today"
@@ -87,7 +95,7 @@ export default async function PortalOverviewPage() {
             dot={<StatusDot tone="active" />}
           />
         </Card>
-        <Card surface="inset" placement="page">
+        <Card>
           <Stat
             size="sm"
             label="Awaiting payment"
@@ -95,7 +103,7 @@ export default async function PortalOverviewPage() {
             dot={<StatusDot tone="warning" />}
           />
         </Card>
-        <Card surface="inset" placement="page">
+        <Card>
           <Stat
             size="sm"
             label="Occupied tonight"

@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from '@/components/ui/toast-store'
@@ -85,11 +86,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
               <FieldError message={state.fieldErrors?.confirm} />
             </div>
 
-            {state.status === 'error' && state.message ? (
-              <p role="alert" className="text-body-sm text-negative-deep">
-                {state.message}
-              </p>
-            ) : null}
+            {state.status === 'error' ? <FieldError message={state.message} /> : null}
 
             <DialogFooter>
               <Button type="button" variant="tertiary" onClick={() => onOpenChange(false)}>
@@ -104,12 +101,4 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
       </DialogContent>
     </Dialog>
   )
-}
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) {
-    return null
-  }
-
-  return <p className="text-body-sm text-negative-deep">{message}</p>
 }

@@ -37,7 +37,7 @@ export function PortalAccount({ user }: { user: PortalAccountUser }) {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex w-full items-center gap-sm rounded-md px-md py-sm text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=open]:bg-muted">
+        <DropdownMenuTrigger className="flex w-full items-center gap-sm rounded-md px-sm py-sm text-left transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=open]:bg-muted">
           <Avatar>
             <AvatarFallback seed={user.id}>{initials(user.name)}</AvatarFallback>
           </Avatar>

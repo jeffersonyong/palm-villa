@@ -67,32 +67,48 @@ const brandColors: Swatch[] = [
 const inkColors: Swatch[] = [
   {
     token: 'ink',
-    hex: '#131417',
+    hex: '#111111',
     swatch: 'bg-ink',
-    note: 'Headings, dark surfaces. Never a button fill.',
+    note: 'Content and headings; dark surfaces. Never a button fill on the public site.',
   },
   {
     token: 'ink-deep',
-    hex: '#1d2025',
+    hex: '#1c1c1c',
     swatch: 'bg-ink-deep',
     note: 'Lighter than ink — dark-theme card surface.',
   },
-  { token: 'body', hex: '#45494f', swatch: 'bg-body', note: 'Light-theme body copy.' },
   {
     token: 'mute',
-    hex: '#6a7076',
+    hex: '#6b6b6b',
     swatch: 'bg-mute',
-    note: 'Captions and micro-labels. Clears AA on ground.',
+    note: 'The one secondary: labels, metadata, idle chrome. AA on all three grounds.',
   },
 ]
 
 const surfaceColors: Swatch[] = [
-  { token: 'canvas', hex: '#ffffff', swatch: 'bg-canvas', note: 'The working surface.' },
+  {
+    token: 'canvas-sunk',
+    hex: '#efefef',
+    swatch: 'bg-canvas-sunk',
+    note: 'The page ground. Everything else sits on it.',
+  },
   {
     token: 'canvas-soft',
-    hex: '#f7f7f8',
+    hex: '#f7f7f7',
     swatch: 'bg-canvas-soft',
-    note: 'Faint gray: selected chips, inset panels, table headers, tab tracks.',
+    note: 'The panel step: inset panels, table headers, tab tracks, hover.',
+  },
+  {
+    token: 'canvas',
+    hex: '#ffffff',
+    swatch: 'bg-canvas',
+    note: 'Cards, and the chip that is here.',
+  },
+  {
+    token: 'hairline',
+    hex: '#e8e8e8',
+    swatch: 'bg-hairline',
+    note: 'Every drawn edge in light, at one weight.',
   },
 ]
 
@@ -109,20 +125,8 @@ const semanticColors: Swatch[] = [
     swatch: 'bg-positive-deep',
     note: 'Positive chip text.',
   },
-  {
-    token: 'positive-tint',
-    hex: '#e2f5e9',
-    swatch: 'bg-positive-tint',
-    note: 'Positive chip ground.',
-  },
   { token: 'warning', hex: '#d97706', swatch: 'bg-warning', note: 'Awaiting payment.' },
   { token: 'warning-deep', hex: '#92400e', swatch: 'bg-warning-deep', note: 'Warning chip text.' },
-  {
-    token: 'warning-tint',
-    hex: '#fdf3d9',
-    swatch: 'bg-warning-tint',
-    note: 'Warning chip ground.',
-  },
   { token: 'negative', hex: '#d03238', swatch: 'bg-negative', note: 'Destructive actions.' },
   {
     token: 'negative-deep',
@@ -130,24 +134,17 @@ const semanticColors: Swatch[] = [
     swatch: 'bg-negative-deep',
     note: 'Negative chip text; destructive hover.',
   },
-  {
-    token: 'negative-tint',
-    hex: '#fbe9ea',
-    swatch: 'bg-negative-tint',
-    note: 'Negative chip ground.',
-  },
   { token: 'info', hex: '#1c80dd', swatch: 'bg-info', note: 'Notice mark. Kept off cyan.' },
   { token: 'info-deep', hex: '#0f5ea8', swatch: 'bg-info-deep', note: 'Notice text.' },
-  { token: 'info-tint', hex: '#d8ecfe', swatch: 'bg-info-tint', note: 'Notice ground.' },
 ]
 
 /** Theme-aware roles: these are what application code should reach for. */
 const roles: { role: string; swatch: string; light: string; dark: string }[] = [
-  { role: 'background', swatch: 'bg-background', light: 'canvas', dark: 'ink' },
-  { role: 'card', swatch: 'bg-card', light: 'canvas', dark: 'ink-deep' },
+  { role: 'background', swatch: 'bg-background', light: 'canvas-sunk', dark: 'ink' },
   { role: 'muted', swatch: 'bg-muted', light: 'canvas-soft', dark: 'ink-deep → ink' },
+  { role: 'card', swatch: 'bg-card', light: 'canvas', dark: 'ink-deep' },
   { role: 'foreground', swatch: 'bg-foreground', light: 'ink', dark: 'canvas' },
-  { role: 'copy', swatch: 'bg-copy', light: 'body', dark: 'canvas-soft' },
+  { role: 'copy', swatch: 'bg-copy', light: 'ink (= foreground)', dark: 'canvas' },
   {
     role: 'muted-foreground',
     swatch: 'bg-muted-foreground',
@@ -155,19 +152,19 @@ const roles: { role: string; swatch: string; light: string; dark: string }[] = [
     dark: 'mute lightened',
   },
   { role: 'primary', swatch: 'bg-primary', light: 'brand-deep', dark: 'brand' },
-  { role: 'border', swatch: 'bg-border', light: 'ink 12%', dark: 'white 9%' },
-  { role: 'divider', swatch: 'bg-divider', light: 'ink 7%', dark: 'white 7%' },
+  { role: 'border', swatch: 'bg-border', light: 'hairline', dark: 'white 9%' },
+  { role: 'divider', swatch: 'bg-divider', light: 'hairline', dark: 'white 7%' },
   { role: 'accent', swatch: 'bg-accent', light: 'brand-pale', dark: 'brand 20% on ink-deep' },
   { role: 'invert-surface', swatch: 'bg-invert-surface', light: 'ink', dark: 'canvas-soft' },
   { role: 'footer-surface', swatch: 'bg-footer-surface', light: 'ink', dark: 'raised ink' },
 ]
 
 const displayType = [
-  { token: 'display-xl', spec: '44 / 600', cls: 'text-display-xl' },
-  { token: 'display-lg', spec: '34 / 600', cls: 'text-display-lg' },
+  { token: 'display-xl', spec: '44 / 700', cls: 'text-display-xl' },
+  { token: 'display-lg', spec: '34 / 700', cls: 'text-display-lg' },
   { token: 'display-md', spec: '28 / 600', cls: 'text-display-md' },
   { token: 'display-sm', spec: '22 / 600', cls: 'text-display-sm' },
-  { token: 'display-xs', spec: '17 / 600', cls: 'text-display-xs' },
+  { token: 'display-xs', spec: '15 / 600', cls: 'text-display-xs' },
 ]
 
 const bodyType = [
@@ -176,7 +173,7 @@ const bodyType = [
   { token: 'body-md-strong', spec: '14 / 500', cls: 'text-body-md-strong' },
   { token: 'body-sm', spec: '13 / 400', cls: 'text-body-sm' },
   { token: 'body-sm-strong', spec: '13 / 500', cls: 'text-body-sm-strong' },
-  { token: 'caption', spec: '12 / 400', cls: 'text-caption' },
+  { token: 'caption', spec: '12 / 500', cls: 'text-caption' },
   { token: 'micro', spec: '11 / 500 · caps', cls: 'micro-label' },
   { token: 'button-md', spec: '13 / 500', cls: 'text-button-md' },
 ]
@@ -184,9 +181,8 @@ const bodyType = [
 const radii = [
   { token: 'sm', px: '4px', cls: 'rounded-sm' },
   { token: 'md', px: '6px', cls: 'rounded-md' },
-  { token: 'lg', px: '10px', cls: 'rounded-lg' },
-  { token: 'xl', px: '14px', cls: 'rounded-xl' },
-  { token: 'pill', px: '9999px', cls: 'rounded-pill' },
+  { token: 'lg', px: '12px', cls: 'rounded-lg' },
+  { token: 'xl', px: '16px', cls: 'rounded-xl' },
 ]
 
 const spacingSteps = [
@@ -194,8 +190,10 @@ const spacingSteps = [
   { token: 'xs', px: '4px', cls: 'w-xs' },
   { token: 'sm', px: '8px', cls: 'w-sm' },
   { token: 'md', px: '12px', cls: 'w-md' },
+  { token: 'card', px: '14px', cls: 'w-card' },
   { token: 'lg', px: '16px', cls: 'w-lg' },
   { token: 'xl', px: '24px', cls: 'w-xl' },
+  { token: 'gutter', px: '28px', cls: 'w-gutter' },
   { token: '2xl', px: '32px', cls: 'w-2xl' },
   { token: '3xl', px: '48px', cls: 'w-3xl' },
 ]
@@ -335,7 +333,7 @@ export default function TokensPage() {
       <Section
         id="type-display"
         title="Display type"
-        lead="One family, Inter. Hierarchy is size, weight and tracking — nothing exceeds 44px, and only the public hero uses that."
+        lead="One family, Geist. Hierarchy is size, weight and tracking — nothing exceeds 44px, and only the public hero uses that."
       >
         <ul className="space-y-lg">
           {displayType.map((item) => (
