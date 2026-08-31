@@ -9,13 +9,20 @@ export const THEME_STORAGE_KEY = 'pv-theme'
 export type ThemePreference = 'light' | 'dark'
 
 /**
- * Browser chrome colours, mirroring the page ground — `canvas` / `ink`
+ * Browser chrome colours, mirroring the page ground — `canvas-sunk` / `ink`
  * (design.md). The `themeColor` viewport export cannot vary by `data-theme`,
  * so the two places that set the theme also rewrite the meta tag.
+ *
+ * These are the only literals of a design token outside globals.css, and they
+ * exist because a `<meta>` attribute cannot read a custom property. Both must
+ * move whenever the page ground does — as they did when the ground dropped
+ * from white to `canvas-sunk`, and again when `canvas-sunk` itself came up
+ * from #efefef to #f3f3f3 (both 2026-08-31). The other copy is the static
+ * default in app/layout.tsx.
  */
 const THEME_COLOR: Record<ThemePreference, string> = {
-  light: '#ffffff',
-  dark: '#131417',
+  light: '#f3f3f3',
+  dark: '#111111',
 }
 
 function applyThemeColorMeta(preference: ThemePreference): void {

@@ -89,7 +89,7 @@ export function MultiSelectFilter<T extends string>({
           align="start"
           sideOffset={6}
           className={cn(
-            'z-50 min-w-[200px] overflow-hidden rounded-xl border border-border bg-popover p-xs text-popover-foreground shadow-overlay',
+            'z-50 min-w-[200px] overflow-hidden rounded-lg border border-border bg-popover p-xs text-popover-foreground shadow-overlay',
             'origin-[var(--radix-dropdown-menu-content-transform-origin)]',
             'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
             'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',

@@ -49,7 +49,7 @@ export function RolesStaffTabs({ staff, roles, currentUserId }: RolesStaffTabsPr
       </TabsContent>
 
       <TabsContent value="roles">
-        <RolesTab roles={roles} />
+        <RolesTab roles={roles} staff={staff} />
       </TabsContent>
 
       {/* Not gated on activeTab: the dialog is modal, so the tab cannot

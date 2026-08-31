@@ -268,7 +268,7 @@ function StepButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'inline-flex size-7 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors outline-none',
+        'inline-flex size-control-sm items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-colors outline-none',
         'hover:bg-muted hover:text-foreground',
         'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover',
         // An arrow at the edge of the bookable window fades rather than

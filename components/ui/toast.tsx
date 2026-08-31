@@ -17,7 +17,8 @@ import { cn } from '@/lib/utils'
  * Radix Toast, themed to design.md §Elevation level 3 — the confirmation
  * voice for actions whose outcome is not otherwise visible on screen.
  *
- * A toast is an overlay: 14px, hairline, `shadow-overlay` on the white card.
+ * A toast is an overlay and wears the overlay shell: 16px, hairline, `xl`
+ * padding, `shadow-overlay` on the white card.
  * Status is carried the sanctioned way — a small icon in the semantic mid
  * hue (design.md: saturated mid hues are for icons and the destructive
  * button only); the surface itself stays white, never a coloured band.
@@ -61,7 +62,7 @@ function ToastNotice({ item }: { item: ToastItem }) {
         if (!open) dismissToast(item.id)
       }}
       className={cn(
-        'flex items-start gap-sm rounded-xl border border-border bg-card p-lg shadow-overlay',
+        'flex items-start gap-sm rounded-xl border border-border bg-card p-xl shadow-overlay',
         'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4',
         'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
         'data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none',
@@ -88,7 +89,7 @@ function ToastNotice({ item }: { item: ToastItem }) {
 
       <ToastPrimitive.Close
         aria-label="Dismiss"
-        className="-mt-xs -mr-xs inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+        className="-mt-xs -mr-xs inline-flex size-control-sm shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
       >
         <XIcon className="size-3.5" />
       </ToastPrimitive.Close>

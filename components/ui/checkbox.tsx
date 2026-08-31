@@ -59,10 +59,11 @@ function CheckboxGlyph({ className }: { className?: string }) {
         className,
       )}
     >
-      <CheckIcon
-        className="size-3 opacity-0 transition-opacity group-data-[state=checked]:opacity-100 motion-reduce:transition-none"
-        strokeWidth={3}
-      />
+      {/* The one glyph heavier than the system's 1.5px icon stroke (globals.css
+          §base): a 12px tick reversed out of a filled 16px box needs the extra
+          weight to hold its shape. Set as a class, not the `strokeWidth` prop —
+          the base rule is CSS, and CSS beats the presentation attribute. */}
+      <CheckIcon className="size-3 [stroke-width:2.5px] opacity-0 transition-opacity group-data-[state=checked]:opacity-100 motion-reduce:transition-none" />
     </span>
   )
 }

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { DateField } from '@/components/ui/date-field'
 import {
   Dialog,
@@ -13,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -144,9 +146,7 @@ function ConfirmDialog({
             <p className="text-caption text-muted-foreground tabular-nums">
               Expected BND {formatCents(due)}
             </p>
-            {state.fieldErrors?.amount ? (
-              <p className="text-caption text-destructive">{state.fieldErrors.amount}</p>
-            ) : null}
+            <FieldError message={state.fieldErrors?.amount} />
           </div>
 
           <div className="grid gap-sm">
@@ -165,9 +165,7 @@ function ConfirmDialog({
 
           {needsReason ? <VarianceNotice variance={variance} state={state} /> : null}
 
-          {state.status === 'error' && state.message ? (
-            <p className="text-body-sm text-destructive">{state.message}</p>
-          ) : null}
+          {state.status === 'error' ? <FieldError message={state.message} /> : null}
 
           <DialogFooter>
             <Button type="button" variant="tertiary" onClick={onClose}>
@@ -197,7 +195,7 @@ function VarianceNotice({ variance, state }: { variance: Cents; state: PaymentAc
   const kind = describeVariance(variance)
 
   return (
-    <div className="grid gap-sm rounded-md bg-muted p-md">
+    <Card surface="inset" className="grid gap-sm">
       <p className="text-body-sm text-copy">
         <strong className="font-medium">
           {kind === 'short' ? 'Short by' : 'Over by'} BND {formatCents(Math.abs(variance))}
@@ -219,14 +217,14 @@ function VarianceNotice({ variance, state }: { variance: Cents; state: PaymentAc
         aria-invalid={Boolean(state.fieldErrors?.amountOverrideReason)}
       />
       {state.fieldErrors?.amountOverrideReason ? (
-        <p className="text-caption text-destructive">{state.fieldErrors.amountOverrideReason}</p>
+        <FieldError message={state.fieldErrors.amountOverrideReason} />
       ) : (
         <p className="text-caption text-muted-foreground">
           Recorded against the payment with your name and the time. No refund or balance is
           calculated — any difference is settled outside the system.
         </p>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -282,9 +280,7 @@ function ManualMatchDialog({
             <p className="text-caption text-muted-foreground tabular-nums">
               Expected BND {formatCents(due)}
             </p>
-            {state.fieldErrors?.amount ? (
-              <p className="text-caption text-destructive">{state.fieldErrors.amount}</p>
-            ) : null}
+            <FieldError message={state.fieldErrors?.amount} />
           </div>
 
           <div className="grid gap-sm">
@@ -300,7 +296,7 @@ function ManualMatchDialog({
               aria-invalid={Boolean(state.fieldErrors?.observedSender)}
             />
             {state.fieldErrors?.observedSender ? (
-              <p className="text-caption text-destructive">{state.fieldErrors.observedSender}</p>
+              <FieldError message={state.fieldErrors.observedSender} />
             ) : (
               <p className="text-caption text-muted-foreground">
                 With no reference quoted, this is the only thing identifying the payment.
@@ -323,11 +319,7 @@ function ManualMatchDialog({
               invalid={Boolean(state.fieldErrors?.observedOn)}
               describedBy={state.fieldErrors?.observedOn ? 'observedOn-error' : undefined}
             />
-            {state.fieldErrors?.observedOn ? (
-              <p id="observedOn-error" className="text-caption text-destructive">
-                {state.fieldErrors.observedOn}
-              </p>
-            ) : null}
+            <FieldError id="observedOn-error" message={state.fieldErrors?.observedOn} />
           </div>
 
           <div className="grid gap-sm">
@@ -354,7 +346,7 @@ function ManualMatchDialog({
               aria-invalid={Boolean(state.fieldErrors?.matchReason)}
             />
             {state.fieldErrors?.matchReason ? (
-              <p className="text-caption text-destructive">{state.fieldErrors.matchReason}</p>
+              <FieldError message={state.fieldErrors.matchReason} />
             ) : (
               <p className="text-caption text-muted-foreground">
                 Recorded as a formal match with your name and the time.
@@ -364,9 +356,7 @@ function ManualMatchDialog({
 
           {needsReason ? <VarianceNotice variance={(observed ?? due) - due} state={state} /> : null}
 
-          {state.status === 'error' && state.message ? (
-            <p className="text-body-sm text-destructive">{state.message}</p>
-          ) : null}
+          {state.status === 'error' ? <FieldError message={state.message} /> : null}
 
           <DialogFooter>
             <Button type="button" variant="tertiary" onClick={onClose}>

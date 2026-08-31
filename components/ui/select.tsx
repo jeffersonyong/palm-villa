@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils'
  *    `transform`, so it costs nothing and tells you the panel belongs to this
  *    control.
  * 2. **The panel is the overlay shell, and the items inside it are controls.**
- *    14px radius, hairline, `shadow-overlay`; items at the 6px control radius
+ *    12px radius, hairline, `shadow-overlay`; items at the 6px control radius
  *    on a `muted` focus fill, exactly like `DropdownMenu`. A select panel and a
  *    menu are the same object with different jobs, and they never diverge.
  * 3. **Selection is a weight shift, never a colour.** The checked item goes ink
@@ -113,7 +113,7 @@ function SelectContent({
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          'relative z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-border bg-popover p-xs text-popover-foreground shadow-overlay',
+          'relative z-50 max-h-[var(--radix-select-content-available-height)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-border bg-popover p-xs text-popover-foreground shadow-overlay',
           // Scaling out of the trigger's corner is what makes the panel read as
           // this control opening rather than a box arriving from elsewhere.
           'origin-[var(--radix-select-content-transform-origin)]',

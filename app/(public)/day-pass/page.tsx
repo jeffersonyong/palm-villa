@@ -60,7 +60,7 @@ export default function DayPassPage() {
                       : 'mt-md flex items-baseline justify-between gap-lg border-t border-divider pt-md'
                   }
                 >
-                  <dt className="text-body-md text-copy">{row.label}</dt>
+                  <dt className="text-body-md text-muted-foreground">{row.label}</dt>
                   <dd className="text-body-md-strong text-foreground">{row.value}</dd>
                 </div>
               ))}

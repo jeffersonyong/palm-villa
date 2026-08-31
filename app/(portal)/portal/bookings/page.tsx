@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableHeaderRow,
   TableRow,
+  TableRowLink,
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
@@ -190,18 +191,11 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
             </TableHeader>
             <TableBody>
               {bookings.map((booking) => (
-                <TableRow key={booking.id} className="relative focus-within:bg-muted/60">
+                <TableRow key={booking.id} interactive>
                   <TableCell className="font-mono text-foreground tabular-nums">
-                    {/* The stretched link: it covers the whole row, so a click
-                        anywhere opens the booking, while the anchor itself stays
-                        on the reference — which is what a screen reader should
-                        announce as the link text. */}
-                    <Link
-                      href={`/portal/bookings/${booking.reference}`}
-                      className="rounded-sm outline-none after:absolute after:inset-0 focus-visible:underline"
-                    >
+                    <TableRowLink href={`/portal/bookings/${booking.reference}`}>
                       {booking.reference}
-                    </Link>
+                    </TableRowLink>
                   </TableCell>
                   <TableCell className="text-foreground">{booking.guestName}</TableCell>
                   <TableCell className="tabular-nums">{booking.unitRef}</TableCell>

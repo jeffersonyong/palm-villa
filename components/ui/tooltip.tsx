@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils'
 /**
  * Radix Tooltip, themed to design.md §Elevation.
  *
- * The one small-overlay exception to the 14px overlay radius: at caption height
- * a 14px corner reads as a pill, so the tooltip takes the control radius and
+ * The one small-overlay exception to the 16px overlay radius: at caption height
+ * a 16px corner reads as a pill, so the tooltip takes the control radius and
  * the polarity-flip surface instead of white-on-white. It is a label, not a
  * panel — no border, no padding beyond a chip's.
  *

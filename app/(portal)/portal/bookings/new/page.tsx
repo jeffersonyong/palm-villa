@@ -155,7 +155,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
             const total = totalByType[type.id] ?? 0
 
             return (
-              <Card key={type.id} surface="inset" placement="page">
+              <Card key={type.id}>
                 <dt className="micro-label text-muted-foreground">{type.name}</dt>
                 <dd className="mt-xs text-display-xs text-foreground tabular-nums">
                   {free}
@@ -174,7 +174,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
             night after check-in, and bookings open up to {config.maxAdvanceBookingDays} days ahead.
           </Notice>
         ) : availableUnits.length === 0 ? (
-          <Card surface="inset" className="p-lg">
+          <Card surface="inset">
             <p className="text-body-md text-copy">
               Nothing free for those dates{unitTypeId ? ' in that unit type' : ''}. Try different
               dates, or widen the unit type.

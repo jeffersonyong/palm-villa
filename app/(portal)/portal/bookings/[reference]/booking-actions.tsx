@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { FieldError } from '@/components/ui/field-error'
 import { Label } from '@/components/ui/label'
 import { Notice } from '@/components/ui/notice'
 import { Textarea } from '@/components/ui/textarea'
@@ -122,7 +123,7 @@ function CancelBookingDialog({
               aria-invalid={Boolean(state.fieldErrors?.reason)}
             />
             {state.fieldErrors?.reason ? (
-              <p className="text-caption text-destructive">{state.fieldErrors.reason}</p>
+              <FieldError message={state.fieldErrors.reason} />
             ) : (
               <p className="text-caption text-muted-foreground">
                 Recorded against the booking with your name and the time.
@@ -139,9 +140,7 @@ function CancelBookingDialog({
             the system.
           </Notice>
 
-          {state.status === 'error' && state.message ? (
-            <p className="text-body-sm text-destructive">{state.message}</p>
-          ) : null}
+          {state.status === 'error' ? <FieldError message={state.message} /> : null}
 
           <DialogFooter>
             <Button type="button" variant="tertiary" onClick={onClose}>

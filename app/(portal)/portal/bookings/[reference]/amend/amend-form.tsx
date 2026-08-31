@@ -3,7 +3,11 @@
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { NumberField, TextField } from '@/components/portal/form-fields'
+import { FormSection } from '@/components/portal/form-section'
+import { QuoteLines, QuoteSummary } from '@/components/portal/quote-summary'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
 import {
   Dialog,
@@ -13,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { FieldError } from '@/components/ui/field-error'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -36,7 +40,6 @@ import { formatStayDate } from '@/lib/domain/dates'
 import { extrasFromLines } from '@/lib/domain/lines'
 import { formatCents } from '@/lib/domain/money'
 import { priceStay } from '@/lib/domain/pricing/stay'
-import { cn } from '@/lib/utils'
 
 import { amendBookingAction, type AmendBookingState } from './actions'
 
@@ -50,7 +53,8 @@ import { amendBookingAction, type AmendBookingState } from './actions'
  * price for something that does not exist yet. Pulling a shared shell out of
  * the two would have meant reworking a form that is already delivered and
  * working. What is genuinely shared — `priceStay`, the formatters, the line
- * shape — is imported, so no pricing logic is duplicated.
+ * shape, and now the section, field and summary-card primitives — is
+ * imported, so no pricing logic and no chrome is duplicated.
  *
  * Dates are URL state on the page around this, so changing them re-renders
  * availability server-side. They arrive here as fixed props, which is also how
@@ -168,9 +172,8 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
         <input type="hidden" name="unitTypeId" value={selectedUnit?.unitTypeId ?? ''} />
 
         <Card>
-          <section>
-            <SectionHeading>Unit</SectionHeading>
-            <div className="mt-md grid gap-sm">
+          <FormSection title="Unit">
+            <div className="grid gap-sm">
               <Label htmlFor="unitId">{units.length} available for these dates</Label>
               {/* The empty value is the placeholder, not an option in the
                   list: the control never offers a unit the form is not
@@ -202,11 +205,10 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
               ) : null}
               <FieldError message={state.fieldErrors?.unitId} />
             </div>
-          </section>
+          </FormSection>
 
-          <section className="mt-xl border-t border-divider pt-xl">
-            <SectionHeading>Guests</SectionHeading>
-            <div className="mt-md flex flex-wrap gap-lg">
+          <FormSection title="Guests">
+            <div className="flex flex-wrap gap-lg">
               <NumberField
                 id="chargeableGuests"
                 label={`Over ${config.paxExemptAgeMax}`}
@@ -224,11 +226,10 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
                 error={state.fieldErrors?.exemptGuests}
               />
             </div>
-          </section>
+          </FormSection>
 
-          <section className="mt-xl border-t border-divider pt-xl">
-            <SectionHeading>Extras</SectionHeading>
-            <div className="mt-md flex flex-wrap gap-lg">
+          <FormSection title="Extras">
+            <div className="flex flex-wrap gap-lg">
               <NumberField
                 id="sofaBeds"
                 label="Sofa beds"
@@ -246,11 +247,10 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
                 error={state.fieldErrors?.lateCheckOutHours}
               />
             </div>
-          </section>
+          </FormSection>
 
-          <section className="mt-xl border-t border-divider pt-xl">
-            <SectionHeading>Guest</SectionHeading>
-            <div className="mt-md grid gap-lg">
+          <FormSection title="Guest">
+            <div className="grid gap-lg">
               <TextField
                 id="guestName"
                 label="Name"
@@ -281,11 +281,10 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
                 />
               </div>
             </div>
-          </section>
+          </FormSection>
 
-          <section className="mt-xl border-t border-divider pt-xl">
-            <SectionHeading>Note</SectionHeading>
-            <div className="mt-md grid max-w-[420px] gap-sm">
+          <FormSection title="Note">
+            <div className="grid max-w-[420px] gap-sm">
               <Label htmlFor="reason">Why is this changing? (optional)</Label>
               <Textarea
                 id="reason"
@@ -299,78 +298,55 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
                 Kept with the change, your name and the time.
               </p>
             </div>
-          </section>
+          </FormSection>
         </Card>
 
-        <div className="lg:sticky lg:top-xl">
-          <Card>
-            <p className="micro-label text-muted-foreground">After this change</p>
-            <p className="mt-sm text-body-md-strong text-foreground">
-              {formatStayDate(checkIn)} → {formatStayDate(checkOut)}
-            </p>
-            <p className="mt-xxs text-body-sm text-muted-foreground">
+        <QuoteSummary
+          eyebrow="After this change"
+          headline={`${formatStayDate(checkIn)} → ${formatStayDate(checkOut)}`}
+          detail={
+            <>
               {selectedUnit?.ref ?? 'no unit chosen'} · {chargeableGuests + exemptGuests}{' '}
               {chargeableGuests + exemptGuests === 1 ? 'guest' : 'guests'}
-            </p>
+            </>
+          }
+        >
+          {quote?.ok ? (
+            <>
+              <QuoteLines lines={quote.lines} total={quote.total} />
 
-            {quote?.ok ? (
-              <>
-                <dl className="mt-lg divide-y divide-divider border-t border-divider">
-                  {quote.lines.map((line) => (
-                    <div
-                      key={`${line.type}-${line.description}`}
-                      className="flex items-baseline justify-between gap-lg py-sm"
-                    >
-                      <dt className="text-body-sm text-copy">{line.description}</dt>
-                      <dd className="text-body-sm-strong text-foreground tabular-nums">
-                        {formatCents(line.amount)}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+              {quote.total !== booking.total ? (
+                <p className="mt-sm text-body-sm text-copy">
+                  Was BND {formatCents(booking.total)} — a difference of BND{' '}
+                  {formatCents(Math.abs(quote.total - booking.total))}{' '}
+                  {quote.total > booking.total ? 'more' : 'less'}. Collect or refund it outside the
+                  system.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <Callout className="mt-lg">
+              {quote?.ok === false ? quote.error.message : 'Choose a unit to see the price.'}
+            </Callout>
+          )}
 
-                <div className="flex items-baseline justify-between gap-lg border-t border-divider pt-md">
-                  <span className="text-body-md-strong text-foreground">Total</span>
-                  <span className="text-display-sm text-foreground tabular-nums">
-                    BND {formatCents(quote.total)}
-                  </span>
-                </div>
+          <Button
+            type="button"
+            className="mt-lg w-full"
+            disabled={!canSave}
+            onClick={() => setIsConfirming(true)}
+          >
+            {isPending ? 'Saving…' : 'Review change'}
+          </Button>
 
-                {quote.total !== booking.total ? (
-                  <p className="mt-sm text-body-sm text-copy">
-                    Was BND {formatCents(booking.total)} — a difference of BND{' '}
-                    {formatCents(Math.abs(quote.total - booking.total))}{' '}
-                    {quote.total > booking.total ? 'more' : 'less'}. Collect or refund it outside
-                    the system.
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className="mt-lg rounded-md bg-negative-tint p-md text-body-sm text-negative-deep">
-                {quote?.ok === false ? quote.error.message : 'Choose a unit to see the price.'}
-              </p>
-            )}
+          {!isDirty ? (
+            <p className="mt-md text-caption text-muted-foreground">Nothing has changed yet.</p>
+          ) : null}
 
-            <Button
-              type="button"
-              className="mt-lg w-full"
-              disabled={!canSave}
-              onClick={() => setIsConfirming(true)}
-            >
-              {isPending ? 'Saving…' : 'Review change'}
-            </Button>
-
-            {!isDirty ? (
-              <p className="mt-md text-caption text-muted-foreground">Nothing has changed yet.</p>
-            ) : null}
-
-            {state.status === 'error' && state.message ? (
-              <p role="alert" className="mt-md text-body-sm text-negative-deep">
-                {state.message}
-              </p>
-            ) : null}
-          </Card>
-        </div>
+          {state.status === 'error' ? (
+            <FieldError className="mt-md" message={state.message} />
+          ) : null}
+        </QuoteSummary>
       </form>
 
       {isConfirming ? (
@@ -440,11 +416,7 @@ function ConfirmAmendmentDialog({
           </p>
         )}
 
-        {error ? (
-          <p role="alert" className="text-body-sm text-negative-deep">
-            {error}
-          </p>
-        ) : null}
+        <FieldError message={error} />
 
         <DialogFooter>
           <Button type="button" variant="tertiary" onClick={onClose}>
@@ -458,89 +430,5 @@ function ConfirmAmendmentDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
-
-/* ── Field primitives ──────────────────────────────────────────────────── */
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return <h2 className="micro-label text-muted-foreground">{children}</h2>
-}
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) {
-    return null
-  }
-
-  return <p className="text-body-sm text-negative-deep">{message}</p>
-}
-
-function NumberField({
-  id,
-  label,
-  value,
-  min,
-  onChange,
-  error,
-}: {
-  id: string
-  label: string
-  value: number
-  min: number
-  onChange: (value: number) => void
-  error?: string
-}) {
-  return (
-    <div className="grid w-[150px] gap-sm">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        name={id}
-        type="number"
-        inputMode="numeric"
-        min={min}
-        value={value}
-        aria-invalid={error ? true : undefined}
-        className="tabular-nums"
-        onChange={(event) => onChange(Math.max(min, Number(event.target.value) || 0))}
-      />
-      <FieldError message={error} />
-    </div>
-  )
-}
-
-function TextField({
-  id,
-  label,
-  type = 'text',
-  value,
-  onChange,
-  autoComplete,
-  className,
-  error,
-}: {
-  id: string
-  label: string
-  type?: string
-  value: string
-  onChange: (value: string) => void
-  autoComplete?: string
-  className?: string
-  error?: string
-}) {
-  return (
-    <div className={cn('grid gap-sm', className)}>
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        name={id}
-        type={type}
-        value={value}
-        autoComplete={autoComplete}
-        aria-invalid={error ? true : undefined}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      <FieldError message={error} />
-    </div>
   )
 }

@@ -55,7 +55,7 @@ export default function StayPage() {
                       : 'mt-md flex items-baseline justify-between gap-lg border-t border-divider pt-md'
                   }
                 >
-                  <dt className="text-body-md text-copy">{unit.name}</dt>
+                  <dt className="text-body-md text-muted-foreground">{unit.name}</dt>
                   <dd className="text-body-md-strong text-foreground tabular-nums">
                     from BND {unit.fromRateBnd} / night
                   </dd>

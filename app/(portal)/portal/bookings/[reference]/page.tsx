@@ -7,6 +7,7 @@ import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
+import { SectionCard } from '@/components/portal/section-card'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { hasPermission } from '@/lib/auth/permissions'
@@ -165,14 +166,9 @@ export default async function BookingDetailPage({ params }: PageProps) {
         booking={booking}
       />
 
-      <section aria-labelledby="history-heading" className="mt-xl">
-        <h2 id="history-heading" className="micro-label text-muted-foreground">
-          History
-        </h2>
-        <Card className="mt-md">
-          <BookingHistory events={events} actorNames={actorNames} />
-        </Card>
-      </section>
+      <SectionCard id="history-heading" title="History" className="mt-xl">
+        <BookingHistory events={events} actorNames={actorNames} />
+      </SectionCard>
     </div>
   )
 }
@@ -183,33 +179,28 @@ function StaySummary({ booking }: { booking: Booking }) {
   const nights = nightsBetween(booking.range.start, booking.range.end)
 
   return (
-    <section aria-labelledby="stay-heading">
-      <h2 id="stay-heading" className="micro-label text-muted-foreground">
-        Stay
-      </h2>
-      <Card className="mt-md">
-        {/* Two columns, not a stack: four readouts in one card read as a panel
-            of figures, and stacked they read as a form nobody can fill in. */}
-        <dl className="grid gap-md sm:grid-cols-2">
-          <Field label="Unit" value={booking.unitRef} mono />
-          <Field
-            label="Dates"
-            value={`${formatStayDate(booking.range.start)} → ${formatStayDate(booking.range.end)}`}
-            hint={`${nights} ${nights === 1 ? 'night' : 'nights'}`}
-          />
-          <Field
-            label="Guests"
-            value={String(booking.chargeableGuests)}
-            hint={
-              booking.exemptGuests > 0
-                ? `plus ${booking.exemptGuests} not counted towards occupancy`
-                : undefined
-            }
-          />
-          <Field label="Vehicle" value={booking.vehicleRegistration ?? '—'} mono />
-        </dl>
-      </Card>
-    </section>
+    <SectionCard id="stay-heading" title="Stay">
+      {/* Two columns, not a stack: four readouts in one card read as a panel
+          of figures, and stacked they read as a form nobody can fill in. */}
+      <dl className="grid gap-md sm:grid-cols-2">
+        <Field label="Unit" value={booking.unitRef} mono />
+        <Field
+          label="Dates"
+          value={`${formatStayDate(booking.range.start)} → ${formatStayDate(booking.range.end)}`}
+          hint={`${nights} ${nights === 1 ? 'night' : 'nights'}`}
+        />
+        <Field
+          label="Guests"
+          value={String(booking.chargeableGuests)}
+          hint={
+            booking.exemptGuests > 0
+              ? `plus ${booking.exemptGuests} not counted towards occupancy`
+              : undefined
+          }
+        />
+        <Field label="Vehicle" value={booking.vehicleRegistration ?? '—'} mono />
+      </dl>
+    </SectionCard>
   )
 }
 
@@ -226,58 +217,50 @@ function MoneySummary({ booking, payments }: { booking: Booking; payments: reado
   const awaiting = payments.some((payment) => payment.status === 'pending_verification')
 
   return (
-    <section aria-labelledby="money-heading">
-      <h2 id="money-heading" className="micro-label text-muted-foreground">
-        Money
-      </h2>
-      <Card className="mt-md">
-        <ul className="grid gap-sm">
-          {booking.lines.map((entry, index) => (
-            <li
-              key={`${entry.type}-${index}`}
-              className="flex items-baseline justify-between gap-lg"
-            >
-              <span className="text-body-sm text-copy">{entry.description}</span>
-              <span className="text-body-sm text-foreground tabular-nums">
-                {formatCents(entry.amount)}
-              </span>
-            </li>
-          ))}
-        </ul>
+    <SectionCard id="money-heading" title="Money">
+      <ul className="grid gap-sm">
+        {booking.lines.map((entry, index) => (
+          <li key={`${entry.type}-${index}`} className="flex items-baseline justify-between gap-lg">
+            <span className="text-body-sm text-muted-foreground">{entry.description}</span>
+            <span className="text-body-sm text-foreground tabular-nums">
+              {formatCents(entry.amount)}
+            </span>
+          </li>
+        ))}
+      </ul>
 
-        <div className="mt-lg flex items-baseline justify-between gap-lg border-t border-divider pt-lg">
-          <span className="text-body-md text-copy">Total</span>
-          <span className="text-display-xs text-foreground tabular-nums">
-            BND {formatCents(booking.total)}
-          </span>
-        </div>
+      <div className="mt-lg flex items-baseline justify-between gap-lg border-t border-divider pt-lg">
+        <span className="text-body-md text-muted-foreground">Total</span>
+        <span className="text-display-xs text-foreground tabular-nums">
+          BND {formatCents(booking.total)}
+        </span>
+      </div>
 
-        <div className="mt-md flex items-baseline justify-between gap-lg">
-          <span className="text-body-sm text-copy">
-            {awaiting ? 'Awaiting a transfer of' : 'Paid'}
-          </span>
-          <span className="text-body-sm text-foreground tabular-nums">
-            BND {formatCents(awaiting ? booking.total : paid)}
-          </span>
-        </div>
+      <div className="mt-md flex items-baseline justify-between gap-lg">
+        <span className="text-body-sm text-muted-foreground">
+          {awaiting ? 'Awaiting a transfer of' : 'Paid'}
+        </span>
+        <span className="text-body-sm text-foreground tabular-nums">
+          BND {formatCents(awaiting ? booking.total : paid)}
+        </span>
+      </div>
 
-        {/* Never summed into the total. prd.md §11: the security deposit is a
+      {/* Never summed into the total. prd.md §11: the security deposit is a
             refundable liability held against the booking, not revenue, and
             folding it in would misstate both the price and the deposit ledger. */}
-        <Card surface="inset" className="mt-lg">
-          <div className="flex items-baseline justify-between gap-lg">
-            <span className="text-body-sm text-copy">Security deposit</span>
-            <span className="text-body-sm text-foreground tabular-nums">
-              BND {formatCents(booking.securityDeposit)}
-            </span>
-          </div>
-          <p className="mt-xs text-caption text-muted-foreground">
-            Refundable, collected on arrival and released after inspection. Held separately from the
-            total above.
-          </p>
-        </Card>
+      <Card surface="inset" className="mt-lg">
+        <div className="flex items-baseline justify-between gap-lg">
+          <span className="text-body-sm text-muted-foreground">Security deposit</span>
+          <span className="text-body-sm text-foreground tabular-nums">
+            BND {formatCents(booking.securityDeposit)}
+          </span>
+        </div>
+        <p className="mt-xs text-caption text-muted-foreground">
+          Refundable, collected on arrival and released after inspection. Held separately from the
+          total above.
+        </p>
       </Card>
-    </section>
+    </SectionCard>
   )
 }
 
@@ -334,100 +317,95 @@ function PaymentsSection({
   booking: Booking
 }) {
   return (
-    <section aria-labelledby="payments-heading" className="mt-xl">
-      <h2 id="payments-heading" className="micro-label text-muted-foreground">
-        Payments
-      </h2>
-      <Card className="mt-md">
-        {payments.length === 0 ? (
-          <p className="text-body-sm text-muted-foreground">
-            No payment recorded against this booking.
-          </p>
-        ) : (
-          <ul className="grid gap-lg">
-            {/* Each row's headline sits `sm` clear of the metadata under it,
+    <SectionCard id="payments-heading" title="Payments" className="mt-xl">
+      {payments.length === 0 ? (
+        <p className="text-body-sm text-muted-foreground">
+          No payment recorded against this booking.
+        </p>
+      ) : (
+        <ul className="grid gap-lg">
+          {/* Each row's headline sits `sm` clear of the metadata under it,
                 which stays on its own tighter `xs` rhythm: what the payment is
                 reads as one line, and what is known about it as a block below
                 — not five lines evenly spaced. */}
-            {payments.map((payment) => (
-              <li
-                key={payment.id}
-                className="grid gap-sm border-b border-divider pb-lg last:border-0 last:pb-0"
-              >
-                {/* Method and its state on one line, with the amount opposite:
+          {payments.map((payment) => (
+            <li
+              key={payment.id}
+              className="grid gap-sm border-b border-divider pb-lg last:border-0 last:pb-0"
+            >
+              {/* Method and its state on one line, with the amount opposite:
                     "Cash, verified, 200.00" is how the row is read aloud, so
                     the chip belongs beside the method rather than on a line of
                     its own underneath it. */}
-                <div className="flex flex-wrap items-center justify-between gap-sm">
-                  <span className="flex flex-wrap items-center gap-sm">
-                    <span className="text-body-md text-foreground">
-                      {PAYMENT_METHOD_LABELS[payment.method]}
-                    </span>
-                    <Badge tone={payment.status === 'verified' ? 'positive' : 'warning'}>
-                      {payment.status === 'verified' ? 'Verified' : 'Awaiting verification'}
-                    </Badge>
-                    {payment.matchKind === 'manual' ? (
-                      <Badge tone="neutral">Matched by hand</Badge>
-                    ) : null}
+              <div className="flex flex-wrap items-center justify-between gap-sm">
+                <span className="flex flex-wrap items-center gap-sm">
+                  <span className="text-body-md text-foreground">
+                    {PAYMENT_METHOD_LABELS[payment.method]}
                   </span>
-                  <span className="text-body-md-strong text-foreground tabular-nums">
-                    BND {formatCents(payment.amount ?? payment.due)}
-                  </span>
-                </div>
+                  <Badge tone={payment.status === 'verified' ? 'positive' : 'warning'}>
+                    {payment.status === 'verified' ? 'Verified' : 'Awaiting verification'}
+                  </Badge>
+                  {payment.matchKind === 'manual' ? (
+                    <Badge tone="neutral">Matched by hand</Badge>
+                  ) : null}
+                </span>
+                <span className="text-body-md-strong text-foreground tabular-nums">
+                  BND {formatCents(payment.amount ?? payment.due)}
+                </span>
+              </div>
 
-                <div className="grid gap-xs">
-                  {payment.verifiedAt ? (
-                    <p className="text-caption text-muted-foreground">
-                      {payment.method === 'cash' ? 'Collected by ' : 'Verified by '}
-                      {payment.verifiedBy
-                        ? (actorNames.get(payment.verifiedBy) ?? 'a former staff member')
-                        : 'the system'}{' '}
-                      on {formatTimestamp(payment.verifiedAt)}
-                    </p>
-                  ) : (
-                    <p className="text-caption text-muted-foreground">
-                      Raised {formatTimestamp(payment.createdAt)} · no slip on file
-                    </p>
-                  )}
+              <div className="grid gap-xs">
+                {payment.verifiedAt ? (
+                  <p className="text-caption text-muted-foreground">
+                    {payment.method === 'cash' ? 'Collected by ' : 'Verified by '}
+                    {payment.verifiedBy
+                      ? (actorNames.get(payment.verifiedBy) ?? 'a former staff member')
+                      : 'the system'}{' '}
+                    on {formatTimestamp(payment.verifiedAt)}
+                  </p>
+                ) : (
+                  <p className="text-caption text-muted-foreground">
+                    Raised {formatTimestamp(payment.createdAt)} · no slip on file
+                  </p>
+                )}
 
-                  {/* Only shown when it differs — the ordinary case is that the
+                {/* Only shown when it differs — the ordinary case is that the
                       customer quoted the booking reference and there is nothing
                       to say about it. */}
-                  {payment.observedSender || payment.observedReference ? (
-                    <p className="text-caption text-muted-foreground">
-                      Bank showed{' '}
-                      {payment.observedSender ? <strong>{payment.observedSender}</strong> : null}
-                      {payment.observedSender && payment.observedReference ? ' · ' : null}
-                      {payment.observedReference ? (
-                        <span className="font-mono">{payment.observedReference}</span>
-                      ) : null}
-                      {payment.observedOn ? ` on ${formatStayDate(payment.observedOn)}` : null}
-                    </p>
-                  ) : null}
+                {payment.observedSender || payment.observedReference ? (
+                  <p className="text-caption text-muted-foreground">
+                    Bank showed{' '}
+                    {payment.observedSender ? <strong>{payment.observedSender}</strong> : null}
+                    {payment.observedSender && payment.observedReference ? ' · ' : null}
+                    {payment.observedReference ? (
+                      <span className="font-mono">{payment.observedReference}</span>
+                    ) : null}
+                    {payment.observedOn ? ` on ${formatStayDate(payment.observedOn)}` : null}
+                  </p>
+                ) : null}
 
-                  {payment.amountOverrideReason ? (
-                    <p className="text-body-sm text-copy">“{payment.amountOverrideReason}”</p>
-                  ) : null}
-                  {payment.matchReason ? (
-                    <p className="text-body-sm text-copy">“{payment.matchReason}”</p>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                {payment.amountOverrideReason ? (
+                  <p className="text-body-sm text-copy">“{payment.amountOverrideReason}”</p>
+                ) : null}
+                {payment.matchReason ? (
+                  <p className="text-body-sm text-copy">“{payment.matchReason}”</p>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
 
-        {pending && mayVerify ? (
-          <div className="mt-lg border-t border-divider pt-lg">
-            <PaymentActions
-              paymentId={pending.id}
-              bookingReference={booking.reference}
-              guestName={booking.guestName}
-              due={pending.due}
-            />
-          </div>
-        ) : null}
-      </Card>
-    </section>
+      {pending && mayVerify ? (
+        <div className="mt-lg border-t border-divider pt-lg">
+          <PaymentActions
+            paymentId={pending.id}
+            bookingReference={booking.reference}
+            guestName={booking.guestName}
+            due={pending.due}
+          />
+        </div>
+      ) : null}
+    </SectionCard>
   )
 }

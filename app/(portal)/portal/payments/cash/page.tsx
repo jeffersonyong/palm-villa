@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableHeaderRow,
   TableRow,
+  TableRowLink,
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
@@ -144,17 +145,14 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
             </TableHeader>
             <TableBody>
               {payments.map((payment) => (
-                <TableRow key={payment.id} className="relative focus-within:bg-muted/60">
+                <TableRow key={payment.id} interactive>
                   <TableCell className="tabular-nums">
                     {payment.collectedAt ? formatTimestamp(payment.collectedAt) : '—'}
                   </TableCell>
                   <TableCell className="font-mono text-foreground tabular-nums">
-                    <Link
-                      href={`/portal/bookings/${payment.bookingReference}`}
-                      className="rounded-sm outline-none after:absolute after:inset-0 focus-visible:underline"
-                    >
+                    <TableRowLink href={`/portal/bookings/${payment.bookingReference}`}>
                       {payment.bookingReference}
-                    </Link>
+                    </TableRowLink>
                   </TableCell>
                   <TableCell className="text-foreground">{payment.guestName}</TableCell>
                   <TableCell className="text-right tabular-nums">

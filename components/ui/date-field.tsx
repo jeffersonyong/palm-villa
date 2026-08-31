@@ -148,9 +148,11 @@ export function DateField({
         </button>
       </PopoverTrigger>
 
-      {/* The grid sizes itself, so the panel does too — a fixed width would
-          either crop the month or leave a margin of nothing beside it. */}
-      <PopoverContent align="start" className="w-auto p-0">
+      {/* Menu scale, like the select's panel: this opens out of a control, and
+          a date field beside a select in one form row should not round
+          differently the moment either is opened. It also sizes to the grid,
+          which a fixed width would either crop or leave a margin beside. */}
+      <PopoverContent align="start" scale="menu">
         <div className="p-lg">
           <DayCalendar value={value} onSelect={select} bounds={bounds} />
         </div>

@@ -1,0 +1,44 @@
+import { Card } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
+
+/**
+ * A card that names itself: the `micro` heading sits **inside** the card, above
+ * its content — exactly as `FormSection` does inside a form.
+ *
+ * The headings on the record screens used to float on the panel *above* their
+ * cards, which left the system saying "section" two different ways for one job.
+ * It read worse as well as inconsistently: on a white panel a label outside a
+ * white card has no surface of its own, so it detached from the box it named
+ * and the card below it looked untitled. Inside, a section is one object with a
+ * title on it.
+ *
+ * `mt-md` between the heading and its content is `FormSection`'s own measure,
+ * quoted here so the two constructions cannot drift apart.
+ *
+ * `h-full` lets two of these sit side by side in a grid and end level — the
+ * section stretches to the row, and the card fills it. In normal flow the
+ * parent's height is auto and it resolves to auto, so it costs nothing.
+ */
+export function SectionCard({
+  id,
+  title,
+  className,
+  children,
+}: {
+  /** Anchors `aria-labelledby`, so the section is announced by its heading. */
+  id: string
+  title: string
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section aria-labelledby={id} className={cn(className)}>
+      <Card className="h-full">
+        <h2 id={id} className="micro-label text-muted-foreground">
+          {title}
+        </h2>
+        <div className="mt-md">{children}</div>
+      </Card>
+    </section>
+  )
+}

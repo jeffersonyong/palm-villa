@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils'
 /**
  * Radix Dialog, themed to design.md §Elevation level 3.
  *
- * 14px radius, hairline, `shadow-overlay`, over a `scrim` backdrop. The title
- * is `display-xs` in Inter, not the display face: a modal heading is a section
+ * 16px radius, hairline, `shadow-overlay`, over a `scrim` backdrop. The title
+ * is `display-xs` in Geist, not the display face: a modal heading is a section
  * heading, and Fraunces is reserved for a screen's single h1 (§Typography).
  * The footer holds at most one primary fill, like any other screen region.
  *
@@ -77,7 +77,7 @@ function DialogContent({
         {showCloseButton ? (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-lg right-lg inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:pointer-events-none"
+            className="absolute top-lg right-lg inline-flex size-control-sm items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:pointer-events-none"
           >
             <XIcon className="size-4" />
             <span className="sr-only">Close</span>

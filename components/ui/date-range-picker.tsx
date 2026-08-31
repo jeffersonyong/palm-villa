@@ -84,7 +84,7 @@ export function DateRangePicker({
         />
       </PopoverTrigger>
 
-      <PopoverContent align="start" className="w-auto p-0">
+      <PopoverContent align="start" scale="menu">
         <div className="flex items-stretch">
           {/* The rail is bounded by a hairline like every other seam in the
               system, and it scrolls rather than stretching the panel if the

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Fraunces, Inter } from 'next/font/google'
+import { Fraunces, Geist, Geist_Mono } from 'next/font/google'
 
 import { Toaster } from '@/components/ui/toast'
 import { themeInitScript } from '@/lib/theme'
@@ -7,24 +7,42 @@ import { themeInitScript } from '@/lib/theme'
 import './globals.css'
 
 /**
- * Inter carries every surface; hierarchy comes from size, weight and tracking
- * — 400/500/600 is the whole range (design.md §Typography).
+ * Geist carries every surface; hierarchy comes from size, weight and tracking
+ * — 400/500/600/700 is the whole range, with 700 reaching only the two display
+ * headline sizes (design.md §Typography). A variable font, so every weight the
+ * scale asks for is a real one, and the figures are tabular.
  */
-const inter = Inter({
+const geist = Geist({
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-inter',
+  variable: '--font-geist',
+  display: 'swap',
+})
+
+/**
+ * The mono face — booking references, bank references, the one-time password.
+ * Geist's own cut, so `font-mono` reads as the same instrument rather than as
+ * whatever the operating system ships (Consolas here, Menlo there).
+ */
+const geistMono = Geist_Mono({
+  subsets: ['latin'],
+  variable: '--font-geist-mono',
   display: 'swap',
 })
 
 /**
  * The display face — the one sanctioned exception: public-site display
- * headlines (`display-md`+) only, one weight, never on the portal or field
- * surfaces (design.md §Typography).
+ * headlines (`display-md`+) only, never on the portal or field surfaces
+ * (design.md §Typography).
+ *
+ * Both weights are loaded because a public headline crosses the breakpoint
+ * between them: it sets `display-md` (600) on mobile and `display-lg` (700)
+ * from `sm` up. Without the second, the browser synthesises a faux bold, which
+ * on a serif smears the stroke contrast that is the whole reason this face is
+ * here.
  */
 const fraunces = Fraunces({
   subsets: ['latin'],
-  weight: ['600'],
+  weight: ['600', '700'],
   variable: '--font-fraunces',
   display: 'swap',
 })
@@ -38,17 +56,22 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  /* The light default (the white page ground). Theming ignores the OS
-     preference (globals.css), so the browser chrome must too — lib/theme.ts
-     rewrites this meta when the reader's explicit choice is dark. */
-  themeColor: '#ffffff',
+  /* The light default — `canvas-sunk`, the page ground. Theming ignores the OS
+     preference (globals.css), so the browser chrome must too; lib/theme.ts
+     rewrites this meta when the reader's explicit choice is dark, and holds
+     the matching pair. */
+  themeColor: '#f3f3f3',
   width: 'device-width',
   initialScale: 1,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${fraunces.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${geist.variable} ${geistMono.variable} ${fraunces.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/* Runs before paint so an explicit theme choice never flashes the
             other one. Everything else about theming is CSS. */}

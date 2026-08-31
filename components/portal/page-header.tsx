@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 /**
  * The portal screen header: title, optional description, optional actions.
  *
- * The title is **Inter**, like everything else on this surface. It wore
+ * The title is **Geist**, like everything else on this surface. It wore
  * Fraunces until 2026-08-31, on the reasoning that the brand voice should
  * carry through the booking journey rather than stop at the portal door; the
  * screens said otherwise. At `display-sm` the face is too small to show the
@@ -44,7 +44,12 @@ export function PageHeader({ title, meta, description, actions, className }: Pag
           <h1 className="text-display-sm text-foreground">{title}</h1>
           {meta}
         </div>
-        {description ? <p className="mt-xs text-body-md text-copy">{description}</p> : null}
+        {/* The description is *about* the screen rather than content on it, so
+            it takes the secondary step — the same side of the two-step ladder
+            as a field label or a table header (design.md §Typography). */}
+        {description ? (
+          <p className="mt-xs text-body-md text-muted-foreground">{description}</p>
+        ) : null}
       </div>
       {actions ? <div className="flex items-center gap-sm">{actions}</div> : null}
     </header>

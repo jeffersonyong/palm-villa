@@ -87,7 +87,7 @@ export function OverlayDemos() {
     <div className="space-y-xl">
       <Row
         title="Dialog"
-        note="rounded-xl · border-border · shadow-overlay over bg-scrim. Title is display-xs in Inter — a modal heading is a section heading, so the display face stays off it."
+        note="rounded-xl · border-border · shadow-overlay over bg-scrim. Title is display-xs in Geist — a modal heading is a section heading, so the display face stays off it."
       >
         <Dialog>
           <DialogTrigger asChild>
@@ -179,7 +179,7 @@ export function OverlayDemos() {
 
       <Row
         title="Tooltip"
-        note="The small-overlay exception: control radius on the invert surface, because a 14px corner on a caption chip reads as a pill. One TooltipProvider wraps the surface — never one per tooltip."
+        note="The small-overlay exception: control radius on the invert surface, because a 16px corner on a caption chip reads as a pill. One TooltipProvider wraps the surface — never one per tooltip."
       >
         <TooltipProvider>
           <Tooltip>
