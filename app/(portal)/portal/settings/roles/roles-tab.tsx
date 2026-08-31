@@ -1,38 +1,73 @@
 'use client'
 
-import { useActionState, useEffect, useRef, useState } from 'react'
+import { Fragment, useState, useTransition } from 'react'
+import { Lock } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { Callout } from '@/components/ui/callout'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableHeaderRow,
+  TableRow,
+  TableRowHead,
+} from '@/components/ui/table'
 import { toast } from '@/components/ui/toast-store'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Permission } from '@/lib/auth/permissions'
-import type { RoleWithPermissions } from '@/lib/db/staff'
+import type { RoleWithPermissions, StaffAccount } from '@/lib/db/staff'
+import { cn } from '@/lib/utils'
 
 import { setRolePermissionsAction, type RoleAdminState } from './actions'
 import { PERMISSION_GROUPS, PERMISSION_LABELS } from './permission-labels'
 
 /**
- * The Roles tab (capability F2): each role's permission set, editable without
- * a developer. One card: the role switcher sits where a heading would — the
- * selected segment already names the role — with Save on the far right of the
- * same row. Every role's form stays mounted (`forceMount`, hidden when
- * inactive) so switching away and back keeps unsaved ticks; each role is
- * still its own form, so a save cannot half-apply across roles.
+ * The Roles tab (capability F2): what each role may do, editable without a
+ * developer.
  *
- * Save is dirty-gated: it only enables once the draft differs from what the
- * server holds, so an idle click cannot fire a no-op write (and its audit
- * event). The checkboxes are controlled and the drafts live here so the
- * shared header Save — wired to the active role's form via the `form`
- * attribute — can know whether that role changed. Save stays secondary: the
- * screen's single primary fill is "New staff account" in the tab row above
- * (design.md — one primary per region).
+ * **A matrix, because the question is comparative.** Permissions are rows and
+ * roles are columns, on the portal's signature table. The screen exists to
+ * answer "who can verify a payment?" and "does Housekeeping see identity
+ * documents?" — questions a one-role-at-a-time switcher could only answer by
+ * being visited five times and remembered. Sixteen permissions across five
+ * roles is eighty cells of fixed, comparable data; it fits on one screen, so it
+ * belongs on one screen. The switcher this replaces also stacked a second
+ * segmented control directly under the page's own, where the second one was
+ * really a column header in disguise.
+ *
+ * **Every draft is visible, which is the point.** The previous shape kept a
+ * draft per role but showed one at a time, so edits to a hidden role could be
+ * lost with no warning — ticked, switched away from, and gone on the next
+ * navigation. Here nothing is hidden: the status line names every changed role
+ * and Save writes all of them.
+ *
+ * **Each role is still its own write.** Save loops the dirty roles and calls
+ * `setRolePermissionsAction` once per role, so each lands as one transaction
+ * with its own audit event (migration 001100) exactly as before — a matrix
+ * that saved all five in one call would be the thing that could half-apply.
+ * The trade is that a failure part-way leaves the earlier roles saved; that is
+ * reported rather than swallowed, and the roles that failed stay dirty.
+ *
+ * Save is dirty-gated: it only enables once a draft differs from what the
+ * server holds, so an idle click cannot fire a no-op write and its audit
+ * event. It stays secondary — the screen's single primary fill is "New staff
+ * account" in the tab row above (design.md — one primary per region).
  */
 
-const initialState: RoleAdminState = { status: 'idle' }
+const PERMISSION_COUNT = PERMISSION_GROUPS.reduce(
+  (total, group) => total + group.permissions.length,
+  0,
+)
+
+/** Only ever a no-op write away from the guard in lib/auth/role-guards.ts. */
+function isLockedCell(role: RoleWithPermissions, permission: Permission): boolean {
+  return role.slug === 'admin' && permission === 'config.manage'
+}
 
 function draftsFromRoles(
   roles: readonly RoleWithPermissions[],
@@ -48,44 +83,30 @@ function isDraftDirty(draft: ReadonlySet<string> | undefined, saved: readonly st
   return draft.size !== saved.length || saved.some((permission) => !draft.has(permission))
 }
 
-function roleFormId(roleId: string): string {
-  return `role-form-${roleId}`
+/** "Front Office", "Front Office and Finance", "Front Office, Finance and Admin". */
+function listNames(names: readonly string[]): string {
+  if (names.length <= 1) {
+    return names[0] ?? ''
+  }
+
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
-export function RolesTab({ roles }: { roles: readonly RoleWithPermissions[] }) {
-  const firstRole = roles[0]
+interface RolesTabProps {
+  roles: readonly RoleWithPermissions[]
+  /** For the head count under each role — how many people this edit reaches. */
+  staff: readonly StaffAccount[]
+}
 
-  const [activeRoleId, setActiveRoleId] = useState(firstRole?.id ?? '')
-  // One action state shared by every role's form: only one can submit at a
-  // time, and `submittedRoleId` scopes the outcome message to the form that
-  // produced it.
-  const [state, formAction, isPending] = useActionState(setRolePermissionsAction, initialState)
-  const [submittedRoleId, setSubmittedRoleId] = useState<string | null>(null)
+export function RolesTab({ roles, staff }: RolesTabProps) {
   const [drafts, setDrafts] = useState(() => draftsFromRoles(roles))
+  const [failures, setFailures] = useState<readonly string[]>([])
+  // Highlighting the hovered column is what makes a five-wide row readable;
+  // the row half of the cross is the table's own hover.
+  const [hotRoleId, setHotRoleId] = useState<string | null>(null)
+  const [isSaving, startSaving] = useTransition()
 
-  // Each completed action produces a new state object; the ref makes sure a
-  // re-render with the same outcome (switching roles, say) cannot re-toast.
-  const lastHandledState = useRef<RoleAdminState>(initialState)
-
-  useEffect(() => {
-    if (state === lastHandledState.current) return
-
-    lastHandledState.current = state
-
-    if (state.status === 'done' && submittedRoleId) {
-      const savedRole = roles.find((role) => role.id === submittedRoleId)
-
-      toast({
-        tone: 'positive',
-        title: 'Permissions saved',
-        description: savedRole
-          ? `Everyone holding ${savedRole.name} has them from their next action.`
-          : undefined,
-      })
-    }
-  }, [state, submittedRoleId, roles])
-
-  if (!firstRole) {
+  if (roles.length === 0) {
     // Roles are seeded with the property, so this is a data problem, not a
     // fresh-install state.
     return (
@@ -96,10 +117,14 @@ export function RolesTab({ roles }: { roles: readonly RoleWithPermissions[] }) {
     )
   }
 
-  const activeRole = roles.find((role) => role.id === activeRoleId)
-  const isActiveDirty = activeRole
-    ? isDraftDirty(drafts.get(activeRole.id), activeRole.permissions)
-    : false
+  const dirtyRoles = roles.filter((role) => isDraftDirty(drafts.get(role.id), role.permissions))
+
+  const headCountByRoleId = new Map(
+    roles.map((role) => [
+      role.id,
+      staff.filter((account) => account.roles.some((held) => held.id === role.id)).length,
+    ]),
+  )
 
   const togglePermission = (roleId: string, permission: Permission, checked: boolean) => {
     setDrafts((previous) => {
@@ -115,119 +140,182 @@ export function RolesTab({ roles }: { roles: readonly RoleWithPermissions[] }) {
     })
   }
 
-  return (
-    <Card>
-      <Tabs value={activeRoleId} onValueChange={setActiveRoleId}>
-        <div className="flex flex-wrap items-center justify-between gap-lg">
-          <TabsList aria-label="Role">
-            {roles.map((role) => (
-              <TabsTrigger key={role.id} value={role.id}>
-                {role.name}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+  const save = () => {
+    // Snapshot the targets: `dirtyRoles` is derived from props that the
+    // revalidation below will change underneath the loop.
+    const targets = dirtyRoles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      permissions: [...(drafts.get(role.id) ?? [])],
+    }))
 
-          <Button
-            type="submit"
-            form={roleFormId(activeRoleId)}
-            variant="secondary"
-            disabled={!isActiveDirty || isPending}
-          >
-            {isPending && submittedRoleId === activeRoleId ? 'Saving…' : 'Save'}
-          </Button>
-        </div>
+    startSaving(async () => {
+      const saved: string[] = []
+      const refused: string[] = []
 
-        {roles.map((role) => (
-          <TabsContent
-            key={role.id}
-            value={role.id}
-            forceMount
-            className="data-[state=inactive]:hidden"
-          >
-            <RoleForm
-              role={role}
-              draft={drafts.get(role.id) ?? new Set()}
-              result={submittedRoleId === role.id ? state : null}
-              formAction={formAction}
-              onSubmit={() => setSubmittedRoleId(role.id)}
-              onToggle={togglePermission}
-            />
-          </TabsContent>
-        ))}
-      </Tabs>
-    </Card>
-  )
-}
+      for (const target of targets) {
+        const formData = new FormData()
 
-interface RoleFormProps {
-  role: RoleWithPermissions
-  draft: ReadonlySet<string>
-  /** The shared action state, or null when another role submitted last. */
-  result: RoleAdminState | null
-  formAction: (formData: FormData) => void
-  onSubmit: () => void
-  onToggle: (roleId: string, permission: Permission, checked: boolean) => void
-}
+        formData.set('roleId', target.id)
+        for (const permission of target.permissions) {
+          formData.append('permissions', permission)
+        }
 
-function RoleForm({ role, draft, result, formAction, onSubmit, onToggle }: RoleFormProps) {
-  const isAdminRole = role.slug === 'admin'
+        const idle: RoleAdminState = { status: 'idle' }
+        const result = await setRolePermissionsAction(idle, formData)
+
+        if (result.status === 'done') {
+          saved.push(target.name)
+        } else {
+          refused.push(`${target.name}: ${result.message ?? 'Could not save this role.'}`)
+        }
+      }
+
+      setFailures(refused)
+
+      if (saved.length > 0) {
+        toast({
+          tone: 'positive',
+          title: saved.length === 1 ? 'Permissions saved' : `${saved.length} roles saved`,
+          description: `Everyone holding ${listNames(saved)} has them from their next action.`,
+        })
+      }
+    })
+  }
 
   return (
-    <form id={roleFormId(role.id)} action={formAction} onSubmit={onSubmit}>
-      <input type="hidden" name="roleId" value={role.id} />
+    <TooltipProvider>
+      <div className="flex flex-wrap items-center justify-between gap-lg pb-lg">
+        <p className="text-body-sm text-muted-foreground">
+          {dirtyRoles.length === 0
+            ? `${PERMISSION_COUNT} permissions across ${roles.length} roles.`
+            : `Unsaved changes to ${listNames(dirtyRoles.map((role) => role.name))}.`}
+        </p>
 
-      {/* The visible role name lives on the segment chip; screen-reader users
-          browsing by heading still get it inside the panel. */}
-      <h2 className="sr-only">What {role.name} staff can do</h2>
-
-      <div className="grid gap-lg sm:grid-cols-2 lg:grid-cols-3">
-        {PERMISSION_GROUPS.map((group) => (
-          <fieldset key={group.label}>
-            <legend className="micro-label text-muted-foreground">{group.label}</legend>
-            <div className="mt-sm grid gap-sm">
-              {group.permissions.map((permission) => {
-                const isLocked = isAdminRole && permission === 'config.manage'
-                const id = `${role.id}-${permission}`
-
-                return (
-                  <div key={permission} className="flex items-center gap-sm">
-                    {/* A disabled control submits nothing, so the locked
-                        permission rides a hidden input instead. */}
-                    {isLocked ? (
-                      <input type="hidden" name="permissions" value={permission} />
-                    ) : null}
-                    <Checkbox
-                      id={id}
-                      name="permissions"
-                      value={permission}
-                      checked={isLocked || draft.has(permission)}
-                      onCheckedChange={(checked) => onToggle(role.id, permission, checked === true)}
-                      // The Admin role always keeps role administration —
-                      // enforced server-side too (lib/auth/role-guards.ts).
-                      disabled={isLocked}
-                    />
-                    <Label htmlFor={id} className={isLocked ? 'text-muted-foreground' : undefined}>
-                      {PERMISSION_LABELS[permission]}
-                    </Label>
-                  </div>
-                )
-              })}
-            </div>
-          </fieldset>
-        ))}
+        <Button variant="secondary" onClick={save} disabled={dirtyRoles.length === 0 || isSaving}>
+          {isSaving
+            ? 'Saving…'
+            : dirtyRoles.length > 1
+              ? `Save ${dirtyRoles.length} roles`
+              : 'Save'}
+        </Button>
       </div>
 
-      {/* Errors stay inline, next to the choices they refer to; the success
-          confirmation is a toast (RolesTab), since a saved state has nothing
-          on this form left to point at. */}
-      {result?.status === 'error' && result.message ? (
-        <p
-          role="alert"
-          className="mt-lg rounded-md bg-negative-tint px-md py-sm text-body-sm text-negative-deep"
-        >
-          {result.message}
-        </p>
+      {failures.length > 0 ? (
+        <Callout role="alert" className="mb-lg">
+          <span>
+            {failures.map((failure) => (
+              <span key={failure} className="block">
+                {failure}
+              </span>
+            ))}
+          </span>
+        </Callout>
       ) : null}
-    </form>
+
+      {/* The matrix is a dense object, not a full-bleed list. Auto layout hands
+          the slack to the widest column — the permission names took ~550px of a
+          1500px panel and left every tick a hand's width from the label it
+          belongs to — so the columns are declared and the layout is fixed:
+          280 + 5 × 136 = 960, which is also the container's cap. Below it the
+          columns scroll sideways and the names stay pinned. */}
+      <Table
+        scrollX
+        className="min-w-[960px] table-fixed"
+        containerClassName="max-w-[960px]"
+        onMouseLeave={() => setHotRoleId(null)}
+      >
+        <TableHeader>
+          <TableHeaderRow>
+            <TableHead className="sticky left-0 z-10 w-[280px] bg-muted">Permission</TableHead>
+            {roles.map((role) => (
+              <TableHead
+                key={role.id}
+                className={cn(
+                  'w-[136px] px-sm text-center align-bottom whitespace-nowrap',
+                  hotRoleId === role.id && 'bg-secondary-hover',
+                )}
+                onMouseEnter={() => setHotRoleId(role.id)}
+              >
+                <span className="block text-foreground">{role.name}</span>
+                <span className="mt-xxs block text-caption font-normal tracking-normal whitespace-nowrap normal-case tabular-nums">
+                  {headCountByRoleId.get(role.id) === 1
+                    ? '1 person'
+                    : `${headCountByRoleId.get(role.id) ?? 0} people`}
+                </span>
+              </TableHead>
+            ))}
+          </TableHeaderRow>
+        </TableHeader>
+
+        <TableBody>
+          {PERMISSION_GROUPS.map((group) => (
+            <Fragment key={group.label}>
+              {/* The group's name in the labelling voice, on white with the
+                  divider above it — FormSection's grammar, not a second gray
+                  strip (design.md — no band alternation). `border-b-0` because
+                  `divide-y` rules each row along its *bottom*: left alone, the
+                  label would carry a rule under it as well as the one above and
+                  read as a boxed heading rather than a heading. */}
+              <TableRow className="border-b-0 hover:bg-transparent">
+                <TableRowHead
+                  scope="rowgroup"
+                  className="sticky left-0 z-10 bg-card pt-lg pb-xs micro-label text-muted-foreground"
+                >
+                  {group.label}
+                </TableRowHead>
+                <TableCell colSpan={roles.length} className="pt-lg pb-xs" />
+              </TableRow>
+
+              {group.permissions.map((permission) => (
+                <TableRow key={permission} className="group">
+                  <TableRowHead className="sticky left-0 z-10 bg-card group-hover:bg-muted/60">
+                    {PERMISSION_LABELS[permission]}
+                  </TableRowHead>
+
+                  {roles.map((role) => {
+                    const isLocked = isLockedCell(role, permission)
+
+                    return (
+                      <TableCell
+                        key={role.id}
+                        className={cn('px-md text-center', hotRoleId === role.id && 'bg-muted/60')}
+                        onMouseEnter={() => setHotRoleId(role.id)}
+                        onFocus={() => setHotRoleId(role.id)}
+                      >
+                        {isLocked ? (
+                          <Tooltip>
+                            <TooltipTrigger
+                              // Focusable so the reason is reachable from the
+                              // keyboard, but not a control — there is nothing
+                              // to toggle.
+                              className="inline-flex rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                              aria-label={`${PERMISSION_LABELS[permission]} — ${role.name}, always granted`}
+                            >
+                              <Lock className="size-4 text-muted-foreground" aria-hidden />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Admin always keeps this — without it, nobody could undo a change here.
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Checkbox
+                            checked={drafts.get(role.id)?.has(permission) ?? false}
+                            onCheckedChange={(checked) =>
+                              togglePermission(role.id, permission, checked === true)
+                            }
+                            aria-label={`${PERMISSION_LABELS[permission]} — ${role.name}`}
+                          />
+                        )}
+                      </TableCell>
+                    )
+                  })}
+                </TableRow>
+              ))}
+            </Fragment>
+          ))}
+        </TableBody>
+      </Table>
+    </TooltipProvider>
   )
 }

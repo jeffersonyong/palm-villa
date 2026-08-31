@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { initials } from '@/components/ui/avatar-identity'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
@@ -24,6 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Pagination } from '@/components/ui/pagination'
@@ -239,24 +241,12 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
 
 /* ── Shared dialog pieces ──────────────────────────────────────────────── */
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) {
-    return null
-  }
-
-  return <p className="text-body-sm text-negative-deep">{message}</p>
-}
-
 function FormError({ state }: { state: RoleAdminState }) {
   if (state.status !== 'error' || !state.message) {
     return null
   }
 
-  return (
-    <p role="alert" className="rounded-md bg-negative-tint p-md text-body-sm text-negative-deep">
-      {state.message}
-    </p>
-  )
+  return <Callout role="alert">{state.message}</Callout>
 }
 
 /**
@@ -324,7 +314,7 @@ function PasswordHandover({ note, password }: { note: string; password: string }
 
   return (
     <div className="grid gap-md">
-      <p className="rounded-md bg-positive-tint p-md text-body-sm text-positive-deep">{note}</p>
+      <Callout tone="positive">{note}</Callout>
       <div className="flex items-center justify-between gap-lg rounded-md border border-border px-md py-sm">
         <code className="font-mono text-body-md text-foreground select-all">{password}</code>
         <Button type="button" variant="secondary" onClick={copy}>
