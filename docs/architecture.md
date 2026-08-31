@@ -26,7 +26,7 @@
 | Validation | **Zod** | Server actions receive untyped `FormData` from a browser. An authenticated staff member is trusted; the request is not. One schema per action, parsed before anything reaches `lib/domain`. Added 2026-08-27 with the walk-in booking form. |
 | Testing | **Vitest** (dev) | §2 makes coverage mandatory for the pricing engine and state machine, which needs a runner. Node's built-in `node:test` was the zero-dependency alternative but needs stable TS stripping the `engines` floor of Node 20.9 lacks, so it would have pulled in `tsx` regardless. Added 2026-08-27. |
 
-**Explicitly not used:** no monorepo (route groups are sufficient at this scale), no separate API service, no native apps, no client-side direct database access, no form-state library (React 19 `useActionState` plus a server action covers the forms in scope), no date-picker library (see `design.md` — no calendar component is specified yet).
+**Explicitly not used:** no monorepo (route groups are sufficient at this scale), no separate API service, no native apps, no client-side direct database access, no form-state library (React 19 `useActionState` plus a server action covers the forms in scope), no date-picker library — the single-date field and the two-month range picker are built on one shared month grid in `components/ui`, from the tokens, and are specified in `design.md` §Components (the public availability calendar, A1, is still unspecified and unbuilt). A library would have arrived with its own geometry and its own opinion about ranges.
 
 ### 1.1 Ownership boundary
 
