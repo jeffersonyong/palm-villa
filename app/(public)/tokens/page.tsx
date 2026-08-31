@@ -370,7 +370,7 @@ export default function TokensPage() {
       <Section
         id="geometry"
         title="Radii and spacing"
-        lead="6px for controls, 10px for cards, 14px for overlays. Pills are badges only. Spacing runs on a 4px base."
+        lead="6px for controls, 12px for cards and menu panels, 16px for overlays. Pills are badges only. Spacing runs on a 4px base."
       >
         <div className="grid gap-xl lg:grid-cols-2">
           <div>
