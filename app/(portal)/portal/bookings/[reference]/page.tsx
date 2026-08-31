@@ -112,13 +112,16 @@ export default async function BookingDetailPage({ params }: PageProps) {
     <div className="max-w-[1120px]">
       <PageHeader
         title={booking.reference}
-        description={
-          <span className="flex flex-wrap items-center gap-sm">
+        // On the title's line, not under it: the reference, the state it is in
+        // and whose booking it is are one thought, and staff read them
+        // together (design.md §Components — Portal screen header).
+        meta={
+          <>
             <BookingStatusBadge status={booking.status} />
-            <span>
+            <span className="text-body-md text-copy">
               {booking.guestName} · {booking.guestPhone}
             </span>
-          </span>
+          </>
         }
         actions={
           <>
@@ -185,7 +188,9 @@ function StaySummary({ booking }: { booking: Booking }) {
         Stay
       </h2>
       <Card className="mt-md">
-        <dl className="grid gap-md">
+        {/* Two columns, not a stack: four readouts in one card read as a panel
+            of figures, and stacked they read as a form nobody can fill in. */}
+        <dl className="grid gap-md sm:grid-cols-2">
           <Field label="Unit" value={booking.unitRef} mono />
           <Field
             label="Dates"
@@ -340,64 +345,73 @@ function PaymentsSection({
           </p>
         ) : (
           <ul className="grid gap-lg">
+            {/* Each row's headline sits `sm` clear of the metadata under it,
+                which stays on its own tighter `xs` rhythm: what the payment is
+                reads as one line, and what is known about it as a block below
+                — not five lines evenly spaced. */}
             {payments.map((payment) => (
               <li
                 key={payment.id}
-                className="grid gap-xs border-b border-divider pb-lg last:border-0 last:pb-0"
+                className="grid gap-sm border-b border-divider pb-lg last:border-0 last:pb-0"
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-sm">
-                  <span className="text-body-md text-foreground">
-                    {PAYMENT_METHOD_LABELS[payment.method]}
+                {/* Method and its state on one line, with the amount opposite:
+                    "Cash, verified, 200.00" is how the row is read aloud, so
+                    the chip belongs beside the method rather than on a line of
+                    its own underneath it. */}
+                <div className="flex flex-wrap items-center justify-between gap-sm">
+                  <span className="flex flex-wrap items-center gap-sm">
+                    <span className="text-body-md text-foreground">
+                      {PAYMENT_METHOD_LABELS[payment.method]}
+                    </span>
+                    <Badge tone={payment.status === 'verified' ? 'positive' : 'warning'}>
+                      {payment.status === 'verified' ? 'Verified' : 'Awaiting verification'}
+                    </Badge>
+                    {payment.matchKind === 'manual' ? (
+                      <Badge tone="neutral">Matched by hand</Badge>
+                    ) : null}
                   </span>
                   <span className="text-body-md-strong text-foreground tabular-nums">
                     BND {formatCents(payment.amount ?? payment.due)}
                   </span>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-sm">
-                  <Badge tone={payment.status === 'verified' ? 'positive' : 'warning'}>
-                    {payment.status === 'verified' ? 'Verified' : 'Awaiting verification'}
-                  </Badge>
-                  {payment.matchKind === 'manual' ? (
-                    <Badge tone="neutral">Matched by hand</Badge>
+                <div className="grid gap-xs">
+                  {payment.verifiedAt ? (
+                    <p className="text-caption text-muted-foreground">
+                      {payment.method === 'cash' ? 'Collected by ' : 'Verified by '}
+                      {payment.verifiedBy
+                        ? (actorNames.get(payment.verifiedBy) ?? 'a former staff member')
+                        : 'the system'}{' '}
+                      on {formatTimestamp(payment.verifiedAt)}
+                    </p>
+                  ) : (
+                    <p className="text-caption text-muted-foreground">
+                      Raised {formatTimestamp(payment.createdAt)} · no slip on file
+                    </p>
+                  )}
+
+                  {/* Only shown when it differs — the ordinary case is that the
+                      customer quoted the booking reference and there is nothing
+                      to say about it. */}
+                  {payment.observedSender || payment.observedReference ? (
+                    <p className="text-caption text-muted-foreground">
+                      Bank showed{' '}
+                      {payment.observedSender ? <strong>{payment.observedSender}</strong> : null}
+                      {payment.observedSender && payment.observedReference ? ' · ' : null}
+                      {payment.observedReference ? (
+                        <span className="font-mono">{payment.observedReference}</span>
+                      ) : null}
+                      {payment.observedOn ? ` on ${formatStayDate(payment.observedOn)}` : null}
+                    </p>
+                  ) : null}
+
+                  {payment.amountOverrideReason ? (
+                    <p className="text-body-sm text-copy">“{payment.amountOverrideReason}”</p>
+                  ) : null}
+                  {payment.matchReason ? (
+                    <p className="text-body-sm text-copy">“{payment.matchReason}”</p>
                   ) : null}
                 </div>
-
-                {payment.verifiedAt ? (
-                  <p className="text-caption text-muted-foreground">
-                    {payment.method === 'cash' ? 'Collected by ' : 'Verified by '}
-                    {payment.verifiedBy
-                      ? (actorNames.get(payment.verifiedBy) ?? 'a former staff member')
-                      : 'the system'}{' '}
-                    on {formatTimestamp(payment.verifiedAt)}
-                  </p>
-                ) : (
-                  <p className="text-caption text-muted-foreground">
-                    Raised {formatTimestamp(payment.createdAt)} · no slip on file
-                  </p>
-                )}
-
-                {/* Only shown when it differs — the ordinary case is that the
-                    customer quoted the booking reference and there is nothing
-                    to say about it. */}
-                {payment.observedSender || payment.observedReference ? (
-                  <p className="text-caption text-muted-foreground">
-                    Bank showed{' '}
-                    {payment.observedSender ? <strong>{payment.observedSender}</strong> : null}
-                    {payment.observedSender && payment.observedReference ? ' · ' : null}
-                    {payment.observedReference ? (
-                      <span className="font-mono">{payment.observedReference}</span>
-                    ) : null}
-                    {payment.observedOn ? ` on ${formatStayDate(payment.observedOn)}` : null}
-                  </p>
-                ) : null}
-
-                {payment.amountOverrideReason ? (
-                  <p className="mt-xxs text-body-sm text-copy">“{payment.amountOverrideReason}”</p>
-                ) : null}
-                {payment.matchReason ? (
-                  <p className="mt-xxs text-body-sm text-copy">“{payment.matchReason}”</p>
-                ) : null}
               </li>
             ))}
           </ul>

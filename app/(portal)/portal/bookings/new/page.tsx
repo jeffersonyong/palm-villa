@@ -145,24 +145,26 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
       </form>
 
       {hasDates && (
-        <Card className="mt-xl">
-          <dl className="grid grid-cols-2 gap-lg sm:grid-cols-4">
-            {config.unitTypes.map((type) => {
-              const free = availableByType[type.id] ?? 0
-              const total = totalByType[type.id] ?? 0
+        /* Tiles on the page ground, uncontained — the dashboard strip's
+           construction, so the two screens' "how many" readouts are the same
+           object. The card that used to hold them drew a box around four
+           boxes and opened the screen with a panel of chrome. */
+        <dl className="mt-xl grid grid-cols-2 gap-md sm:grid-cols-4">
+          {config.unitTypes.map((type) => {
+            const free = availableByType[type.id] ?? 0
+            const total = totalByType[type.id] ?? 0
 
-              return (
-                <div key={type.id}>
-                  <dt className="micro-label text-muted-foreground">{type.name}</dt>
-                  <dd className="mt-xs text-display-xs text-foreground tabular-nums">
-                    {free}
-                    <span className="text-body-sm text-muted-foreground"> of {total} free</span>
-                  </dd>
-                </div>
-              )
-            })}
-          </dl>
-        </Card>
+            return (
+              <Card key={type.id} surface="inset" placement="page">
+                <dt className="micro-label text-muted-foreground">{type.name}</dt>
+                <dd className="mt-xs text-display-xs text-foreground tabular-nums">
+                  {free}
+                  <span className="text-body-sm text-muted-foreground"> of {total} free</span>
+                </dd>
+              </Card>
+            )
+          })}
+        </dl>
       )}
 
       <section className="mt-xl">

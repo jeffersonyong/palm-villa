@@ -4,11 +4,8 @@ import { FunnelX } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 
-import {
-  bookingStatusLabel,
-  bookingStatusTone,
-  type BookingStatusTone,
-} from '@/components/portal/booking-status-badge'
+import { bookingStatusLabel, bookingStatusTone } from '@/components/portal/booking-status-badge'
+import { StatusDot } from '@/components/portal/status-dot'
 import { Button } from '@/components/ui/button'
 import type { StayDateRange } from '@/components/ui/calendar'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
@@ -51,7 +48,7 @@ const STATUS_OPTIONS: readonly MultiSelectOption<BookingStatus>[] = BOOKING_STAT
   (status) => ({
     value: status,
     label: bookingStatusLabel(status),
-    leading: <StatusDot status={status} />,
+    leading: <StatusDot tone={bookingStatusTone(status)} />,
   }),
 )
 
@@ -116,31 +113,5 @@ export function BookingsFilters({ statuses, from, to }: BookingsFiltersProps) {
         </Button>
       ) : null}
     </div>
-  )
-}
-
-/**
- * The status hue at icon scale, so the option list carries the same language as
- * the badges in the table below it.
- *
- * design.md reserves the mid semantic hues for icons, which is what this is —
- * and status colour is meaning rather than brand, so it stays identical on the
- * monochrome operations surface. The tone mapping is *not* duplicated here: it
- * comes from the badge module, which owns it.
- */
-const DOT_CLASSES: Record<BookingStatusTone, string> = {
-  positive: 'bg-positive',
-  warning: 'bg-warning',
-  negative: 'bg-negative',
-  active: 'bg-brand',
-  neutral: 'bg-mute',
-}
-
-function StatusDot({ status }: { status: BookingStatus }) {
-  return (
-    <span
-      aria-hidden
-      className={cn('size-1.5 shrink-0 rounded-full', DOT_CLASSES[bookingStatusTone(status)])}
-    />
   )
 }

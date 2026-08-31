@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { initials } from '@/components/ui/avatar-identity'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -159,7 +161,14 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
                     BND {formatCents(payment.amount ?? 0)}
                   </TableCell>
                   <TableCell>
-                    {payment.collectedBy ? (names.get(payment.collectedBy) ?? 'Unknown') : '—'}
+                    {/* Who took the money, wearing their identity colour — a
+                        24px face, the in-row avatar size, so a name staff
+                        already know is findable before it is read. A collector
+                        no longer on the roster keeps the plain text. */}
+                    <CollectedByCell
+                      id={payment.collectedBy}
+                      name={payment.collectedBy ? names.get(payment.collectedBy) : undefined}
+                    />
                   </TableCell>
                   <TableCell>
                     <BookingStatusBadge status={payment.bookingStatus} />
@@ -170,16 +179,39 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
           </Table>
         )}
 
-        {payments.length > 0 ? (
-          <div className="mt-md flex items-baseline justify-between gap-lg">
-            <p className="text-caption text-muted-foreground">
-              A sum of the rows above, not a reconciliation. Comparing recorded cash against banked
-              cash is the daily cash-up, a separate screen.
-            </p>
-            <p className="text-body-md text-foreground tabular-nums">BND {formatCents(total)}</p>
-          </div>
-        ) : null}
+        {payments.length > 0 ? <CashTotalFootnote total={total} /> : null}
       </section>
     </>
+  )
+}
+
+function CollectedByCell({ id, name }: { id: string | null; name: string | undefined }) {
+  if (!id) {
+    return <>—</>
+  }
+
+  if (!name) {
+    return <>Unknown</>
+  }
+
+  return (
+    <span className="flex items-center gap-sm">
+      <Avatar className="size-6">
+        <AvatarFallback seed={id}>{initials(name)}</AvatarFallback>
+      </Avatar>
+      <span className="min-w-0 truncate">{name}</span>
+    </span>
+  )
+}
+
+function CashTotalFootnote({ total }: { total: number }) {
+  return (
+    <div className="mt-md flex items-baseline justify-between gap-lg">
+      <p className="text-caption text-muted-foreground">
+        A sum of the rows above, not a reconciliation. Comparing recorded cash against banked cash
+        is the daily cash-up, a separate screen.
+      </p>
+      <p className="text-body-md text-foreground tabular-nums">BND {formatCents(total)}</p>
+    </div>
   )
 }

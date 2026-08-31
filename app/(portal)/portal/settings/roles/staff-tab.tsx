@@ -129,12 +129,12 @@ export function StaffTab({ staff, roles, currentUserId }: StaffTabProps) {
             {visibleStaff.map((account) => (
               <TableRow key={account.id}>
                 <TableCell className="font-medium text-foreground">
-                  {/* The only screen in the portal that shows several people at
-                      once, and so the only one where an identity colour has
-                      anything to do: it is what makes a name you already know
-                      findable in the list before you have read it. 24px, the
-                      denser of the two avatar sizes, because a table row is
-                      32px and a 32px face would set the row's height. */}
+                  {/* Identity colour is what makes a name you already know
+                      findable in the list before you have read it — here, on
+                      the cash log's collected-by column, and on a booking's
+                      history. 24px, the denser of the two avatar sizes,
+                      because a table row is 32px and a 32px face would set the
+                      row's height. */}
                   <span className="flex items-center gap-sm">
                     <Avatar className="size-6">
                       <AvatarFallback seed={account.id}>

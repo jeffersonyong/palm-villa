@@ -1,3 +1,5 @@
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { initials } from '@/components/ui/avatar-identity'
 import type { AuditEvent } from '@/lib/db/audit'
 import { formatTimestamp } from '@/lib/domain/dates'
 
@@ -101,27 +103,44 @@ export function BookingHistory({ events, actorNames }: BookingHistoryProps) {
     <ol className="grid gap-md">
       {events.map((event) => {
         const reason = reasonOf(event)
+        const actorName = event.actorId ? actorNames.get(event.actorId) : undefined
 
         return (
           <li
             key={event.id}
-            className="grid gap-xxs border-b border-divider pb-md last:border-0 last:pb-0"
+            className="flex gap-md border-b border-divider pb-md last:border-0 last:pb-0"
           >
-            <div className="flex flex-wrap items-baseline justify-between gap-sm">
-              <p className="text-body-sm-strong text-foreground">{actionLabel(event)}</p>
-              <p className="text-caption text-muted-foreground tabular-nums">
-                {formatTimestamp(event.at)}
+            <ActorMark id={event.actorId} name={actorName} />
+            <div className="grid min-w-0 flex-1 gap-xxs">
+              <div className="flex flex-wrap items-baseline justify-between gap-sm">
+                <p className="text-body-sm-strong text-foreground">{actionLabel(event)}</p>
+                <p className="text-caption text-muted-foreground tabular-nums">
+                  {formatTimestamp(event.at)}
+                </p>
+              </div>
+              <p className="text-caption text-muted-foreground">
+                {event.actorId ? (actorName ?? 'A former staff member') : 'System'}
               </p>
+              {reason ? <p className="mt-xxs text-body-sm text-copy">“{reason}”</p> : null}
             </div>
-            <p className="text-caption text-muted-foreground">
-              {event.actorId
-                ? (actorNames.get(event.actorId) ?? 'A former staff member')
-                : 'System'}
-            </p>
-            {reason ? <p className="mt-xxs text-body-sm text-copy">“{reason}”</p> : null}
           </li>
         )
       })}
     </ol>
+  )
+}
+
+/**
+ * Who did it, wearing their identity colour — the 24px in-row avatar, so the
+ * trail scans by face before it is read. Every entry carries the mark so the
+ * text column keeps one left edge: a departed actor's colour is still derived
+ * from their id (it never repaints), and the system wears the neutral,
+ * seedless face — an event nobody performed, marked by nobody in particular.
+ */
+function ActorMark({ id, name }: { id: string | null; name: string | undefined }) {
+  return (
+    <Avatar className="size-6">
+      <AvatarFallback seed={id ?? undefined}>{id ? initials(name ?? '?') : 'PV'}</AvatarFallback>
+    </Avatar>
   )
 }
