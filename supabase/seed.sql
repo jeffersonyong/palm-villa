@@ -7,12 +7,19 @@
 --
 -- ── What is NOT in here, and why ───────────────────────────────────────────
 --
--- No bookings. The demo bookings that populated the portal's list screens lived
--- in lib/db/demo-seed.ts and were deleted with the fixture layer; a seed that
--- invented guests would put fictional people in a real database. The screens
--- show their empty states until a booking is taken, and a walk-in created
--- through /portal/bookings/new now survives a dev-server restart — which is the
--- visible proof that the fixture layer is gone.
+-- No bookings, in THIS file. The demo bookings that populated the portal's list
+-- screens lived in lib/db/demo-seed.ts and were deleted with the fixture layer;
+-- a seed that invented guests would put fictional people in a real database.
+-- That still holds for anything the property itself is made of, which is what
+-- this file seeds.
+--
+-- Local development gets its bookings from ./seeds/demo.sql, loaded after this
+-- one and only ever by `supabase db reset` against the CLI stack. Its header
+-- explains what keeps the distinction honest: scenario-named DEMO guests
+-- rather than invented people, and every row written through
+-- create_walk_in_booking() rather than inserted, so it is data the application
+-- could have produced. Drop it from config.toml's `sql_paths` to work against
+-- the empty states instead.
 --
 -- No facilities. architecture.md §10 lists them, but prd.md §7.2 has three of
 -- the seven pending a Ladyboss decision (C1) and every capacity unknown (C2),

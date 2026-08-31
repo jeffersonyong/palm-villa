@@ -6,6 +6,24 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-08-31 — the local stack seeds itself, and a reset leaves a working environment behind
+
+`npm run db:reset` left a developer with three problems and no signposts: no bookings to look at, no account to sign in with, and — for a dev server that stayed running across the reset — an empty portal whose admin appeared to hold no permissions. All three were separately explicable and together read as a broken login. No schema, no action contract, no scope change and no new dependency.
+
+### Added
+- **`supabase/seeds/demo.sql`** — five bookings spanning `confirmed`, `awaiting_payment_verification` (×2), `checked_in` and `completed`, so the portal's list screens, the payment verification queue (B4) and the booking record all have something to render on a fresh stack. Dates are relative to today in Asia/Brunei; the nightly figure is read from `unit_type.base_rate_cents` rather than restated, and the BND 100 deposit is the [C] figure from prd.md §11.
+
+  This **narrows the "no bookings" decision recorded in `seed.sql`** rather than reversing it. That note's concern — a seed putting fictional people in the system of record — is answered by two rules the file states and keeps: guests are named for the scenario they set up (`DEMO — Awaiting transfer`), so no invented person exists in the database; and nothing is inserted directly, every booking going through `create_walk_in_booking()` and every status move through `transition_booking()`, so the data is reachable by the application and subject to the G1 exclusion constraint. Demo data the product could not itself have produced would be the deleted fixture layer under another name. `db reset` is local-only — production schema moves by `db push`, which runs no seed — and dropping the path from `config.toml`'s `sql_paths` restores the empty states.
+- **`npm run db:seed-demo`** — replays that file in about a second. The integration suite clears `booking` and `guest` between tests (lib/db/test/setup.ts), so `npm test` takes the demo data with it; the seed guards on its own presence and is safe to re-run.
+
+### Changed
+- **`db:reset` now chains `db:bootstrap-admin`.** `auth.users` lives in the database being dropped, so every reset deleted the only account that could sign in, and the seed cannot recreate it — a password has to be hashed through the Auth API. The bootstrap script was already idempotent by design, so chaining it costs nothing and a reset now ends with a stack you can log into.
+
+### Fixed
+- **The property id is resolved per request in development.** `currentPropertyId()` memoised the uuid for the life of the process, on the reasoning that it cannot change while the process runs. A reset falsifies that: it reseeds the property with a fresh uuid under a live dev server. Because `role_permission` is scoped by `property_id` exactly as `booking` is, one stale id emptied the portal *and* stripped the admin's permissions — from a database that was correctly seeded. The memo is now production-only, where the original reasoning holds; dev pays one indexed single-row lookup per request.
+
+---
+
 ## 2026-08-31 — the portal becomes a shell: one surface, and no bar across the top
 
 v1.1 gave the system three tones and the portal used two of them — a `canvas-sunk` ground and white cards. That is enough for a page of cards and not enough for a tool. The sidebar and the content region were the *same* surface, separated only by a hairline, so the chrome never read as chrome; and content simply stopped partway down the viewport where the last table ended, with the ground continuing beneath it. This slice recuts the operations layout. [design.md](docs/design.md) carries the direction; the v1.2 shell-recut note at the top records what changed and what was tried and rejected.
