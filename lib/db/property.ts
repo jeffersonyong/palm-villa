@@ -12,16 +12,36 @@ import { dataClient } from '@/lib/supabase/data'
  * environment variable, so a database reseeded with a fresh uuid keeps working
  * and no id is duplicated between the seed and the application.
  *
- * Resolution is memoised per process because the answer cannot change while the
- * process runs: v1 has exactly one property row, and a query per request to
- * re-learn the same uuid is pure overhead. A failed lookup is not cached — a
- * database that was not running when the first request arrived should recover
- * when it is, rather than leaving the process permanently broken.
+ * Resolution is memoised per process in production, because the answer cannot
+ * change while the process runs: v1 has exactly one property row, and a query
+ * per request to re-learn the same uuid is pure overhead. A failed lookup is
+ * not cached — a database that was not running when the first request arrived
+ * should recover when it is, rather than leaving the process permanently
+ * broken.
+ *
+ * In development that premise does not hold. `npm run db:reset` drops the
+ * property and reseeds it with a FRESH uuid under a dev server that is still
+ * running, and the memoised id becomes one that no longer exists. Because
+ * every query — bookings, and `role_permission` too — is scoped by
+ * property_id, the result is an empty portal AND an admin who appears to hold
+ * no permissions, from a database that is in fact perfectly seeded. The
+ * failure looks like a broken login, which sends you looking in the wrong
+ * place entirely.
+ *
+ * So the cache is production-only. The cost in dev is one indexed
+ * single-row lookup per request; the cost of keeping it was a confusing
+ * debugging session after every reset.
  */
 
 let cached: Promise<string> | null = null
 
+const isMemoised = process.env.NODE_ENV === 'production'
+
 export function currentPropertyId(): Promise<string> {
+  if (!isMemoised) {
+    return resolvePropertyId()
+  }
+
   cached ??= resolvePropertyId().catch((error: unknown) => {
     cached = null
 
