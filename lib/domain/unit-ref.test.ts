@@ -27,6 +27,7 @@ const scheme = (overrides: Partial<RefScheme> = {}): RefScheme => ({
   separator: '-',
   digits: 2,
   startAt: 1,
+  suffix: '',
   ...overrides,
 })
 
@@ -57,6 +58,14 @@ describe('formatUnitRef', () => {
   test('a first-floor scheme starts where it is told', () => {
     expect(formatUnitRef(scheme({ prefix: 'A', digits: 3, startAt: 101 }), 101)).toBe('A-101')
   })
+
+  test('a suffix follows the number, for a building that names its wing', () => {
+    expect(formatUnitRef(scheme({ prefix: 'A', suffix: ' East' }), 3)).toBe('A-03 East')
+  })
+
+  test('no suffix is the ordinary case and adds nothing', () => {
+    expect(formatUnitRef(scheme({ suffix: '' }), 3)).toBe('3B-03')
+  })
 })
 
 describe('generateUnitRefs', () => {
@@ -74,6 +83,10 @@ describe('generateUnitRefs', () => {
 
   test('caps at the per-type ceiling, so a slipped keystroke is not nine thousand rows', () => {
     expect(generateUnitRefs(scheme(), 10_000)).toHaveLength(MAX_UNITS_PER_TYPE)
+  })
+
+  test('carries the suffix through the whole run', () => {
+    expect(generateUnitRefs(scheme({ prefix: 'A', suffix: 'B' }), 2)).toEqual(['A-01B', 'A-02B'])
   })
 
   test('starts from the scheme, not from one', () => {

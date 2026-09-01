@@ -23,8 +23,12 @@ import { listUnitStates, type UnitState } from '@/lib/db/units'
 import { formatStayDate } from '@/lib/domain/dates'
 import { countByStatus, isUnitStatus, UNIT_STATUSES } from '@/lib/domain/unit-status'
 
+import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
+
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from './page-size'
 import { UnitStatusTiles } from './status-tiles'
 import { UnitsFilters } from './units-filters'
+import { UnitsPagination } from './units-pagination'
 
 export const metadata: Metadata = {
   title: 'Units',
@@ -66,6 +70,8 @@ interface PageProps {
   searchParams: Promise<{
     status?: string | string[]
     type?: string | string[]
+    page?: string
+    size?: string
   }>
 }
 
@@ -83,6 +89,24 @@ function readChoices<T extends string>(
   const chosen = new Set(raw.filter(isMember))
 
   return canonical.filter((entry) => chosen.has(entry))
+}
+
+/**
+ * The requested page, or 1. Anything unusable falls back to the first page
+ * rather than erroring, like every other param on this screen. Being *past the
+ * end* needs the total, so it is clamped after the read.
+ */
+function readPage(value: string | undefined): number {
+  const parsed = Number(value)
+
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : 1
+}
+
+/** The requested rows-per-page, restricted to the sizes the footer offers. */
+function readPageSize(value: string | undefined): number {
+  const parsed = Number(value)
+
+  return (PAGE_SIZE_OPTIONS as readonly number[]).includes(parsed) ? parsed : DEFAULT_PAGE_SIZE
 }
 
 export default async function UnitsPage({ searchParams }: PageProps) {
@@ -132,12 +156,29 @@ export default async function UnitsPage({ searchParams }: PageProps) {
 
   const isFiltered = statuses.length > 0 || types.length > 0
 
+  // Paged over the filtered set rather than in SQL — see units-pagination.tsx.
+  // Clamped against the real total so a bookmarked `?page=4` that has outlived
+  // its rows lands on the last page that exists rather than an empty table
+  // under a footer claiming otherwise.
+  const pageSize = readPageSize(params.size)
+  const currentPage = clampPage(readPage(params.page), pageCountFor(visible.length, pageSize))
+  const paged = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
   // Carried through every tile so choosing a status keeps the type filter. The
-  // tiles *set* `status`, so this must not already contain one.
+  // tiles *set* `status`, so this must not already contain one. Nor the page:
+  // narrowing a list drops you back to page 1, the only page guaranteed to
+  // exist afterwards.
   const tileParams = new URLSearchParams()
 
   for (const type of types) {
     tileParams.append('type', type)
+  }
+
+  // The footer moves *within* the current view, so it carries every filter.
+  const pageParams = new URLSearchParams(tileParams)
+
+  for (const status of statuses) {
+    pageParams.append('status', status)
   }
 
   const mayEditRegistry = hasPermission(actor.permissions, 'config.manage')
@@ -162,9 +203,10 @@ export default async function UnitsPage({ searchParams }: PageProps) {
         <UnitsFilters statuses={statuses} types={types} unitTypes={unitTypes} />
 
         <div className="ml-auto flex items-center gap-md">
-          <p className="micro-label whitespace-nowrap text-muted-foreground tabular-nums">
-            {visible.length} {visible.length === 1 ? 'unit' : 'units'}
-          </p>
+          {/* No count here: the table's own footer states it properly
+              ("1–50 of 54 units") and is the thing that also lets you move, so
+              keeping both meant reading the same figure twice in two registers
+              a hand's width apart — the register's own conclusion. */}
 
           {/* Hidden rather than disabled for someone who cannot use it: an
               affordance for a screen that will refuse you is worse than no
@@ -207,7 +249,16 @@ export default async function UnitsPage({ searchParams }: PageProps) {
             }
           />
         ) : (
-          <Table>
+          <Table
+            footer={
+              <UnitsPagination
+                page={currentPage}
+                pageSize={pageSize}
+                total={visible.length}
+                params={pageParams.toString()}
+              />
+            }
+          >
             <TableHeader>
               <TableHeaderRow>
                 <TableHead>Unit</TableHead>
@@ -224,7 +275,7 @@ export default async function UnitsPage({ searchParams }: PageProps) {
               </TableHeaderRow>
             </TableHeader>
             <TableBody>
-              {visible.map((unit) => (
+              {paged.map((unit) => (
                 <UnitRow key={unit.id} unit={unit} />
               ))}
             </TableBody>

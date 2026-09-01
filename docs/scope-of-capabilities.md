@@ -60,6 +60,10 @@ Everyone works from the same live data, so availability, payments, and booking s
 | B12 | Keep free-text notes on any booking: an append-only thread with who wrote each note and when, so context stops living in WhatsApp. Each note is marked for the office or for housekeeping. **(added 1 September 2026 at the client team's request)** |
 | B13 | Settle what an amendment left owing: a booking shows what has been paid and what is still outstanding, and the difference can be taken in cash or by bank transfer from the booking itself. A top-up transfer goes through the same verification queue as any other. **(added 1 September 2026 — the gap the amend feature created)** |
 
+| B14 | Keep a note against a **unit** — a sticking door, a temperamental aircon, where the spare key lives. It belongs to the unit rather than to whoever is staying in it, so it survives every booking, and every change to it is recorded with who made it and when. **(added 2 September 2026 at the owner's request)** |
+
+**B8 is delivered across two slices.** Four of the six states — available, held, booked, occupied — are live now, alongside out of service and leased long-term from B9. **Awaiting inspection** and **cleaning** are the two the housekeeping flow writes, so they arrive with **C2–C3** and B8 is not complete until those screens land. Said here rather than left to be noticed: until then the board can tell you a unit is empty, but not whether it has been cleaned.
+
 ---
 
 ## C. What Housekeeping can do (phone)
@@ -106,6 +110,7 @@ A forwarded or leaked QR code grants nothing by itself — check-in authority co
 | F3 | Configure pricing, facility inclusion and capacity, hold durations, and document retention periods — pending decisions (e.g. whether gym, snooker or sauna are included in the day pass) become a settings change, not a development change |
 | F4 | Review the full audit trail: every change to bookings, payments, deposits, and charges, with actor and timestamp |
 | F5 | Export all business data at any time in a usable format — the data is yours |
+| F6 | Name the units the way they are labelled on the actual doors, and set how many of each type the building has — so the system matches the building without a developer. Names are set as a pattern per unit type and can be adjusted one at a time where a block does not follow the pattern. Every rename is recorded, and a unit that has hosted a booking is taken out of service rather than deleted, so its history survives. **(added 2 September 2026 — it removes two of the open questions from the critical path)** |
 
 ---
 
@@ -157,7 +162,7 @@ These exclusions are deliberate. Each is either not needed on day one or depends
 
 None of these block starting; each is needed before its specific screen is finalised.
 
-1. Number of 2-bedroom units, and confirmation of the total unit count.
+1. Number of 2-bedroom units, and confirmation of the total unit count. **No longer blocks delivery** — F6 makes this a setting rather than a build step, so it can be answered on the day the system is handed over.
 2. Whether stated max occupancy is a hard cap, or the point above which the extra-person charge applies.
 3. The exact day-pass age boundary (the current "1–12" and "12+" bands overlap at 12), and pricing under age 1.
 4. Family bundle pricing for shapes other than 2 adults + 1 child and 2 adults + 2 children.

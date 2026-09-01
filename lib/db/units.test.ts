@@ -14,6 +14,7 @@ import {
   markUnitLeased,
   markUnitOutOfService,
   returnUnitToService,
+  setUnitNotes,
 } from './units'
 import { givenBooking, givenLease, givenUnitOutOfService, unitIdByRef } from './test/factory'
 import { dataClient } from '@/lib/supabase/data'
@@ -663,5 +664,85 @@ describe('the unit registry (F6)', () => {
 
     expect(events.map((event) => event.action)).toEqual(['unit.added'])
     expect(events[0]?.after).toMatchObject({ ref: '2B-01', unitType: 'two-bedroom' })
+  })
+})
+
+describe("the unit's standing note (N18)", () => {
+  test('starts empty, and a unit with no note reads as null rather than blank', async () => {
+    expect((await getUnitStateByRef('3B-01'))?.notes).toBeNull()
+  })
+
+  test('is saved, and comes back on the board', async () => {
+    const unitId = await unitIdByRef('3B-01')
+
+    const result = await setUnitNotes({
+      unitId,
+      notes: 'Shower door sticks — lift slightly to close.',
+      actorId: null,
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.changed).toBe(true)
+    expect((await getUnitStateByRef('3B-01'))?.notes).toBe(
+      'Shower door sticks — lift slightly to close.',
+    )
+  })
+
+  test('outlives the booking that was in the unit when it was written', async () => {
+    // The whole reason N18 refused to hang this off a booking: it is true long
+    // after the guest has gone.
+    const unitId = await unitIdByRef('3B-01')
+    const booking = await givenBooking({
+      unitRef: '3B-01',
+      checkIn: RANGE.start,
+      checkOut: RANGE.end,
+    })
+    await setUnitNotes({ unitId, notes: 'Spare key with security.', actorId: null })
+
+    const { transitionBooking } = await import('./bookings')
+    await transitionBooking(booking.id, 'cancel', null, 'Test')
+
+    expect((await getUnitStateByRef('3B-01'))?.notes).toBe('Spare key with security.')
+  })
+
+  test('blank clears it, and that is recorded as an edit of its own', async () => {
+    const unitId = await unitIdByRef('3B-01')
+    await setUnitNotes({ unitId, notes: 'Something', actorId: null })
+
+    const cleared = await setUnitNotes({ unitId, notes: '   ', actorId: null })
+
+    expect(cleared.ok).toBe(true)
+    // Whitespace is not a note. Stored as null so "no note" is one value, not
+    // two that render alike and compare differently.
+    expect((await getUnitStateByRef('3B-01'))?.notes).toBeNull()
+    expect(await latestActions(unitId, 1)).toEqual(['unit.note_cleared'])
+  })
+
+  test('saving the same text again changes nothing and records nothing', async () => {
+    // Opening the field and closing it should not leave an audit event saying
+    // something happened.
+    const unitId = await unitIdByRef('3B-01')
+    await setUnitNotes({ unitId, notes: 'Same', actorId: null })
+    const before = (await listAuditEvents('unit', unitId)).length
+
+    const again = await setUnitNotes({ unitId, notes: 'Same', actorId: null })
+
+    expect(again.ok).toBe(true)
+    if (!again.ok) return
+    expect(again.changed).toBe(false)
+    expect(await listAuditEvents('unit', unitId)).toHaveLength(before)
+  })
+
+  test('records the text before and after, so the trail is the history a thread would be', async () => {
+    const unitId = await unitIdByRef('3B-01')
+    await setUnitNotes({ unitId, notes: 'Door sticks', actorId: null })
+    await setUnitNotes({ unitId, notes: 'Door fixed', actorId: null })
+
+    const [newest] = await listAuditEvents('unit', unitId)
+
+    expect(newest?.action).toBe('unit.note_changed')
+    expect(newest?.before).toMatchObject({ notes: 'Door sticks' })
+    expect(newest?.after).toMatchObject({ notes: 'Door fixed' })
   })
 })

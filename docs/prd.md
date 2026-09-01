@@ -122,8 +122,13 @@ report.view           document.view_identity
 | Role | Permission set |
 |---|---|
 | **Admin** | All permissions, including `config.manage` and `document.view_identity` |
-| **Front Office** | `booking.*`, `payment.verify`, `payment.record_cash`, `charge.create`, `unit.manage`, `document.view_identity` |
+| **Front Office** | `booking.*`, `payment.verify`, `payment.record_cash`, `charge.create`, `unit.manage`, `tenancy.manage`, `document.view_identity` |
 | **Housekeeping** | `inspection.record`, `unit.manage` (status only), read-only booking view for today |
+
+**[A] What "(status only)" means concretely**, settled when the units screens were built. `unit.manage` opens the units board and the two service actions — taking a unit out of service and returning it — which is exactly the cleaner's job. Two neighbouring things are deliberately *not* on it:
+
+- **Marking a unit let long-term is `tenancy.manage`.** Declaring a unit let to a tenant for six months is a commercial statement, not an operational one, and it should not sit with the person who reports that the shower door sticks. The permission already existed in the vocabulary and had never been held for anything; Front Office gains it.
+- **Naming and counting the units is `config.manage`** (the unit registry, F6). Renumbering the building is configuration, in the same class as pricing (F3). A seventeenth permission string was considered and rejected — it would cost a migration, a seed change and a role rework for a screen an administrator opens twice a year — at the price that Front Office cannot correct a typo'd door number.
 | **Security** | Today's arrivals view, check-in action, read-only booking summary. No document or payment access. |
 | **Finance** | `payment.verify`, `deposit.approve_release`, `charge.waive`, `report.view`, read-only booking view |
 
@@ -193,6 +198,21 @@ available → leased_long_term → (lease end) → available
 any → out_of_service → available
 ```
 
+**How each state is actually held** — settled by the units slice (B8–B9), and worth being explicit about because only two of them are stored:
+
+| State | How it is held |
+|---|---|
+| `available`, `held`, `booked`, `occupied` | **Derived** from the occupancy rows that already exist. There is no `unit.status` column and there will not be one; storing these would be a second copy of a fact recorded elsewhere. See architecture.md §5.1. |
+| `out_of_service` | **Stored** on the unit, as a since-date and a required reason. The one part of the lifecycle nothing else can tell you. |
+| `leased_long_term` | **Stored** as an occupancy row with no booking, so §6.1's "one Occupancy concept" gives it the same availability guarantee a booking gets. |
+| `awaiting_inspection`, `cleaning` | **Not built.** Written and cleared by the inspection flow (C2–C3). Named in code as deferred rather than omitted, so the gap is visible. |
+
+**[A] A unit with a live booking on it cannot be taken out of service.** The PRD does not say either way. Out of service means nobody can be put in the unit, so allowing it over a confirmed booking produces a unit that is simultaneously sold and unusable — and the guest finds out at the door. The refusal names how many bookings are in the way and the first reference, so the clerk can move or cancel them on a screen they already have. Warning and allowing was considered and rejected: it puts that decision in a toast nobody reads.
+
+**[C] A unit carries its own note** (capability B14, answering the second half of open-questions.md N18). A standing fact about the unit — a sticking door, where the spare key lives — belongs to the unit rather than to whoever is staying in it, so it survives every booking. One editable block rather than an append-only thread, because the fact stops being true when somebody fixes it; every edit is an audit event carrying the text before and after, so the trail is the thread. Written under `unit.manage`, which is what makes it a thing Housekeeping can record.
+
+**[A] A lease records a name and two dates, and nothing else.** §6.2 sketches a `Tenancy` with a tenant record and a monthly rent, and §16 makes that Phase 3. B9 asks only that availability reflects reality and that staff can see who is in the unit, so the occupant is free text on the occupancy row until the tenancy module gives it a real relationship. No rent, agreement or renewal is recorded, and the screen says so.
+
 ---
 
 ## 7. Inventory
@@ -210,7 +230,11 @@ any → out_of_service → available
 
 **[O]** Units of the same type are not interchangeable, because bed configuration differs. It is unconfirmed whether guests may choose or request a configuration, or whether it is assigned by staff.
 
-**[O]** The database seeds the 48 confirmed units only. The 2-bedroom **type** exists and prices correctly, with **zero units**, until N1 is answered — answering it is one `INSERT`. Unit references are provisional pending N10.
+**[O]** The database seeds the 48 confirmed units only. The 2-bedroom **type** exists and prices correctly, with **zero units**, until N1 is answered. Unit references are provisional pending N10.
+
+**Both are now answerable in the product rather than in a migration** (capability F6). The unit registry screen sets the number of units of each type and what each one is called, so N1 is a number typed into a field and N10 is a naming pattern with a live preview. Neither question is *answered* by that — a count nobody has agreed is still not a fact, and both stay open in the register — but neither blocks a screen any more, and the seeded 48 and the `3B-01` scheme remain the starting point until somebody changes them.
+
+**[A] A rename is retrospective, deliberately.** `booking_summary.unit_ref` reads through to the unit, so renaming `SD-01` to `Villa 1` relabels every stay that unit has ever hosted. That is the intent: the reference is what staff *call the door*, and a completed booking that still names a door nobody uses is the confusing outcome, not the safe one. The rename is recorded against the unit with who did it and when, which is where the old name lives. Snapshotting a reference onto each booking is out of scope.
 
 ### 7.2 Facilities
 

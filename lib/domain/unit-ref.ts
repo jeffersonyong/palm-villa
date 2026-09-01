@@ -60,6 +60,15 @@ export interface RefScheme {
   digits: number
   /** The first number in the run. Usually 1; 101 for a first floor. */
   startAt: number
+  /**
+   * The part after the number, e.g. the `A` in `01A` or the ` Block B` in
+   * `01 Block B`. Usually empty.
+   *
+   * Buildings number by wing and by floor as often as they number straight
+   * through, and without this a scheme like `A-01 (East)` was thirty-six
+   * fields typed by hand — which is the work the pattern exists to remove.
+   */
+  suffix: string
 }
 
 export const DEFAULT_REF_SCHEME: RefScheme = {
@@ -67,13 +76,14 @@ export const DEFAULT_REF_SCHEME: RefScheme = {
   separator: '-',
   digits: 2,
   startAt: 1,
+  suffix: '',
 }
 
 /** One reference from a scheme. Numbers longer than `digits` are not truncated. */
 export function formatUnitRef(scheme: RefScheme, ordinal: number): string {
   const number = String(ordinal).padStart(Math.max(0, scheme.digits), '0')
 
-  return `${scheme.prefix}${scheme.separator}${number}`
+  return `${scheme.prefix}${scheme.separator}${number}${scheme.suffix ?? ''}`
 }
 
 /** `count` consecutive references, starting at the scheme's first number. */

@@ -9,6 +9,7 @@ import {
   markUnitLeased,
   markUnitOutOfService,
   returnUnitToService,
+  setUnitNotes,
   type LeaseEnding,
 } from '@/lib/db/units'
 import { isStayDate } from '@/lib/domain/dates'
@@ -39,6 +40,8 @@ export interface UnitActionState {
   fieldErrors?: Record<string, string>
   /** Which of an action's two outcomes happened, where it has two. */
   outcome?: LeaseEnding
+  /** Whether a save actually altered anything — the note editor asks. */
+  changed?: boolean
 }
 
 /**
@@ -246,4 +249,49 @@ export async function endLeaseAction(
   // Which of the two happened, so the toast can say the true thing: a date on
   // or before the start unwinds the lease rather than ending it.
   return { status: 'done', outcome: result.outcome }
+}
+
+/**
+ * The unit's standing note (open-questions.md N18).
+ *
+ * `unit.manage`, not a permission of its own: the note is operational — what
+ * the cleaner and the desk need to know about the door — and it is exactly the
+ * kind of thing prd.md §4's "(status only)" Housekeeping should be able to
+ * write. Empty is legal and means "clear it", which the function records as an
+ * edit of its own rather than a silent deletion.
+ */
+const notesSchema = z.object({
+  unitId: z.string().uuid(),
+  ref: z.string().min(1),
+  notes: z.string().max(2000, 'Keep the note under 2000 characters.'),
+})
+
+export async function saveUnitNotesAction(
+  _previous: UnitActionState,
+  formData: FormData,
+): Promise<UnitActionState> {
+  const actor = await requirePermission('unit.manage')
+  const parsed = notesSchema.safeParse(Object.fromEntries(formData))
+
+  if (!parsed.success) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: fieldErrorsOf(parsed.error),
+    }
+  }
+
+  const result = await setUnitNotes({
+    unitId: parsed.data.unitId,
+    notes: parsed.data.notes,
+    actorId: actor.userId,
+  })
+
+  if (!result.ok) {
+    return { status: 'error', message: result.error.message }
+  }
+
+  revalidateUnitScreens(parsed.data.ref)
+
+  return { status: 'done', changed: result.changed }
 }

@@ -12,6 +12,10 @@ import type { AuditEvent } from '@/lib/db/audit'
  * Renames are in it too. A reference is what staff call a door, so changing one
  * changes how every past stay reads (prd.md §7.1 [A]) — and this is the record
  * of what it used to be called.
+ *
+ * And every edit to the unit's note, which is what lets the note itself be a
+ * single editable block rather than an append-only thread: the thread is here,
+ * and the block at the top of the screen says what is true now.
  */
 
 const ACTION_LABELS: Record<string, string> = {
@@ -21,6 +25,9 @@ const ACTION_LABELS: Record<string, string> = {
   'unit.lease_ended': 'Lease end date changed',
   'unit.lease_cancelled': 'Lease removed',
   'unit.added': 'Added to the building',
+  'unit.note_added': 'Note added',
+  'unit.note_changed': 'Note changed',
+  'unit.note_cleared': 'Note cleared',
 }
 
 /**
@@ -43,6 +50,12 @@ function actionLabel(event: AuditEvent): string {
   if (event.action === 'unit.renamed') {
     return renameLabel(event)
   }
+
+  // The note's own text is not quoted in the trail. `EventHistory` quotes an
+  // event's `reason` — a sentence written *about* an action — and a note is
+  // the thing itself, often several lines of it. Six entries each carrying a
+  // paragraph would bury the history in copies of a field the reader can see
+  // in full at the top of the screen.
 
   // An unmapped action still renders as its raw verb. Hiding it would make the
   // trail lie by omission about something that happened to this unit.

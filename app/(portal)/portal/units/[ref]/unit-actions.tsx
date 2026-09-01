@@ -1,6 +1,5 @@
 'use client'
 
-import { MoreHorizontal } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useActionState, useEffect, useState } from 'react'
 
@@ -14,12 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,6 +32,17 @@ import {
 /**
  * What a person can do to a unit (capability B9).
  *
+ * ── The actions are buttons, not a menu ───────────────────────────────────
+ *
+ * They were behind a `…` trigger, on the booking screen's pattern. That was
+ * the wrong borrowing: a booking has a dozen things you might do to it and the
+ * menu keeps the header from becoming a toolbar, whereas a unit has **two**,
+ * they are mutually exclusive with their own opposites, and which two you get
+ * already depends on the unit's state. Hiding two buttons behind a click cost
+ * a click and bought nothing — and worse, it made the state-dependence
+ * invisible: "Return to service" reads as an available action the moment you
+ * can see it, where inside a menu you have to open the menu to find out.
+ *
  * ── Which of these gets a dialog, and why ─────────────────────────────────
  *
  * design.md's confirmation dialog exists for two things: stating in plain
@@ -47,14 +51,17 @@ import {
  * needs a form. Ending a lease needs a date, and has to say which of its two
  * outcomes the date will produce before the click.
  *
- * **Returning a unit to service gets neither**, and that is deliberate rather
- * than an omission: nothing surprising happens, no booking is affected, and
- * there is no reason worth typing. A dialog there would be the "are you sure"
- * design.md refuses.
+ * **Returning a unit to service gets neither**, deliberately: nothing
+ * surprising happens, no booking is affected, and there is no reason worth
+ * typing. A dialog there would be the "are you sure" design.md refuses.
  *
- * The menu only ever offers what the unit's current state allows, so there is
- * no disabled item that never explains itself. A unit that is out of service
- * cannot be let; a unit with no lease has nothing to end.
+ * The buttons are quiet. design.md allows one primary fill per screen region
+ * and none of these is the screen's point — the screen's point is the record.
+ * Taking a unit out of service keeps the red it had as a menu item, but as
+ * destructive *text* on tertiary chrome (`destructive-tertiary`) rather than a
+ * fill: the fill belongs on the confirmation footer, where the irreversible
+ * click is, and spending it here would leave two red fills on the path with
+ * only the second one meaning anything.
  */
 
 const initialState: UnitActionState = { status: 'idle' }
@@ -79,49 +86,33 @@ export function UnitActions(props: UnitActionsProps) {
   const { unitId, ref_, isOutOfService, lease, mayLease, canManageUnit, canManageTenancy } = props
   const [open, setOpen] = useState<OpenDialog>(null)
 
-  const items = [
-    canManageUnit && !isOutOfService && 'out_of_service',
-    canManageUnit && isOutOfService && 'return',
-    canManageTenancy && !lease && mayLease && 'lease',
-    canManageTenancy && lease && 'end_lease',
-  ].filter(Boolean)
-
-  // No menu at all rather than an empty one: a trigger that opens onto nothing
-  // is worse than no trigger.
-  if (items.length === 0) {
-    return null
-  }
-
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="tertiary" size="icon" aria-label={`Actions for ${ref_}`}>
-            <MoreHorizontal aria-hidden />
+      {canManageUnit ? (
+        isOutOfService ? (
+          <ReturnToServiceButton unitId={unitId} ref_={ref_} />
+        ) : (
+          <Button variant="destructive-tertiary" onClick={() => setOpen('out_of_service')}>
+            Take out of service
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {canManageUnit && !isOutOfService ? (
-            <DropdownMenuItem variant="destructive" onSelect={() => setOpen('out_of_service')}>
-              Take out of service
-            </DropdownMenuItem>
-          ) : null}
+        )
+      ) : null}
 
-          {canManageUnit && isOutOfService ? (
-            <ReturnToServiceItem unitId={unitId} ref_={ref_} />
-          ) : null}
+      {canManageTenancy && lease ? (
+        <Button variant="tertiary" onClick={() => setOpen('end_lease')}>
+          End the lease
+        </Button>
+      ) : null}
 
-          {canManageTenancy && !lease && mayLease ? (
-            <DropdownMenuItem onSelect={() => setOpen('lease')}>
-              Mark leased long-term
-            </DropdownMenuItem>
-          ) : null}
-
-          {canManageTenancy && lease ? (
-            <DropdownMenuItem onSelect={() => setOpen('end_lease')}>End the lease</DropdownMenuItem>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Absent rather than disabled when the unit cannot take one: an
+          affordance that will refuse you is worse than no affordance. A unit
+          that is occupied today, or out of service, is not a unit anyone can
+          let — and the reason is legible from the badge beside the title. */}
+      {canManageTenancy && !lease && mayLease ? (
+        <Button variant="tertiary" onClick={() => setOpen('lease')}>
+          Mark leased long-term
+        </Button>
+      ) : null}
 
       {open === 'out_of_service' ? (
         <OutOfServiceDialog unitId={unitId} ref_={ref_} onClose={() => setOpen(null)} />
@@ -139,12 +130,10 @@ export function UnitActions(props: UnitActionsProps) {
 }
 
 /**
- * Returning to service is one click, submitted from the menu item itself.
- *
- * A form rather than a fetch, so it goes through the same server action and the
- * same permission gate as everything else here.
+ * Returning to service is one click, submitted as a form so it goes through the
+ * same server action and the same permission gate as everything else here.
  */
-function ReturnToServiceItem({ unitId, ref_ }: { unitId: string; ref_: string }) {
+function ReturnToServiceButton({ unitId, ref_ }: { unitId: string; ref_: string }) {
   const [state, formAction, isPending] = useActionState(returnToServiceAction, initialState)
   const router = useRouter()
 
@@ -167,11 +156,9 @@ function ReturnToServiceItem({ unitId, ref_ }: { unitId: string; ref_: string })
     <form action={formAction}>
       <input type="hidden" name="unitId" value={unitId} />
       <input type="hidden" name="ref" value={ref_} />
-      <DropdownMenuItem asChild>
-        <button type="submit" disabled={isPending} className="w-full">
-          {isPending ? 'Returning…' : 'Return to service'}
-        </button>
-      </DropdownMenuItem>
+      <Button type="submit" variant="tertiary" disabled={isPending}>
+        {isPending ? 'Returning…' : 'Return to service'}
+      </Button>
     </form>
   )
 }
@@ -190,7 +177,11 @@ function OutOfServiceDialog({
 
   useEffect(() => {
     if (state.status === 'done') {
-      toast({ tone: 'positive', title: `${ref_} is out of service`, description: 'It has left availability.' })
+      toast({
+        tone: 'positive',
+        title: `${ref_} is out of service`,
+        description: 'It has left availability.',
+      })
       onClose()
       router.refresh()
     }
@@ -267,7 +258,11 @@ function LeaseDialog({
 
   useEffect(() => {
     if (state.status === 'done') {
-      toast({ tone: 'positive', title: `${ref_} is let long-term`, description: 'It will not be offered for those dates.' })
+      toast({
+        tone: 'positive',
+        title: `${ref_} is let long-term`,
+        description: 'It will not be offered for those dates.',
+      })
       onClose()
       router.refresh()
     }
@@ -344,7 +339,7 @@ function LeaseDialog({
 
           <DialogFooter>
             <Button type="button" variant="tertiary" onClick={onClose}>
-              Don’t mark it
+              Don&rsquo;t mark it
             </Button>
             <Button type="submit" disabled={isPending}>
               {isPending ? 'Saving…' : 'Mark leased'}
@@ -433,7 +428,11 @@ function EndLeaseDialog({
             <Button type="button" variant="tertiary" onClick={onClose}>
               Leave the lease
             </Button>
-            <Button type="submit" variant={willUnwind ? 'destructive' : 'primary'} disabled={isPending}>
+            <Button
+              type="submit"
+              variant={willUnwind ? 'destructive' : 'primary'}
+              disabled={isPending}
+            >
               {isPending ? 'Saving…' : willUnwind ? 'Remove the lease' : 'Change the end date'}
             </Button>
           </DialogFooter>

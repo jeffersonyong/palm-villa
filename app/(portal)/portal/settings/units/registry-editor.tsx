@@ -1,5 +1,6 @@
 'use client'
 
+import { ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useActionState, useEffect, useMemo, useState } from 'react'
 
@@ -26,7 +27,10 @@ import {
   planRegistry,
   type CurrentUnit,
   type RefProblem,
+  type RefScheme,
 } from '@/lib/domain/unit-ref'
+
+import { cn } from '@/lib/utils'
 
 import { saveUnitRegistryAction, type RegistryActionState } from './actions'
 
@@ -85,6 +89,7 @@ type NumberingId = (typeof NUMBERING)[number]['id']
 interface TypeDraft {
   prefix: string
   numbering: NumberingId
+  suffix: string
   refs: string[]
 }
 
@@ -98,13 +103,15 @@ interface TypeDraft {
  */
 function inferDraft(refs: readonly string[]): TypeDraft {
   const first = refs[0] ?? ''
-  const match = /^(.*?)(\d+)$/.exec(first)
+  // Greedy prefix, then the number, then whatever trails it — so `A-01 East`
+  // reads as prefix `A-`, number `01`, suffix ` East`.
+  const match = /^(.*?)(\d+)(\D*)$/.exec(first)
 
   if (!match) {
-    return { prefix: first, numbering: 'pad2', refs: [...refs] }
+    return { prefix: first, numbering: 'pad2', suffix: '', refs: [...refs] }
   }
 
-  const [, prefix, digits] = match
+  const [, prefix, digits, suffix] = match
   const startAt = Number(digits)
 
   const numbering: NumberingId =
@@ -116,15 +123,21 @@ function inferDraft(refs: readonly string[]): TypeDraft {
           ? 'plain'
           : 'pad2'
 
-  return { prefix: prefix ?? '', numbering, refs: [...refs] }
+  return { prefix: prefix ?? '', numbering, suffix: suffix ?? '', refs: [...refs] }
 }
 
-function schemeOf(draft: TypeDraft) {
+function schemeOf(draft: TypeDraft): RefScheme {
   const numbering = NUMBERING.find((entry) => entry.id === draft.numbering) ?? NUMBERING[0]
 
   // The separator lives in the prefix — one field the reader types the whole
   // way ("3B-", "Villa ") rather than two they have to keep in step.
-  return { prefix: draft.prefix, separator: '', digits: numbering.digits, startAt: numbering.startAt }
+  return {
+    prefix: draft.prefix,
+    separator: '',
+    digits: numbering.digits,
+    startAt: numbering.startAt,
+    suffix: draft.suffix,
+  }
 }
 
 const initialState: RegistryActionState = { status: 'idle' }
@@ -197,7 +210,7 @@ export function RegistryEditor({ units, unitTypes }: RegistryEditorProps) {
       // A pattern change regenerates every name for the type; a count change
       // does not touch the names already there.
       const patternChanged =
-        next.prefix !== undefined || next.numbering !== undefined
+        next.prefix !== undefined || next.numbering !== undefined || next.suffix !== undefined
 
       const refs = patternChanged
         ? merged.refs.map((_, index) => formatUnitRef(schemeOf(merged), schemeOf(merged).startAt + index))
@@ -301,6 +314,23 @@ export function RegistryEditor({ units, unitTypes }: RegistryEditorProps) {
                   </Select>
                 </div>
 
+                {/* Optional, and labelled as such. Most buildings need none;
+                    the ones that name a wing or a block after the number would
+                    otherwise be thirty-six fields typed by hand, which is the
+                    work the pattern exists to remove. */}
+                <div className="grid gap-sm">
+                  <Label htmlFor={`suffix-${type.id}`}>
+                    Ending pattern <span className="text-muted-foreground">(optional)</span>
+                  </Label>
+                  <Input
+                    id={`suffix-${type.id}`}
+                    value={draft.suffix}
+                    onChange={(event) => updateDraft(type.id, { suffix: event.target.value })}
+                    placeholder=" East"
+                    className="w-[150px]"
+                  />
+                </div>
+
                 <div className="grid gap-sm">
                   <Label htmlFor={`count-${type.id}`}>How many</Label>
                   <Input
@@ -336,9 +366,12 @@ export function RegistryEditor({ units, unitTypes }: RegistryEditorProps) {
               </p>
 
               {draft.refs.length > 0 ? (
-                <div>
-                  <p className="micro-label text-muted-foreground">Each unit’s name</p>
-                  <div className="mt-md grid gap-sm sm:grid-cols-3 lg:grid-cols-4">
+                <NameList
+                  typeId={type.id}
+                  count={draft.refs.length}
+                  problemCount={draft.refs.filter((ref) => problemRefs.has(ref)).length}
+                >
+                  <div className="grid gap-sm sm:grid-cols-3 lg:grid-cols-4">
                     {draft.refs.map((ref, index) => {
                       const problem = problemRefs.get(ref)
                       const removing = plan.removals.some((entry) => entry.ref === ref)
@@ -361,7 +394,7 @@ export function RegistryEditor({ units, unitTypes }: RegistryEditorProps) {
                       )
                     })}
                   </div>
-                </div>
+                </NameList>
               ) : null}
 
               {existing.length > draft.refs.length ? (
@@ -402,6 +435,67 @@ export function RegistryEditor({ units, unitTypes }: RegistryEditorProps) {
         </Button>
       </div>
     </form>
+  )
+}
+
+/**
+ * The per-unit names, folded away until wanted.
+ *
+ * Thirty-six fields is the right control for the building that needs it and
+ * pure noise for the four types that do not — at full height the screen was two
+ * hundred inputs deep, and the pattern controls, which are what most edits
+ * actually use, scrolled off the top of it.
+ *
+ * It opens itself when something inside is wrong, because a validation error in
+ * a collapsed panel is an error nobody can find. The problem count stays on the
+ * summary line either way, so a folded panel can still say it is hiding
+ * something that needs attention.
+ *
+ * `hidden` rather than unmounting the children: the fields are controlled by
+ * the editor's own state, so collapsing a panel must not discard what someone
+ * typed into it.
+ */
+function NameList({
+  typeId,
+  count,
+  problemCount,
+  children,
+}: {
+  typeId: string
+  count: number
+  problemCount: number
+  children: React.ReactNode
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const open = isOpen || problemCount > 0
+  const panelId = `names-${typeId}`
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex items-center gap-xs rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        <ChevronRight
+          aria-hidden
+          className={cn(
+            'size-3.5 text-muted-foreground transition-transform motion-reduce:transition-none',
+            open && 'rotate-90',
+          )}
+        />
+        <span className="micro-label text-muted-foreground">Each unit’s name ({count})</span>
+        {problemCount > 0 ? (
+          <span className="text-caption text-destructive">{problemCount} to fix</span>
+        ) : null}
+      </button>
+
+      <div id={panelId} hidden={!open} className="mt-md">
+        {children}
+      </div>
+    </div>
   )
 }
 

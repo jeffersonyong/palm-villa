@@ -87,9 +87,13 @@ Not hypothetical. Each screen below exists and works, and is deliberately incomp
 
 **What's been built anyway, and why it is cheap:** notes carry an `internal` / `housekeeping` audience tag from the outset. Both appear in one thread on the booking screen, each labelled, and the housekeeping filter the field screen will need already exists and is tested. If the answer turns out to be "the cleaner needs nothing", the cost of having asked is one tag nobody selects.
 
-**What is deliberately not built:** a note against the *unit*. It outlives every booking, so hanging it off one would lose it when the guest leaves — that belongs with the inspections slice (PRD §11).
+**What was deliberately not built, and now is:** a note against the *unit*. The reasoning here was that it outlives every booking, so hanging it off one would lose it when the guest leaves — correct, and what it was missing was a screen to put it on. The units board is that screen, so **the second half of this question is answered**: `unit.notes` is a single editable block on the unit's own page, and the shower door lives there.
 
-**Answer:** _unanswered_
+It is a block rather than a thread on purpose. A booking's notes accumulate — each entry stays true about the moment it was written — but "the shower door sticks" stops being true when somebody fixes it, and a thread would make the current state of a unit something a reader reconstructs from the bottom of a list. Nothing is lost: every edit writes an audit event with the text before and after, so the unit's history *is* the thread, and the card at the top always says what is true now.
+
+**The first half is still open.** Whether the office has anything to tell a cleaner about *this guest* is a question about a screen that does not exist — the housekeeping field surface is C-series — and the `housekeeping` audience tag on booking notes is still the cheap bet it always was.
+
+**Answer:** _partly_. Unit notes: built, 2 September 2026 (capability B14). Housekeeping notes on a booking: still unanswered.
 
 ---
 
@@ -109,12 +113,15 @@ Not blocking today, but each one is a screen that cannot be finished without it.
 
 ### The building itself
 
+Two of these — **N1** and **N10** — changed character on 2 September 2026 without being answered. They used to block: the number of 2-bedroom units and the names on the doors were both baked into a seed file, so getting them wrong meant a migration. The unit registry screen (capability **F6**) makes both a setting an administrator changes, which is the same move §7.2 already made for facility inclusion. They stay open because the client has still not said what the answers are; what has gone is the cost of finding out.
+
+
 | # | Ask | What it decides | Assumed meanwhile |
 |---|---|---|---|
-| **N1** | "How many 2-bedroom units are there? Is 48 units still the right total?" | The 2-bedroom type exists and prices correctly but has **zero units** in the system, so none can be booked. | 48 units seeded, no 2-bedrooms. Answering it is a one-line database insert. |
+| **N1** | "How many 2-bedroom units are there? Is 48 units still the right total?" | The 2-bedroom type exists and prices correctly but has **zero units** in the system, so none can be booked. | 48 units seeded, no 2-bedrooms. **No longer blocks a screen** — an administrator sets the count on the unit registry screen, so answering it is typing rather than a migration. Still unanswered: a number nobody has agreed is not a fact, and the system ships zero 2-bedrooms until somebody says otherwise. |
 | **N8** | "How many sofa beds are there in total across the building?" | Whether the system can stop overbooking sofa beds. | Modelled as property-wide stock with no limit set. |
 | **N9** | "Can guests ask for a particular bed setup, or does staff just assign it?" | Units of the same type aren't actually interchangeable — the bed configuration differs. | Staff assign; no guest choice offered. |
-| **N10** | "How are the units labelled on the actual doors?" | Staff will not recognise the references on screen. | Provisional scheme (`3B-01`, `3B-02`…) purely so units are distinguishable. |
+| **N10** | "How are the units labelled on the actual doors?" | Staff will not recognise the references on screen. | Provisional scheme (`3B-01`, `3B-02`…) purely so units are distinguishable. **No longer blocks a screen** — the unit registry screen sets a naming pattern per type with a live preview, and any individual unit can be named off-pattern, so a building that is not uniform is expressible. Still unanswered: the provisional scheme stays until somebody types the real one. |
 
 ### Rules and permissions
 

@@ -55,6 +55,11 @@ export interface UnitState {
   occupant: UnitOccupant | null
   /** The next stay's start, so a free unit can say when it stops being free. */
   nextStart: StayDate | null
+  /**
+   * A standing fact about the unit itself — the answer to open-questions.md
+   * N18. Null when nobody has written one.
+   */
+  notes: string | null
 }
 
 interface UnitStateRow {
@@ -64,6 +69,7 @@ interface UnitStateRow {
   unit_type_name: string
   out_of_service_since: string | null
   out_of_service_reason: string | null
+  notes: string | null
   occupancy_id: string | null
   occupancy_status: string | null
   occupancy_type: string | null
@@ -145,6 +151,7 @@ function toUnitState(row: UnitStateRow): UnitState {
     outOfService,
     occupant,
     nextStart: row.next_start_date,
+    notes: row.notes,
   }
 }
 
@@ -373,6 +380,42 @@ export async function endUnitLease(input: {
   }
 
   return { ok: true, outcome: result.outcome }
+}
+
+/**
+ * Sets the unit's standing note (open-questions.md N18).
+ *
+ * Edited in place rather than appended to, because "the shower door sticks" is
+ * a fact about the door that stops being true when somebody fixes it — see the
+ * migration for why that is the opposite shape from a booking note. Nothing is
+ * lost: every edit writes an audit event carrying the text before and after, so
+ * the unit's own history is the thread this deliberately is not.
+ */
+export async function setUnitNotes(input: {
+  unitId: string
+  notes: string
+  actorId: string | null
+}): Promise<UnitWriteResult<{ changed: boolean }>> {
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await dataClient().rpc('set_unit_notes', {
+    p_property_id: propertyId,
+    p_unit_id: input.unitId,
+    p_notes: input.notes,
+    p_actor_id: input.actorId,
+  })
+
+  if (error) {
+    throw new Error(`Could not save the note: ${error.message}`)
+  }
+
+  const result = data as { ok: true; changed: boolean } | RpcRefusal
+
+  if (!result.ok) {
+    return { ok: false, error: { code: result.error, message: 'That unit no longer exists.' } }
+  }
+
+  return { ok: true, changed: result.changed }
 }
 
 export interface RegistryOutcome {

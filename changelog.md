@@ -6,6 +6,41 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-09-04 — the state of the building, and the building names itself
+
+`/portal/units` was the last stub in the operations nav. It now answers "what is every unit doing right now", and — the part that was not asked for in the scope but removes two questions from the critical path — it lets an administrator say what the units are **called** and how many there are.
+
+Capability refs: **B8**, **B9**, and the new **B14** and **F6** in [scope-of-capabilities.md](docs/scope-of-capabilities.md). The lifecycle is normative in [prd.md §6.4](docs/prd.md); the shape is [architecture.md §5.1 and §5.2](docs/architecture.md); the status tones and the new button variant are in [design.md](docs/design.md). No new dependency.
+
+### The decision this slice was waiting on
+
+[architecture.md §5.1](docs/architecture.md) left `unit.status` out of the schema with a condition attached — *"an unread status column that availability silently ignores is worse than none"* — and deferred it to whichever slice needed the part that is not derivable. This is that slice, and it **cashed the condition in rather than reversing it**. Four of the six lifecycle states are derived from occupancy rows that already exist; the two that are stored (`out_of_service`, and a lease) are both read by `available_units()`, which is exactly the bar that paragraph set. There is still no `unit.status` column and there will not be one.
+
+### Added
+- **The units board.** A register, not a floor plan: the question staff actually ask is "what is going on with 3B-04", which needs the occupant and the day they leave. Six status tiles above it double as filters; both filters and paging are URL state. Filtering happens in TypeScript because the register is bounded by the building — the opposite of the bookings list, and deliberately, since it keeps the status derivation in one place.
+- **A unit has its own screen and its own history.** A unit outlives every booking in it, so *"why was 3B-04 unavailable all September"* is a question only an append-only trail can answer.
+- **Out of service, and back** (B9). A required reason, shown on the board, so the next person does not ring anyone to find out. **Refused while the unit still has a live booking on it** — a unit that is simultaneously sold and unusable is discovered by the guest at the door — with the refusal naming the count and the first reference. Recorded as **[A]** in prd.md §6.4.
+- **Long leases** (B9), as an `occupancy` row with no booking. [prd.md §6.1](docs/prd.md) — *"a short stay and a long tenancy are the same object"* — pays for itself here: the exclusion constraint blocks bookings over a lease by construction, with no second mechanism to keep in step. Ending one has two honest outcomes, and the dialog says which the chosen date will produce.
+- **The unit registry** (F6, new capability). A naming pattern per unit type with a live preview does the bulk; every generated name is still an editable field underneath, because a building with two units called "Annex" is the normal case rather than the exotic one. Nothing is a demolition: the nth door stays the nth door and is renamed, so its bookings and history survive. A unit that has hosted a booking cannot be removed at all — it is taken out of service instead, which is the retire mechanism and the only one.
+- **A note on the unit** (B14), answering the second half of [N18](docs/open-questions.md). One editable block rather than a thread: "the shower door sticks" stops being true when somebody fixes it, and every edit is an audit event carrying the text before and after — so the history *is* the thread, and the card at the top says what is true now.
+
+### Changed
+- **Two open questions left the critical path without being answered.** N1 (how many 2-bedroom units) and N10 (what the doors are actually called) were baked into a seed file, so getting either wrong meant a migration. Both are now settings. They stay **open** in the register — a number nobody has agreed is still not a fact — but the cost of finding out has gone, and the system ships the seeded 48 and the provisional scheme until somebody types otherwise.
+- `unique (property_id, ref)` on `unit` is now **deferrable**, because renumbering walks through references the old scheme still holds.
+- `getUnitCounts({ serviceableOnly: true })` is the denominator of "3 of 36 free" on the booking screens — a unit nobody can be put in is not one of the thirty-six.
+- **`destructive-tertiary`**, a new button variant: destructive text on tertiary chrome. Moving an action out of a `…` menu and onto the page must not change how loud it is, and the destructive *fill* stays reserved for the confirmation footer.
+- `event-history.tsx` and `status-tone.ts` were extracted rather than copied, at the point [booking-history.tsx](app/(portal)/portal/bookings/[reference]/booking-history.tsx) said it would be: when a second record type had a history.
+
+### Fixed
+- **`available_units()` would have sold leased units.** Its predicate was `o.booking_id is distinct from p_exclude_booking_id`, correct while every occupancy had a booking. A lease has none, and on an ordinary call the exclude parameter is null — so `null is distinct from null` is **false**, the lease row was skipped, and the unit reported free. **G1 defeated by a null comparison rather than a race.** Fixed in the same migration that made the column nullable, with a named regression test.
+- **The integration suite was contaminating itself.** `clearTransactionalData` cleared bookings and guests only, so a lease occupancy and an out-of-service flag both leaked between test files as a unit that was mysteriously unavailable.
+- **A latent flake in the bookings register's tie-break test.** It asserted that concurrent bookings come back in descending *reference* order, reasoning that references are allocated in creation order. They are not: `next_booking_reference()` is `nextval()`, which is non-transactional and orders by when a transaction *calls* it, while `created_at` is `now()`, which orders by when it *started*. The product's `(created_at desc, reference desc)` is still a total order — the property pagination actually needs — so the test now asserts stability across two reads, which is what its own comment always said it was for.
+
+### Known gap, stated rather than absorbed
+- **B8 is delivered four states out of six.** `awaiting_inspection` and `cleaning` are written and cleared by the inspection flow (**C2–C3**), which does not exist, so the board can tell you a unit is empty but not whether it has been cleaned. Named in code as `DEFERRED_UNIT_STATUSES` and asserted by two tests, so closing the gap is a deliberate act rather than a drift.
+
+---
+
 ## 2026-09-03 — a booking knows what it is owed, and a transfer can settle it
 
 The amend feature shipped with a sentence — *"collect or refund it outside the system"* — and that sentence was doing more work than it could carry. A guest who transfers for one night, is verified, then extends to two leaves a booking worth BND 400 with BND 200 banked against it, and until now the platform could neither name the difference nor take a second bank transfer to clear it. The only ways to record the top-up were to log a transfer as **cash** — money in Finance's daily cash-up (E4) that was never in the drawer — or to confirm a short payment through B5's override, which exists precisely so that a short payment is never silently accepted. A flag that fires on the routine case stops being read.

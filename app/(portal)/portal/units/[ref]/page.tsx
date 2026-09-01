@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { ArrowLeft } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
@@ -16,6 +17,7 @@ import { formatStayDate } from '@/lib/domain/dates'
 
 import { UnitActions } from './unit-actions'
 import { UnitHistory } from './unit-history'
+import { UnitNotes } from './unit-notes'
 
 export const metadata: Metadata = {
   title: 'Unit',
@@ -90,11 +92,26 @@ export default async function UnitPage({ params }: PageProps) {
 
   // A lease may only be recorded on a unit that is free today and in service.
   // The database refuses the rest anyway — the exclusion constraint and the
-  // out-of-service trigger — so this only decides whether the menu offers it.
+  // out-of-service trigger — so this only decides whether the button appears.
   const mayLease = unit.occupant === null && unit.outOfService === null
 
   return (
     <>
+      {/* Rows on the board open this screen, so it needs a way back that is not
+          the browser's. Above the title rather than beside it: it is a
+          navigation control, not one of the record's actions, and the header's
+          action slot is spoken for. `ghost`, because a way out is not a thing
+          to advertise — the same treatment the amend screen and the unit
+          registry use. */}
+      <div className="mb-md">
+        <Button asChild variant="ghost">
+          <Link href="/portal/units">
+            <ArrowLeft aria-hidden />
+            Back to units
+          </Link>
+        </Button>
+      </div>
+
       <PageHeader
         title={unit.ref}
         meta={<UnitStatusBadge status={unit.status} />}
@@ -111,8 +128,24 @@ export default async function UnitPage({ params }: PageProps) {
         }
       />
 
-      <div className="mt-xl grid gap-md lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="grid gap-md">
+      <div className="mt-xl grid items-start gap-md lg:grid-cols-[minmax(0,1fr)_360px]">
+        {/* `content-start`, or the column's rows stretch to match the history
+            beside them and a two-line note becomes a card six hundred pixels
+            tall. */}
+        <div className="grid content-start gap-md">
+          {/* First, not last. A standing fact about the unit — "the shower door
+              sticks" — is the thing a cleaner opening this screen most needs,
+              and it outlives every booking beneath it (open-questions.md
+              N18). */}
+          <SectionCard id="unit-notes" title="About this unit">
+            <UnitNotes
+              unitId={unit.id}
+              ref_={unit.ref}
+              notes={unit.notes}
+              canEdit={hasPermission(actor.permissions, 'unit.manage')}
+            />
+          </SectionCard>
+
           <SectionCard id="unit-facts" title="The unit">
             <dl className="grid gap-md sm:grid-cols-2">
               <Fact label="Reference" value={<span className="font-mono">{unit.ref}</span>} />

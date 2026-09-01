@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
+import { Button } from '@/components/ui/button'
 import { getUnitTypes } from '@/lib/db/inventory'
 import { listUnitRegistry } from '@/lib/db/units'
 
@@ -71,6 +74,21 @@ export default async function UnitRegistryPage() {
 
   return (
     <>
+      {/* The way back, above the title rather than beside it. This screen is
+          reached from the units board and from a different nav group, so
+          leaving it needs an obvious exit — and a header action would compete
+          with the h1 for a control that is not an action at all. `ghost`,
+          because a way out is not a thing to advertise. The amend screen
+          already does this; nothing new is being invented. */}
+      <div className="mb-md">
+        <Button asChild variant="ghost">
+          <Link href="/portal/units">
+            <ArrowLeft aria-hidden />
+            Back to units
+          </Link>
+        </Button>
+      </div>
+
       <PageHeader
         title="Unit registry"
         description="What the units are called, and how many of each type the building has."

@@ -25,6 +25,22 @@ const buttonVariants = cva(
         tertiary: 'border border-border bg-card text-foreground hover:bg-muted',
         ghost: 'text-foreground hover:bg-muted',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-negative-deep',
+        /**
+         * A destructive action that is not the screen's primary one: the
+         * `tertiary` chrome carrying destructive *text*, which is exactly the
+         * weight `DropdownMenuItem variant="destructive"` has.
+         *
+         * It exists because moving an action out of a menu and onto the page
+         * must not change how loud it is. A menu item said "this one is
+         * different" in red text; a filled red button in a page header says
+         * something else entirely — it becomes the loudest thing on the
+         * screen, and it spends the destructive fill that design.md reserves
+         * for the confirmation footer, where the irreversible click actually
+         * happens. Two red fills, one of which does nothing but open a dialog,
+         * is how a warning stops being read.
+         */
+        'destructive-tertiary':
+          'border border-border bg-card text-destructive hover:bg-badge-negative',
         /** For dark surfaces (`invert-surface` cards and bands) only. */
         inverted: 'bg-primary-invert text-primary-invert-foreground hover:bg-primary-invert-hover',
       },

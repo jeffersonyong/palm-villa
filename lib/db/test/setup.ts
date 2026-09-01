@@ -126,10 +126,12 @@ async function clearTransactionalData(): Promise<void> {
     throw new Error(`Could not clear guests between tests: ${guestError.message}`)
   }
 
+  // Notes ride along here for the same reason: they are a column on a seeded
+  // row, so nothing else clears them between tests.
   const { error: serviceError } = await db
     .from('unit')
-    .update({ out_of_service_since: null, out_of_service_reason: null })
-    .not('out_of_service_since', 'is', null)
+    .update({ out_of_service_since: null, out_of_service_reason: null, notes: null })
+    .or('out_of_service_since.not.is.null,notes.not.is.null')
 
   if (serviceError) {
     throw new Error(`Could not return units to service between tests: ${serviceError.message}`)
