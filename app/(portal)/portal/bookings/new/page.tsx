@@ -77,7 +77,9 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   const availableByType = hasDates
     ? await countAvailableByType({ start: checkIn, end: checkOut })
     : {}
-  const totalByType = await getUnitCounts()
+  // Serviceable only: this is the denominator of "3 of 36 free", and a unit
+  // that is out of service is not one of the thirty-six anyone can be sold.
+  const totalByType = await getUnitCounts({ serviceableOnly: true })
 
   // The discount control is an affordance, not a gate: the server action checks
   // `booking.discount` again on every submit. Deciding it here only spares a

@@ -245,6 +245,10 @@ export async function findAvailableUnits(query: AvailabilityQuery): Promise<read
   ).map((row) => ({
     id: row.id,
     ref: row.ref,
+    // Always null here, and not a lie: available_units() filters out-of-service
+    // units out entirely (20260904000100 part 3), so every row this returns is
+    // a unit that can take a guest.
+    outOfServiceSince: null,
     unitTypeId: row.unit_type_slug,
     unitTypeName: row.unit_type_name,
   }))

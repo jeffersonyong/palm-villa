@@ -7,6 +7,7 @@ import { dataClient } from '@/lib/supabase/data'
 
 import { createWalkInBooking, type Booking, type CreateWalkInBookingInput } from '../bookings'
 import { listPaymentsForBooking, type Payment } from '../payments'
+import { markUnitLeased, markUnitOutOfService } from '../units'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { currentPropertyId } from '../property'
 
@@ -333,4 +334,51 @@ async function nextReference(): Promise<string> {
   }
 
   return data as string
+}
+
+/**
+ * Puts a long lease on a unit (capability B9).
+ *
+ * Goes through `markUnitLeased`, so what a test acts on is the row the product
+ * writes: an occupancy with no booking, `occupancy_type = 'tenancy'` and
+ * `status = 'leased'`, participating in the exclusion constraint exactly like
+ * a booking's.
+ */
+export async function givenLease(spec: {
+  unitRef?: string
+  unitId?: string
+  occupantName?: string
+  start: StayDate
+  end: StayDate
+}): Promise<{ occupancyId: string; unitId: string }> {
+  const unitId = spec.unitId ?? (await unitIdByRef(spec.unitRef ?? '3B-01'))
+
+  const result = await markUnitLeased({
+    unitId,
+    occupantName: spec.occupantName ?? 'Test Tenant',
+    start: spec.start,
+    end: spec.end,
+    actorId: null,
+  })
+
+  if (!result.ok) {
+    throw new Error(`Test setup could not record a lease: ${result.error.message}`)
+  }
+
+  return { occupancyId: result.occupancyId, unitId }
+}
+
+/** Takes a unit out of service, failing the test rather than returning a refusal. */
+export async function givenUnitOutOfService(
+  unitRef: string,
+  reason = 'Test maintenance',
+): Promise<string> {
+  const unitId = await unitIdByRef(unitRef)
+  const result = await markUnitOutOfService({ unitId, reason, actorId: null })
+
+  if (!result.ok) {
+    throw new Error(`Test setup could not take ${unitRef} out of service: ${result.error.message}`)
+  }
+
+  return unitId
 }
