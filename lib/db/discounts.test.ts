@@ -239,6 +239,46 @@ describe('amending a discounted booking', () => {
     expect(after?.lines.some((entry) => entry.type === 'discount')).toBe(false)
   })
 
+  test('adding a discount to an undiscounted booking records it as an addition', async () => {
+    // The history reads `before.kind` to tell "applied" from "changed" — a
+    // removal labelled "changed" describes an event that did not happen — so
+    // the null on the before side is load-bearing, not incidental.
+    const booking = await givenBooking({
+      unitRef: '3B-10',
+      checkIn: CHECK_IN,
+      checkOut: CHECK_OUT,
+    })
+
+    if (!booking.stay) {
+      throw new Error('Test setup produced a booking with no stay.')
+    }
+
+    await extendTo(booking, CHECK_OUT, { kind: 'percent', value: 20, reason: REASON })
+
+    const events = await auditEventsFor(booking.id)
+    const discounted = events.filter((event) => event.action === 'booking.discounted')
+
+    expect(discounted).toHaveLength(1)
+    expect(discounted[0]?.before).toMatchObject({ kind: null })
+    expect(discounted[0]?.after).toMatchObject({ kind: 'percent' })
+  })
+
+  test('removing a discount records it as a removal, not as a change', async () => {
+    const booking = await givenDiscounted('3B-11', {
+      kind: 'amount',
+      value: bnd(60),
+      reason: REASON,
+    })
+
+    await extendTo(booking, CHECK_OUT, null)
+
+    const events = await auditEventsFor(booking.id)
+    const removal = events.filter((event) => event.action === 'booking.discounted').at(-1)
+
+    expect(removal?.before).toMatchObject({ kind: 'amount' })
+    expect(removal?.after).toMatchObject({ kind: null })
+  })
+
   test('a discount that changes records its own event, with both sides', async () => {
     const booking = await givenDiscounted('3B-08', {
       kind: 'amount',

@@ -63,6 +63,32 @@ function createdLabel(event: AuditEvent): string {
 }
 
 /**
+ * One verb, three things that happened.
+ *
+ * `booking.discounted` is written when a discount is given, when one is
+ * changed, and when one is taken away — deliberately, so "show me every
+ * discount given this month" stays a lookup on a single action. That makes it
+ * the second label that cannot come from the verb alone: "Discount changed"
+ * against a removal is not a clumsy phrasing, it is the trail describing an
+ * event that did not happen.
+ *
+ * Which one it was is in the payload. `before` is null on creation, and on an
+ * amendment it carries the previous instruction — whose `kind` is null when
+ * there was no discount before. `after.kind` is null when the discount has
+ * been removed.
+ */
+function discountLabel(event: AuditEvent): string {
+  const had = Boolean(event.before?.kind)
+  const has = Boolean(event.after?.kind)
+
+  if (!had) {
+    return 'Discount applied'
+  }
+
+  return has ? 'Discount changed' : 'Discount removed'
+}
+
+/**
  * An unmapped action still renders, as its raw verb.
  *
  * Falling back rather than hiding it: an event nobody wrote a label for is
@@ -72,6 +98,10 @@ function createdLabel(event: AuditEvent): string {
 function actionLabel(event: AuditEvent): string {
   if (event.action === 'booking.created_walk_in') {
     return createdLabel(event)
+  }
+
+  if (event.action === 'booking.discounted') {
+    return discountLabel(event)
   }
 
   return (
