@@ -2,6 +2,7 @@ import {
   BadgeCheck,
   Banknote,
   BarChart3,
+  Building2,
   CalendarDays,
   DoorOpen,
   Globe,
@@ -76,6 +77,12 @@ export const navGroups = [
     label: 'Admin',
     items: [
       { href: '/portal/settings/pricing', label: 'Pricing', icon: Tag },
+      // Under Admin rather than beside Units in Property, deliberately. The
+      // Units board is a daily operations screen; naming the building is
+      // configuration and is gated on `config.manage` like everything else
+      // here. The board links across to it, which is where anyone looking for
+      // it will look first.
+      { href: '/portal/settings/units', label: 'Unit registry', icon: Building2 },
       { href: '/portal/settings/roles', label: 'Roles & staff', icon: Users },
       { href: '/portal/settings/audit', label: 'Audit log', icon: ScrollText },
     ],

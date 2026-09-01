@@ -117,20 +117,44 @@ describe('listBookings', () => {
   test('breaks a tie on reference, so no row can drift across a page boundary', async () => {
     // Two bookings created inside the same clock tick would otherwise have no
     // defined order between them, and an order that is not total lets a row
-    // appear on two pages or on neither. References are allocated in creation
-    // order, so descending reference agrees with descending creation.
+    // appear on two pages or on neither.
+    //
+    // ── What this asserts, and what it deliberately does not ──────────────
+    //
+    // It asserts the order is **total and stable**: the same rows, in the same
+    // sequence, on every read. It does NOT assert any particular sequence, and
+    // an earlier version did — it expected descending reference, on the
+    // reasoning that "references are allocated in creation order".
+    //
+    // They are not, for simultaneous writes. `next_booking_reference()` is
+    // `nextval()`, which is non-transactional and hands out values in the order
+    // transactions *call* it; `created_at` defaults to `now()`, which is the
+    // order transactions *started*. Three concurrent creations can therefore
+    // allocate PV-5224 to the transaction that started last, and the product's
+    // `(created_at desc, reference desc)` correctly returns 5226, 5224, 5225.
+    //
+    // That is not a weaker guarantee — the pair is still a total order, which
+    // is the whole property pagination needs — so the old expectation was
+    // testing an accident of timing that held whenever the three writes
+    // happened to serialise neatly, and failed under load. Stability across two
+    // reads is the real invariant, and is what the comment above always said
+    // this test was for.
     const created = await Promise.all([
       givenBooking({ unitRef: '3B-01', checkIn: '2026-09-01', checkOut: '2026-09-03' }),
       givenBooking({ unitRef: '3B-02', checkIn: '2026-09-01', checkOut: '2026-09-03' }),
       givenBooking({ unitRef: '3B-03', checkIn: '2026-09-01', checkOut: '2026-09-03' }),
     ])
 
-    const descending = [...created.map((booking) => booking.reference)].sort().reverse()
+    const first = (await listBookings()).bookings.map((entry) => entry.reference)
+    const second = (await listBookings()).bookings.map((entry) => entry.reference)
 
-    // Read twice: an unstable order is allowed to be wrong once and right the
-    // next time, which is exactly the bug pagination turns into a lost row.
-    expect((await listBookings()).bookings.map((entry) => entry.reference)).toEqual(descending)
-    expect((await listBookings()).bookings.map((entry) => entry.reference)).toEqual(descending)
+    // Every booking, exactly once — nothing lost, nothing duplicated.
+    expect([...first].sort()).toEqual([...created.map((booking) => booking.reference)].sort())
+
+    // And the same sequence twice: an unstable order is allowed to be wrong
+    // once and right the next time, which is exactly the bug pagination turns
+    // into a lost row.
+    expect(second).toEqual(first)
   })
 
   test('matches a stay that overlaps the filter range', async () => {

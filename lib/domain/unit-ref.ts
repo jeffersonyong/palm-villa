@@ -286,3 +286,28 @@ export function refsAfter(
 
   return [...kept, ...plan.additions.map((addition) => addition.ref)]
 }
+
+/**
+ * Everything wrong with the names a registry edit would leave behind.
+ *
+ * Checks the whole building, not the types being edited. `unique (property_id,
+ * ref)` is property-wide, so naming a 2-bedroom `3B-01` collides with a
+ * 3-bedroom the form may not even be showing — and the database would say so
+ * only after the clerk had filled the rest of it in.
+ *
+ * The untouched references go in first deliberately. `checkUnitRefs` flags the
+ * *second* occurrence of a duplicate, so leading with the names that are not
+ * being edited means the problem is reported against the field the form can
+ * actually fix.
+ */
+export function checkUnitRegistry(
+  current: readonly CurrentUnit[],
+  desired: readonly DesiredUnitType[],
+): readonly RefProblem[] {
+  const edited = new Set(desired.map((type) => type.unitTypeId))
+  const untouched = current
+    .filter((unit) => !edited.has(unit.unitTypeId))
+    .map((unit) => unit.ref)
+
+  return checkUnitRefs([...untouched, ...desired.flatMap((type) => type.refs)])
+}

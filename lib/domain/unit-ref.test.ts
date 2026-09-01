@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   checkUnitRefs,
+  checkUnitRegistry,
   formatUnitRef,
   generateUnitRefs,
   isNoOp,
@@ -282,5 +283,45 @@ describe('refsAfter', () => {
     expect(checkUnitRefs(refsAfter(current, plan))).toEqual([
       { ref: 'SD-01', reason: 'duplicate' },
     ])
+  })
+})
+
+describe('checkUnitRegistry', () => {
+  const building: CurrentUnit[] = [
+    unit('3B-01'),
+    unit('SD-01', { unitTypeId: 'semi-detached' }),
+  ]
+
+  test('a clean edit has nothing wrong with it', () => {
+    expect(
+      checkUnitRegistry(building, [{ unitTypeId: 'three-bedroom', refs: ['A-101'] }]),
+    ).toEqual([])
+  })
+
+  test('catches a collision with a type the form is not even showing', () => {
+    // The database would refuse this after the form was filled in. Catching it
+    // here is the difference between a marked field and a lost edit.
+    expect(
+      checkUnitRegistry(building, [{ unitTypeId: 'three-bedroom', refs: ['SD-01'] }]),
+    ).toEqual([{ ref: 'SD-01', reason: 'duplicate' }])
+  })
+
+  test('reports the problem against the name being edited, not the one being kept', () => {
+    // Both are 'SD-01'; only one of them is in a field the clerk can change.
+    const problems = checkUnitRegistry(building, [
+      { unitTypeId: 'three-bedroom', refs: ['SD-01'] },
+    ])
+
+    expect(problems).toHaveLength(1)
+  })
+
+  test('a type being renamed does not collide with its own old names', () => {
+    // Its current refs are replaced, not kept, so they must not be counted.
+    expect(
+      checkUnitRegistry(
+        [unit('3B-01'), unit('3B-02')],
+        [{ unitTypeId: 'three-bedroom', refs: ['3B-02', '3B-01'] }],
+      ),
+    ).toEqual([])
   })
 })

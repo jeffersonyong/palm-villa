@@ -21,7 +21,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'deposit.approve_release': 'Approve deposit release',
   'unit.manage': 'Manage units',
   'tenancy.manage': 'Manage tenancies',
-  'config.manage': 'Edit settings & roles',
+  'config.manage': 'Edit settings, roles & the unit registry',
   'report.view': 'View reports',
   'document.view_identity': 'View identity documents',
 }

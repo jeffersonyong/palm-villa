@@ -1,4 +1,4 @@
-import type { BookingStatusTone } from '@/components/portal/booking-status-badge'
+import type { StatusTone } from '@/components/portal/status-tone'
 import { cn } from '@/lib/utils'
 
 /**
@@ -11,10 +11,11 @@ import { cn } from '@/lib/utils'
  * rather than brand, so the dot is identical on the monochrome operations
  * surface, `active`'s aqua included.
  *
- * The tone comes from the badge module, which owns the status → tone mapping;
- * this file only knows how to draw a tone small.
+ * The tone comes from whichever badge module owns that status → tone mapping
+ * — bookings have one, units have another; this file only knows how to draw a
+ * tone small.
  */
-const DOT_CLASSES: Record<BookingStatusTone, string> = {
+const DOT_CLASSES: Record<StatusTone, string> = {
   positive: 'bg-positive',
   warning: 'bg-warning',
   negative: 'bg-negative',
@@ -23,7 +24,7 @@ const DOT_CLASSES: Record<BookingStatusTone, string> = {
 }
 
 interface StatusDotProps {
-  tone: BookingStatusTone
+  tone: StatusTone
   className?: string
 }
 
