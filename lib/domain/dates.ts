@@ -88,6 +88,27 @@ export function formatStayDate(date: StayDate): string {
   }).format(new Date(`${parseStayDate(date)}T00:00:00Z`))
 }
 
+/**
+ * A stay's own dates as one string, e.g. `14 → 16 Sept 2026`.
+ *
+ * The arrival-to-departure pair, for the places one cell has to hold what two
+ * columns used to — the bookings register, whose date column collapsed when the
+ * list took on streams that have no such pair at all (prd.md §6.1).
+ *
+ * Shares its elision with `formatStayRange` below, so a date reads the same in
+ * a filter chip and in the table the chip filters. What differs is the
+ * separator and what it means: an **arrow**, because these ends are a
+ * half-open occupancy — the guest leaves *on* the second date and does not
+ * sleep there — where the dash of a filter span joins two days that are both
+ * included.
+ */
+export function formatStayDates(checkIn: StayDate, checkOut: StayDate): string {
+  const from = parseStayDate(checkIn)
+  const to = parseStayDate(checkOut)
+
+  return `${formatRangeStart(from, to)} → ${formatRangeEnd(to)}`
+}
+
 /** Adds a number of days to a stay date, returning a new stay date. */
 export function addDays(date: StayDate, days: number): StayDate {
   const shifted = new Date(

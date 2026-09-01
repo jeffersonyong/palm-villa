@@ -14,7 +14,7 @@
 
 ## 1. Answer these first — a finished screen is waiting
 
-These two are not hypothetical. The screens exist, work, and are deliberately incomplete in one specific way until Jason answers.
+Not hypothetical. Each screen below exists and works, and is deliberately incomplete in one specific way until Jason answers — except N16, which is a feature the desk has asked for and which cannot be built at all until he settles a rule he has already given.
 
 ### N5 — Which payment is forfeited when someone cancels or doesn't show up?
 
@@ -39,6 +39,55 @@ These two are not hypothetical. The screens exist, work, and are deliberately in
 **Assumed meanwhile:** nothing expires. The queue lists oldest-first and shows how long each has been waiting, so it is visible rather than silent — but it relies on a person looking. The PRD suggests 60 minutes for stays and 30 for day passes as a starting point; nobody has agreed it.
 
 **Worth raising alongside:** this also decides what the public booking site's checkout countdown says, so it will block Phase 2 as well.
+
+**Answer:** _unanswered_
+
+---
+
+### N16 — Can a guest pay part of a booking now and the rest later?
+
+**Ask:** "If someone wants to pay half now and half on arrival, do we let them — and is the unit theirs while the balance is outstanding?"
+
+**Why this needs Jason and not a build decision:** it contradicts a **[C]** he has already given. PRD §9.1 says *"Full payment is required to secure a unit. Unpaid bookings do not hold inventory"*, and §9.4 excludes booked-ahead, pay-on-arrival from v1 in as many words. A booking confirmed with a balance owing is a softer version of exactly that. It is also the same conversation as the adoption risk §9.4 already flags — if staff are informally holding units for regulars today, part payment is how that habit comes back.
+
+**What's blocked:** part payments are **not built**, and nothing in the system can express one. The payment slice opens by recording that it "is NOT a ledger" — it computes no balance, and two payments against one booking are two recorded facts rather than an arithmetic. Concretely, four things would have to change:
+
+- The **mismatch rule** would have to match against the outstanding balance rather than the booking total. Today a payment for less than the total can only be confirmed with a written override reason (capability B5) — a deliberate 50% deposit would trip that flag every time, and a flag that fires on the ordinary case stops meaning anything.
+- **`expected_amount_cents`** currently means "what the whole booking is worth", refreshed under lock at verification. It would have to mean "what was outstanding when this payment was raised".
+- The **state machine** has no partial state: `verify_payment` and `pay_in_full` both reach `confirmed`, so the first BND 100 of a BND 400 booking would confirm it outright.
+- Somewhere has to answer **"what is still owed"**, derived from the verified payments rather than stored, or the two figures drift.
+
+**Assumed meanwhile:** nothing. A booking is paid in full or it is not, and the desk records a second payment against a booking as a second fact with no balance attached to it.
+
+**The shape agreed with Jeff if Jason says yes** (2026-09-01): status stays about the *stay* — the booking is confirmed and the money owed is a derived balance shown beside it — rather than adding a `partially_paid` state to the machine. Recorded here so the answer lands on a decision already taken rather than reopening it.
+
+**Jeff's position (2026-09-01): out of v1 unless Jason asks for it.** Not a "not yet decided" — a decision to leave the stated policy standing. The question stays open because it is Jason's to reverse, but nothing is waiting on it and no screen is incomplete without it. If he does ask, it is a slice of its own, not an addition to one.
+
+**Answer:** _unanswered — deferred out of v1 by Jeff, pending Jason_
+
+---
+
+### N17 — Is there a ceiling on a staff discount, or a sign-off above some figure?
+
+**Ask:** "Front Office can now take money off a booking at the desk. Is there a limit — and should anything above, say, twenty percent need you or the Ladyboss to approve it?"
+
+**What it decides:** whether the discount control needs a cap, and whether a large discount needs a second person the way a deposit release does (PRD §11 [C]).
+
+**Assumed meanwhile:** no cap and no approval step. A discount of up to the full value of the booking is allowed — comping a stay outright is a real thing a manager does — and it is *recorded* rather than gated: every discount carries a typed reason and its own audit event (`booking.discounted`), so "who discounted what, and why" is answerable today even though nothing is prevented. Adding a threshold later is a rule in one pure module plus a permission, not a rework. See [prd.md §8.4](prd.md).
+
+**Answer:** _unanswered_
+
+---
+
+### N18 — Is a housekeeping note on a booking actually useful, and what about notes on a unit?
+
+**Ask:** "When the cleaner opens a unit on their phone, is there anything the office would want to tell them about *that guest*? And separately — where should 'the shower door sticks' live, given it's true long after the guest has gone?"
+
+**Why it is here rather than built:** flagged by Jeff as not thought through, and it is the right instinct — the housekeeping field screen does not exist yet (C-series, and the current `/field` route is a placeholder with no data layer), so nothing can show a housekeeping note today.
+
+**What's been built anyway, and why it is cheap:** notes carry an `internal` / `housekeeping` audience tag from the outset. Both appear in one thread on the booking screen, each labelled, and the housekeeping filter the field screen will need already exists and is tested. If the answer turns out to be "the cleaner needs nothing", the cost of having asked is one tag nobody selects.
+
+**What is deliberately not built:** a note against the *unit*. It outlives every booking, so hanging it off one would lose it when the guest leaves — that belongs with the inspections slice (PRD §11).
 
 **Answer:** _unanswered_
 
@@ -71,7 +120,7 @@ Not blocking today, but each one is a screen that cannot be finished without it.
 
 | # | Ask | What it decides | Assumed meanwhile |
 |---|---|---|---|
-| **N11** | "Who is allowed to check a guest in? And should confirming an odd payment amount need someone more senior?" | There is no permission for check-in at all, so Security cannot be granted it. Separately: confirming a short payment and hand-matching a transfer both reuse "verify payments". | Security holds view-only. All three payment actions treated as one job. **Note the consequence:** Finance can override a payment amount but cannot record cash. |
+| **N11** | "Who is allowed to check a guest in? And should confirming an odd payment amount need someone more senior?" | There is no permission for check-in at all, so Security cannot be granted it. Separately: confirming a short payment and hand-matching a transfer both reuse "verify payments". | Security holds view-only. All three payment actions treated as one job. **Note the consequence:** Finance can override a payment amount but cannot record cash. **Also:** `payment.record_cash` now gates recording a *bank transfer* against a booking too (PRD §10.7), so its name is narrower than its job — whoever may say money arrived is the same person either way. Splitting or renaming it is part of this answer. |
 | **N12** | "Can we change a booking after the guest has already checked in — and if so, what do we charge for the nights they've already had?" | Amending a checked-in booking is currently blocked outright. | Blocked. The pricing engine refuses a check-in date in the past, so a mid-stay re-price isn't possible without a deliberate decision. |
 | **N14** | "Which of the three phone numbers is the WhatsApp one for booking enquiries?" | The public site links one of them. | Linking the first number listed. |
 

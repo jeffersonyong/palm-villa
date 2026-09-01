@@ -7,8 +7,15 @@ import { requirePermission } from '@/lib/auth/require-permission'
 import { createWalkInBooking } from '@/lib/db/bookings'
 import { isStayDate } from '@/lib/domain/dates'
 import { palmVillaConfig } from '@/lib/domain/config'
+import { parseDiscount, MAX_DISCOUNT_REASON_LENGTH } from '@/lib/domain/discount'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { priceStay } from '@/lib/domain/pricing/stay'
+import {
+  hasVehicleAnswer,
+  normaliseVehicleRegistrations,
+  MAX_VEHICLES_PER_BOOKING,
+  MAX_VEHICLE_REGISTRATION_LENGTH,
+} from '@/lib/domain/vehicle'
 
 /**
  * Walk-in booking creation (prd.md §9.4, capability B2).
@@ -47,8 +54,24 @@ const walkInBookingSchema = z.object({
   lateCheckOutHours: z.coerce.number().int().min(0).max(12),
   guestName: z.string().trim().min(1, 'Enter the guest name.').max(120),
   guestPhone: z.string().trim().min(1, 'Enter a contact number.').max(40),
-  vehicleRegistration: z.string().trim().max(20).optional(),
+  /**
+   * One entry per row of the repeated field. Read with `getAll`, not
+   * `Object.fromEntries`, which keeps only the last of a repeated name — a
+   * family arriving in three cars would have silently become one.
+   */
+  vehicles: z.array(z.string().max(MAX_VEHICLE_REGISTRATION_LENGTH)).max(MAX_VEHICLES_PER_BOOKING),
+  /** The deliberate exception, submitted as a value on every save. */
+  noVehicle: z.enum(['true', 'false']).transform((value) => value === 'true'),
   paymentMethod: z.enum(['cash', 'bank_transfer']),
+  /**
+   * The discount control, always submitted — `none` when nothing is being
+   * taken off. Left as loose strings here and read by `parseDiscount`, which
+   * is the one place that decides what "40.00" and "15" mean and is unit
+   * tested against both.
+   */
+  discountKind: z.string().default('none'),
+  discountValue: z.string().default(''),
+  discountReason: z.string().max(MAX_DISCOUNT_REASON_LENGTH).default(''),
 })
 
 export interface WalkInBookingState {
@@ -75,7 +98,12 @@ export async function createWalkInBookingAction(
   // architecture.md §4: every mutation passes the permission check first.
   const actor = await requirePermission('booking.create')
 
-  const parsed = walkInBookingSchema.safeParse(Object.fromEntries(formData))
+  const parsed = walkInBookingSchema.safeParse({
+    ...Object.fromEntries(formData),
+    // Files are dropped rather than coerced: nothing on this form uploads one,
+    // and a `File` reaching a plate field is a malformed request, not a plate.
+    vehicles: formData.getAll('vehicles').filter((entry) => typeof entry === 'string'),
+  })
 
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {}
@@ -93,9 +121,53 @@ export async function createWalkInBookingAction(
 
   const input = parsed.data
 
+  // Normalised here rather than in the browser, so a plate typed at the desk
+  // and one read at the gate are the same string (prd.md §12.5). De-duplicating
+  // is not cosmetic: `booking_vehicle` is unique per booking and registration,
+  // and the same car entered twice would otherwise refuse the whole write.
+  const vehicles = normaliseVehicleRegistrations(input.vehicles)
+
+  // prd.md §13 [C]: name and vehicle registration are required. The database
+  // refuses this combination too — this is the courtesy that turns a raised
+  // exception into a message beside the field.
+  if (!hasVehicleAnswer(vehicles, input.noVehicle)) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: {
+        vehicles:
+          'Enter the vehicle registration, or tick "Arriving without a vehicle" if there is no car.',
+      },
+    }
+  }
+
+  const discount = parseDiscount({
+    kind: input.discountKind,
+    value: input.discountValue,
+    reason: input.discountReason,
+  })
+
+  if (!discount.ok) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: { [discount.error.field]: discount.error.message },
+    }
+  }
+
+  // A second gate, and the reason the permission exists (architecture.md §4).
+  // The control is not rendered for a staff member without it, so a request
+  // that carries one is a forged one — this throws rather than answering
+  // politely, which is how every other permission failure behaves.
+  if (discount.discount) {
+    await requirePermission('booking.discount')
+  }
+
   // Re-priced server-side. The client island computes the same total for live
   // display, but no submitted total is ever trusted — the price charged is the
-  // one the server derives from the inputs.
+  // one the server derives from the inputs. The discount is an INPUT to that,
+  // never a subtraction applied afterwards: `priceStay` emits it as a negative
+  // line and the total stays the sum of the lines.
   const priced = priceStay(
     {
       unitTypeId: input.unitTypeId,
@@ -105,6 +177,7 @@ export async function createWalkInBookingAction(
       sofaBeds: input.sofaBeds,
       earlyCheckInHours: input.earlyCheckInHours,
       lateCheckOutHours: input.lateCheckOutHours,
+      discount: discount.discount,
     },
     palmVillaConfig,
   )
@@ -118,12 +191,14 @@ export async function createWalkInBookingAction(
     range: { start: input.checkIn, end: input.checkOut },
     guestName: input.guestName,
     guestPhone: input.guestPhone,
-    vehicleRegistration: input.vehicleRegistration?.toUpperCase() || null,
+    vehicles,
+    noVehicle: input.noVehicle,
     chargeableGuests: input.chargeableGuests,
     exemptGuests: input.exemptGuests,
     lines: priced.lines,
     total: priced.total,
     securityDeposit: priced.securityDeposit,
+    discount: discount.discount,
     paymentMethod: input.paymentMethod,
     actorId: actor.userId,
   })
@@ -145,9 +220,12 @@ export async function createWalkInBookingAction(
     status: 'created',
     created: {
       reference: result.booking.reference,
-      unitRef: result.booking.unitRef,
-      checkIn: result.booking.range.start,
-      checkOut: result.booking.range.end,
+      // A walk-in always occupies a unit, so `stay` is present — but it is
+      // read defensively rather than asserted, because a blank reference on
+      // the confirmation panel is what the guest is asked to quote at the bank.
+      unitRef: result.booking.stay?.unitRef ?? '',
+      checkIn: result.booking.stay?.range.start ?? input.checkIn,
+      checkOut: result.booking.stay?.range.end ?? input.checkOut,
       total: result.booking.total,
       securityDeposit: result.booking.securityDeposit,
       paymentMethod: input.paymentMethod,

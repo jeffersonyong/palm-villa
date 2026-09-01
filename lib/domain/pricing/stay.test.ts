@@ -303,3 +303,91 @@ describe('partyFromAges — prd.md §8.2, guests aged 3 and below are not counte
     expect(result.ok).toBe(true)
   })
 })
+
+describe('priceStay — staff discount', () => {
+  const reason = 'Repeat guest, third stay this year'
+
+  test('adds the discount as a negative line, and the total is still the sum', () => {
+    // Arrange — two nights of a 3-bedroom, less BND 40.
+    const undiscounted = priceStay(input(), palmVillaConfig, TODAY)
+
+    // Act
+    const result = priceStay(
+      input({ discount: { kind: 'amount', value: bnd(40), reason } }),
+      palmVillaConfig,
+      TODAY,
+    )
+
+    // Assert
+    expect(result.ok && undiscounted.ok).toBe(true)
+    if (!result.ok || !undiscounted.ok) return
+
+    expect(result.total).toBe(undiscounted.total - bnd(40))
+    expect(result.lines.at(-1)).toMatchObject({ type: 'discount', amount: -bnd(40) })
+    expect(result.lines.reduce((sum, entry) => sum + entry.amount, 0)).toBe(result.total)
+  })
+
+  test('a percentage is taken against the priced lines, not the deposit', () => {
+    const result = priceStay(
+      input({ discount: { kind: 'percent', value: 10, reason } }),
+      palmVillaConfig,
+      TODAY,
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const subtotal = result.lines
+      .filter((entry) => entry.type !== 'discount')
+      .reduce((sum, entry) => sum + entry.amount, 0)
+
+    expect(result.total).toBe(subtotal - Math.round(subtotal / 10))
+    // The refundable BND 100 is untouched: discounting it would be a shortfall
+    // at release time, not a discount (prd.md §11).
+    expect(result.securityDeposit).toBe(palmVillaConfig.securityDeposit)
+  })
+
+  test('the discount is applied after every extra, so an extra is discounted too', () => {
+    const withExtras = input({ sofaBeds: 1, lateCheckOutHours: 2 })
+
+    const plain = priceStay(withExtras, palmVillaConfig, TODAY)
+    const discounted = priceStay(
+      { ...withExtras, discount: { kind: 'percent', value: 50, reason } },
+      palmVillaConfig,
+      TODAY,
+    )
+
+    expect(plain.ok && discounted.ok).toBe(true)
+    if (!plain.ok || !discounted.ok) return
+
+    expect(discounted.total).toBe(plain.total - Math.round(plain.total / 2))
+  })
+
+  test('a discount worth more than the stay is refused, not clamped', () => {
+    const result = priceStay(
+      input({ discount: { kind: 'amount', value: bnd(100_000), reason } }),
+      palmVillaConfig,
+      TODAY,
+    )
+
+    expect(result.ok).toBe(false)
+    expect(!result.ok && result.error.code).toBe('invalid_discount')
+  })
+
+  test('a discount with no reason is refused', () => {
+    const result = priceStay(
+      input({ discount: { kind: 'amount', value: bnd(40), reason: '  ' } }),
+      palmVillaConfig,
+      TODAY,
+    )
+
+    expect(!result.ok && result.error.code).toBe('invalid_discount')
+  })
+
+  test('no discount leaves the lines exactly as they were', () => {
+    const result = priceStay(input({ discount: null }), palmVillaConfig, TODAY)
+
+    expect(result.ok).toBe(true)
+    expect(result.ok && result.lines.some((entry) => entry.type === 'discount')).toBe(false)
+  })
+})

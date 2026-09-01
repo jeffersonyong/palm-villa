@@ -15,6 +15,11 @@ import { cn } from '@/lib/utils'
  * runs uncontrolled unless given `value`/`onChange`, so the walk-in form's
  * plain `<form action>` fields and the amendment form's controlled ones are
  * the same component.
+ *
+ * `placeholder` carries an example of the value — `John Doe`, `BAA 1234` —
+ * never a restatement of the label above it. An empty field says nothing about
+ * the shape of what belongs in it, and a desk filling this in with a guest
+ * waiting should not have to guess whether a phone wants the +673.
  */
 
 interface NumberFieldProps {
@@ -50,6 +55,8 @@ interface TextFieldProps {
   id: string
   label: string
   type?: string
+  /** An example of the value, never a restatement of the label. */
+  placeholder?: string
   /** Supplied together with `onChange` for a controlled field; omit both for uncontrolled. */
   value?: string
   onChange?: (value: string) => void
@@ -62,6 +69,7 @@ export function TextField({
   id,
   label,
   type = 'text',
+  placeholder,
   value,
   onChange,
   autoComplete,
@@ -76,6 +84,7 @@ export function TextField({
         name={id}
         type={type}
         value={value}
+        placeholder={placeholder}
         autoComplete={autoComplete}
         aria-invalid={error ? true : undefined}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}

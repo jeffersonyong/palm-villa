@@ -21,6 +21,15 @@ export const PERMISSIONS = [
   'booking.amend',
   'booking.cancel',
   'booking.override_hold',
+  /**
+   * Discounting a booking, at creation or on an amendment.
+   *
+   * Deliberately not folded into `booking.create`. Every other permission here
+   * gates an operational act; this one gates giving money away, and separating
+   * it is what lets a manager withhold discretion from a role that otherwise
+   * takes bookings all day.
+   */
+  'booking.discount',
   'payment.verify',
   'payment.record_cash',
   'inspection.record',

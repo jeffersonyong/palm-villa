@@ -28,7 +28,13 @@ import { cn } from '@/lib/utils'
 
 interface PageHeaderProps {
   title: string
-  /** Identity of the record on the title's line: status chip, who, contact. */
+  /**
+   * Identity of the record on the title's line: status chip, and whose it is.
+   *
+   * Identity, not data. A guest's name belongs here; their phone number does
+   * not — a number somebody rings needs a label and a `tel:`, which is a field
+   * in the record's own card rather than grey text after a middot.
+   */
   meta?: React.ReactNode
   /** A sentence about the screen, on the line below. */
   description?: React.ReactNode

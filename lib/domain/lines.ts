@@ -19,6 +19,14 @@ export type BookingLineType =
   | 'late_check_out'
   | 'day_pass'
   | 'day_pass_bundle'
+  /**
+   * The one line that is negative. A staff discount is expressed as a line
+   * rather than as a subtraction on the total, so prd.md §8's "the total is
+   * the sum of the lines" survives it and a receipt still explains itself.
+   * Built by `resolveDiscount` in ./discount.ts, which is the only place the
+   * amount is decided.
+   */
+  | 'discount'
 
 export interface BookingLine {
   type: BookingLineType

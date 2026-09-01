@@ -3,6 +3,8 @@ import { transition, type BookingEvent, type BookingStatus } from '@/lib/domain/
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { palmVillaConfig, type PropertyConfig } from '@/lib/domain/config'
 import { addDays, type StayDate } from '@/lib/domain/dates'
+import type { Discount, DiscountKind } from '@/lib/domain/discount'
+import { BOOKING_STREAMS, type BookingStream } from '@/lib/domain/stream'
 import type { BookingLine } from '@/lib/domain/lines'
 import type { Cents } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
@@ -14,9 +16,14 @@ import { currentPropertyId } from './property'
  * Booking reads and writes.
  *
  * Every read here goes through the `booking_summary` view, which joins the
- * booking to its guest, occupancy and unit and aggregates its priced lines —
- * see supabase/migrations/20260829000600_read_model.sql. Assembling that shape
- * in TypeScript would mean a round trip per row on every list screen.
+ * booking to its guest, occupancy and unit and aggregates its priced lines and
+ * its vehicles — see supabase/migrations/20260901000100_stream_aware_bookings.sql
+ * for its current shape. Assembling that in TypeScript would mean several round
+ * trips per row on every list screen.
+ *
+ * Occupancy is joined LEFT, so the view carries every stream and not only the
+ * ones that occupy a unit. That is why `Booking.stay` is nullable: a day pass
+ * consumes facility capacity on a date and occupies nothing (prd.md §6.1).
  *
  * Availability goes through `available_units()`, which applies the same
  * half-open range semantics as the exclusion constraint. That is deliberate:
@@ -25,19 +32,15 @@ import { currentPropertyId } from './property'
  */
 
 /**
- * Which revenue stream a booking belongs to (prd.md §1).
+ * The unit a booking occupies, and for how long.
  *
- * A read-model type rather than a domain one: nothing in lib/domain branches on
- * it yet, and `booking_summary` joins day passes out by construction, so today
- * every row this module returns is a `short_stay`.
+ * Nullable on `Booking` rather than four nullable fields beside each other,
+ * because the four are one fact: prd.md §6.1 says "a day pass occupies no
+ * unit", and it consequently has no unit reference, no unit type and no
+ * dates from occupancy either. One check narrows all four, and no screen can
+ * accidentally read a unit ref while treating the dates as absent.
  */
-export type BookingStream = 'short_stay' | 'day_pass' | 'tenancy'
-
-/** A booking as the portal's screens read it. */
-export interface Booking {
-  id: string
-  /** Human-readable payment reference, `PV-` + 4 digits (architecture.md §6.1). */
-  reference: string
+export interface BookingStay {
   unitId: string
   unitRef: string
   /**
@@ -45,12 +48,28 @@ export interface Booking {
    * `priceStay` needs it to reprice an amendment.
    */
   unitTypeId: string
-  stream: BookingStream
   range: DateRange
+}
+
+/** A booking as the portal's screens read it. */
+export interface Booking {
+  id: string
+  /** Human-readable payment reference, `PV-` + 4 digits (architecture.md §6.1). */
+  reference: string
+  stream: BookingStream
+  /** Null for a booking that occupies no unit — a day pass (prd.md §6.1). */
+  stay: BookingStay | null
   status: BookingStatus
   guestName: string
   guestPhone: string
-  vehicleRegistration: string | null
+  /**
+   * Every vehicle arriving on this booking, in the order they were given
+   * (prd.md §2, §13 [C]). Empty with `noVehicle` false means *not recorded* —
+   * a booking taken before the field was required — not a guest without a car.
+   */
+  vehicles: readonly string[]
+  /** The guest asserted they are arriving without a vehicle. */
+  noVehicle: boolean
   chargeableGuests: number
   exemptGuests: number
   lines: readonly BookingLine[]
@@ -61,6 +80,23 @@ export interface Booking {
    * which of them is forfeited on cancellation is still open.
    */
   securityDeposit: Cents
+  /**
+   * The discount instruction, or null. Its EFFECT is already among `lines` as
+   * a negative one; this is what a staff member actually asked for, which is
+   * what an amendment has to re-derive from (see lib/domain/discount.ts).
+   */
+  discount: Discount | null
+  /**
+   * The sum of the payments actually VERIFIED against this booking — a
+   * promised transfer counts for nothing (capability B13).
+   *
+   * Derived by `booking_summary` from the payment rows, never stored: a
+   * stored figure is a second copy of one the payments already hold, and the
+   * two disagree the first time something writes a payment without
+   * maintaining it. What is *owed* is `balanceOf(total, paid)` in
+   * lib/domain/balance.ts, which owns the subtraction.
+   */
+  paid: Cents
   createdAt: string
   /**
    * Optimistic-concurrency token for `amendBooking`, maintained by the
@@ -74,6 +110,10 @@ export interface Booking {
   updatedAt: string
 }
 
+/**
+ * The view's row shape. Everything occupancy contributes is nullable, because
+ * the view left-joins it — see 20260901000100_stream_aware_bookings.sql.
+ */
 interface BookingSummaryRow {
   id: string
   reference: string
@@ -81,44 +121,88 @@ interface BookingSummaryRow {
   stream: BookingStream
   guest_name: string
   guest_phone: string
-  vehicle_registration: string | null
+  vehicles: string[]
+  no_vehicle: boolean
   chargeable_guests: number
   exempt_guests: number
   total_cents: number
   security_deposit_cents: number
   created_at: string
-  unit_id: string
-  unit_ref: string
-  unit_type_slug: string
-  check_in: StayDate
-  check_out: StayDate
+  unit_id: string | null
+  unit_ref: string | null
+  unit_type_slug: string | null
+  check_in: StayDate | null
+  check_out: StayDate | null
   lines: BookingLine[]
   updated_at: string
+  discount_kind: DiscountKind | null
+  discount_value: number | null
+  discount_reason: string | null
+  paid_cents: number
 }
 
 const SUMMARY_COLUMNS =
-  'id, reference, status, stream, guest_name, guest_phone, vehicle_registration, ' +
+  'id, reference, status, stream, guest_name, guest_phone, vehicles, no_vehicle, ' +
   'chargeable_guests, exempt_guests, total_cents, security_deposit_cents, ' +
-  'created_at, updated_at, unit_id, unit_ref, unit_type_slug, check_in, check_out, lines'
+  'created_at, updated_at, unit_id, unit_ref, unit_type_slug, check_in, check_out, lines, ' +
+  'discount_kind, discount_value, discount_reason, paid_cents'
+
+/**
+ * The five occupancy columns are read as one fact.
+ *
+ * They are null together or present together — the view joins them from a
+ * single occupancy row — so this collapses them into one nullable object
+ * rather than leaving five independent nullable fields for every call site to
+ * check in some order of its own. A partial row would mean the view is broken,
+ * so it is treated as absence rather than assembled into half a stay.
+ */
+function toStay(row: BookingSummaryRow): BookingStay | null {
+  if (!row.unit_id || !row.unit_ref || !row.unit_type_slug || !row.check_in || !row.check_out) {
+    return null
+  }
+
+  return {
+    unitId: row.unit_id,
+    unitRef: row.unit_ref,
+    unitTypeId: row.unit_type_slug,
+    range: { start: row.check_in, end: row.check_out },
+  }
+}
+
+/**
+ * The three discount columns as one fact.
+ *
+ * Null together or present together — a database constraint says so
+ * (`booking_discount_is_whole`) — so they collapse into one nullable object
+ * rather than three nullable fields every call site has to check in an order
+ * of its own. Same treatment, and same reasoning, as `toStay` above.
+ */
+function toDiscount(row: BookingSummaryRow): Discount | null {
+  if (!row.discount_kind || row.discount_value === null || !row.discount_reason) {
+    return null
+  }
+
+  return { kind: row.discount_kind, value: row.discount_value, reason: row.discount_reason }
+}
 
 function toBooking(row: BookingSummaryRow): Booking {
   return {
     id: row.id,
     reference: row.reference,
-    unitId: row.unit_id,
-    unitRef: row.unit_ref,
-    unitTypeId: row.unit_type_slug,
     stream: row.stream,
-    range: { start: row.check_in, end: row.check_out },
+    stay: toStay(row),
     status: row.status,
     guestName: row.guest_name,
     guestPhone: row.guest_phone,
-    vehicleRegistration: row.vehicle_registration,
+    vehicles: row.vehicles,
+    noVehicle: row.no_vehicle,
     chargeableGuests: row.chargeable_guests,
     exemptGuests: row.exempt_guests,
     lines: row.lines,
     total: row.total_cents,
     securityDeposit: row.security_deposit_cents,
+    discount: toDiscount(row),
+    paid: row.paid_cents,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -196,43 +280,221 @@ export interface BookingListFilter {
    * screen.
    */
   statuses?: readonly BookingStatus[]
+  /** Any of these streams. Empty or absent is no stream filter, as above. */
+  streams?: readonly BookingStream[]
   /** Stays touching this half-open range, matching availability semantics. */
   overlaps?: DateRange
 }
 
 /**
- * Bookings, most imminent first.
+ * Applies a list filter to a `booking_summary` query.
  *
- * Sorted by check-in and then reference so the order is stable — a list that
- * reshuffles between reads is unusable for a staff member scanning it.
+ * Extracted so the list and its per-stream counts are filtered by exactly the
+ * same predicates. Two copies of this would be two chances for the stat strip
+ * to disagree with the table underneath it, which is the one thing a summary
+ * of a list must never do.
  */
-export async function listBookings(filter: BookingListFilter = {}): Promise<readonly Booking[]> {
-  const propertyId = await currentPropertyId()
-
-  const query = dataClient()
-    .from('booking_summary')
-    .select(SUMMARY_COLUMNS)
-    .eq('property_id', propertyId)
-    .order('check_in')
-    .order('reference')
-
+function applyListFilter<Query extends FilterableQuery<Query>>(
+  query: Query,
+  filter: BookingListFilter,
+): Query {
   if (filter.statuses && filter.statuses.length > 0) {
     query.in('status', [...filter.statuses])
   }
 
+  if (filter.streams && filter.streams.length > 0) {
+    query.in('stream', [...filter.streams])
+  }
+
   // Half-open overlap: a stay ending on the day the filter range starts does
   // not touch it, and neither does one starting on the day it ends.
+  //
+  // A booking with no occupancy — a day pass — has null dates, and a null fails
+  // both comparisons, so a date filter excludes it. That is the honest answer
+  // while day passes carry no date of their own: the filter asks "which stays
+  // touch these days", and a row with no dates cannot answer. The day-pass
+  // slice brings a date to filter on.
   if (filter.overlaps) {
     query.lt('check_in', filter.overlaps.end).gt('check_out', filter.overlaps.start)
   }
 
-  const { data, error } = await query
+  return query
+}
+
+/**
+ * The three predicates `applyListFilter` uses, structurally.
+ *
+ * Named against the builder's shape rather than imported from
+ * `@supabase/postgrest-js`: the data client is untyped (no generated schema
+ * types — see lib/supabase/data.ts), so importing the concrete builder would
+ * mean naming five generic parameters that carry no information here.
+ */
+interface FilterableQuery<Self> {
+  in(column: string, values: unknown[]): Self
+  lt(column: string, value: unknown): Self
+  gt(column: string, value: unknown): Self
+}
+
+/** One page of a list. 1-based, because a page number is read by people. */
+export interface PageRequest {
+  page: number
+  pageSize: number
+}
+
+export interface BookingPage {
+  bookings: readonly Booking[]
+  /**
+   * How many bookings match the filter, **ignoring the page** — the footer's
+   * denominator, and what decides how many pages there are.
+   */
+  total: number
+}
+
+/**
+ * Bookings, newest booking taken first.
+ *
+ * ── Why `created_at` and not `check_in` ────────────────────────────────────
+ *
+ * This sorted by check-in ascending while the list was unpaginated, where the
+ * order was a detail. Paginated it is the screen's front door, and check-in
+ * ascending would have made page 1 *the oldest bookings on record* — after a
+ * year of trading, last September. Newest-taken-first means the booking a
+ * clerk just made is always on page 1, which is the one most likely to need
+ * checking or correcting. Who is arriving is the dashboard's question, and it
+ * has its own screen.
+ *
+ * `reference` breaks the tie, descending to match, so the order is total and
+ * stable. That matters more under pagination than it did without it: two rows
+ * with an equal sort key can swap between requests, and a row that swaps
+ * across a page boundary is a row that appears twice or not at all.
+ *
+ * ── Pagination is optional here and mandatory on the screen ────────────────
+ *
+ * `page` omitted returns every match, which is what the tests want and what
+ * nothing user-facing should do — an unbounded query against a table that
+ * grows forever is the thing web/performance.md names. The register always
+ * passes one.
+ */
+export async function listBookings(
+  filter: BookingListFilter = {},
+  page?: PageRequest,
+): Promise<BookingPage> {
+  const propertyId = await currentPropertyId()
+
+  // `count: 'exact'` rides along on the same request, so the footer's total
+  // costs no extra round trip. It counts what the filter matched, not what the
+  // page returned — PostgREST applies the range after the count.
+  const query = dataClient()
+    .from('booking_summary')
+    .select(SUMMARY_COLUMNS, { count: 'exact' })
+    .eq('property_id', propertyId)
+    .order('created_at', { ascending: false })
+    .order('reference', { ascending: false })
+
+  applyListFilter(query, filter)
+
+  if (page) {
+    const from = (page.page - 1) * page.pageSize
+
+    query.range(from, from + page.pageSize - 1)
+  }
+
+  const { data, error, count } = await query
 
   if (error) {
+    // A range past the last row is a 416 from PostgREST, not a fault in the
+    // system: it is exactly what a bookmarked `?page=7` asks for once the rows
+    // beneath it are gone. Answered as an empty page carrying the real total,
+    // so the caller can clamp to a page that exists and read again — the same
+    // treatment a losing write race gets, a value rather than a throw.
+    if (page && isRangeNotSatisfiable(error)) {
+      return { bookings: [], total: await countBookings(propertyId, filter) }
+    }
+
     throw new Error(`Could not list bookings: ${error.message}`)
   }
 
-  return (data as unknown as BookingSummaryRow[]).map(toBooking)
+  return { bookings: (data as unknown as BookingSummaryRow[]).map(toBooking), total: count ?? 0 }
+}
+
+/**
+ * PostgREST's "Requested range not satisfiable".
+ *
+ * Matched on the code, with the message as a fallback: the code is the stable
+ * contract, and the message is what a version that stopped setting one would
+ * still say.
+ */
+function isRangeNotSatisfiable(error: { code?: string; message?: string }): boolean {
+  return error.code === 'PGRST103' || /range not satisfiable/i.test(error.message ?? '')
+}
+
+/**
+ * How many bookings match a filter, without fetching any.
+ *
+ * Only on the out-of-range path, so the ordinary read stays one round trip —
+ * `count: 'exact'` rides along with the rows there.
+ */
+async function countBookings(propertyId: string, filter: BookingListFilter): Promise<number> {
+  const query = dataClient()
+    .from('booking_summary')
+    .select('id', { count: 'exact', head: true })
+    .eq('property_id', propertyId)
+
+  applyListFilter(query, filter)
+
+  const { count, error } = await query
+
+  if (error) {
+    throw new Error(`Could not count bookings: ${error.message}`)
+  }
+
+  return count ?? 0
+}
+
+/** How many bookings of each stream match a filter. Every stream is present. */
+export type BookingStreamCounts = Record<BookingStream, number>
+
+/**
+ * The per-stream breakdown of a filtered list.
+ *
+ * One head-count per stream rather than a `group by`, which PostgREST does not
+ * expose: three counting round trips in parallel is cheaper than a bespoke RPC
+ * and keeps the predicates identical to the list's by construction.
+ *
+ * The **stream filter itself is deliberately not applied.** These figures are
+ * how a staff member chooses a stream, so narrowing them to the stream already
+ * chosen would zero the two tiles they might want to switch to.
+ */
+export async function countBookingsByStream(
+  filter: BookingListFilter = {},
+): Promise<BookingStreamCounts> {
+  const propertyId = await currentPropertyId()
+  const db = dataClient()
+  const withoutStream: BookingListFilter = { ...filter, streams: undefined }
+
+  const results = await Promise.all(
+    BOOKING_STREAMS.map((stream) => {
+      const query = db
+        .from('booking_summary')
+        .select('id', { count: 'exact', head: true })
+        .eq('property_id', propertyId)
+        .eq('stream', stream)
+
+      applyListFilter(query, withoutStream)
+
+      return query
+    }),
+  )
+
+  const failure = results.find((result) => result.error)
+
+  if (failure?.error) {
+    throw new Error(`Could not count bookings by stream: ${failure.error.message}`)
+  }
+
+  return Object.fromEntries(
+    BOOKING_STREAMS.map((stream, index) => [stream, results[index]?.count ?? 0]),
+  ) as BookingStreamCounts
 }
 
 /**
@@ -352,12 +614,29 @@ export interface CreateWalkInBookingInput {
   range: DateRange
   guestName: string
   guestPhone: string
-  vehicleRegistration: string | null
+  /**
+   * Normalised and de-duplicated by the caller
+   * (`normaliseVehicleRegistrations`). Empty is only legal with `noVehicle`:
+   * prd.md §13 [C] requires a registration, and `create_walk_in_booking()`
+   * raises rather than writing a booking that records neither a car nor the
+   * decision that there isn't one.
+   */
+  vehicles: readonly string[]
+  /** The guest arrives without a vehicle, asserted rather than left blank. */
+  noVehicle: boolean
   chargeableGuests: number
   exemptGuests: number
   lines: readonly BookingLine[]
   total: Cents
   securityDeposit: Cents
+  /**
+   * The discount a staff member asked for, or null.
+   *
+   * The instruction only. Its resolved cents must ALREADY be among `lines` as
+   * a negative one — `priceStay` puts it there — because the total is the sum
+   * of the lines and nothing downstream is allowed to subtract anything.
+   */
+  discount: Discount | null
   /**
    * How the guest is paying, which decides where the booking lands.
    *
@@ -440,13 +719,17 @@ export async function createWalkInBooking(
     p_check_out: input.range.end,
     p_guest_name: input.guestName,
     p_guest_phone: input.guestPhone,
-    p_vehicle_registration: input.vehicleRegistration,
+    p_vehicles: input.vehicles,
+    p_no_vehicle: input.noVehicle,
     p_chargeable_guests: input.chargeableGuests,
     p_exempt_guests: input.exemptGuests,
     p_total_cents: input.total,
     p_security_deposit_cents: input.securityDeposit ?? config.securityDeposit,
     p_lines: input.lines,
     p_payment_method: input.paymentMethod,
+    p_discount_kind: input.discount?.kind ?? null,
+    p_discount_value: input.discount?.value ?? null,
+    p_discount_reason: input.discount?.reason ?? null,
     p_actor_id: input.actorId,
   })
 
@@ -595,12 +878,22 @@ export interface AmendBookingInput {
   range: DateRange
   guestName: string
   guestPhone: string
-  vehicleRegistration: string | null
+  /** Replaces the booking's whole set of plates — see `amend_booking()`. */
+  vehicles: readonly string[]
+  noVehicle: boolean
   chargeableGuests: number
   exemptGuests: number
   lines: readonly BookingLine[]
   total: Cents
   securityDeposit: Cents
+  /**
+   * The discount a staff member asked for, or null.
+   *
+   * The instruction only. Its resolved cents must ALREADY be among `lines` as
+   * a negative one — `priceStay` puts it there — because the total is the sum
+   * of the lines and nothing downstream is allowed to subtract anything.
+   */
+  discount: Discount | null
   /** Optional free text, recorded on the audit event. */
   reason: string | null
   /** From requirePermission()'s Actor. Required, not defaulted. */
@@ -648,12 +941,16 @@ export async function amendBooking(input: AmendBookingInput): Promise<AmendBooki
     p_check_out: input.range.end,
     p_guest_name: input.guestName,
     p_guest_phone: input.guestPhone,
-    p_vehicle_registration: input.vehicleRegistration,
+    p_vehicles: input.vehicles,
+    p_no_vehicle: input.noVehicle,
     p_chargeable_guests: input.chargeableGuests,
     p_exempt_guests: input.exemptGuests,
     p_total_cents: input.total,
     p_security_deposit_cents: input.securityDeposit,
     p_lines: input.lines,
+    p_discount_kind: input.discount?.kind ?? null,
+    p_discount_value: input.discount?.value ?? null,
+    p_discount_reason: input.discount?.reason ?? null,
     p_reason: input.reason,
     p_actor_id: input.actorId,
   })

@@ -37,7 +37,7 @@ describe('toPermissionSet', () => {
     // with the seeded roles long before a screen does.
     const set = toPermissionSet([...PERMISSIONS])
 
-    expect(set.size).toBe(16)
+    expect(set.size).toBe(17)
   })
 })
 

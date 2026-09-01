@@ -30,6 +30,25 @@ export default defineConfig({
     },
   },
   test: {
+    /**
+     * Test FILES run one at a time, across the whole run.
+     *
+     * The integration project shares one database and one set of seeded units,
+     * and its `beforeEach` clears every booking, so two of its files in flight
+     * at once delete each other's fixtures mid-test. It surfaces as "test setup
+     * lost booking <uuid>", as a unit somehow already booked for the dates a
+     * test just chose, or as the cleaner itself failing to delete a guest
+     * because another file inserted a booking against it a moment ago.
+     *
+     * It has to be declared HERE, at the root, not inside the project that
+     * needs it. Worker allocation is decided for the run as a whole, so the
+     * project-level copy does not bind when a second project is configured —
+     * the integration files were still being spread across workers, rarely
+     * enough to look like flakiness while there were seven of them and
+     * routinely at nine. The unit project is serialised too and pays almost
+     * nothing: it is pure functions and finishes in well under a second.
+     */
+    fileParallelism: false,
     projects: [
       {
         extends: true,
@@ -56,8 +75,8 @@ export default defineConfig({
           environment: 'node',
           include: ['lib/db/**/*.test.ts'],
           setupFiles: ['./lib/db/test/setup.ts'],
-          // One database, one set of seeded units. Test files running in
-          // parallel would clear each other's bookings between assertions.
+          // One database, one set of seeded units. Declared at the root as
+          // well, which is the copy that actually binds — see the note there.
           fileParallelism: false,
           // The G1 test deliberately contends for a row lock, and a losing
           // racer waits for the winner to commit.

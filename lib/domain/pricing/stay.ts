@@ -1,5 +1,6 @@
 import { unitTypeById, type PropertyConfig } from '../config'
 import { nightsBetween, todayInBrunei, type StayDate } from '../dates'
+import { resolveDiscount, type Discount } from '../discount'
 import { line, totalOf, type BookingLine } from '../lines'
 import type { Cents } from '../money'
 
@@ -16,6 +17,11 @@ import type { Cents } from '../money'
  * input arrives as an argument, including today's date, which is what lets the
  * advance-booking window be tested without freezing time. architecture.md §2
  * makes this one of the two modules where test coverage is mandatory.
+ *
+ * A staff discount, when one is given, is applied here and nowhere else. It
+ * arrives as an input and leaves as a negative line, so the total this returns
+ * is still the sum of what it returns — no caller subtracts anything, and no
+ * screen posts a total of its own (see the walk-in action).
  *
  * The security deposit is deliberately NOT a booking line. It is a refundable
  * liability held against the booking (prd.md §11), not revenue, and folding it
@@ -46,6 +52,11 @@ export interface StayPricingInput {
   sofaBeds: number
   earlyCheckInHours: number
   lateCheckOutHours: number
+  /**
+   * A staff discount, or nothing. Applied last, against the sum of everything
+   * above it, and never against the security deposit (see ../discount.ts).
+   */
+  discount?: Discount | null
 }
 
 export type StayPricingErrorCode =
@@ -57,6 +68,7 @@ export type StayPricingErrorCode =
   | 'early_check_in_undefined'
   | 'sofa_bed_stock_exceeded'
   | 'negative_quantity'
+  | 'invalid_discount'
 
 export interface StayPricingError {
   code: StayPricingErrorCode
@@ -232,6 +244,20 @@ export function priceStay(
         config.lateCheckOutPerHour,
       ),
     )
+  }
+
+  // Last, and against the subtotal above it. Everything a discount could be
+  // refused for — a value of zero, more than 100%, more than the booking is
+  // worth, a missing reason — is decided in one place, and reaches the clerk
+  // as the sentence that module wrote rather than as a constraint violation.
+  if (input.discount) {
+    const discounted = resolveDiscount(totalOf(lines), input.discount)
+
+    if (!discounted.ok) {
+      return fail('invalid_discount', discounted.error.message)
+    }
+
+    lines.push(discounted.line)
   }
 
   return {

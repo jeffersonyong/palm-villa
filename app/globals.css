@@ -167,6 +167,38 @@
   --color-identity-lime-tint: #e3fbb4;
   --color-identity-lime-deep: #3f6212;
 
+  /* Stream — says *which product was sold*, never who and never how it turned
+     out. The third register, and the smallest: the three revenue streams of
+     prd.md §1, labelled "Type" on screen.
+
+     **Mid hues only, and that is the guardrail rather than an omission.** The
+     other two registers are tint/deep pairs because something sits *on* them —
+     a status word, a person's initials. A stream never fills anything: it is a
+     6px dot beside its own label and nothing else. Giving it no tint means
+     there is no token to build a stream badge out of, so the row can never end
+     up carrying two tinted rectangles where only one of them is the status.
+     That is the rule design.md draws, expressed as a missing token.
+
+     Hues follow the identity set's reasoning exactly: sit *beside* the arcs
+     status already spends, never on them, and let **form** carry the rest — a
+     stream is a dot beside a word, a status is a chip containing one. `orange`
+     is again the deliberate near-miss, ≈25° against warning's amber ≈32°, and
+     never literally `{--color-warning}`. The two do meet: a day pass awaiting
+     payment shows both. The separation there is a saturated point against a
+     pale chip four times its size, which is the same bet identity-orange makes.
+
+     `short-stay` sits at indigo rather than a blue nearer `info`, which is the
+     one status hue it could otherwise be confused with — and the two never
+     appear in the same register anyway, since `info` marks a notice panel and
+     is not among the tones a booking status can take.
+
+     Identical in both themes, like every semantic mid: a dot carries no text,
+     so it needs presence rather than contrast, and these hold it against the
+     white card and the `ink-raised` one alike. */
+  --color-stream-short-stay: #6366f1;
+  --color-stream-day-pass: #f97316;
+  --color-stream-tenancy: #c026d3;
+
   /* Type — Geist carries every surface; hierarchy is size, weight
      (400/500/600, plus 700 on the two display headline sizes) and negative
      tracking at display sizes. `micro-label` (a custom utility below) is the

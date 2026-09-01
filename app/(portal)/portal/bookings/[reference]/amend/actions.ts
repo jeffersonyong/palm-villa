@@ -3,12 +3,20 @@
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
+import { hasPermission } from '@/lib/auth/permissions'
 import { requirePermission } from '@/lib/auth/require-permission'
 import { amendBooking, getBookingById } from '@/lib/db/bookings'
 import { canAmend } from '@/lib/domain/booking-state'
 import { palmVillaConfig } from '@/lib/domain/config'
 import { isStayDate } from '@/lib/domain/dates'
+import { parseDiscount, MAX_DISCOUNT_REASON_LENGTH } from '@/lib/domain/discount'
 import { priceStay } from '@/lib/domain/pricing/stay'
+import {
+  hasVehicleAnswer,
+  normaliseVehicleRegistrations,
+  MAX_VEHICLES_PER_BOOKING,
+  MAX_VEHICLE_REGISTRATION_LENGTH,
+} from '@/lib/domain/vehicle'
 
 /**
  * Amending a booking (capability B3, amend half).
@@ -40,13 +48,24 @@ const amendBookingSchema = z.object({
   lateCheckOutHours: z.coerce.number().int().min(0).max(12),
   guestName: z.string().trim().min(1, 'Enter the guest name.').max(120),
   guestPhone: z.string().trim().min(1, 'Enter a contact number.').max(40),
-  vehicleRegistration: z.string().trim().max(20).optional(),
+  /** One entry per row — read with `getAll`, see the walk-in action. */
+  vehicles: z.array(z.string().max(MAX_VEHICLE_REGISTRATION_LENGTH)).max(MAX_VEHICLES_PER_BOOKING),
+  noVehicle: z.enum(['true', 'false']).transform((value) => value === 'true'),
   /**
    * Optional, unlike the cancellation reason. **[A]** — an amendment already
    * records what changed on both sides, so the note is context rather than the
    * only evidence; a cancellation records only that it happened.
    */
   reason: z.string().trim().max(280).optional(),
+  /**
+   * Submitted only by a staff member who holds `booking.discount` — the
+   * control is not rendered otherwise. Defaulted here so an amendment by
+   * someone without it parses cleanly rather than failing validation on three
+   * fields their form never had.
+   */
+  discountKind: z.string().default('none'),
+  discountValue: z.string().default(''),
+  discountReason: z.string().max(MAX_DISCOUNT_REASON_LENGTH).default(''),
 })
 
 export interface AmendBookingState {
@@ -63,7 +82,10 @@ export async function amendBookingAction(
 ): Promise<AmendBookingState> {
   const actor = await requirePermission('booking.amend')
 
-  const parsed = amendBookingSchema.safeParse(Object.fromEntries(formData))
+  const parsed = amendBookingSchema.safeParse({
+    ...Object.fromEntries(formData),
+    vehicles: formData.getAll('vehicles').filter((entry) => typeof entry === 'string'),
+  })
 
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {}
@@ -80,6 +102,22 @@ export async function amendBookingAction(
   }
 
   const input = parsed.data
+  const vehicles = normaliseVehicleRegistrations(input.vehicles)
+
+  // prd.md §13 [C] again, and the reason it is re-checked on amendment rather
+  // than only on creation: a booking taken before the field was required has
+  // no plate, and this is the screen where that gets fixed.
+  if (!hasVehicleAnswer(vehicles, input.noVehicle)) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: {
+        vehicles:
+          'Enter the vehicle registration, or tick "Arriving without a vehicle" if there is no car.',
+      },
+    }
+  }
+
   const booking = await getBookingById(input.bookingId)
 
   if (!booking) {
@@ -96,6 +134,36 @@ export async function amendBookingAction(
     }
   }
 
+  // ── Who may move the discount, and what happens when they may not ────────
+  //
+  // A discount is only read off this form when its author holds
+  // `booking.discount`. For everyone else the booking's existing instruction
+  // is carried through untouched — because the lines are replaced wholesale on
+  // every amendment, and a discount nobody resubmitted would otherwise vanish.
+  // Somebody without the permission changing a guest's phone number must not
+  // silently put a comped stay back to full price.
+  let discount = booking.discount
+
+  if (hasPermission(actor.permissions, 'booking.discount')) {
+    const submitted = parseDiscount({
+      kind: input.discountKind,
+      value: input.discountValue,
+      reason: input.discountReason,
+    })
+
+    if (!submitted.ok) {
+      return {
+        status: 'error',
+        message: 'Check the highlighted fields.',
+        fieldErrors: { [submitted.error.field]: submitted.error.message },
+      }
+    }
+
+    // Null is a removal, not an omission — the control always submits a value,
+    // and taking a discount away is recorded like giving one.
+    discount = submitted.discount
+  }
+
   const priced = priceStay(
     {
       unitTypeId: input.unitTypeId,
@@ -109,6 +177,10 @@ export async function amendBookingAction(
       // hours. No booking can carry such a line today.
       earlyCheckInHours: 0,
       lateCheckOutHours: input.lateCheckOutHours,
+      // Re-derived against the new subtotal rather than carried as cents: a
+      // stay given ten percent off and then extended by a night is discounted
+      // ten percent of the longer stay, which is what was actually agreed.
+      discount,
     },
     palmVillaConfig,
   )
@@ -124,12 +196,14 @@ export async function amendBookingAction(
     range: { start: input.checkIn, end: input.checkOut },
     guestName: input.guestName,
     guestPhone: input.guestPhone,
-    vehicleRegistration: input.vehicleRegistration?.toUpperCase() || null,
+    vehicles,
+    noVehicle: input.noVehicle,
     chargeableGuests: input.chargeableGuests,
     exemptGuests: input.exemptGuests,
     lines: priced.lines,
     total: priced.total,
     securityDeposit: priced.securityDeposit,
+    discount,
     reason: input.reason || null,
     actorId: actor.userId,
   })

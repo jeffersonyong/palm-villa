@@ -6,12 +6,14 @@ import { useTransition } from 'react'
 
 import { bookingStatusLabel, bookingStatusTone } from '@/components/portal/booking-status-badge'
 import { StatusDot } from '@/components/portal/status-dot'
+import { StreamDot } from '@/components/portal/stream-dot'
 import { Button } from '@/components/ui/button'
 import type { StayDateRange } from '@/components/ui/calendar'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { MultiSelectFilter, type MultiSelectOption } from '@/components/ui/multi-select-filter'
 import { BOOKING_STATUSES, type BookingStatus } from '@/lib/domain/booking-state'
 import type { StayDate } from '@/lib/domain/dates'
+import { BOOKING_STREAMS, BOOKING_STREAM_LABELS, type BookingStream } from '@/lib/domain/stream'
 import { cn } from '@/lib/utils'
 
 /**
@@ -35,6 +37,8 @@ import { cn } from '@/lib/utils'
 interface BookingsFiltersProps {
   /** The chosen statuses, in canonical order. Empty means any. */
   statuses: readonly BookingStatus[]
+  /** The chosen streams, in canonical order. Empty means any. */
+  streams: readonly BookingStream[]
   /** Both ends inclusive — the days the calendar shows as selected. */
   from?: StayDate
   to?: StayDate
@@ -52,20 +56,52 @@ const STATUS_OPTIONS: readonly MultiSelectOption<BookingStatus>[] = BOOKING_STAT
   }),
 )
 
-export function BookingsFilters({ statuses, from, to }: BookingsFiltersProps) {
+/**
+ * The type options, each carrying its stream dot — so the panel reads in the
+ * same language as the column it filters and the tiles above it.
+ *
+ * A *stream* dot, not a status one. They are two colour registers doing two
+ * jobs, and this panel sits directly under the Status panel that uses the
+ * other, which is exactly where borrowing a hue would read as a meaning.
+ */
+const STREAM_OPTIONS: readonly MultiSelectOption<BookingStream>[] = BOOKING_STREAMS.map(
+  (stream) => ({
+    value: stream,
+    label: BOOKING_STREAM_LABELS[stream],
+    leading: <StreamDot stream={stream} />,
+  }),
+)
+
+export function BookingsFilters({ statuses, streams, from, to }: BookingsFiltersProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const range: StayDateRange | null = from && to ? { start: from, end: to } : null
-  const isFiltered = statuses.length > 0 || range !== null
+  const isFiltered = statuses.length > 0 || streams.length > 0 || range !== null
 
-  function apply(nextStatuses: readonly BookingStatus[], nextRange: StayDateRange | null) {
+  /**
+   * Writes the whole filter set, not a patch of it.
+   *
+   * Every control passes the values the other two currently hold, so the URL is
+   * rebuilt from one place. Merging into the existing query string instead would
+   * mean this island had to know which params belong to it — and it would carry
+   * forward a param the page had already rejected as malformed.
+   */
+  function apply(
+    nextStatuses: readonly BookingStatus[],
+    nextStreams: readonly BookingStream[],
+    nextRange: StayDateRange | null,
+  ) {
     const params = new URLSearchParams()
 
     // One param per status rather than one comma-joined value — see the page's
     // reader for why.
     for (const status of nextStatuses) {
       params.append('status', status)
+    }
+
+    for (const stream of nextStreams) {
+      params.append('stream', stream)
     }
 
     if (nextRange) {
@@ -97,15 +133,32 @@ export function BookingsFilters({ statuses, from, to }: BookingsFiltersProps) {
         label="Status"
         options={STATUS_OPTIONS}
         selected={statuses}
-        onChange={(next) => apply(next, range)}
+        onChange={(next) => apply(next, streams, range)}
+      />
+
+      {/* The plural control for the same param the stat tiles set. A tile is
+          "show me these"; this is "these two, not that one".
+
+          Labelled "Type" rather than "Stream": prd.md §1's word is *stream*,
+          and it stays the word in the schema and the URL, but it is trade
+          vocabulary. The staff reading this row say type. */}
+      <MultiSelectFilter
+        label="Type"
+        options={STREAM_OPTIONS}
+        selected={streams}
+        onChange={(next) => apply(statuses, next, range)}
       />
 
       {/* "Staying", not "from / to": the filter matches stays that overlap the
           range, not stays that begin inside it. */}
-      <DateRangePicker label="Staying" value={range} onChange={(next) => apply(statuses, next)} />
+      <DateRangePicker
+        label="Staying"
+        value={range}
+        onChange={(next) => apply(statuses, streams, next)}
+      />
 
       {isFiltered ? (
-        <Button variant="ghost" onClick={() => apply([], null)}>
+        <Button variant="ghost" onClick={() => apply([], [], null)}>
           {/* A funnel struck through, not a bare cross: this clears the whole
               filter set, where a cross elsewhere in the row clears one field. */}
           <FunnelX aria-hidden />

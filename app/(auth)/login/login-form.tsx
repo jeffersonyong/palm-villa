@@ -46,6 +46,7 @@ export function LoginForm({ next }: { next?: string }) {
               name="email"
               type="email"
               autoComplete="email"
+              placeholder="you@example.com"
               required
               autoFocus
               aria-invalid={state.fieldErrors?.email ? true : undefined}
@@ -60,6 +61,7 @@ export function LoginForm({ next }: { next?: string }) {
               name="password"
               type="password"
               autoComplete="current-password"
+              placeholder="••••••••"
               required
               aria-invalid={state.fieldErrors?.password ? true : undefined}
             />

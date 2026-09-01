@@ -282,6 +282,7 @@ function TempPasswordField({
       <Input
         id={id}
         name="tempPassword"
+        placeholder="Generate one, or type your own"
         autoComplete="off"
         required
         minLength={6}
@@ -412,6 +413,7 @@ export function NewStaffDialog({
               <Input
                 id="staff-name"
                 name="displayName"
+                placeholder="Jane Doe"
                 autoComplete="off"
                 required
                 aria-invalid={state.fieldErrors?.displayName ? true : undefined}
@@ -425,6 +427,7 @@ export function NewStaffDialog({
                 id="staff-email"
                 name="email"
                 type="email"
+                placeholder="jane@example.com"
                 autoComplete="off"
                 required
                 aria-invalid={state.fieldErrors?.email ? true : undefined}

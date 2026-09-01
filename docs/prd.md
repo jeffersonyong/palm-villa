@@ -103,13 +103,15 @@ Indicative permission set:
 
 ```
 booking.view          booking.create        booking.amend
-booking.cancel        booking.override_hold
+booking.cancel        booking.override_hold booking.discount
 payment.verify        payment.record_cash
 inspection.record     charge.create         charge.waive
 deposit.approve_release
 unit.manage           tenancy.manage        config.manage
 report.view           document.view_identity
 ```
+
+**[A] `booking.discount` is separate from `booking.create`** and is the one permission that gates discretion rather than an operation — see §8.4. Front Office holds it by default, because the desk is where a discount is asked for; withholding it from a role is one click in the Roles matrix.
 
 **[C]** Deposit release approval sits at the end of the pipeline, with Finance or Jason, not with Housekeeping or Front Office. Housekeeping records the inspection; a separate role approves.
 
@@ -266,6 +268,24 @@ total = (base_rate × nights)
 
 **[C]** Flexible, negotiated per tenancy. Not rate-card driven. Stored on the `Tenancy` record.
 
+### 8.4 Discounts
+
+The PRD has never described a discount, and staff asked for one: a guest at the desk negotiates, and the alternative is a clerk quietly typing a different total into a spreadsheet. The following are **[A]** assumptions made when the discount was built, and are the ones to put in front of the client.
+
+**[A] A discount is a line, not an adjusted total.** §8's rule holds unchanged — the total is the sum of the lines — so a discount appears on the booking as a negative `discount` line and the receipt still explains itself. Nothing anywhere subtracts a figure from a stored price.
+
+**[A] Two shapes: a fixed amount in BND, or a whole percentage of the priced lines.** Both are what staff actually say. The **instruction** is stored on the booking as well as its effect, which is what lets an amendment re-derive it: a stay given ten percent off and then extended by a night is discounted ten percent of the longer stay, not the dollars the shorter one happened to produce.
+
+**[A] The security deposit is never discounted.** §11 makes the BND 100 a refundable liability rather than revenue, so a discount applies only to the priced lines above it. Taking money off a sum that is given back is a shortfall at release time, not a discount.
+
+**[A] A typed reason is required, and is enforced by the database.** Not by the form alone. A discount is discretionary money, and the first question anyone asks about one later is what it was for. The reason is staff-facing only — it is never shown to the guest and never printed on a receipt.
+
+**[A] Discounting is its own permission, `booking.discount`.** Every other permission gates an operational act; this one gates giving money away, so it is separable from `booking.create` and can be withheld from a role that otherwise takes bookings all day. Seeded to Admin and Front Office. A staff member who does not hold it never sees the control — and amending a discounted booking **carries the existing discount through untouched**, so changing a guest's phone number cannot silently restore full price.
+
+**[A] There is no cap and no approval step.** A discount of up to the whole booking is allowed — comping a stay outright is a real thing a manager does — and it is recorded rather than gated. **[O] Whether the client wants a ceiling, or a second person's sign-off above some figure, is [N17](open-questions.md).**
+
+**Every discount is its own audit event** (`booking.discounted`), on creation and on every amendment that moves one, including removal. "Show me every discount given this month" is therefore a lookup on one verb rather than a scan through booking history.
+
 ---
 
 ## 9. Booking flows
@@ -326,7 +346,21 @@ The PRD has never stated rules for changing a booking after it exists — §4 gr
 
 **[A] A cancellation requires a typed reason; an amendment's is optional.** B3 promises who, what and when. The reason adds why, and the two differ because an amendment already records both sides of every field it touched, whereas a cancellation would otherwise record only that it happened — and §9.5 forfeits a payment on one.
 
-**[A] Money is not moved by either action.** An amendment that changes the price states the difference and says to collect or refund it outside the system; a cancellation calculates no refund or forfeiture at all. This is a direct consequence of **N5 being open** (§9.5): the platform cannot state a forfeiture policy it has not been given. It is also consistent with architecture.md §6.4, where a v1 refund is a recorded instruction executed by a person in a banking app, never an automated movement.
+**[A] Money is not moved by either action — but an amendment now records what it left owing.** A cancellation still calculates no refund or forfeiture at all. An amendment still moves no money, but the difference it creates is no longer only a sentence on screen: the booking carries it as an outstanding balance and it can be settled in cash or by bank transfer from the booking itself (§10.7). A price *reduction* is unchanged — that is a refund, and refunds are settled outside the system. This is a direct consequence of **N5 being open** (§9.5): the platform cannot state a forfeiture policy it has not been given. It is also consistent with architecture.md §6.4, where a v1 refund is a recorded instruction executed by a person in a banking app, never an automated movement.
+
+### 9.7 Notes on a booking
+
+Nothing in the PRD gives staff anywhere to write down what they know about a stay, and §2 records that the current system is WhatsApp — which is mostly this. A booking with no scratchpad is a booking whose context stays in a chat thread nobody else can search. The following are **[A]**.
+
+**[A] Notes are a thread, not a field.** Each note records its author and the moment it was written, and notes are **append-only**: no edit, no delete, and a correction is a further note. A mutable text box would let one person overwrite another's account of the same guest without trace, which is exactly the value a note has in a dispute.
+
+**[A] Each note carries an audience: `internal` or `housekeeping`.** One system, not two. "Notes for the team" and "notes for the cleaner" are the same act differing only in who needs to read it, and the tag is what lets the housekeeping field screen (C-series) show its subset when that screen is built. Both appear in one thread in the portal, each labelled, so an office note and a housekeeping note about the same guest sit next to each other.
+
+**[A] Anyone who can view a booking may add a note.** Deliberately not a permission of its own. A note moves no money, changes no status and releases no unit, and a note nobody may add is a note everyone keeps in WhatsApp instead. If a role should read notes without writing them, that is one permission string added later.
+
+**[A] Notes are not audit events, and audit events are not notes.** A note carries its own author and timestamp and is never mutated, so a second row asserting that somebody wrote something would say nothing the first does not. The two live side by side on the booking screen: the history is the system's account of what happened, the notes are the staff's.
+
+**[O] A note about the *unit* rather than the stay is not modelled.** "The shower door sticks" outlives every booking, so hanging it off one loses it the moment the guest leaves. It belongs with the inspections slice (§11) and is [N18](open-questions.md) — which also asks whether the housekeeping audience is genuinely useful before the field screens are built around it.
 
 ---
 
@@ -377,6 +411,20 @@ Requirements: record who collected, when, and against which booking. Provide a d
 
 **Cash gets the same amount rule as a transfer.** Where the notes do not add up to the booking total, a person says why; the system does not write its own justification to satisfy the constraint.
 
+### 10.7 Settling what a booking still owes
+
+Added when the amendment path made the gap real. Nothing in §10 described what happens when a booking's price moves *after* it has been paid — and §9.6 said only that the difference is "collected outside the system", which stopped being good enough once staff had no way to record collecting it. The following are **[A]**.
+
+**[A] A booking knows what it owes.** `total − paid`, where `paid` is the sum of the payments actually **verified** against it. A promised transfer counts for nothing until somebody has checked the bank, which is the same rule §10.4 already applies to confirmation. The figure is derived from the payment rows on every read, never stored: a stored total is a second copy of one the payments already hold.
+
+**[A] The amount rule now matches against the balance, not the total.** §10.4's "match on amount as well as reference" and §10.5's cash equivalent both compared what arrived against the whole booking. On a top-up that made the ordinary case look short — settling the second night of a BND 400 booking with BND 200 demanded a written override, and a flag that fires on the routine case stops being read. It compares against what is outstanding. For a booking with one payment, which is every booking taken before this, the two figures are identical.
+
+**[A] Both methods can settle a difference, from the booking itself.** Cash is counted at the desk and settles immediately. A bank transfer is raised as pending, appears in the verification queue like any other, and settles only once confirmed — **and it carries no amount when raised**, because a pending transfer has been promised rather than seen. One transfer at a time per booking: two pending rows for the same money means whichever is confirmed first silently makes the other wrong.
+
+**[A] Owing money is not a status.** A booking with a balance outstanding stays `confirmed`; the amount is stated beside it rather than encoded in the state machine. §9.2's states describe the *stay* — where the guest is in their journey — and a second axis running through them would have to be answered by every screen that filters on status.
+
+**This is not part payments.** §9.1's **[C]** stands: full payment secures a unit, and nothing offers a guest the choice of paying half up front. What is now expressible is a shortfall the *system itself* created by repricing a booking somebody had already paid for. The balance being computable does make instalments mechanically possible — worth stating plainly, because it means the policy is now enforced by the product declining to offer them rather than by the schema being unable to represent one. **[N16](open-questions.md) is unchanged and still the client's to answer.**
+
 ### 10.6 Later (out of scope for v1)
 
 **[A]** Automated matching will realistically be **statement CSV import matched on payment reference**, not a live bank API. Brunei business banking is unlikely to offer programmatic access. Only exceptions reach the manual queue. Same screen, less work.
@@ -424,6 +472,11 @@ Requirements: record who collected, when, and against which booking. Provide a d
 ## 13. Documents and data protection
 
 **[C]** A copy of the guest's IC is required for registration. Name and vehicle registration are required for records and security.
+
+**[A] A booking records every vehicle arriving on it, and the guest with no car says so explicitly.** §6.2 already sketches vehicle registrations as a list, and §12.5 makes plate lookup the guard's primary path — a family arriving in two cars has one of them unfindable at the gate if only one plate is stored. Two assumptions sit on top of the [C] above, neither confirmed with Jason:
+
+- **A guest may genuinely arrive without a car**, and the booking form accepts that as a ticked exception rather than a blank field. "No car" and "nobody asked" are different facts and are stored differently ([architecture.md §5.1](architecture.md)); the exception is deliberately made the awkward option, not an equal choice.
+- **No cap is enforced against the unit type's `car_allowance`** (§7.1). A family that turns up in three cars for a two-car unit is a fact Security needs recorded, not a booking to refuse; whether that is chargeable or capacity-limited waits on **R3** in the [open-questions register](open-questions.md), which asks how many bays the property actually has.
 
 Brunei's Personal Data Protection Order 2025 commenced most substantive provisions on 1 January 2026, covering collection, use, disclosure, retention and access rights, with significant penalties for non-compliance.
 

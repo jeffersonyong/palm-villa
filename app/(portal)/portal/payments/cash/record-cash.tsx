@@ -114,6 +114,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
                 id="cash-amount"
                 name="amount"
                 inputMode="decimal"
+                placeholder="0.00"
                 required
                 autoComplete="off"
                 className="w-[160px] tabular-nums"
@@ -125,7 +126,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
               <FieldError message={state.fieldErrors.amount} />
             ) : (
               <p className="text-caption text-muted-foreground">
-                Count the notes. If this is not the booking total you will be asked why.
+                Count the notes. If this is not what the booking still owes you will be asked why.
               </p>
             )}
           </div>
@@ -149,8 +150,8 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
           ) : null}
 
           <Notice>
-            This records the cash. It does not calculate a balance — the daily cash-up against
-            banked amounts is a separate screen.
+            This records the cash and settles that much of what the booking owes. It does not
+            reconcile against banked amounts — the daily cash-up is a separate screen.
           </Notice>
 
           {state.status === 'error' && !needsReason ? <FieldError message={state.message} /> : null}

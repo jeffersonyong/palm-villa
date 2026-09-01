@@ -1,12 +1,17 @@
 'use client'
 
-import { useActionState, useState } from 'react'
-import Link from 'next/link'
+import { useState } from 'react'
 
+import {
+  DiscountFields,
+  NO_DISCOUNT,
+  toDiscountFormValues,
+  type DiscountValue,
+} from '@/components/portal/discount-fields'
 import { NumberField, TextField } from '@/components/portal/form-fields'
 import { FormSection } from '@/components/portal/form-section'
+import { VehicleFields } from '@/components/portal/vehicle-fields'
 import { QuoteLines, QuoteSummary } from '@/components/portal/quote-summary'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
@@ -23,11 +28,12 @@ import {
 import type { Unit } from '@/lib/db/inventory'
 import type { PropertyConfig } from '@/lib/domain/config'
 import { formatStayDate } from '@/lib/domain/dates'
+import { parseDiscount } from '@/lib/domain/discount'
 import { formatCents } from '@/lib/domain/money'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { priceStay } from '@/lib/domain/pricing/stay'
 
-import { createWalkInBookingAction, type WalkInBookingState } from './actions'
+import type { WalkInBookingState } from './actions'
 
 /**
  * The walk-in booking form (capability B2).
@@ -39,11 +45,17 @@ import { createWalkInBookingAction, type WalkInBookingState } from './actions'
  * sits beside the form as the signature `booking-summary-card`, sticky, with
  * tabular figures, carrying the screen's one primary CTA.
  *
- * The only client island on the screen. It exists so the price updates as
- * staff type — a clerk reading a total back to a guest should not wait on a
- * round trip per keystroke. Pricing runs here AND on the server; that is not
- * duplication, `priceStay` is one pure function used in both places, and the
- * submitted total is never trusted (see actions.ts).
+ * Client-side so the price updates as staff type — a clerk reading a total
+ * back to a guest should not wait on a round trip per keystroke. Pricing runs
+ * here AND on the server; that is not duplication, `priceStay` is one pure
+ * function used in both places, and the submitted total is never trusted (see
+ * actions.ts).
+ *
+ * The fields are this component's; the *outcome* is not. `NewBookingScreen`
+ * owns the action state and swaps the whole screen for the confirmation when
+ * a booking is created, because that outcome stands down the server-rendered
+ * header and availability tiles too — which is more of the screen than a form
+ * should be reaching for.
  */
 
 interface BookingFormProps {
@@ -51,21 +63,49 @@ interface BookingFormProps {
   config: PropertyConfig
   checkIn: string
   checkOut: string
+  /** Whether this staff member holds `booking.discount`. Decided by the page. */
+  mayDiscount: boolean
+  /**
+   * The create action's state, owned by `NewBookingScreen`. It lives there
+   * rather than here because a booking that succeeds stands the whole screen
+   * down — header, date controls and availability tiles included — and a form
+   * cannot remove the chrome it is rendered inside.
+   */
+  state: WalkInBookingState
+  formAction: (formData: FormData) => void
+  isPending: boolean
 }
 
-const initialState: WalkInBookingState = { status: 'idle' }
-
-export function BookingForm({ units, config, checkIn, checkOut }: BookingFormProps) {
-  const [state, formAction, isPending] = useActionState(createWalkInBookingAction, initialState)
-
+export function BookingForm({
+  units,
+  config,
+  checkIn,
+  checkOut,
+  mayDiscount,
+  state,
+  formAction,
+  isPending,
+}: BookingFormProps) {
   const [unitId, setUnitId] = useState(units[0]?.id ?? '')
   const [chargeableGuests, setChargeableGuests] = useState(2)
   const [exemptGuests, setExemptGuests] = useState(0)
   const [sofaBeds, setSofaBeds] = useState(0)
   const [lateCheckOutHours, setLateCheckOutHours] = useState(0)
+  // Controlled, like every other field here. React 19 resets an uncontrolled
+  // field once a form action settles, so a submit refused for a missing
+  // vehicle registration was also silently clearing the guest's name and
+  // number — and asking a clerk to retype them with the guest standing there
+  // is exactly the friction this screen exists to remove.
+  const [guestName, setGuestName] = useState('')
+  const [guestPhone, setGuestPhone] = useState('')
+  // One empty row to type into. prd.md §13 [C] requires a registration, so the
+  // form opens asking for one rather than offering the exception first.
+  const [vehicles, setVehicles] = useState<readonly string[]>([''])
+  const [noVehicle, setNoVehicle] = useState(false)
   // prd.md §10.1 [C]'s two methods. Cash confirms outright; a transfer is paid
   // but not yet seen, so it goes to the verification queue (§10.3).
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  const [discount, setDiscount] = useState<DiscountValue>(NO_DISCOUNT)
 
   const selectedUnit = units.find((unit) => unit.id === unitId)
   const totalGuests = chargeableGuests + exemptGuests
@@ -80,80 +120,11 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
           sofaBeds,
           earlyCheckInHours: 0,
           lateCheckOutHours,
+          discount: previewDiscount(discount),
         },
         config,
       )
     : null
-
-  if (state.status === 'created' && state.created) {
-    const { created } = state
-    const isTransfer = created.paymentMethod === 'bank_transfer'
-
-    return (
-      <Card className="max-w-[520px]">
-        <div className="flex items-start justify-between gap-lg">
-          <div>
-            <p className="micro-label text-muted-foreground">Booking created</p>
-            <p className="mt-xs font-mono text-display-sm text-foreground">{created.reference}</p>
-          </div>
-          <Badge tone={isTransfer ? 'warning' : 'positive'}>
-            {isTransfer ? 'Awaiting payment' : 'Confirmed'}
-          </Badge>
-        </div>
-
-        <p className="mt-sm text-body-md text-copy">
-          {created.unitRef} · {formatStayDate(created.checkIn)} → {formatStayDate(created.checkOut)}
-        </p>
-
-        <dl className="mt-lg border-t border-divider pt-lg">
-          <div className="flex items-baseline justify-between gap-lg">
-            <dt className="text-body-md text-muted-foreground">
-              {isTransfer ? 'To transfer' : 'Paid'}
-            </dt>
-            <dd className="text-body-md-strong text-foreground tabular-nums">
-              BND {formatCents(created.total)}
-            </dd>
-          </div>
-          <div className="mt-sm flex items-baseline justify-between gap-lg">
-            <dt className="text-body-md text-muted-foreground">Security deposit collected</dt>
-            <dd className="text-body-md-strong text-foreground tabular-nums">
-              BND {formatCents(created.securityDeposit)}
-            </dd>
-          </div>
-        </dl>
-
-        <p className="mt-lg text-body-sm text-muted-foreground">
-          {isTransfer
-            ? 'The guest must quote the reference above in the transfer description — it is how the payment is matched. It is also what they quote at the gate.'
-            : 'Give the guest the reference above — it is what they quote at the gate.'}
-        </p>
-
-        {isTransfer ? (
-          <Notice className="mt-md">
-            The unit is held for this booking now. It stays held until someone confirms the transfer
-            landed, so this booking needs working off the verification queue.
-          </Notice>
-        ) : null}
-
-        {isTransfer ? (
-          <Button asChild variant="tertiary" className="mt-lg mr-sm">
-            <Link href="/portal/payments">Open the verification queue</Link>
-          </Button>
-        ) : null}
-
-        {/* A full reload on purpose: it clears the `useActionState` state and
-            re-renders the availability counts for the next booking, which a
-            client-side navigation back to this same route would not. The lint
-            rule cannot see that intent — it only sees an anchor to a known
-            page — so it is silenced here rather than obeyed. */}
-        {/* eslint-disable @next/next/no-html-link-for-pages */}
-        <Button asChild variant="tertiary" className="mt-lg">
-          <a href="/portal/bookings/new">Take another booking</a>
-        </Button>
-        {/* eslint-enable @next/next/no-html-link-for-pages */}
-      </Card>
-    )
-  }
 
   return (
     <form
@@ -236,32 +207,50 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
           )}
         </FormSection>
 
+        {mayDiscount ? (
+          <FormSection title="Discount">
+            <DiscountFields value={discount} onChange={setDiscount} errors={state.fieldErrors} />
+          </FormSection>
+        ) : null}
+
         <FormSection title="Guest">
-          <div className="grid gap-lg">
+          {/* One row, sized to what each field holds rather than split evenly:
+              a name needs room, a Brunei number does not. Two full-width rows for
+              two short fields was a row of empty space in a form the desk fills in
+              with a guest waiting. */}
+          <div className="flex flex-wrap items-start gap-lg">
             <TextField
               id="guestName"
               label="Name"
+              placeholder="John Doe"
+              value={guestName}
+              onChange={setGuestName}
               autoComplete="name"
-              className="max-w-[420px]"
+              className="w-[320px]"
               error={state.fieldErrors?.guestName}
             />
-            <div className="flex flex-wrap gap-lg">
-              <TextField
-                id="guestPhone"
-                label="Phone"
-                type="tel"
-                autoComplete="tel"
-                className="w-[220px]"
-                error={state.fieldErrors?.guestPhone}
-              />
-              <TextField
-                id="vehicleRegistration"
-                label="Vehicle reg (optional)"
-                className="w-[220px]"
-                error={state.fieldErrors?.vehicleRegistration}
-              />
-            </div>
+            <TextField
+              id="guestPhone"
+              label="Phone"
+              type="tel"
+              placeholder="+673 712 3456"
+              value={guestPhone}
+              onChange={setGuestPhone}
+              autoComplete="tel"
+              className="w-[220px]"
+              error={state.fieldErrors?.guestPhone}
+            />
           </div>
+        </FormSection>
+
+        <FormSection title="Vehicles">
+          <VehicleFields
+            vehicles={vehicles}
+            onChange={setVehicles}
+            noVehicle={noVehicle}
+            onNoVehicleChange={setNoVehicle}
+            error={state.fieldErrors?.vehicles}
+          />
         </FormSection>
 
         <FormSection title="Payment">
@@ -327,4 +316,30 @@ export function BookingForm({ units, config, checkIn, checkOut }: BookingFormPro
       </QuoteSummary>
     </form>
   )
+}
+
+/**
+ * The discount as the price card should show it while it is still being typed.
+ *
+ * `parseDiscount` requires a reason, because saving without one is refused —
+ * but a clerk who has entered "10%" and not yet said why should still see what
+ * the guest will pay. The stand-in reason exists only to satisfy the parse for
+ * this preview; nothing submits it, and the server parses the real form values
+ * with the same function.
+ *
+ * A figure that cannot be read at all — mid-keystroke, or nonsense — previews
+ * as no discount rather than as an error. The field says what is wrong once
+ * the form is submitted; the price card's job is to stay legible.
+ */
+function previewDiscount(value: DiscountValue) {
+  if (value.kind === 'none') {
+    return null
+  }
+
+  const parsed = parseDiscount({
+    ...toDiscountFormValues(value),
+    reason: value.reason.trim() || 'pending',
+  })
+
+  return parsed.ok ? parsed.discount : null
 }

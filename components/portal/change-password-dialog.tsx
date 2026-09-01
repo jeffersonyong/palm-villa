@@ -66,6 +66,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
                 name="password"
                 type="password"
                 autoComplete="new-password"
+                placeholder="At least 6 characters"
                 required
                 minLength={6}
                 aria-invalid={state.fieldErrors?.password ? true : undefined}
@@ -80,6 +81,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
                 name="confirm"
                 type="password"
                 autoComplete="new-password"
+                placeholder="Type it again"
                 required
                 aria-invalid={state.fieldErrors?.confirm ? true : undefined}
               />
