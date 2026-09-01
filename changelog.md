@@ -32,6 +32,23 @@ Both are new business rules, so both are written up as **[A]** assumptions in [p
 
 ---
 
+## 2026-09-01 — booking references grow past 9999 instead of colliding
+
+Found while chasing what looked like a flaky test suite, and it was not the tests. `next_booking_reference()` formatted its counter with `lpad(v::text, 4, '0')`, and `lpad` pads a short string but **truncates a long one** — `lpad('10000', 4, '0')` is `'1000'`, and so is `lpad('10009', 4, '0')`. Ten consecutive counter values therefore produced one reference, and `unique (property_id, reference)` refused nine of every ten bookings. [The migration that introduced it](supabase/migrations/20260829000500_booking_reference.sql) promised the opposite in its own comment: *"past 9999 the reference grows to five digits"*.
+
+The constraint was doing the right thing. Ten guests quoting one reference on ten bank transfers is the failure this product is built to avoid, so a hard refusal is the good outcome — but from the 10,000th booking onward, booking creation is 90% broken.
+
+**Two horizons, and the near one is why it was worth fixing now.** Production is ~10,000 bookings away, which at 48 units is years, and that is what the original note was weighing. A *local* database crosses it in about thirty full test runs — the suite burns roughly 155 references each time and nothing winds the sequence back. There it does not surface as a clear error: it surfaces as bookings that cannot be created, blamed on whichever assertion happened to be next, in tests that have nothing to do with references. That cost real time to diagnose in this session.
+
+### Fixed
+- **`next_booking_reference()` grows instead of truncating.** Below 10000 the output is byte-for-byte what it was, so every existing reference is unchanged; above it the reference is simply longer. Verified end-to-end by parking the sequence at 9998 and inserting six bookings across the boundary — all six succeeded with distinct references, where five would previously have failed.
+- **[architecture.md §6.1](docs/architecture.md) now states the rule**: four digits is a *minimum, not a width*, and anything reading a reference must accept `PV-\d{4,}`. The existing format test already did.
+
+### Changed
+- **The formatting is its own function, `booking_reference_for(bigint)`** — and that is the actual root-cause fix. The rule was welded to `nextval()`, so checking it meant burning sequence values and moving a sequence from a test, which the integration harness cannot do: it speaks to the database through PostgREST, not raw SQL. Untestable rules are where this kind of bug lives. Split out, it is an immutable function of one number and the boundary is pinned by three tests.
+
+---
+
 ## 2026-09-01 — the bookings list becomes one register, and a booking knows every car arriving on it
 
 The bookings screen has always described itself as "every booking across all streams — the single source of truth", and its read model made that untrue by construction. Separately, a vehicle registration was a single optional text field against a **[C]** requirement (prd.md §13) that it be recorded — and against a guard at a gate who may be looking at the second of three cars. Both reshape `booking_summary`, so they land together: `create or replace view` can only append columns, and two rebuilds in two migrations would have meant the second dropping the first.

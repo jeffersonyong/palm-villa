@@ -184,6 +184,8 @@ The occupancy update is the statement that wins or loses the race against the §
 ### 6.1 Reference format
 `PV-` + 4-digit number, unique per property, generated at booking creation. Short enough to type into a bank transfer description; the customer-facing reference is **not** used in any URL (see §7 for tokens).
 
+Allocated from a sequence, so it is unique by construction and never gapless — a rolled-back booking burns its number, and uniqueness rather than contiguity is the requirement. **Four digits is a minimum, not a width:** past 9999 the reference simply grows, because a reference identifies exactly one booking forever and truncating it back to four would make two bookings share one. Anything reading a reference must therefore accept `PV-\d{4,}`. The formatting is `booking_reference_for()`, split out from the allocator so the boundary can be tested without burning ten thousand sequence values.
+
 ### 6.2 Verification queue
 Backed by bookings in `awaiting_payment_verification`. Confirming requires `payment.verify`, records verifier and timestamp, and matches on **amount as well as reference**: a mismatched amount can only be confirmed through an explicit override that records a reason. A manual-match action attaches an arbitrary observed payment to a booking for customers who omit the reference.
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { bnd } from '@/lib/domain/money'
+import { dataClient } from '@/lib/supabase/data'
 
 import {
   amendBooking,
@@ -619,5 +620,55 @@ describe('listBookings pagination', () => {
 
     expect(all.bookings).toHaveLength(5)
     expect(all.total).toBe(5)
+  })
+})
+
+/**
+ * The reference format, pinned at the boundary that broke it.
+ *
+ * `next_booking_reference()` used `lpad(v::text, 4, '0')`, which pads a short
+ * value and **truncates a long one** — so from 10000 onward ten consecutive
+ * counter values produced the same reference and the unique constraint refused
+ * nine of every ten bookings. The migration that introduced it promised the
+ * opposite in its own comment.
+ *
+ * These test the formatting directly rather than through a booking, which is
+ * the point of it being a separate function: reaching 10000 through
+ * `createWalkInBooking` would mean ten thousand bookings, and the harness
+ * speaks PostgREST rather than SQL so it cannot move the sequence.
+ */
+describe('booking_reference_for', () => {
+  async function referenceFor(value: number): Promise<string> {
+    const { data, error } = await dataClient().rpc('booking_reference_for', { p_value: value })
+
+    if (error) {
+      throw new Error(`Could not format reference for ${value}: ${error.message}`)
+    }
+
+    return data as string
+  }
+
+  test('pads to four digits, the shape staff quote at the gate', async () => {
+    expect(await referenceFor(1)).toBe('PV-0001')
+    expect(await referenceFor(821)).toBe('PV-0821')
+    expect(await referenceFor(4821)).toBe('PV-4821')
+    expect(await referenceFor(9999)).toBe('PV-9999')
+  })
+
+  test('grows past four digits rather than truncating', async () => {
+    // The bug: lpad('10000', 4, '0') is '1000'.
+    expect(await referenceFor(10000)).toBe('PV-10000')
+    expect(await referenceFor(99999)).toBe('PV-99999')
+  })
+
+  test('never gives two counter values the same reference', async () => {
+    // The ten that used to collapse onto PV-1000, plus the value either side
+    // of the boundary. A reference identifies exactly one booking, forever
+    // (architecture.md §6.1), and the sequence is the only thing guaranteeing
+    // it — so the formatting must not throw that guarantee away.
+    const values = [9999, 10000, 10001, 10002, 10003, 10009, 10010]
+    const references = await Promise.all(values.map(referenceFor))
+
+    expect(new Set(references).size).toBe(values.length)
   })
 })
