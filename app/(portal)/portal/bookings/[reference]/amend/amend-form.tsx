@@ -4,7 +4,14 @@ import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { NumberField, TextField } from '@/components/portal/form-fields'
+import {
+  DiscountFields,
+  NO_DISCOUNT,
+  toDiscountFormValues,
+  type DiscountValue,
+} from '@/components/portal/discount-fields'
 import { FormSection } from '@/components/portal/form-section'
+import { VehicleFields } from '@/components/portal/vehicle-fields'
 import { QuoteLines, QuoteSummary } from '@/components/portal/quote-summary'
 import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/ui/callout'
@@ -28,7 +35,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast-store'
-import type { Booking } from '@/lib/db/bookings'
+import type { Booking, BookingStay } from '@/lib/db/bookings'
 import type { Unit } from '@/lib/db/inventory'
 import {
   describeAmendment,
@@ -37,9 +44,11 @@ import {
 } from '@/lib/domain/booking-amendment'
 import type { PropertyConfig } from '@/lib/domain/config'
 import { formatStayDate } from '@/lib/domain/dates'
+import { parseDiscount, type Discount } from '@/lib/domain/discount'
 import { extrasFromLines } from '@/lib/domain/lines'
 import { formatCents } from '@/lib/domain/money'
 import { priceStay } from '@/lib/domain/pricing/stay'
+import { normaliseVehicleRegistrations } from '@/lib/domain/vehicle'
 
 import { amendBookingAction, type AmendBookingState } from './actions'
 
@@ -69,26 +78,58 @@ const initialState: AmendBookingState = { status: 'idle' }
 
 interface AmendFormProps {
   booking: Booking
+  /**
+   * The booking's occupancy, narrowed by the page.
+   *
+   * `Booking.stay` is nullable now that the read model carries every stream,
+   * and this form amends a *stay*: it picks a unit and a range, and reprices
+   * nights. Rather than checking for null at each of the eight places it is
+   * read, the page refuses a booking without one and hands the rest down
+   * already narrowed.
+   */
+  stay: BookingStay
   units: readonly Unit[]
   config: PropertyConfig
   checkIn: string
   checkOut: string
+  /**
+   * Whether this staff member holds `booking.discount`.
+   *
+   * When false the control is not rendered and the form submits nothing for
+   * it — and the action then carries the booking's existing discount through
+   * untouched, rather than reading a removal into the silence.
+   */
+  mayDiscount: boolean
 }
 
-export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFormProps) {
+export function AmendForm({
+  booking,
+  stay,
+  units,
+  config,
+  checkIn,
+  checkOut,
+  mayDiscount,
+}: AmendFormProps) {
   const [state, formAction, isPending] = useActionState(amendBookingAction, initialState)
   const router = useRouter()
 
   const existing = extrasFromLines(booking.lines)
 
-  const [unitId, setUnitId] = useState(booking.unitId)
+  const [unitId, setUnitId] = useState(stay.unitId)
   const [chargeableGuests, setChargeableGuests] = useState(booking.chargeableGuests)
   const [exemptGuests, setExemptGuests] = useState(booking.exemptGuests)
   const [sofaBeds, setSofaBeds] = useState(existing.sofaBeds)
   const [lateCheckOutHours, setLateCheckOutHours] = useState(existing.lateCheckOutHours)
   const [guestName, setGuestName] = useState(booking.guestName)
   const [guestPhone, setGuestPhone] = useState(booking.guestPhone)
-  const [vehicleRegistration, setVehicleRegistration] = useState(booking.vehicleRegistration ?? '')
+  // An empty row when the booking predates the requirement, so the section
+  // asks for the plate rather than showing a filled-in nothing.
+  const [vehicles, setVehicles] = useState<readonly string[]>(
+    booking.vehicles.length > 0 ? [...booking.vehicles] : [''],
+  )
+  const [noVehicle, setNoVehicle] = useState(booking.noVehicle)
+  const [discount, setDiscount] = useState<DiscountValue>(discountValueOf(booking.discount))
   const [reason, setReason] = useState('')
   const [isConfirming, setIsConfirming] = useState(false)
 
@@ -111,7 +152,7 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
    * with a message about choosing a unit that already looks chosen. Naming the
    * situation is the only honest way out of it.
    */
-  const isCurrentUnitAvailable = units.some((unit) => unit.id === booking.unitId)
+  const isCurrentUnitAvailable = units.some((unit) => unit.id === stay.unitId)
 
   const quote = selectedUnit
     ? priceStay(
@@ -123,34 +164,44 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
           sofaBeds,
           earlyCheckInHours: 0,
           lateCheckOutHours,
+          discount: mayDiscount ? previewDiscount(discount) : booking.discount,
         },
         config,
       )
     : null
 
   const before: AmendmentSnapshot = {
-    unitRef: booking.unitRef,
-    checkIn: booking.range.start,
-    checkOut: booking.range.end,
+    unitRef: stay.unitRef,
+    checkIn: stay.range.start,
+    checkOut: stay.range.end,
     chargeableGuests: booking.chargeableGuests,
     exemptGuests: booking.exemptGuests,
-    vehicleRegistration: booking.vehicleRegistration,
+    vehicles: booking.vehicles,
+    noVehicle: booking.noVehicle,
     guestName: booking.guestName,
     guestPhone: booking.guestPhone,
+    discount: booking.discount,
     total: booking.total,
   }
 
   const after: AmendmentSnapshot = {
-    unitRef: selectedUnit?.ref ?? booking.unitRef,
+    unitRef: selectedUnit?.ref ?? stay.unitRef,
     // Only ever read while a unit is selected — Save is gated on the quote,
     // which needs one.
     checkIn,
     checkOut,
     chargeableGuests,
     exemptGuests,
-    vehicleRegistration: vehicleRegistration.trim().toUpperCase() || null,
+    // Normalised for the diff the same way the action normalises for the
+    // write, so the confirmation names the plates that will actually be
+    // stored — including the blank rows it drops.
+    vehicles: normaliseVehicleRegistrations(vehicles),
+    noVehicle,
     guestName: guestName.trim(),
     guestPhone: guestPhone.trim(),
+    // The same value the action will store: read off the control when this
+    // staff member may move it, and carried through unchanged when they may not.
+    discount: mayDiscount ? previewDiscount(discount) : booking.discount,
     total: quote?.ok ? quote.total : booking.total,
   }
 
@@ -189,14 +240,14 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
                   {units.map((unit) => (
                     <SelectItem key={unit.id} value={unit.id}>
                       {unit.ref} — {unit.unitTypeName}
-                      {unit.id === booking.unitId ? ' (current)' : ''}
+                      {unit.id === stay.unitId ? ' (current)' : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {!isCurrentUnitAvailable ? (
                 <p className="text-body-sm text-copy">
-                  {booking.unitRef} is not free for these dates — another booking has it for part of
+                  {stay.unitRef} is not free for these dates — another booking has it for part of
                   the range.
                   {/* The instruction drops away once it has been acted on; the
                       fact behind it stays, because it is why the guest moved. */}
@@ -250,38 +301,50 @@ export function AmendForm({ booking, units, config, checkIn, checkOut }: AmendFo
           </FormSection>
 
           <FormSection title="Guest">
-            <div className="grid gap-lg">
+            {/* One row, sized to what each field holds rather than split evenly:
+                a name needs room, a Brunei number does not. Two full-width rows for
+                two short fields was a row of empty space in a form the desk fills in
+                with a guest waiting. */}
+            <div className="flex flex-wrap items-start gap-lg">
               <TextField
                 id="guestName"
                 label="Name"
+                placeholder="John Doe"
                 value={guestName}
                 onChange={setGuestName}
                 autoComplete="name"
-                className="max-w-[420px]"
+                className="w-[320px]"
                 error={state.fieldErrors?.guestName}
               />
-              <div className="flex flex-wrap gap-lg">
-                <TextField
-                  id="guestPhone"
-                  label="Phone"
-                  type="tel"
-                  value={guestPhone}
-                  onChange={setGuestPhone}
-                  autoComplete="tel"
-                  className="w-[220px]"
-                  error={state.fieldErrors?.guestPhone}
-                />
-                <TextField
-                  id="vehicleRegistration"
-                  label="Vehicle reg (optional)"
-                  value={vehicleRegistration}
-                  onChange={setVehicleRegistration}
-                  className="w-[220px]"
-                  error={state.fieldErrors?.vehicleRegistration}
-                />
-              </div>
+              <TextField
+                id="guestPhone"
+                label="Phone"
+                type="tel"
+                placeholder="+673 712 3456"
+                value={guestPhone}
+                onChange={setGuestPhone}
+                autoComplete="tel"
+                className="w-[220px]"
+                error={state.fieldErrors?.guestPhone}
+              />
             </div>
           </FormSection>
+
+          <FormSection title="Vehicles">
+            <VehicleFields
+              vehicles={vehicles}
+              onChange={setVehicles}
+              noVehicle={noVehicle}
+              onNoVehicleChange={setNoVehicle}
+              error={state.fieldErrors?.vehicles}
+            />
+          </FormSection>
+
+          {mayDiscount ? (
+            <FormSection title="Discount">
+              <DiscountFields value={discount} onChange={setDiscount} errors={state.fieldErrors} />
+            </FormSection>
+          ) : null}
 
           <FormSection title="Note">
             <div className="grid max-w-[420px] gap-sm">
@@ -431,4 +494,44 @@ function ConfirmAmendmentDialog({
       </DialogContent>
     </Dialog>
   )
+}
+
+/**
+ * The stored instruction as the control's three strings.
+ *
+ * A percentage comes back as a percentage and an amount as BND, so an
+ * amendment reprices what was actually agreed rather than the cents it
+ * happened to produce on the shorter stay.
+ */
+function discountValueOf(discount: Discount | null): DiscountValue {
+  if (!discount) {
+    return NO_DISCOUNT
+  }
+
+  return {
+    kind: discount.kind,
+    value: discount.kind === 'percent' ? String(discount.value) : formatCents(discount.value),
+    reason: discount.reason,
+  }
+}
+
+/**
+ * The discount as the price card should show it mid-edit.
+ *
+ * The stand-in reason exists only to satisfy the parse while a clerk is still
+ * typing one; nothing submits it, and a figure that cannot be read yet
+ * previews as no discount rather than as an error. Same helper, same reasoning,
+ * as the walk-in form's.
+ */
+function previewDiscount(value: DiscountValue): Discount | null {
+  if (value.kind === 'none') {
+    return null
+  }
+
+  const parsed = parseDiscount({
+    ...toDiscountFormValues(value),
+    reason: value.reason.trim() || 'pending',
+  })
+
+  return parsed.ok ? parsed.discount : null
 }

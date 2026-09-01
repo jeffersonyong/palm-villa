@@ -114,6 +114,7 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
                 id="cash-amount"
                 name="amount"
                 inputMode="decimal"
+                placeholder="0.00"
                 required
                 autoComplete="off"
                 className="w-[160px] tabular-nums"

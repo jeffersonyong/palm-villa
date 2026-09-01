@@ -50,6 +50,8 @@ interface TextFieldProps {
   id: string
   label: string
   type?: string
+  /** An example of the value, never a restatement of the label. */
+  placeholder?: string
   /** Supplied together with `onChange` for a controlled field; omit both for uncontrolled. */
   value?: string
   onChange?: (value: string) => void
@@ -62,6 +64,7 @@ export function TextField({
   id,
   label,
   type = 'text',
+  placeholder,
   value,
   onChange,
   autoComplete,
@@ -76,6 +79,7 @@ export function TextField({
         name={id}
         type={type}
         value={value}
+        placeholder={placeholder}
         autoComplete={autoComplete}
         aria-invalid={error ? true : undefined}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}

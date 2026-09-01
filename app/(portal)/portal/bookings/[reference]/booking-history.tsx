@@ -25,6 +25,9 @@ import { formatTimestamp } from '@/lib/domain/dates'
 
 const ACTION_LABELS: Record<string, string> = {
   'booking.amended': 'Amended',
+  // Its own row rather than a detail inside the amendment, because "show me
+  // every discount given" is a question about this verb alone.
+  'booking.discounted': 'Discount changed',
   'booking.cancel': 'Cancelled',
   'booking.check_in': 'Checked in',
   'booking.check_out': 'Checked out',

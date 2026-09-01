@@ -136,6 +136,7 @@ function ConfirmDialog({
                 id="amount"
                 name="amount"
                 inputMode="decimal"
+                placeholder="0.00"
                 autoComplete="off"
                 className="w-[160px] tabular-nums"
                 value={typed}
@@ -270,6 +271,7 @@ function ManualMatchDialog({
                 id="manual-amount"
                 name="amount"
                 inputMode="decimal"
+                placeholder="0.00"
                 autoComplete="off"
                 className="w-[160px] tabular-nums"
                 value={typed}
@@ -291,7 +293,7 @@ function ManualMatchDialog({
               required
               maxLength={120}
               autoComplete="off"
-              placeholder="SITI BINTI ABDULLAH"
+              placeholder="JOHN DOE"
               defaultValue={submitted?.observedSender ?? ''}
               aria-invalid={Boolean(state.fieldErrors?.observedSender)}
             />

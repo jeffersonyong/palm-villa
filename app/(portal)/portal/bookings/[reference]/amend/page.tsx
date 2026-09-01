@@ -62,6 +62,12 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
     )
   }
 
+  // Whether the discount control is offered. The action re-checks it, and
+  // carries the booking's existing discount through untouched when it is
+  // absent — an amendment by somebody without the permission must not put a
+  // discounted stay back to full price.
+  const mayDiscount = hasPermission(actor.permissions, 'booking.discount')
+
   const booking = await getBookingByReference(decodeURIComponent(reference))
 
   if (!booking) {
@@ -93,6 +99,32 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
     )
   }
 
+  // Amending is amending a *stay*: this screen picks a unit and a range and
+  // reprices nights, none of which a day pass has (prd.md §6.1). The read model
+  // now carries streams that occupy nothing, so the case has to be answered
+  // rather than assumed away — and answered here, once, so the form below
+  // receives an occupancy it can rely on. `amend_booking()` refuses the same
+  // booking for the same reason. Nothing writes such a booking yet.
+  if (!booking.stay) {
+    return (
+      <>
+        <PageHeader title={`Amend ${booking.reference}`} />
+        <EmptyState
+          className="mt-xl"
+          title="This booking has no stay to amend"
+          description="It occupies no unit, so there are no dates or unit to change here."
+          action={
+            <Button asChild variant="tertiary">
+              <Link href={`/portal/bookings/${booking.reference}`}>Back to the booking</Link>
+            </Button>
+          }
+        />
+      </>
+    )
+  }
+
+  const { stay } = booking
+
   // Anything unusable in the URL falls back to the dates the booking already
   // has, so a mistyped range shows the booking as it stands rather than an error.
   const requested =
@@ -102,7 +134,7 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
     isStayDate(query.to) &&
     query.from < query.to
       ? { start: query.from, end: query.to }
-      : booking.range
+      : stay.range
 
   const units = await findAvailableUnits({
     range: requested,
@@ -157,7 +189,7 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
             Check these dates
           </Button>
 
-          {requested.start !== booking.range.start || requested.end !== booking.range.end ? (
+          {requested.start !== stay.range.start || requested.end !== stay.range.end ? (
             <Button asChild variant="ghost">
               <Link href={`/portal/bookings/${booking.reference}/amend`}>Reset dates</Link>
             </Button>
@@ -175,10 +207,12 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
         <div className="mt-xl">
           <AmendForm
             booking={booking}
+            stay={stay}
             units={units}
             config={config}
             checkIn={requested.start}
             checkOut={requested.end}
+            mayDiscount={mayDiscount}
           />
         </div>
       )}

@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DateField } from '@/components/ui/date-field'
 import { Label } from '@/components/ui/label'
-import { Notice } from '@/components/ui/notice'
 import {
   Select,
   SelectContent,
@@ -13,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { hasPermission } from '@/lib/auth/permissions'
+import { getActor } from '@/lib/auth/require-permission'
 import { countAvailableByType, findAvailableUnits } from '@/lib/db/bookings'
 import { getUnitCounts } from '@/lib/db/inventory'
 import { palmVillaConfig } from '@/lib/domain/config'
@@ -78,6 +79,12 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
     : {}
   const totalByType = await getUnitCounts()
 
+  // The discount control is an affordance, not a gate: the server action checks
+  // `booking.discount` again on every submit. Deciding it here only spares a
+  // staff member a field they cannot use (architecture.md §3).
+  const actor = await getActor()
+  const mayDiscount = Boolean(actor && hasPermission(actor.permissions, 'booking.discount'))
+
   return (
     <div className="max-w-[1120px]">
       <PageHeader
@@ -91,58 +98,84 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
           fields line up with the page title. The counts below it *are* drawn,
           because they are a different thing — the answer, not the question —
           and a card is what tells the two apart now that the row has no edge
-          of its own. Everything from the header down is then one rhythm at
-          `xl`: the counts were briefly pulled closer to the row that produced
-          them, but with a card of their own they are a peer of the form below,
-          and the tighter gap read as a slip rather than as grouping. */}
-      <form method="get" className="mt-xl flex flex-wrap items-end gap-lg">
-        <div className="grid w-[164px] gap-sm">
-          <Label htmlFor="from">Check-in</Label>
-          <DateField
-            id="from"
-            name="from"
-            defaultValue={checkIn || today}
-            min={today}
-            max={addDays(today, config.maxAdvanceBookingDays)}
-          />
-        </div>
+          of its own.
 
-        <div className="grid w-[164px] gap-sm">
-          <Label htmlFor="to">Check-out</Label>
-          <DateField
-            id="to"
-            name="to"
-            defaultValue={checkOut || addDays(today, 1)}
-            min={addDays(today, 1)}
-            max={addDays(today, config.maxAdvanceBookingDays + 1)}
-          />
-        </div>
+          The instruction and the fields it is about are **one cluster**: `xl`
+          from the header, `md` between the two, which is design.md's "tight
+          inside a cluster, loose between clusters". It sits above the row
+          rather than below it because it tells you what to do with those
+          fields, and an instruction underneath the thing it instructs is read
+          second if at all. Everything else on the screen keeps the `xl`
+          rhythm. */}
+      <div className="mt-xl grid gap-md">
+        {!hasDates ? (
+          /* Not a `Notice`. Blue is `info`, and design.md spends it on a fact
+             the reader needs before acting — what a transfer hold does to a
+             unit, that BND 100 is collected on arrival. This is the screen
+             saying it has nothing to show yet, which is an absence, and the
+             system draws absence in quiet gray. Spending the one attention
+             colour on "fill in these two fields" would also devalue it on this
+             very screen: the summary panel carries a real `Notice` about the
+             deposit, and two blue panels of equal weight flatten the
+             difference between how to use a form and what money changes hands. */
+          <Card surface="inset" placement="page">
+            <p className="text-body-md text-copy">
+              Choose check-in and check-out dates to see what is free. Check-out must be at least
+              one night after check-in, and bookings open up to {config.maxAdvanceBookingDays} days
+              ahead.
+            </p>
+          </Card>
+        ) : null}
 
-        <div className="grid gap-sm">
-          <Label htmlFor="type">Unit type</Label>
-          {/* `ANY_UNIT_TYPE` rather than an empty value: a select option must
+        <form method="get" className="flex flex-wrap items-end gap-lg">
+          <div className="grid w-[164px] gap-sm">
+            <Label htmlFor="from">Check-in</Label>
+            <DateField
+              id="from"
+              name="from"
+              defaultValue={checkIn || today}
+              min={today}
+              max={addDays(today, config.maxAdvanceBookingDays)}
+            />
+          </div>
+
+          <div className="grid w-[164px] gap-sm">
+            <Label htmlFor="to">Check-out</Label>
+            <DateField
+              id="to"
+              name="to"
+              defaultValue={checkOut || addDays(today, 1)}
+              min={addDays(today, 1)}
+              max={addDays(today, config.maxAdvanceBookingDays + 1)}
+            />
+          </div>
+
+          <div className="grid gap-sm">
+            <Label htmlFor="type">Unit type</Label>
+            {/* `ANY_UNIT_TYPE` rather than an empty value: a select option must
               carry a non-empty value, and the page already treats an
               unrecognised `type` as "no filter", so the sentinel never reaches
               the query. */}
-          <Select name="type" defaultValue={unitTypeId ?? ANY_UNIT_TYPE}>
-            <SelectTrigger id="type" className="w-[264px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY_UNIT_TYPE}>Any type</SelectItem>
-              {config.unitTypes.map((type) => (
-                <SelectItem key={type.id} value={type.id}>
-                  {type.name} — BND {formatCents(type.baseRatePerNight)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            <Select name="type" defaultValue={unitTypeId ?? ANY_UNIT_TYPE}>
+              <SelectTrigger id="type" className="w-[264px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY_UNIT_TYPE}>Any type</SelectItem>
+                {config.unitTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id}>
+                    {type.name} — BND {formatCents(type.baseRatePerNight)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Button type="submit" variant="tertiary">
-          Check availability
-        </Button>
-      </form>
+          <Button type="submit" variant="tertiary">
+            Check availability
+          </Button>
+        </form>
+      </div>
 
       {hasDates && (
         /* Tiles on the page ground, uncontained — the dashboard strip's
@@ -167,28 +200,30 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
         </dl>
       )}
 
-      <section className="mt-xl">
-        {!hasDates ? (
-          <Notice placement="page">
-            Choose check-in and check-out dates to see what is free. Check-out must be at least one
-            night after check-in, and bookings open up to {config.maxAdvanceBookingDays} days ahead.
-          </Notice>
-        ) : availableUnits.length === 0 ? (
-          <Card surface="inset">
-            <p className="text-body-md text-copy">
-              Nothing free for those dates{unitTypeId ? ' in that unit type' : ''}. Try different
-              dates, or widen the unit type.
-            </p>
-          </Card>
-        ) : (
-          <BookingForm
-            units={availableUnits}
-            config={config}
-            checkIn={checkIn}
-            checkOut={checkOut}
-          />
-        )}
-      </section>
+      {hasDates ? (
+        <section className="mt-xl">
+          {availableUnits.length === 0 ? (
+            /* `placement="page"` to match the instruction above: design.md
+               gives a gray panel its radius and padding from where it sits,
+               and both of these stand on the page ground. This one was at the
+               nested scale, which read as a control that had grown. */
+            <Card surface="inset" placement="page">
+              <p className="text-body-md text-copy">
+                Nothing free for those dates{unitTypeId ? ' in that unit type' : ''}. Try different
+                dates, or widen the unit type.
+              </p>
+            </Card>
+          ) : (
+            <BookingForm
+              units={availableUnits}
+              config={config}
+              checkIn={checkIn}
+              checkOut={checkOut}
+              mayDiscount={mayDiscount}
+            />
+          )}
+        </section>
+      ) : null}
     </div>
   )
 }

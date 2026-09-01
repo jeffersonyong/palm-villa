@@ -14,7 +14,7 @@ import { signInAction, type SignInState } from './actions'
 
 /**
  * The sign-in card: the sidebar's brand block above a hairline card, one
- * primary fill (design.md §Components — Cards, Buttons). No Fraunces — the
+ * primary fill (design.md Â§Components â Cards, Buttons). No Fraunces â the
  * display face belongs to the public site and each portal screen's h1, and
  * this screen is chrome, not content.
  */
@@ -46,6 +46,7 @@ export function LoginForm({ next }: { next?: string }) {
               name="email"
               type="email"
               autoComplete="email"
+              placeholder="you@palmvilla.bn"
               required
               autoFocus
               aria-invalid={state.fieldErrors?.email ? true : undefined}
@@ -60,6 +61,7 @@ export function LoginForm({ next }: { next?: string }) {
               name="password"
               type="password"
               autoComplete="current-password"
+              placeholder="••••••••"
               required
               aria-invalid={state.fieldErrors?.password ? true : undefined}
             />
@@ -71,7 +73,7 @@ export function LoginForm({ next }: { next?: string }) {
           ) : null}
 
           <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? 'Signing in…' : 'Sign in'}
+            {isPending ? 'Signing inâ¦' : 'Sign in'}
           </Button>
         </form>
       </Card>

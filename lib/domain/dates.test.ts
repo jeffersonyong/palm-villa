@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest'
 
-import { elapsedMinutes, formatElapsed, formatStayRange, formatTimestamp } from './dates'
+import {
+  elapsedMinutes,
+  formatElapsed,
+  formatStayDates,
+  formatStayRange,
+  formatTimestamp,
+} from './dates'
 
 /**
  * Timestamps are rendered in the property's timezone, not the reader's.
@@ -21,6 +27,26 @@ describe('formatTimestamp', () => {
 
   test('survives the microsecond precision Postgres returns', () => {
     expect(formatTimestamp('2026-09-14T05:05:00.123456+00:00')).toBe('14 Sept 2026, 13:05')
+  })
+})
+
+describe('formatStayDates', () => {
+  test('elides the month the closing date already supplies', () => {
+    expect(formatStayDates('2026-09-14', '2026-09-16')).toBe('14 → 16 Sept 2026')
+  })
+
+  test('keeps both months across a month boundary', () => {
+    expect(formatStayDates('2026-09-28', '2026-10-02')).toBe('28 Sept → 2 Oct 2026')
+  })
+
+  test('keeps both years across new year, which is where a bare day is ambiguous', () => {
+    expect(formatStayDates('2026-12-28', '2027-01-03')).toBe('28 Dec 2026 → 3 Jan 2027')
+  })
+
+  test('uses an arrow, not the filter span dash — these ends are half-open', () => {
+    // The guest leaves on the second date and does not sleep there. The dash
+    // in formatStayRange joins two days that are both included.
+    expect(formatStayDates('2026-09-14', '2026-09-16')).toContain('→')
   })
 })
 

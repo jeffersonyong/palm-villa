@@ -63,15 +63,20 @@ begin
     -- create_walk_in_booking() can only produce the two a walk-in reaches, so
     -- anything further is walked there by transition_booking() below — the
     -- same path the portal's own actions take.
+    --
+    -- `vehicles` is an array now (prd.md §13 [C] requires a registration, and a
+    -- family often arrives in more than one car). The one booking with no
+    -- plates carries the deliberate exception instead, so the demo data shows
+    -- both halves of how the field is answered.
     select * from (values
-      ('DEMO — Arriving today (cash)',        '+673 000 0001', '3B-01',  0, 2, 2, 'BAA 1234', 'cash',          'confirmed'),
-      ('DEMO — Awaiting transfer',            '+673 000 0002', '3B-02',  3, 3, 4, null,       'bank_transfer', 'awaiting_payment_verification'),
-      ('DEMO — Awaiting transfer (4-bed)',    '+673 000 0003', '4B-01',  7, 3, 6, 'BAB 5678', 'bank_transfer', 'awaiting_payment_verification'),
-      ('DEMO — In residence',                 '+673 000 0004', 'SD-01', -1, 3, 8, 'BAC 9012', 'cash',          'checked_in'),
-      ('DEMO — Departed last week',           '+673 000 0005', '3B-03', -5, 3, 2, null,       'cash',          'completed')
+      ('DEMO — Arriving today (cash)',        '+673 000 0001', '3B-01',  0, 2, 2, array['BAA 1234'],             false, 'cash',          'confirmed'),
+      ('DEMO — Awaiting transfer',            '+673 000 0002', '3B-02',  3, 3, 4, array[]::text[],              true,  'bank_transfer', 'awaiting_payment_verification'),
+      ('DEMO — Awaiting transfer (4-bed)',    '+673 000 0003', '4B-01',  7, 3, 6, array['BAB 5678', 'BAD 3456'], false, 'bank_transfer', 'awaiting_payment_verification'),
+      ('DEMO — In residence',                 '+673 000 0004', 'SD-01', -1, 3, 8, array['BAC 9012'],            false, 'cash',          'checked_in'),
+      ('DEMO — Departed last week',           '+673 000 0005', '3B-03', -5, 3, 2, array['BAE 7788'],            false, 'cash',          'completed')
     ) as t (
       guest_name, phone, unit_ref, start_offset, nights,
-      chargeable_guests, vehicle, payment_method, settles_at
+      chargeable_guests, vehicles, no_vehicle, payment_method, settles_at
     )
   loop
     select u.id, ut.base_rate_cents
@@ -100,7 +105,8 @@ begin
       v_check_in + spec.nights,
       spec.guest_name,
       spec.phone,
-      spec.vehicle,
+      spec.vehicles,
+      spec.no_vehicle,
       spec.chargeable_guests,
       0,
       v_total_cents,
@@ -114,10 +120,13 @@ begin
         'amount', v_total_cents
       )),
       spec.payment_method,
+      -- Named from here on. The discount parameters sit between the payment
+      -- method and the actor, and a positional `null` would have quietly
+      -- become a discount kind the day one of them stopped being optional.
+      p_actor_id => null
       -- No actor. These bookings were taken by nobody, and naming the
       -- bootstrap admin would put a real account's name against work it did
       -- not do. Every actor column in this schema is nullable for this case.
-      null
     ) into v_result;
 
     if v_result ->> 'ok' <> 'true' then
@@ -140,6 +149,25 @@ begin
       perform transition_booking(
         v_property_id, v_booking_id, 'checked_in', 'completed', 'check_out', null
       );
+    end if;
+
+    -- One booking carries notes, so the thread on the detail screen is not
+    -- empty on a fresh stack — and so both audiences are visible at once. The
+    -- in-house guest is the natural one: it is the case where housekeeping
+    -- would actually be told something.
+    if spec.settles_at = 'checked_in' then
+      insert into booking_note (property_id, booking_id, audience, body, author_id)
+      values
+        (
+          v_property_id, v_booking_id, 'internal',
+          'DEMO — Guest asked about a late check-out. Quoted BND 15 an hour, not booked yet.',
+          null
+        ),
+        (
+          v_property_id, v_booking_id, 'housekeeping',
+          'DEMO — Extra towels on arrival, four guests rather than two.',
+          null
+        );
     end if;
   end loop;
 end;

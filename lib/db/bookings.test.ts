@@ -3,13 +3,20 @@ import { describe, expect, test } from 'vitest'
 import { bnd } from '@/lib/domain/money'
 
 import {
+  amendBooking,
+  countBookingsByStream,
   createWalkInBooking,
   getBookingByReference,
   getDailySnapshot,
   listBookings,
   transitionBooking,
 } from './bookings'
-import { bookingInput, givenBooking, givenBookingInState } from './test/factory'
+import {
+  bookingInput,
+  givenBooking,
+  givenBookingInState,
+  givenDayPassBooking,
+} from './test/factory'
 import { auditEventsFor } from './test/inspect'
 
 /**
@@ -29,7 +36,7 @@ describe('listBookings', () => {
     await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
     await givenBooking({ unitRef: '3B-02', checkIn: TODAY, checkOut: '2026-08-30' })
 
-    expect(await listBookings()).toHaveLength(2)
+    expect((await listBookings()).bookings).toHaveLength(2)
   })
 
   test('filters by status', async () => {
@@ -42,7 +49,7 @@ describe('listBookings', () => {
 
     await transitionBooking(doomed.id, 'cancel')
 
-    const cancelled = await listBookings({ statuses: ['cancelled'] })
+    const { bookings: cancelled } = await listBookings({ statuses: ['cancelled'] })
 
     expect(cancelled.map((booking) => booking.reference)).toEqual([doomed.reference])
     expect(cancelled.map((booking) => booking.reference)).not.toContain(confirmed.reference)
@@ -60,7 +67,7 @@ describe('listBookings', () => {
     await transitionBooking(doomed.id, 'cancel')
     await transitionBooking(arrived.id, 'check_in')
 
-    const listed = await listBookings({ statuses: ['cancelled', 'checked_in'] })
+    const { bookings: listed } = await listBookings({ statuses: ['cancelled', 'checked_in'] })
 
     expect(listed.map((booking) => booking.reference).sort()).toEqual(
       [doomed.reference, arrived.reference].sort(),
@@ -73,36 +80,56 @@ describe('listBookings', () => {
     await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
     await givenBooking({ unitRef: '3B-02', checkIn: TODAY, checkOut: '2026-08-30' })
 
-    expect(await listBookings({ statuses: [] })).toHaveLength(2)
+    expect((await listBookings({ statuses: [] })).bookings).toHaveLength(2)
   })
 
-  test('sorts by check-in, then reference', async () => {
-    // Created out of order, and two share a check-in date so the second sort
-    // key decides between them. References are allocated in creation order, so
-    // `early` holds the lower one.
-    const late = await givenBooking({
+  test('puts the booking taken most recently first, whatever its dates', async () => {
+    // The register's front door. It sorted by check-in until it paginated, at
+    // which point page 1 became the oldest bookings on record; a clerk wants
+    // the one they just took. Check-in deliberately runs *against* creation
+    // order here, so a test that passed on either rule cannot pass on both.
+    const first = await givenBooking({
       unitRef: '3B-01',
       checkIn: '2026-09-05',
       checkOut: '2026-09-07',
     })
-    const early = await givenBooking({
+    const second = await givenBooking({
       unitRef: '3B-02',
       checkIn: '2026-09-01',
       checkOut: '2026-09-03',
     })
-    const alsoEarly = await givenBooking({
+    const third = await givenBooking({
       unitRef: '3B-03',
       checkIn: '2026-09-01',
       checkOut: '2026-09-02',
     })
 
-    const listed = await listBookings()
+    const { bookings: listed } = await listBookings()
 
     expect(listed.map((booking) => booking.reference)).toEqual([
-      early.reference,
-      alsoEarly.reference,
-      late.reference,
+      third.reference,
+      second.reference,
+      first.reference,
     ])
+  })
+
+  test('breaks a tie on reference, so no row can drift across a page boundary', async () => {
+    // Two bookings created inside the same clock tick would otherwise have no
+    // defined order between them, and an order that is not total lets a row
+    // appear on two pages or on neither. References are allocated in creation
+    // order, so descending reference agrees with descending creation.
+    const created = await Promise.all([
+      givenBooking({ unitRef: '3B-01', checkIn: '2026-09-01', checkOut: '2026-09-03' }),
+      givenBooking({ unitRef: '3B-02', checkIn: '2026-09-01', checkOut: '2026-09-03' }),
+      givenBooking({ unitRef: '3B-03', checkIn: '2026-09-01', checkOut: '2026-09-03' }),
+    ])
+
+    const descending = [...created.map((booking) => booking.reference)].sort().reverse()
+
+    // Read twice: an unstable order is allowed to be wrong once and right the
+    // next time, which is exactly the bug pagination turns into a lost row.
+    expect((await listBookings()).bookings.map((entry) => entry.reference)).toEqual(descending)
+    expect((await listBookings()).bookings.map((entry) => entry.reference)).toEqual(descending)
   })
 
   test('matches a stay that overlaps the filter range', async () => {
@@ -112,7 +139,9 @@ describe('listBookings', () => {
       checkOut: '2026-09-05',
     })
 
-    const listed = await listBookings({ overlaps: { start: '2026-09-04', end: '2026-09-10' } })
+    const { bookings: listed } = await listBookings({
+      overlaps: { start: '2026-09-04', end: '2026-09-10' },
+    })
 
     expect(listed.map((entry) => entry.reference)).toEqual([booking.reference])
   })
@@ -121,7 +150,9 @@ describe('listBookings', () => {
     // Half-open: the guest leaves on the 5th, so they do not occupy it.
     await givenBooking({ unitRef: '3B-01', checkIn: '2026-09-01', checkOut: '2026-09-05' })
 
-    expect(await listBookings({ overlaps: { start: '2026-09-05', end: '2026-09-08' } })).toEqual([])
+    expect(
+      (await listBookings({ overlaps: { start: '2026-09-05', end: '2026-09-08' } })).bookings,
+    ).toEqual([])
   })
 })
 
@@ -315,5 +346,278 @@ describe('transitionBooking', () => {
 
     expect(result.ok).toBe(false)
     expect(!result.ok && result.error.code).toBe('terminal_state')
+  })
+})
+
+/**
+ * The register carries every stream (capability B1).
+ *
+ * `booking_summary` used to inner-join occupancy, which meant a day pass could
+ * never appear in a list whose own header calls itself "every booking across
+ * all streams". These pin the left join: the row is present, and everything
+ * occupancy would have supplied is absent rather than invented.
+ */
+describe('bookings that occupy no unit', () => {
+  test('a day pass appears in the list, with no unit and no dates', async () => {
+    await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
+    const dayPass = await givenDayPassBooking()
+
+    const { bookings: listed } = await listBookings()
+    const found = listed.find((booking) => booking.reference === dayPass.reference)
+
+    expect(found).toBeDefined()
+    expect(found?.stream).toBe('day_pass')
+    // The four occupancy facts are one nullable object, so a screen cannot read
+    // a unit reference while treating the dates as absent.
+    expect(found?.stay).toBeNull()
+  })
+
+  test('takes its place in creation order like any other booking', async () => {
+    // It used to need a rule of its own: sorting by check-in put a row with no
+    // dates at one end of the list by accident, and `nullsFirst: false` was
+    // there to decide which end. Ordering by creation retires the question —
+    // every booking has a creation time, whatever it occupies.
+    const dayPass = await givenDayPassBooking()
+    const stay = await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
+
+    expect((await listBookings()).bookings.map((booking) => booking.reference)).toEqual([
+      stay.reference,
+      dayPass.reference,
+    ])
+  })
+
+  test('a date filter excludes it, because it has no dates to match', async () => {
+    // The honest answer while a day pass carries no date of its own: the filter
+    // asks which stays touch these days, and a row with no dates cannot answer.
+    // The day-pass slice brings a date to filter on.
+    await givenDayPassBooking()
+
+    expect(
+      (await listBookings({ overlaps: { start: TODAY, end: '2026-09-30' } })).bookings,
+    ).toHaveLength(0)
+  })
+})
+
+describe('countBookingsByStream', () => {
+  test('counts each stream, and reports zero for the ones with no writer yet', async () => {
+    await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
+    await givenBooking({ unitRef: '3B-02', checkIn: TODAY, checkOut: '2026-08-30' })
+    await givenDayPassBooking()
+
+    expect(await countBookingsByStream()).toEqual({ short_stay: 2, day_pass: 1, tenancy: 0 })
+  })
+
+  test('narrows with the same filters as the list it summarises', async () => {
+    await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
+    const doomed = await givenBooking({ unitRef: '3B-02', checkIn: TODAY, checkOut: '2026-08-30' })
+
+    await transitionBooking(doomed.id, 'cancel')
+
+    const filter = { statuses: ['confirmed'] } as const
+
+    expect((await countBookingsByStream(filter)).short_stay).toBe(1)
+    expect((await listBookings(filter)).bookings).toHaveLength(1)
+  })
+
+  test('ignores the stream filter, so the tiles a staff member might switch to still read', async () => {
+    // These figures are how a stream is chosen. Narrowing them to the stream
+    // already chosen would zero the other two and make the strip a dead end.
+    await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
+    await givenDayPassBooking()
+
+    expect(await countBookingsByStream({ streams: ['day_pass'] })).toEqual({
+      short_stay: 1,
+      day_pass: 1,
+      tenancy: 0,
+    })
+  })
+})
+
+/**
+ * Vehicles (prd.md §2, §13 [C], §12.5).
+ *
+ * A registration is required for records and security, a family may arrive in
+ * several cars, and the guard's lookup at the gate is an equality match on the
+ * stored string — so what goes in has to be complete, ordered, and refused when
+ * it is neither a plate nor a stated exception.
+ */
+describe('vehicles', () => {
+  test('keeps every plate on the booking, in the order they were given', async () => {
+    const booking = await givenBooking({
+      unitRef: '3B-01',
+      checkIn: TODAY,
+      checkOut: '2026-08-30',
+      vehicles: ['BAA 1234', 'BB 5678', 'CC 9012'],
+    })
+
+    expect((await getBookingByReference(booking.reference))?.vehicles).toEqual([
+      'BAA 1234',
+      'BB 5678',
+      'CC 9012',
+    ])
+  })
+
+  test('records the no-vehicle exception as an assertion, not an absence', async () => {
+    const booking = await givenBooking({
+      unitRef: '3B-01',
+      checkIn: TODAY,
+      checkOut: '2026-08-30',
+      noVehicle: true,
+    })
+
+    const stored = await getBookingByReference(booking.reference)
+
+    // The two are different facts: "no car" versus "nobody asked". Only the
+    // flag distinguishes them, because both hold an empty list.
+    expect(stored?.vehicles).toEqual([])
+    expect(stored?.noVehicle).toBe(true)
+  })
+
+  test('refuses a booking that records neither a plate nor the exception', async () => {
+    // The application checks this too, but the database is what makes it true
+    // of every writer — including one added later that forgets.
+    await expect(
+      createWalkInBooking(
+        await bookingInput({
+          unitRef: '3B-01',
+          checkIn: TODAY,
+          checkOut: '2026-08-30',
+          vehicles: [],
+        }),
+      ),
+    ).rejects.toThrow(/vehicle registration/)
+  })
+
+  test('an amendment replaces the whole set rather than adding to it', async () => {
+    const booking = await givenBooking({
+      unitRef: '3B-01',
+      checkIn: TODAY,
+      checkOut: '2026-08-30',
+      vehicles: ['BAA 1234', 'BB 5678'],
+    })
+
+    const current = await getBookingByReference(booking.reference)
+
+    const result = await amendBooking({
+      bookingId: booking.id,
+      expectedUpdatedAt: current!.updatedAt,
+      unitId: current!.stay!.unitId,
+      range: current!.stay!.range,
+      guestName: current!.guestName,
+      guestPhone: current!.guestPhone,
+      discount: current!.discount,
+      // The family turned up in one car, not two.
+      vehicles: ['BB 5678'],
+      noVehicle: false,
+      chargeableGuests: current!.chargeableGuests,
+      exemptGuests: current!.exemptGuests,
+      lines: current!.lines.map((entry) => ({ ...entry })),
+      total: current!.total,
+      securityDeposit: current!.securityDeposit,
+      reason: null,
+      actorId: null,
+    })
+
+    expect(result.ok).toBe(true)
+    expect((await getBookingByReference(booking.reference))?.vehicles).toEqual(['BB 5678'])
+  })
+
+  test('records the plates on the creation audit event', async () => {
+    // prd.md §13 [C] makes these a record-keeping requirement, so a later
+    // dispute about which car was declared has an answer in the trail.
+    const booking = await givenBooking({
+      unitRef: '3B-01',
+      checkIn: TODAY,
+      checkOut: '2026-08-30',
+      vehicles: ['BAA 1234'],
+    })
+
+    const [created] = await auditEventsFor(booking.id)
+
+    expect(created?.after).toMatchObject({ vehicles: ['BAA 1234'], no_vehicle: false })
+  })
+})
+
+/**
+ * Paging the register (capability B1).
+ *
+ * The list is fetched a page at a time rather than sliced in the browser, so
+ * these pin the two things that separates it from the Staff tab's client-side
+ * slice: only one page of rows crosses the wire, and `total` counts what the
+ * filter matched rather than what the page returned.
+ */
+describe('listBookings pagination', () => {
+  /** Five bookings, newest first, so a page boundary lands inside them. */
+  async function givenFiveBookings(): Promise<readonly string[]> {
+    const created: string[] = []
+
+    for (const unitRef of ['3B-01', '3B-02', '3B-03', '3B-04', '3B-05']) {
+      const booking = await givenBooking({ unitRef, checkIn: TODAY, checkOut: '2026-08-30' })
+
+      created.push(booking.reference)
+    }
+
+    // Newest taken first is the register's order.
+    return [...created].reverse()
+  }
+
+  test('returns only the rows on the page, and the total behind them', async () => {
+    const newestFirst = await givenFiveBookings()
+
+    const first = await listBookings({}, { page: 1, pageSize: 2 })
+
+    expect(first.bookings.map((booking) => booking.reference)).toEqual(newestFirst.slice(0, 2))
+    // The count is what the filter matched, not what came back — it is the
+    // footer's denominator and what decides how many pages exist.
+    expect(first.total).toBe(5)
+  })
+
+  test('walks pages without repeating or dropping a booking', async () => {
+    const newestFirst = await givenFiveBookings()
+
+    const pages = await Promise.all([
+      listBookings({}, { page: 1, pageSize: 2 }),
+      listBookings({}, { page: 2, pageSize: 2 }),
+      listBookings({}, { page: 3, pageSize: 2 }),
+    ])
+
+    expect(pages.flatMap((page) => page.bookings.map((entry) => entry.reference))).toEqual(
+      newestFirst,
+    )
+    // The last page is short rather than padded.
+    expect(pages[2]?.bookings).toHaveLength(1)
+  })
+
+  test('counts what the filter matched, not the whole table', async () => {
+    await givenFiveBookings()
+    const doomed = await givenBooking({ unitRef: '3B-06', checkIn: TODAY, checkOut: '2026-08-30' })
+
+    await transitionBooking(doomed.id, 'cancel')
+
+    const page = await listBookings({ statuses: ['cancelled'] }, { page: 1, pageSize: 2 })
+
+    expect(page.total).toBe(1)
+    expect(page.bookings.map((booking) => booking.reference)).toEqual([doomed.reference])
+  })
+
+  test('a page past the end comes back empty rather than erroring', async () => {
+    // What a bookmarked `?page=7` does once the rows beneath it are gone. The
+    // screen clamps against `total` and re-reads; the query layer's job is
+    // only to answer without throwing.
+    await givenFiveBookings()
+
+    const page = await listBookings({}, { page: 9, pageSize: 2 })
+
+    expect(page.bookings).toEqual([])
+    expect(page.total).toBe(5)
+  })
+
+  test('omitting the page returns everything, which is what the tests use', async () => {
+    await givenFiveBookings()
+
+    const all = await listBookings()
+
+    expect(all.bookings).toHaveLength(5)
+    expect(all.total).toBe(5)
   })
 })

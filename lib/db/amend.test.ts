@@ -36,19 +36,27 @@ async function unchangedAmendment(bookingId: string) {
     throw new Error(`Test setup lost booking ${bookingId}.`)
   }
 
+  if (!booking.stay) {
+    throw new Error(`Booking ${booking.reference} has no occupancy to amend.`)
+  }
+
   return {
     bookingId: booking.id,
     expectedUpdatedAt: booking.updatedAt,
-    unitId: booking.unitId,
-    range: booking.range,
+    unitId: booking.stay.unitId,
+    range: booking.stay.range,
     guestName: booking.guestName,
     guestPhone: booking.guestPhone,
-    vehicleRegistration: booking.vehicleRegistration,
+    vehicles: booking.vehicles,
+    noVehicle: booking.noVehicle,
     chargeableGuests: booking.chargeableGuests,
     exemptGuests: booking.exemptGuests,
     lines: booking.lines,
     total: booking.total,
     securityDeposit: booking.securityDeposit,
+    // "Unchanged" includes the discount: resubmitting without it would be a
+    // removal, and the amend path treats a null instruction as exactly that.
+    discount: booking.discount,
     reason: null,
     actorId: null,
   }
@@ -73,7 +81,7 @@ describe('amendBooking', () => {
 
     const after = await getBookingById(booking.id)
 
-    expect(after?.range).toEqual({ start: CHECK_IN, end: '2026-09-18' })
+    expect(after?.stay?.range).toEqual({ start: CHECK_IN, end: '2026-09-18' })
     expect(after?.total).toBe(bnd(800))
     // prd.md §8: the total is the sum of the lines, never a stored figure that
     // could disagree with them.
@@ -100,7 +108,7 @@ describe('amendBooking', () => {
     })
 
     expect(result.ok).toBe(true)
-    expect((await getBookingById(booking.id))?.range).toEqual({
+    expect((await getBookingById(booking.id))?.stay?.range).toEqual({
       start: '2026-09-13',
       end: '2026-09-19',
     })
@@ -127,7 +135,7 @@ describe('amendBooking', () => {
     // the dates, the total and the lines are all as they were.
     const after = await getBookingById(booking.id)
 
-    expect(after?.range).toEqual({ start: CHECK_IN, end: CHECK_OUT })
+    expect(after?.stay?.range).toEqual({ start: CHECK_IN, end: CHECK_OUT })
     expect(after?.total).toBe(bnd(600))
     expect(after?.lines[0]?.quantity).toBe(3)
   })
@@ -145,7 +153,7 @@ describe('amendBooking', () => {
     })
 
     expect(result.ok).toBe(true)
-    expect((await getBookingById(booking.id))?.unitRef).toBe('3B-02')
+    expect((await getBookingById(booking.id))?.stay?.unitRef).toBe('3B-02')
 
     // The proof that the old unit is genuinely free: a second booking can take
     // the exact nights the first one vacated.
@@ -155,7 +163,7 @@ describe('amendBooking', () => {
       checkOut: CHECK_OUT,
     })
 
-    expect(backfill.unitRef).toBe('3B-01')
+    expect(backfill.stay?.unitRef).toBe('3B-01')
   })
 
   test('refuses a save made against a booking that moved underneath it', async () => {
@@ -309,10 +317,10 @@ describe('cancelling a booking', () => {
       checkOut: CHECK_OUT,
     })
 
-    expect(replacement.unitRef).toBe('3B-01')
+    expect(replacement.stay?.unitRef).toBe('3B-01')
     // The cancellation is a state, not a deletion — a cancelled booking that
     // returns is a new booking, and both are still readable.
-    expect((await listBookings()).map((entry) => entry.status).sort()).toEqual([
+    expect((await listBookings()).bookings.map((entry) => entry.status).sort()).toEqual([
       'cancelled',
       'confirmed',
     ])

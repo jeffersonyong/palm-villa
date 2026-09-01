@@ -21,6 +21,7 @@ import {
 import { getDailySnapshot, type Booking } from '@/lib/db/bookings'
 import { formatStayDate, todayInBrunei } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
+import { formatVehicles } from '@/lib/domain/vehicle'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -165,11 +166,17 @@ function ArrivalsSection({ bookings }: { bookings: readonly Booking[] }) {
                   {booking.reference}
                 </TableCell>
                 <TableCell className="text-foreground">{booking.guestName}</TableCell>
-                <TableCell className="tabular-nums">{booking.unitRef}</TableCell>
+                <TableCell className="tabular-nums">{booking.stay?.unitRef ?? '—'}</TableCell>
+                {/* Every plate on the booking, because the guard checks the car
+                    that arrived and a family may come in two (prd.md §12.5). */}
                 <TableCell className="tabular-nums">
-                  {booking.vehicleRegistration ?? <span className="text-muted-foreground">—</span>}
+                  {formatVehicles(booking.vehicles) ?? (
+                    <span className="text-muted-foreground">
+                      {booking.noVehicle ? 'None' : '—'}
+                    </span>
+                  )}
                 </TableCell>
-                <TableCell>{formatStayDate(booking.range.end)}</TableCell>
+                <TableCell>{booking.stay ? formatStayDate(booking.stay.range.end) : '—'}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   BND {formatCents(booking.total)}
                 </TableCell>
@@ -219,8 +226,10 @@ function DeparturesSection({ bookings }: { bookings: readonly Booking[] }) {
                   {booking.reference}
                 </TableCell>
                 <TableCell className="text-foreground">{booking.guestName}</TableCell>
-                <TableCell className="tabular-nums">{booking.unitRef}</TableCell>
-                <TableCell>{formatStayDate(booking.range.start)}</TableCell>
+                <TableCell className="tabular-nums">{booking.stay?.unitRef ?? '—'}</TableCell>
+                <TableCell>
+                  {booking.stay ? formatStayDate(booking.stay.range.start) : '—'}
+                </TableCell>
                 <TableCell className="text-right tabular-nums">
                   BND {formatCents(booking.securityDeposit)}
                 </TableCell>

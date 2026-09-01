@@ -1,5 +1,6 @@
 import { transition, type BookingEvent, type BookingStatus } from '@/lib/domain/booking-state'
 import { nightsBetween, type StayDate } from '@/lib/domain/dates'
+import type { Discount } from '@/lib/domain/discount'
 import { line, totalOf } from '@/lib/domain/lines'
 import { bnd } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
@@ -48,7 +49,10 @@ export interface BookingSpec {
   checkOut: StayDate
   guestName?: string
   guestPhone?: string
-  vehicleRegistration?: string | null
+  /** Plates on the booking. Defaults to one, since prd.md §13 [C] requires it. */
+  vehicles?: readonly string[]
+  /** Set instead of `vehicles` to exercise the deliberate no-car exception. */
+  noVehicle?: boolean
   chargeableGuests?: number
   exemptGuests?: number
   /**
@@ -58,6 +62,8 @@ export interface BookingSpec {
    * `givenTransferBooking`.
    */
   paymentMethod?: PaymentMethod
+  /** Defaults to none — a discount is the exception, not the shape. */
+  discount?: Discount | null
 }
 
 /**
@@ -77,12 +83,17 @@ export async function bookingInput(spec: BookingSpec): Promise<CreateWalkInBooki
     range: { start: spec.checkIn, end: spec.checkOut },
     guestName: spec.guestName ?? 'Test Guest',
     guestPhone: spec.guestPhone ?? '+673 000 0000',
-    vehicleRegistration: spec.vehicleRegistration ?? null,
+    // A plate by default rather than none: the write path now refuses a
+    // booking that records neither a vehicle nor the exception, so a fixture
+    // with no opinion has to have a car like a real booking does.
+    vehicles: spec.vehicles ?? (spec.noVehicle ? [] : ['BAA1234']),
+    noVehicle: spec.noVehicle ?? false,
     chargeableGuests: spec.chargeableGuests ?? 2,
     exemptGuests: spec.exemptGuests ?? 0,
     lines,
     total: totalOf(lines),
     securityDeposit: bnd(100),
+    discount: spec.discount ?? null,
     paymentMethod: spec.paymentMethod ?? 'cash',
     // Tests act as no one; the auth slice's own tests cover real actors.
     actorId: null,
@@ -182,7 +193,7 @@ export async function givenBookingInState(
       guest_id: (guest.data as { id: string }).id,
       chargeable_guests: input.chargeableGuests,
       exempt_guests: input.exemptGuests,
-      vehicle_registration: input.vehicleRegistration,
+      no_vehicle: input.noVehicle,
       total_cents: input.total,
       security_deposit_cents: input.securityDeposit,
     })
@@ -194,6 +205,25 @@ export async function givenBookingInState(
   }
 
   const bookingId = (booking.data as { id: string }).id
+
+  // The real path writes these inside create_walk_in_booking(); a hand-written
+  // fixture has to as well, or a booking in a state nothing can reach yet would
+  // also be the only booking in the database with no plates on it — a second
+  // difference from the product, on top of the one this helper exists for.
+  if (input.vehicles.length > 0) {
+    const plates = await db.from('booking_vehicle').insert(
+      input.vehicles.map((registration, index) => ({
+        property_id: propertyId,
+        booking_id: bookingId,
+        registration,
+        sort_order: index,
+      })),
+    )
+
+    if (plates.error) {
+      throw new Error(`Test setup could not record a vehicle: ${plates.error.message}`)
+    }
+  }
 
   const occupancy = await db.from('occupancy').insert({
     property_id: propertyId,
@@ -227,6 +257,71 @@ export async function givenBookingInState(
   }
 
   return { id: bookingId, reference, status }
+}
+
+/**
+ * Creates a booking that occupies no unit — a day pass (prd.md §6.1).
+ *
+ * Written directly, for the same reason `givenBookingInState` is: **nothing in
+ * the application creates one yet.** The day-pass flow is phase two. What the
+ * bookings register promises today is that its read model *carries* such a
+ * booking rather than joining it away, and that promise needs a row to be true
+ * about — otherwise the left join in `booking_summary` is untested until the
+ * slice that depends on it lands.
+ *
+ * Deliberately minimal: a booking and its guest, no occupancy, no unit, no
+ * lines. That is exactly the shape §6.1 describes, and inventing a facility
+ * table or a day-pass date here would be guessing at a schema the day-pass
+ * slice has to design. This helper is replaced by that slice's real path.
+ */
+export async function givenDayPassBooking(
+  spec: { guestName?: string; chargeableGuests?: number; exemptGuests?: number } = {},
+): Promise<{ id: string; reference: string }> {
+  const db = dataClient()
+  const propertyId = await currentPropertyId()
+
+  const guest = await db
+    .from('guest')
+    .insert({
+      property_id: propertyId,
+      name: spec.guestName ?? 'Test Day Guest',
+      phone: '+673 000 0000',
+    })
+    .select('id')
+    .single()
+
+  if (guest.error) {
+    throw new Error(`Test setup could not create a guest: ${guest.error.message}`)
+  }
+
+  const reference = await nextReference()
+
+  const booking = await db
+    .from('booking')
+    .insert({
+      property_id: propertyId,
+      reference,
+      stream: 'day_pass',
+      // Reached by draft --pay_in_full--> confirmed, the same move a cash
+      // walk-in makes. Not chosen freely: architecture.md §5.3.
+      status: transition('draft', 'pay_in_full').ok ? 'confirmed' : 'draft',
+      guest_id: (guest.data as { id: string }).id,
+      chargeable_guests: spec.chargeableGuests ?? 2,
+      exempt_guests: spec.exemptGuests ?? 1,
+      // A day pass visitor parks too, but nothing collects the plate until the
+      // day-pass form exists — so the exception, which is the honest value.
+      no_vehicle: true,
+      total_cents: bnd(20),
+      security_deposit_cents: 0,
+    })
+    .select('id')
+    .single()
+
+  if (booking.error) {
+    throw new Error(`Test setup could not create a day pass: ${booking.error.message}`)
+  }
+
+  return { id: (booking.data as { id: string }).id, reference }
 }
 
 /** Allocates a reference the same way the write path does. */

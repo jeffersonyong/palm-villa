@@ -14,17 +14,21 @@ import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listAuditEvents, type AuditEvent } from '@/lib/db/audit'
 import { getBookingByReference, type Booking } from '@/lib/db/bookings'
+import { listBookingNotes } from '@/lib/db/notes'
 import { listPaymentsForBooking, type Payment } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
 import { allowedEvents, canAmend } from '@/lib/domain/booking-state'
 import { formatStayDate, formatTimestamp, nightsBetween } from '@/lib/domain/dates'
+import { describeDiscount } from '@/lib/domain/discount'
 import { formatCents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
+import { formatVehicles } from '@/lib/domain/vehicle'
 
 import { PaymentActions } from '../../payments/payment-actions'
 
 import { BookingActions } from './booking-actions'
 import { BookingHistory } from './booking-history'
+import { BookingNotes } from './booking-notes'
 
 /**
  * One booking, everything known about it, and what can still be done to it
@@ -80,10 +84,11 @@ export default async function BookingDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  const [bookingEvents, payments, staff] = await Promise.all([
+  const [bookingEvents, payments, staff, notes] = await Promise.all([
     listAuditEvents('booking', booking.id),
     listPaymentsForBooking(booking.id),
     listStaff(),
+    listBookingNotes(booking.id),
   ])
 
   // Payment events are typed against the payment, not the booking, so a trail
@@ -166,6 +171,13 @@ export default async function BookingDetailPage({ params }: PageProps) {
         booking={booking}
       />
 
+      {/* Above the history, below the money. The history is the system's
+          account of what happened; this is the staff's, and the two read
+          better in that order — what people said, then what was recorded. */}
+      <SectionCard id="notes-heading" title="Notes" className="mt-xl">
+        <BookingNotes bookingId={booking.id} notes={notes} actorNames={actorNames} />
+      </SectionCard>
+
       <SectionCard id="history-heading" title="History" className="mt-xl">
         <BookingHistory events={events} actorNames={actorNames} />
       </SectionCard>
@@ -176,18 +188,27 @@ export default async function BookingDetailPage({ params }: PageProps) {
 /* ── The stay ──────────────────────────────────────────────────────────── */
 
 function StaySummary({ booking }: { booking: Booking }) {
-  const nights = nightsBetween(booking.range.start, booking.range.end)
+  const { stay } = booking
+  const nights = stay ? nightsBetween(stay.range.start, stay.range.end) : null
 
   return (
     <SectionCard id="stay-heading" title="Stay">
       {/* Two columns, not a stack: four readouts in one card read as a panel
           of figures, and stacked they read as a form nobody can fill in. */}
       <dl className="grid gap-md sm:grid-cols-2">
-        <Field label="Unit" value={booking.unitRef} mono />
+        {/* A booking with no occupancy is a day pass — it consumes facility
+            capacity on a date and occupies no unit (prd.md §6.1). Nothing
+            writes one yet, so this is the register's shape reaching the record
+            screen rather than a case staff can produce today. */}
+        <Field label="Unit" value={stay ? stay.unitRef : 'No unit'} mono={Boolean(stay)} />
         <Field
           label="Dates"
-          value={`${formatStayDate(booking.range.start)} → ${formatStayDate(booking.range.end)}`}
-          hint={`${nights} ${nights === 1 ? 'night' : 'nights'}`}
+          value={
+            stay
+              ? `${formatStayDate(stay.range.start)} → ${formatStayDate(stay.range.end)}`
+              : 'No stay dates'
+          }
+          hint={nights === null ? undefined : `${nights} ${nights === 1 ? 'night' : 'nights'}`}
         />
         <Field
           label="Guests"
@@ -198,9 +219,39 @@ function StaySummary({ booking }: { booking: Booking }) {
               : undefined
           }
         />
-        <Field label="Vehicle" value={booking.vehicleRegistration ?? '—'} mono />
+        <VehicleField booking={booking} />
       </dl>
     </SectionCard>
+  )
+}
+
+/**
+ * The plates arriving on this booking (prd.md §2, §13 [C]).
+ *
+ * Three different absences, said three different ways, because they mean
+ * different things to the guard at the gate. **"None"** is the guest saying
+ * they have no car. **"Not recorded"** is a booking taken before the field was
+ * required — nobody asserted anything, and it is worth fixing on the next
+ * amendment. Neither is a blank, which would read as a rendering fault.
+ */
+function VehicleField({ booking }: { booking: Booking }) {
+  const plates = formatVehicles(booking.vehicles)
+  const label = booking.vehicles.length === 1 ? 'Vehicle' : 'Vehicles'
+
+  if (plates) {
+    return <Field label={label} value={plates} mono />
+  }
+
+  return (
+    <Field
+      label="Vehicle"
+      value={booking.noVehicle ? 'None' : 'Not recorded'}
+      hint={
+        booking.noVehicle
+          ? 'The guest is arriving without one.'
+          : 'Taken before a registration was required — add it when amending.'
+      }
+    />
   )
 }
 
@@ -228,6 +279,14 @@ function MoneySummary({ booking, payments }: { booking: Booking; payments: reado
           </li>
         ))}
       </ul>
+
+      {/* The discount's own line is already among the lines above; this is the
+          why, which never appears on anything the guest reads. */}
+      {booking.discount ? (
+        <p className="mt-md text-caption text-muted-foreground">
+          Discounted {describeDiscount(booking.discount)}
+        </p>
+      ) : null}
 
       <div className="mt-lg flex items-baseline justify-between gap-lg border-t border-divider pt-lg">
         <span className="text-body-md text-muted-foreground">Total</span>

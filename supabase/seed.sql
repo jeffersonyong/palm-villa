@@ -119,8 +119,8 @@ select r.property_id, r.id, permission
 from staff_role r
 cross join unnest(array[
   'booking.view', 'booking.create', 'booking.amend', 'booking.cancel',
-  'booking.override_hold', 'payment.verify', 'payment.record_cash',
-  'inspection.record', 'charge.create', 'charge.waive',
+  'booking.override_hold', 'booking.discount', 'payment.verify',
+  'payment.record_cash', 'inspection.record', 'charge.create', 'charge.waive',
   'deposit.approve_release', 'unit.manage', 'tenancy.manage',
   'config.manage', 'report.view', 'document.view_identity'
 ]) as permission
@@ -131,8 +131,8 @@ select r.property_id, r.id, permission
 from staff_role r
 cross join unnest(array[
   'booking.view', 'booking.create', 'booking.amend', 'booking.cancel',
-  'booking.override_hold', 'payment.verify', 'payment.record_cash',
-  'charge.create', 'unit.manage', 'document.view_identity'
+  'booking.override_hold', 'booking.discount', 'payment.verify',
+  'payment.record_cash', 'charge.create', 'unit.manage', 'document.view_identity'
 ]) as permission
 where r.slug = 'front-office';
 
