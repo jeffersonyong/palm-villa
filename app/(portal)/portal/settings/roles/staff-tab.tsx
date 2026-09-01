@@ -427,7 +427,7 @@ export function NewStaffDialog({
                 id="staff-email"
                 name="email"
                 type="email"
-                placeholder="jane@palmvilla.bn"
+                placeholder="jane@example.com"
                 autoComplete="off"
                 required
                 aria-invalid={state.fieldErrors?.email ? true : undefined}

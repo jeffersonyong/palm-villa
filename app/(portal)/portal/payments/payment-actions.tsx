@@ -293,7 +293,7 @@ function ManualMatchDialog({
               required
               maxLength={120}
               autoComplete="off"
-              placeholder="JOHN DOE"
+              placeholder="John Doe"
               defaultValue={submitted?.observedSender ?? ''}
               aria-invalid={Boolean(state.fieldErrors?.observedSender)}
             />

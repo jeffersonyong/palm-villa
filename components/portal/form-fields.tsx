@@ -15,6 +15,11 @@ import { cn } from '@/lib/utils'
  * runs uncontrolled unless given `value`/`onChange`, so the walk-in form's
  * plain `<form action>` fields and the amendment form's controlled ones are
  * the same component.
+ *
+ * `placeholder` carries an example of the value — `John Doe`, `BAA 1234` —
+ * never a restatement of the label above it. An empty field says nothing about
+ * the shape of what belongs in it, and a desk filling this in with a guest
+ * waiting should not have to guess whether a phone wants the +673.
  */
 
 interface NumberFieldProps {
