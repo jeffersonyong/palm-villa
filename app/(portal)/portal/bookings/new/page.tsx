@@ -20,7 +20,7 @@ import { palmVillaConfig } from '@/lib/domain/config'
 import { addDays, isStayDate, todayInBrunei } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 
-import { BookingForm } from './booking-form'
+import { NewBookingScreen } from './new-booking-screen'
 
 export const metadata: Metadata = {
   title: 'New booking',
@@ -85,8 +85,15 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   const actor = await getActor()
   const mayDiscount = Boolean(actor && hasPermission(actor.permissions, 'booking.discount'))
 
-  return (
-    <div className="max-w-[1120px]">
+  /* Header, date controls and availability tiles — everything that asks the
+     question rather than answering it. Hoisted into a variable because
+     `NewBookingScreen` drops it entirely once a booking exists: a confirmation
+     sharing a screen with the search that produced it reads as one more
+     result, which is what made this screen hard to place at a glance. It is
+     server-rendered here and passed across as a prop, so the queries above
+     stay on the server and only the outcome is client state. */
+  const chrome = (
+    <>
       <PageHeader
         title="New booking"
         description="Walk-in only — the guest is here and pays now (prd.md §9.4)."
@@ -199,29 +206,43 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
           })}
         </dl>
       )}
+    </>
+  )
+
+  // Only the form's screen can reach the confirmation state, so only that
+  // branch goes through `NewBookingScreen`. Every other state is chrome plus
+  // an explanation, and stays a server render.
+  if (hasDates && availableUnits.length > 0) {
+    return (
+      <div className="max-w-[1120px]">
+        <NewBookingScreen
+          chrome={chrome}
+          units={availableUnits}
+          config={config}
+          checkIn={checkIn}
+          checkOut={checkOut}
+          mayDiscount={mayDiscount}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-[1120px]">
+      {chrome}
 
       {hasDates ? (
         <section className="mt-xl">
-          {availableUnits.length === 0 ? (
-            /* `placement="page"` to match the instruction above: design.md
-               gives a gray panel its radius and padding from where it sits,
-               and both of these stand on the page ground. This one was at the
-               nested scale, which read as a control that had grown. */
-            <Card surface="inset" placement="page">
-              <p className="text-body-md text-copy">
-                Nothing free for those dates{unitTypeId ? ' in that unit type' : ''}. Try different
-                dates, or widen the unit type.
-              </p>
-            </Card>
-          ) : (
-            <BookingForm
-              units={availableUnits}
-              config={config}
-              checkIn={checkIn}
-              checkOut={checkOut}
-              mayDiscount={mayDiscount}
-            />
-          )}
+          {/* `placement="page"` to match the instruction above: design.md
+              gives a gray panel its radius and padding from where it sits,
+              and both of these stand on the page ground. This one was at the
+              nested scale, which read as a control that had grown. */}
+          <Card surface="inset" placement="page">
+            <p className="text-body-md text-copy">
+              Nothing free for those dates{unitTypeId ? ' in that unit type' : ''}. Try different
+              dates, or widen the unit type.
+            </p>
+          </Card>
         </section>
       ) : null}
     </div>
