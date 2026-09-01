@@ -58,6 +58,7 @@ Everyone works from the same live data, so availability, payments, and booking s
 | B10 | Access guest records and identity documents, subject to permission (see G-series) |
 | B11 | Discount a booking at the desk — a fixed amount or a percentage — with a typed reason recorded against it. Discounting is its own permission, so it can be withheld from a role that otherwise takes bookings, and every discount given appears in the audit trail. **(added 1 September 2026 at the client team's request)** |
 | B12 | Keep free-text notes on any booking: an append-only thread with who wrote each note and when, so context stops living in WhatsApp. Each note is marked for the office or for housekeeping. **(added 1 September 2026 at the client team's request)** |
+| B13 | Settle what an amendment left owing: a booking shows what has been paid and what is still outstanding, and the difference can be taken in cash or by bank transfer from the booking itself. A top-up transfer goes through the same verification queue as any other. **(added 1 September 2026 — the gap the amend feature created)** |
 
 ---
 
@@ -148,7 +149,7 @@ These exclusions are deliberate. Each is either not needed on day one or depends
 | X8 | Smart locks / automated gate control | Physical access remains as-is; the system tells Security who to expect. |
 | X9 | Multi-property administration screens | The data layer supports additional properties from day one; the management UI for it is built when a second property is real. |
 | X10 | Migration of historical documents | The system holds data from go-live onward. The existing folder of accumulated documents stays outside the system. |
-| X11 | Part payments — paying a deposit now and the balance later | Not in the quoted delivery, and not a technical limitation: the stated policy is that full payment secures a unit and that unpaid bookings hold no inventory. Raised 1 September 2026; it needs that policy revisited before it can be built, and the payment layer is designed so adding an outstanding balance is an extension rather than a rework. |
+| X11 | Part payments — a guest *choosing* to pay a deposit now and the balance later | Not in the quoted delivery, and not a technical limitation: the stated policy is that full payment secures a unit and that unpaid bookings hold no inventory. Raised 1 September 2026; it needs that policy revisited before it can be offered. **Note the distinction from B13:** the system can now track an outstanding balance, because an amendment can leave one. What it does not do is let a guest opt into paying in instalments at booking time. |
 
 ---
 

@@ -35,8 +35,15 @@ export interface Payment {
   method: PaymentMethod
   status: PaymentStatus
   /**
-   * What the booking is worth **now**. The queue's "amount expected" column,
-   * and what a confirmation is matched against.
+   * What is **outstanding** on the booking now — its total less every other
+   * payment already verified against it. The queue's "amount expected"
+   * column, and what a confirmation is matched against.
+   *
+   * It used to be the booking's whole total, and for a booking with one
+   * payment the two are the same figure. They part company on a top-up: a
+   * second transfer raised to clear what an amendment added is matched
+   * against the difference, not against a total its predecessor has already
+   * reduced (capability B13).
    */
   due: Cents
   /**
@@ -289,17 +296,26 @@ export async function verifyPayment(input: VerifyPaymentInput): Promise<VerifyPa
     }
   }
 
-  const next = transition(payment.bookingStatus, 'verify_payment')
+  // ── The booking may not move at all ──────────────────────────────────────
+  //
+  // Verifying the transfer a booking is *waiting* on confirms it. Verifying a
+  // top-up raised against a booking that is already confirmed moves nothing —
+  // there is no legal event from `confirmed` that means "confirmed again", and
+  // `transition()` says so rather than being talked round. The pair is passed
+  // as nulls in that case, which is the arrangement `recordCashPayment`
+  // already had for cash taken against a booking that needed no move.
+  const isAwaiting = payment.bookingStatus === 'awaiting_payment_verification'
+  const next = isAwaiting ? transition(payment.bookingStatus, 'verify_payment') : null
 
-  if (!next.ok) {
+  if (next && !next.ok) {
     return { ok: false, error: next.error }
   }
 
   const { data, error } = await dataClient().rpc('verify_payment', {
     p_property_id: propertyId,
     p_payment_id: input.paymentId,
-    p_from_status: payment.bookingStatus,
-    p_to_status: next.status,
+    p_from_status: isAwaiting ? payment.bookingStatus : null,
+    p_to_status: next?.ok ? next.status : null,
     p_observed_amount_cents: input.observedAmount,
     p_match_kind: input.match,
     p_observed_reference: input.observedReference ?? null,
@@ -494,4 +510,103 @@ export async function recordCashPayment(
   }
 
   return { ok: true, payment, bookingStatus: result.status }
+}
+
+export interface RecordTransferPaymentInput {
+  bookingId: string
+  actorId: string | null
+}
+
+export type RecordTransferPaymentResult =
+  | { ok: true; payment: Payment }
+  | {
+      ok: false
+      error: {
+        code: 'booking_not_found' | 'nothing_outstanding' | 'already_pending'
+        message: string
+        dueCents?: Cents
+      }
+    }
+
+/**
+ * Raises a bank transfer against an existing booking, for whatever it still
+ * owes (capability B13).
+ *
+ * The path that did not exist. Until this, the only two writers of a payment
+ * row were booking creation and the cash form, so a guest who extended a paid
+ * stay and wanted to transfer the difference could not be recorded at all —
+ * and the workaround, logging a transfer as cash, puts money in Finance's
+ * daily cash-up (E4) that was never in the drawer.
+ *
+ * ── It takes no amount ────────────────────────────────────────────────────
+ *
+ * A pending transfer has been promised, not seen. `payment.amount_cents` stays
+ * null until somebody has looked at the bank — a table constraint enforces it
+ * — so what is raised here is an expectation of the outstanding figure, and
+ * the real number is entered at verification against the statement. Asking for
+ * it twice would invite the second answer to disagree with the first.
+ *
+ * The booking does not move: a top-up is raised against one already confirmed,
+ * and confirmation does not happen twice.
+ */
+export async function recordTransferPayment(
+  input: RecordTransferPaymentInput,
+): Promise<RecordTransferPaymentResult> {
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await dataClient().rpc('record_transfer_payment', {
+    p_property_id: propertyId,
+    p_booking_id: input.bookingId,
+    p_actor_id: input.actorId,
+  })
+
+  if (error) {
+    throw new Error(`Could not record the transfer: ${error.message}`)
+  }
+
+  const result = data as
+    | { ok: true; payment_id: string; due_cents: number }
+    | {
+        ok: false
+        error: 'booking_not_found' | 'nothing_outstanding' | 'already_pending'
+        due_cents?: number
+      }
+
+  if (!result.ok) {
+    return { ok: false, error: describeTransferFailure(result.error, result.due_cents) }
+  }
+
+  const raised = await getPaymentById(result.payment_id)
+
+  if (!raised) {
+    // Not reachable: the function returned this id from a committed insert.
+    throw new Error(`Transfer ${result.payment_id} was raised but could not be read back.`)
+  }
+
+  return { ok: true, payment: raised }
+}
+
+function describeTransferFailure(
+  code: 'booking_not_found' | 'nothing_outstanding' | 'already_pending',
+  dueCents?: number,
+): { code: typeof code; message: string; dueCents?: Cents } {
+  switch (code) {
+    case 'booking_not_found':
+      return { code, message: 'That booking no longer exists.' }
+    case 'nothing_outstanding':
+      return {
+        code,
+        message:
+          dueCents !== undefined && dueCents < 0
+            ? 'This booking has been overpaid. Settle the difference outside the system.'
+            : 'This booking is fully paid. There is nothing left to collect.',
+        dueCents,
+      }
+    case 'already_pending':
+      return {
+        code,
+        message:
+          'A transfer is already awaiting verification on this booking. Confirm that one first.',
+      }
+  }
 }

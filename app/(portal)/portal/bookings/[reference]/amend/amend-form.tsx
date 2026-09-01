@@ -382,8 +382,10 @@ export function AmendForm({
                 <p className="mt-sm text-body-sm text-copy">
                   Was BND {formatCents(booking.total)} — a difference of BND{' '}
                   {formatCents(Math.abs(quote.total - booking.total))}{' '}
-                  {quote.total > booking.total ? 'more' : 'less'}. Collect or refund it outside the
-                  system.
+                  {quote.total > booking.total ? 'more' : 'less'}.{' '}
+                  {quote.total > booking.total
+                    ? 'The booking will show it as outstanding, and it can be settled from the booking screen.'
+                    : 'Refunds are settled outside the system.'}
                 </p>
               ) : null}
             </>

@@ -18,8 +18,15 @@ import { centsFromInput } from '@/lib/domain/money'
  * recording on a colleague's behalf is a form change later rather than a
  * schema one. Recorded as an [A] in prd.md §10.5.
  *
- * What this does NOT do: calculate a balance, or reconcile against banked
- * cash. The daily cash-up is capability E4 and its own screen.
+ * The amount is matched against what the booking still OWES rather than
+ * against its total (capability B13). For a booking nobody has paid the two
+ * are the same figure, which is every payment this screen took before the
+ * balance existed; they part company when cash settles the difference an
+ * amendment created, which used to demand a written override for the ordinary
+ * case.
+ *
+ * What this still does NOT do: reconcile against banked cash. The daily
+ * cash-up is capability E4 and its own screen.
  */
 
 const recordCashSchema = z.object({
@@ -105,7 +112,7 @@ export async function recordCashAction(
         status: 'error',
         message: result.error.message,
         fieldErrors: {
-          amountOverrideReason: 'This is not the amount due. Say why.',
+          amountOverrideReason: 'This is not what the booking still owes. Say why.',
         },
         submitted: echo(formData),
       }

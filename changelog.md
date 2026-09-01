@@ -6,6 +6,29 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-09-03 — a booking knows what it is owed, and a transfer can settle it
+
+The amend feature shipped with a sentence — *"collect or refund it outside the system"* — and that sentence was doing more work than it could carry. A guest who transfers for one night, is verified, then extends to two leaves a booking worth BND 400 with BND 200 banked against it, and until now the platform could neither name the difference nor take a second bank transfer to clear it. The only ways to record the top-up were to log a transfer as **cash** — money in Finance's daily cash-up (E4) that was never in the drawer — or to confirm a short payment through B5's override, which exists precisely so that a short payment is never silently accepted. A flag that fires on the routine case stops being read.
+
+This reverses a decision [migration 20260831000100](supabase/migrations/20260831000100_payments.sql) recorded explicitly — *"this is NOT a ledger"* — and the reversal is written into that migration's successor rather than left as a surprise. The rules are **[A]** in [prd.md §10.7](docs/prd.md); the shape is in [architecture.md §5.1 and §6.2a](docs/architecture.md); the capability ref is B13 in [scope-of-capabilities.md](docs/scope-of-capabilities.md). No new dependency.
+
+### Added
+- **A booking knows what it owes.** `booking_summary.paid_cents` sums the payments **verified** against it — a promised transfer counts for nothing — and `balanceOf()` in `lib/domain/balance.ts` owns the one subtraction. Derived on every read, stored nowhere: a stored total is a second copy of a figure the payment rows already hold, and the two disagree the first time something writes a payment without maintaining it. The Money card states **Paid** and **Outstanding**, and says *Overpaid by* rather than collapsing a negative into "settled" — an overpayment is a refund conversation, and N5 is still open.
+- **`record_transfer_payment()` — the write path that did not exist.** Only booking creation and the cash form had ever created a payment row. This raises a pending bank transfer for whatever is outstanding, and it lands in the same verification queue as any other. **It takes no amount:** a pending transfer has been promised, not seen, and the observed figure is entered at verification against the statement — asking twice invites the second answer to disagree with the first. It refuses a booking that owes nothing, and refuses a second transfer while one is already pending, because two rows for the same money means whichever is confirmed first silently makes the other wrong.
+- **A "Record a payment" action on the booking itself**, offered only while something is genuinely outstanding, so a clerk is never shown a button that is going to refuse. Cash settles immediately; a transfer goes to the queue and the dialog says so, because the difference decides whether the guest can walk away.
+
+### Changed
+- **The amount rule matches against the balance, not the total.** `verify_payment()` and `record_cash_payment()` changed in the body only — both compare what arrived against the total less what other verified payments have already settled. For every payment written before this the two figures are identical; they part company exactly where the product was previously wrong, which is the top-up that looked BND 200 short against a booking with BND 200 already banked. `payment_summary.due_amount_cents` keeps its name and narrows its meaning to match.
+- **Verifying a payment may now move no booking at all.** A top-up is confirmed against a booking that is already `confirmed`, and there is no legal event from there — `transition()` says so rather than being talked round. The caller passes nulls, and the history gains no second "Booking confirmed" line for a booking that never moved.
+- **Owing money is not a status.** A booking with a balance stays `confirmed` and states the figure beside itself. A second axis running through the §9.2 states would have to be answered by every screen that filters on one.
+- **The amend screen stops promising something the product cannot do.** A price increase now says the difference will show as outstanding and can be settled from the booking; a price *decrease* still says refunds happen outside the system, because they do.
+
+### Still not included
+- **Part payments.** prd.md §9.1's **[C]** is untouched — full payment secures a unit, and nothing offers a guest the choice of paying half up front. What is now expressible is a shortfall the *system itself* created by repricing a booking somebody had already paid for. Worth saying plainly, though: the balance being computable means the policy is now enforced by the product declining to offer instalments rather than by the schema being unable to represent one. [N16](docs/open-questions.md) is unchanged and still the client's to answer.
+- **`payment.record_cash` now gates recording a transfer too**, so its name is narrower than its job. Extending it was deliberate — whoever is trusted to say money arrived is the same person either way — rather than minting a permission string the client has never been asked about. Added to [N11](docs/open-questions.md), which already asks how the payment permissions should be split.
+
+---
+
 ## 2026-09-02 — the desk can discount a booking, and write down what it knows about one
 
 Two things the client team asked for that the PRD had never described, and one it asked for that is deliberately **not** here. A guest at the desk negotiates, and the alternative to a discount control is a clerk quietly typing a different total into a spreadsheet — which is the divergence this product exists to remove. Separately, a booking had nowhere to record anything a field does not carry, so that context stayed in WhatsApp.

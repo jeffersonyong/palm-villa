@@ -61,7 +61,9 @@ Not hypothetical. Each screen below exists and works, and is deliberately incomp
 
 **The shape agreed with Jeff if Jason says yes** (2026-09-01): status stays about the *stay* — the booking is confirmed and the money owed is a derived balance shown beside it — rather than adding a `partially_paid` state to the machine. Recorded here so the answer lands on a decision already taken rather than reopening it.
 
-**Answer:** _unanswered_
+**Jeff's position (2026-09-01): out of v1 unless Jason asks for it.** Not a "not yet decided" — a decision to leave the stated policy standing. The question stays open because it is Jason's to reverse, but nothing is waiting on it and no screen is incomplete without it. If he does ask, it is a slice of its own, not an addition to one.
+
+**Answer:** _unanswered — deferred out of v1 by Jeff, pending Jason_
 
 ---
 
@@ -118,7 +120,7 @@ Not blocking today, but each one is a screen that cannot be finished without it.
 
 | # | Ask | What it decides | Assumed meanwhile |
 |---|---|---|---|
-| **N11** | "Who is allowed to check a guest in? And should confirming an odd payment amount need someone more senior?" | There is no permission for check-in at all, so Security cannot be granted it. Separately: confirming a short payment and hand-matching a transfer both reuse "verify payments". | Security holds view-only. All three payment actions treated as one job. **Note the consequence:** Finance can override a payment amount but cannot record cash. |
+| **N11** | "Who is allowed to check a guest in? And should confirming an odd payment amount need someone more senior?" | There is no permission for check-in at all, so Security cannot be granted it. Separately: confirming a short payment and hand-matching a transfer both reuse "verify payments". | Security holds view-only. All three payment actions treated as one job. **Note the consequence:** Finance can override a payment amount but cannot record cash. **Also:** `payment.record_cash` now gates recording a *bank transfer* against a booking too (PRD §10.7), so its name is narrower than its job — whoever may say money arrived is the same person either way. Splitting or renaming it is part of this answer. |
 | **N12** | "Can we change a booking after the guest has already checked in — and if so, what do we charge for the nights they've already had?" | Amending a checked-in booking is currently blocked outright. | Blocked. The pricing engine refuses a check-in date in the past, so a mid-stay re-price isn't possible without a deliberate decision. |
 | **N14** | "Which of the three phone numbers is the WhatsApp one for booking enquiries?" | The public site links one of them. | Linking the first number listed. |
 

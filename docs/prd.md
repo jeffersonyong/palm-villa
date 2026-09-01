@@ -346,7 +346,7 @@ The PRD has never stated rules for changing a booking after it exists — §4 gr
 
 **[A] A cancellation requires a typed reason; an amendment's is optional.** B3 promises who, what and when. The reason adds why, and the two differ because an amendment already records both sides of every field it touched, whereas a cancellation would otherwise record only that it happened — and §9.5 forfeits a payment on one.
 
-**[A] Money is not moved by either action.** An amendment that changes the price states the difference and says to collect or refund it outside the system; a cancellation calculates no refund or forfeiture at all. This is a direct consequence of **N5 being open** (§9.5): the platform cannot state a forfeiture policy it has not been given. It is also consistent with architecture.md §6.4, where a v1 refund is a recorded instruction executed by a person in a banking app, never an automated movement.
+**[A] Money is not moved by either action — but an amendment now records what it left owing.** A cancellation still calculates no refund or forfeiture at all. An amendment still moves no money, but the difference it creates is no longer only a sentence on screen: the booking carries it as an outstanding balance and it can be settled in cash or by bank transfer from the booking itself (§10.7). A price *reduction* is unchanged — that is a refund, and refunds are settled outside the system. This is a direct consequence of **N5 being open** (§9.5): the platform cannot state a forfeiture policy it has not been given. It is also consistent with architecture.md §6.4, where a v1 refund is a recorded instruction executed by a person in a banking app, never an automated movement.
 
 ### 9.7 Notes on a booking
 
@@ -410,6 +410,20 @@ Requirements: record who collected, when, and against which booking. Provide a d
 **[A] Who and when are the acting user and the moment of recording**, not editable fields. The schema carries both as columns, so back-dating or recording on a colleague's behalf is a later form change rather than a migration.
 
 **Cash gets the same amount rule as a transfer.** Where the notes do not add up to the booking total, a person says why; the system does not write its own justification to satisfy the constraint.
+
+### 10.7 Settling what a booking still owes
+
+Added when the amendment path made the gap real. Nothing in §10 described what happens when a booking's price moves *after* it has been paid — and §9.6 said only that the difference is "collected outside the system", which stopped being good enough once staff had no way to record collecting it. The following are **[A]**.
+
+**[A] A booking knows what it owes.** `total − paid`, where `paid` is the sum of the payments actually **verified** against it. A promised transfer counts for nothing until somebody has checked the bank, which is the same rule §10.4 already applies to confirmation. The figure is derived from the payment rows on every read, never stored: a stored total is a second copy of one the payments already hold.
+
+**[A] The amount rule now matches against the balance, not the total.** §10.4's "match on amount as well as reference" and §10.5's cash equivalent both compared what arrived against the whole booking. On a top-up that made the ordinary case look short — settling the second night of a BND 400 booking with BND 200 demanded a written override, and a flag that fires on the routine case stops being read. It compares against what is outstanding. For a booking with one payment, which is every booking taken before this, the two figures are identical.
+
+**[A] Both methods can settle a difference, from the booking itself.** Cash is counted at the desk and settles immediately. A bank transfer is raised as pending, appears in the verification queue like any other, and settles only once confirmed — **and it carries no amount when raised**, because a pending transfer has been promised rather than seen. One transfer at a time per booking: two pending rows for the same money means whichever is confirmed first silently makes the other wrong.
+
+**[A] Owing money is not a status.** A booking with a balance outstanding stays `confirmed`; the amount is stated beside it rather than encoded in the state machine. §9.2's states describe the *stay* — where the guest is in their journey — and a second axis running through them would have to be answered by every screen that filters on status.
+
+**This is not part payments.** §9.1's **[C]** stands: full payment secures a unit, and nothing offers a guest the choice of paying half up front. What is now expressible is a shortfall the *system itself* created by repricing a booking somebody had already paid for. The balance being computable does make instalments mechanically possible — worth stating plainly, because it means the policy is now enforced by the product declining to offer them rather than by the schema being unable to represent one. **[N16](open-questions.md) is unchanged and still the client's to answer.**
 
 ### 10.6 Later (out of scope for v1)
 

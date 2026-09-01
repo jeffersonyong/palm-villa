@@ -6,6 +6,9 @@ import { z } from 'zod'
 import { requirePermission } from '@/lib/auth/require-permission'
 import { getBookingById, transitionBooking } from '@/lib/db/bookings'
 import { addBookingNote } from '@/lib/db/notes'
+import { recordCashPayment, recordTransferPayment } from '@/lib/db/payments'
+import { centsFromInput } from '@/lib/domain/money'
+import type { PaymentMethod } from '@/lib/domain/payment'
 import { isNoteAudience, MAX_NOTE_LENGTH } from '@/lib/domain/note'
 
 /**
@@ -178,4 +181,158 @@ export async function addBookingNoteAction(
   revalidatePath(`/portal/bookings/${booking.reference}`)
 
   return { status: 'done' }
+}
+
+/**
+ * Settling what a booking still owes, from the booking itself (capability B13).
+ *
+ * The case this exists for is an amendment: a guest who paid for one night and
+ * extends to two leaves the booking worth more than has been paid for it. Both
+ * methods the property takes are here, because the one that was missing is the
+ * whole point — cash had a screen already, and a second bank transfer could
+ * not be represented at all, which pushed staff into logging transfers as cash
+ * and putting money into Finance's cash-up that was never in the drawer.
+ *
+ * The two behave differently, and the difference is the existing model rather
+ * than a choice made here. **Cash** is counted at the desk, so it is recorded
+ * as verified and the balance moves immediately. **A transfer** has been
+ * promised, not seen, so it is raised as pending, lands in the verification
+ * queue, and moves the balance only once somebody has checked the bank.
+ *
+ * ── The permission, and its name ──────────────────────────────────────────
+ *
+ * Gated on `payment.record_cash`, which is now narrower as a name than the job
+ * it does: it means "may record a payment taken against a booking", and cash
+ * was simply the only method that path supported when it was named. Extending
+ * it is deliberate rather than minting `payment.record_transfer` — whoever is
+ * trusted to say money arrived is the same person either way, and inventing a
+ * permission string the client has never been asked about would be this file
+ * settling a question that belongs to them. Flagged on N11 in the
+ * open-questions register, which already asks how the payment permissions
+ * should be split.
+ */
+
+const recordPaymentSchema = z.object({
+  bookingId: z.string().uuid(),
+  method: z.enum(['cash', 'bank_transfer']),
+  /**
+   * Cash only, and required there. A transfer deliberately carries no amount:
+   * `payment.amount_cents` stays null until somebody has looked at the bank,
+   * so the figure is entered at verification against the statement rather than
+   * promised here and contradicted later.
+   */
+  amount: z.string().trim().default(''),
+  amountOverrideReason: z.string().trim().max(280).default(''),
+})
+
+export interface RecordPaymentState {
+  status: 'idle' | 'error' | 'done'
+  message?: string
+  fieldErrors?: Record<string, string>
+  recorded?: {
+    method: PaymentMethod
+    /** Null for a transfer, which has been promised rather than counted. */
+    amount: number | null
+  }
+  /** Echoed back so a refusal does not empty the form. */
+  submitted?: { amount: string; amountOverrideReason: string }
+}
+
+export async function recordPaymentAction(
+  _previous: RecordPaymentState,
+  formData: FormData,
+): Promise<RecordPaymentState> {
+  const actor = await requirePermission('payment.record_cash')
+  const parsed = recordPaymentSchema.safeParse(Object.fromEntries(formData))
+
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {}
+
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0]
+
+      if (typeof field === 'string' && !fieldErrors[field]) {
+        fieldErrors[field] = issue.message
+      }
+    }
+
+    return { status: 'error', message: 'Check the highlighted fields.', fieldErrors }
+  }
+
+  const input = parsed.data
+  const echo = {
+    amount: input.amount,
+    amountOverrideReason: input.amountOverrideReason,
+  }
+
+  const booking = await getBookingById(input.bookingId)
+
+  if (!booking) {
+    return { status: 'error', message: 'That booking no longer exists.' }
+  }
+
+  if (input.method === 'bank_transfer') {
+    const raised = await recordTransferPayment({
+      bookingId: input.bookingId,
+      actorId: actor.userId,
+    })
+
+    if (!raised.ok) {
+      return { status: 'error', message: raised.error.message, submitted: echo }
+    }
+
+    revalidateBooking(booking.reference)
+
+    return { status: 'done', recorded: { method: 'bank_transfer', amount: null } }
+  }
+
+  const amount = centsFromInput(input.amount)
+
+  if (amount === null || amount <= 0) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: { amount: 'Enter an amount like 200.00.' },
+      submitted: echo,
+    }
+  }
+
+  const recorded = await recordCashPayment({
+    bookingId: input.bookingId,
+    amount,
+    amountOverrideReason: input.amountOverrideReason || null,
+    actorId: actor.userId,
+  })
+
+  if (!recorded.ok) {
+    if (recorded.error.code === 'reason_required') {
+      return {
+        status: 'error',
+        message: recorded.error.message,
+        fieldErrors: { amountOverrideReason: 'This is not what is outstanding. Say why.' },
+        submitted: echo,
+      }
+    }
+
+    return { status: 'error', message: recorded.error.message, submitted: echo }
+  }
+
+  revalidateBooking(booking.reference)
+
+  return { status: 'done', recorded: { method: 'cash', amount } }
+}
+
+/**
+ * Every screen a payment changes.
+ *
+ * The queue and the dashboard counter both move when a transfer is raised, and
+ * the register's own list carries nothing about money — but the booking's
+ * detail screen and the cash log do, so all four are rebuilt rather than
+ * guessing which one the clerk will look at next.
+ */
+function revalidateBooking(reference: string): void {
+  revalidatePath(`/portal/bookings/${reference}`)
+  revalidatePath('/portal/payments')
+  revalidatePath('/portal/payments/cash')
+  revalidatePath('/portal')
 }

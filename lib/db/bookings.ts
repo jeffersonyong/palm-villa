@@ -86,6 +86,17 @@ export interface Booking {
    * what an amendment has to re-derive from (see lib/domain/discount.ts).
    */
   discount: Discount | null
+  /**
+   * The sum of the payments actually VERIFIED against this booking — a
+   * promised transfer counts for nothing (capability B13).
+   *
+   * Derived by `booking_summary` from the payment rows, never stored: a
+   * stored figure is a second copy of one the payments already hold, and the
+   * two disagree the first time something writes a payment without
+   * maintaining it. What is *owed* is `balanceOf(total, paid)` in
+   * lib/domain/balance.ts, which owns the subtraction.
+   */
+  paid: Cents
   createdAt: string
   /**
    * Optimistic-concurrency token for `amendBooking`, maintained by the
@@ -127,13 +138,14 @@ interface BookingSummaryRow {
   discount_kind: DiscountKind | null
   discount_value: number | null
   discount_reason: string | null
+  paid_cents: number
 }
 
 const SUMMARY_COLUMNS =
   'id, reference, status, stream, guest_name, guest_phone, vehicles, no_vehicle, ' +
   'chargeable_guests, exempt_guests, total_cents, security_deposit_cents, ' +
   'created_at, updated_at, unit_id, unit_ref, unit_type_slug, check_in, check_out, lines, ' +
-  'discount_kind, discount_value, discount_reason'
+  'discount_kind, discount_value, discount_reason, paid_cents'
 
 /**
  * The five occupancy columns are read as one fact.
@@ -190,6 +202,7 @@ function toBooking(row: BookingSummaryRow): Booking {
     total: row.total_cents,
     securityDeposit: row.security_deposit_cents,
     discount: toDiscount(row),
+    paid: row.paid_cents,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
