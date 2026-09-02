@@ -10,11 +10,12 @@ import { UnitStatusBadge } from '@/components/portal/unit-status-badge'
 import { Button } from '@/components/ui/button'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listAuditEvents } from '@/lib/db/audit'
+import { listAuditEventWindow } from '@/lib/db/audit'
 import { listStaff } from '@/lib/db/staff'
 import { getUnitStateByRef } from '@/lib/db/units'
 import { formatStayDate } from '@/lib/domain/dates'
 
+import { HISTORY_PAGE_SIZE, historyWindow } from './history-window'
 import { UnitActions } from './unit-actions'
 import { UnitHistory } from './unit-history'
 import { UnitNotes } from './unit-notes'
@@ -49,10 +50,11 @@ export const metadata: Metadata = {
 
 interface PageProps {
   params: Promise<{ ref: string }>
+  searchParams: Promise<{ history?: string }>
 }
 
-export default async function UnitPage({ params }: PageProps) {
-  const { ref: encoded } = await params
+export default async function UnitPage({ params, searchParams }: PageProps) {
+  const [{ ref: encoded }, search] = await Promise.all([params, searchParams])
   const ref = decodeURIComponent(encoded)
   const actor = await getActor()
 
@@ -77,7 +79,14 @@ export default async function UnitPage({ params }: PageProps) {
     notFound()
   }
 
-  const [events, staff] = await Promise.all([listAuditEvents('unit', unit.id), listStaff()])
+  // How much of the trail this request asks for. A unit's history grows for
+  // the life of the building, so the read is windowed rather than whole — the
+  // reasoning is in `history-window.ts`.
+  const shown = historyWindow(search.history)
+  const [history, staff] = await Promise.all([
+    listAuditEventWindow('unit', unit.id, shown),
+    listStaff(),
+  ])
   const actorNames = new Map(staff.map((account) => [account.id, account.displayName]))
 
   const lease =
@@ -153,7 +162,10 @@ export default async function UnitPage({ params }: PageProps) {
 
               {unit.outOfService ? (
                 <>
-                  <Fact label="Out of service since" value={formatStayDate(unit.outOfService.since)} />
+                  <Fact
+                    label="Out of service since"
+                    value={formatStayDate(unit.outOfService.since)}
+                  />
                   <Fact label="Reason" value={unit.outOfService.reason} />
                 </>
               ) : null}
@@ -167,10 +179,7 @@ export default async function UnitPage({ params }: PageProps) {
                   label={unit.occupant.bookingReference ? 'Guest' : 'Tenant'}
                   value={unit.occupant.name}
                 />
-                <Fact
-                  label="Until"
-                  value={formatStayDate(unit.occupant.end)}
-                />
+                <Fact label="Until" value={formatStayDate(unit.occupant.end)} />
                 {unit.occupant.bookingReference ? (
                   <Fact
                     label="Booking"
@@ -199,7 +208,13 @@ export default async function UnitPage({ params }: PageProps) {
         </div>
 
         <SectionCard id="unit-history" title="History">
-          <UnitHistory events={events} actorNames={actorNames} />
+          <UnitHistory
+            events={history.events}
+            total={history.total}
+            actorNames={actorNames}
+            ref_={unit.ref}
+            nextWindow={shown + HISTORY_PAGE_SIZE}
+          />
         </SectionCard>
       </div>
     </>

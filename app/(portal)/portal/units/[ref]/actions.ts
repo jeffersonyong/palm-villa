@@ -74,7 +74,17 @@ function fieldErrorsOf(error: z.ZodError): Record<string, string> {
   return fieldErrors
 }
 
-const stayDate = z.string().refine(isStayDate, 'Use a real date.')
+/**
+ * A date the form has to carry.
+ *
+ * Empty and malformed are two different mistakes and used to share one
+ * message: leaving the lease's end date unpicked answered "Use a real date",
+ * which reads as *the date you gave is wrong* against a field nobody had
+ * touched. The empty case gets a message that says what to do instead.
+ */
+function requiredDate(missing: string) {
+  return z.string().min(1, missing).refine(isStayDate, 'Use a real date.')
+}
 
 /**
  * A reason is required, and it is the useful half of the record.
@@ -171,8 +181,8 @@ const leaseSchema = z
       .trim()
       .min(2, 'Who is the unit let to?')
       .max(120, 'Keep the name under 120 characters.'),
-    start: stayDate,
-    end: stayDate,
+    start: requiredDate('Pick the day the lease starts.'),
+    end: requiredDate('Pick the day the lease ends.'),
   })
   .refine((value) => value.end > value.start, {
     path: ['end'],
@@ -216,7 +226,7 @@ export async function markLeasedAction(
 const endLeaseSchema = z.object({
   occupancyId: z.string().uuid(),
   ref: z.string().min(1),
-  end: stayDate,
+  end: requiredDate('Pick the day the lease ends.'),
 })
 
 export async function endLeaseAction(

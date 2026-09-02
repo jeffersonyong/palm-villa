@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Notice } from '@/components/ui/notice'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/toast-store'
-import { formatStayDate, todayInBrunei, type StayDate } from '@/lib/domain/dates'
+import { addDays, formatStayDate, todayInBrunei, type StayDate } from '@/lib/domain/dates'
 
 import {
   endLeaseAction,
@@ -174,6 +174,12 @@ function OutOfServiceDialog({
 }) {
   const [state, formAction, isPending] = useActionState(markOutOfServiceAction, initialState)
   const router = useRouter()
+  // Held here rather than left to the DOM, because React resets an uncontrolled
+  // form as soon as its action returns — so a rejected submit used to hand back
+  // an error *and* an empty box, asking the person to retype what they had
+  // already written correctly. State survives the round trip; a DOM value does
+  // not.
+  const [reason, setReason] = useState('')
 
   useEffect(() => {
     if (state.status === 'done') {
@@ -213,6 +219,8 @@ function OutOfServiceDialog({
               required
               maxLength={280}
               placeholder="Aircon compressor failed — parts ordered"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
               aria-invalid={Boolean(state.fieldErrors?.reason)}
             />
             {state.fieldErrors?.reason ? (
@@ -255,6 +263,13 @@ function LeaseDialog({
   const [state, formAction, isPending] = useActionState(markLeasedAction, initialState)
   const router = useRouter()
   const [today] = useState(() => todayInBrunei())
+  // Every field is controlled, for the reason `OutOfServiceDialog` gives: React
+  // resets an uncontrolled form once its action returns, so the old version
+  // answered "you didn't pick an end date" by also throwing away the tenant's
+  // name.
+  const [occupantName, setOccupantName] = useState('')
+  const [start, setStart] = useState<StayDate>(today)
+  const [end, setEnd] = useState<StayDate | null>(null)
 
   useEffect(() => {
     if (state.status === 'done') {
@@ -291,6 +306,8 @@ function LeaseDialog({
               required
               maxLength={120}
               placeholder="Tan Family"
+              value={occupantName}
+              onChange={(event) => setOccupantName(event.target.value)}
               aria-invalid={Boolean(state.fieldErrors?.occupantName)}
             />
             {state.fieldErrors?.occupantName ? (
@@ -304,7 +321,8 @@ function LeaseDialog({
               <DateField
                 id="start"
                 name="start"
-                defaultValue={today}
+                value={start}
+                onChange={(day) => setStart(day ?? today)}
                 invalid={Boolean(state.fieldErrors?.start)}
               />
               {state.fieldErrors?.start ? <FieldError message={state.fieldErrors.start} /> : null}
@@ -312,18 +330,40 @@ function LeaseDialog({
 
             <div className="grid gap-sm">
               <Label htmlFor="end">Ends</Label>
+              {/* Bounded by the start rather than by today: a lease covers at
+                  least one night, so the day before the end date is not a
+                  choice the calendar should offer and then have the server
+                  refuse. */}
               <DateField
                 id="end"
                 name="end"
-                min={today}
+                value={end}
+                onChange={setEnd}
+                min={addDays(start, 1)}
                 invalid={Boolean(state.fieldErrors?.end)}
-                describedBy={state.fieldErrors?.end ? 'end-error' : undefined}
+                // Both, in reading order, when there is a rejection: what is
+                // wrong, then what to put there. The trigger is a button, so
+                // this is the only way either reaches a screen reader.
+                describedBy={state.fieldErrors?.end ? 'end-error end-hint' : 'end-hint'}
               />
               {state.fieldErrors?.end ? (
                 <FieldError id="end-error" message={state.fieldErrors.end} />
               ) : null}
             </div>
           </div>
+
+          {/* Full width, under both dates rather than squeezed into the right
+              column — a hint that wraps to four lines in a half-width column
+              reads as a warning, which is how the field came to look like it
+              was refusing an open-ended tenancy. It is not: prd.md §16 keeps an
+              end date on every lease because forward availability cannot be
+              answered without one. What the date means when nobody has agreed a
+              last day is "review it then", and saying so is cheaper than the
+              phone call that follows a form demanding a fact nobody has. */}
+          <p id="end-hint" className="-mt-sm text-caption text-muted-foreground">
+            Month to month, with no agreed last day? Put a date you would review it on — you can
+            move it whenever, from <b className="font-medium">End the lease</b>.
+          </p>
 
           {/* scope X5: full tenancy management — agreements, rent collection,
               renewals — is a defined phase-three extension. Saying so here is
