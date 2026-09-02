@@ -70,8 +70,13 @@ interface UnitActionsProps {
   unitId: string
   ref_: string
   isOutOfService: boolean
-  /** The lease covering today, if this unit is let. */
-  lease: { occupancyId: string; occupantName: string; start: StayDate; end: StayDate } | null
+  /** The lease covering today, if this unit is let. `end` is null when it is open-ended. */
+  lease: {
+    occupancyId: string
+    occupantName: string
+    start: StayDate
+    end: StayDate | null
+  } | null
   /** Whether this unit can take a lease at all — free today, and in service. */
   mayLease: boolean
   /** `unit.manage` — out of service and back. */
@@ -315,7 +320,12 @@ function LeaseDialog({
             ) : null}
           </div>
 
-          <div className="grid grid-cols-2 gap-md">
+          {/* `items-start`, or the two columns stretch to each other's height:
+              the taller one — an error message under the end date — makes the
+              shorter one distribute the slack between its own rows, and
+              "Starts" visibly drops below "Ends" the moment a submit is
+              rejected. */}
+          <div className="grid grid-cols-2 items-start gap-md">
             <div className="grid gap-sm">
               <Label htmlFor="start">Starts</Label>
               <DateField
@@ -329,17 +339,22 @@ function LeaseDialog({
             </div>
 
             <div className="grid gap-sm">
-              <Label htmlFor="end">Ends</Label>
+              <Label htmlFor="end">
+                Ends <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
               {/* Bounded by the start rather than by today: a lease covers at
                   least one night, so the day before the end date is not a
                   choice the calendar should offer and then have the server
-                  refuse. */}
+                  refuse. `clearable`, because a date picked by mistake has to
+                  be removable now that the field is not required (N19). */}
               <DateField
                 id="end"
                 name="end"
                 value={end}
                 onChange={setEnd}
                 min={addDays(start, 1)}
+                clearable
+                placeholder="No end date"
                 invalid={Boolean(state.fieldErrors?.end)}
                 // Both, in reading order, when there is a rejection: what is
                 // wrong, then what to put there. The trigger is a button, so
@@ -354,15 +369,14 @@ function LeaseDialog({
 
           {/* Full width, under both dates rather than squeezed into the right
               column — a hint that wraps to four lines in a half-width column
-              reads as a warning, which is how the field came to look like it
-              was refusing an open-ended tenancy. It is not: prd.md §16 keeps an
-              end date on every lease because forward availability cannot be
-              answered without one. What the date means when nobody has agreed a
-              last day is "review it then", and saying so is cheaper than the
-              phone call that follows a form demanding a fact nobody has. */}
+              reads as a warning rather than as help. What it has to say is that
+              leaving the field empty is a real answer and not an omission
+              (N19): a month-to-month tenancy has no agreed last day, and the
+              form used to make staff invent one so the software would accept
+              the truth. */}
           <p id="end-hint" className="-mt-sm text-caption text-muted-foreground">
-            Month to month, with no agreed last day? Put a date you would review it on — you can
-            move it whenever, from <b className="font-medium">End the lease</b>.
+            Leave the end date empty for a month-to-month tenancy. The unit stays occupied until
+            somebody ends the lease.
           </p>
 
           {/* scope X5: full tenancy management — agreements, rent collection,
@@ -397,7 +411,7 @@ function EndLeaseDialog({
   onClose,
 }: {
   ref_: string
-  lease: { occupancyId: string; occupantName: string; start: StayDate; end: StayDate }
+  lease: { occupancyId: string; occupantName: string; start: StayDate; end: StayDate | null }
   onClose: () => void
 }) {
   const [state, formAction, isPending] = useActionState(endLeaseAction, initialState)
@@ -410,6 +424,13 @@ function EndLeaseDialog({
   // ending at all, it is a lease recorded in error.
   const willUnwind = end !== null && end <= lease.start
 
+  // This dialog now does two jobs, because they are one statement in the
+  // database: moving the last day of a lease that has one, and giving a last
+  // day to a month-to-month tenancy that never had one (N19). Only the wording
+  // differs, and it has to — "Change the end date" against a lease with no end
+  // date describes something that is not happening.
+  const isOpenEnded = lease.end === null
+
   useEffect(() => {
     if (state.status === 'done') {
       toast({
@@ -417,7 +438,7 @@ function EndLeaseDialog({
         title:
           state.outcome === 'cancelled'
             ? `The lease on ${ref_} was removed`
-            : `The lease on ${ref_} now ends ${formatStayDate(end ?? lease.end)}`,
+            : `The lease on ${ref_} now ends ${end === null ? 'as recorded' : formatStayDate(end)}`,
         description: lease.occupantName,
       })
       onClose()
@@ -431,8 +452,9 @@ function EndLeaseDialog({
         <DialogHeader>
           <DialogTitle>End the lease on {ref_}?</DialogTitle>
           <DialogDescription>
-            Let to {lease.occupantName} until {formatStayDate(lease.end)}. The unit becomes
-            available again from the day the lease ends.
+            {isOpenEnded
+              ? `Let to ${lease.occupantName} since ${formatStayDate(lease.start)}, with no end date. Give it one and the unit becomes available again from that day.`
+              : `Let to ${lease.occupantName} until ${formatStayDate(lease.end!)}. The unit becomes available again from the day the lease ends.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -442,20 +464,28 @@ function EndLeaseDialog({
 
           <div className="grid gap-sm">
             <Label htmlFor="lease-end">Ends on</Label>
+            {/* Required here, unlike the field that creates a lease: this
+                dialog exists to set a last day. Clearing one — turning a fixed
+                term back into a month-to-month tenancy — is a different action
+                and does not belong behind a button called "End the lease". */}
             <DateField
               id="lease-end"
               name="end"
               value={end}
               onChange={setEnd}
+              min={addDays(lease.start, 1)}
               invalid={Boolean(state.fieldErrors?.end)}
+              describedBy={state.fieldErrors?.end ? 'lease-end-error' : 'lease-end-hint'}
             />
             {state.fieldErrors?.end ? (
-              <FieldError message={state.fieldErrors.end} />
+              <FieldError id="lease-end-error" message={state.fieldErrors.end} />
             ) : (
-              <p className="text-caption text-muted-foreground">
+              <p id="lease-end-hint" className="text-caption text-muted-foreground">
                 {willUnwind
                   ? `That is on or before the lease started (${formatStayDate(lease.start)}), so the lease will be removed altogether and the unit freed immediately.`
-                  : `The unit is free again from ${formatStayDate(end ?? lease.end)}.`}
+                  : end === null
+                    ? 'Pick the day the tenant leaves. The unit is bookable again from that day.'
+                    : `The unit is free again from ${formatStayDate(end)}.`}
               </p>
             )}
           </div>
@@ -473,7 +503,13 @@ function EndLeaseDialog({
               variant={willUnwind ? 'destructive' : 'primary'}
               disabled={isPending}
             >
-              {isPending ? 'Saving…' : willUnwind ? 'Remove the lease' : 'Change the end date'}
+              {isPending
+                ? 'Saving…'
+                : willUnwind
+                  ? 'Remove the lease'
+                  : isOpenEnded
+                    ? 'Set the end date'
+                    : 'Change the end date'}
             </Button>
           </DialogFooter>
         </form>

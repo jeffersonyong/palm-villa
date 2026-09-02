@@ -335,11 +335,16 @@ function UnitRow({ unit }: { unit: UnitState }) {
             Since {formatStayDate(unit.outOfService.since)}
           </span>
         ) : unit.occupant ? (
-          formatStayDate(unit.occupant.end)
+          // An open-ended lease has no date to put here, and an em dash would
+          // read as "we don't know". It is a fact about the tenancy, not a
+          // missing value, so it is said in words (N19).
+          unit.occupant.end !== null ? (
+            formatStayDate(unit.occupant.end)
+          ) : (
+            <span className="text-muted-foreground">No end date</span>
+          )
         ) : unit.nextStart ? (
-          <span className="text-muted-foreground">
-            Next stay {formatStayDate(unit.nextStart)}
-          </span>
+          <span className="text-muted-foreground">Next stay {formatStayDate(unit.nextStart)}</span>
         ) : (
           <Absent title="Nothing booked" />
         )}

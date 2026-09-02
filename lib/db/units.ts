@@ -1,8 +1,4 @@
-import {
-  deriveUnitStatus,
-  type OccupancyStatus,
-  type UnitStatus,
-} from '@/lib/domain/unit-status'
+import { deriveUnitStatus, type OccupancyStatus, type UnitStatus } from '@/lib/domain/unit-status'
 import type { RegistryPlan } from '@/lib/domain/unit-ref'
 import type { StayDate } from '@/lib/domain/dates'
 import { dataClient } from '@/lib/supabase/data'
@@ -30,7 +26,16 @@ export interface UnitOccupant {
   /** The guest's name, or the tenant's for a lease. */
   name: string
   start: StayDate
-  end: StayDate
+  /**
+   * The day the unit frees up — **null on an open-ended lease** (N19).
+   *
+   * A booking always has one; a month-to-month tenancy often does not, and
+   * making staff invent a date so the software would accept the truth was
+   * worse than carrying the null. In the database this is an unbounded
+   * `daterange`, so the exclusion constraint blocks every future booking over
+   * it by construction rather than by a rule anyone had to write.
+   */
+  end: StayDate | null
   /** Null for a lease — a lease is not a booking and has no reference. */
   bookingReference: string | null
 }
@@ -106,10 +111,7 @@ export async function listUnitStates(asOf?: StayDate): Promise<readonly UnitStat
 }
 
 /** One unit by its human reference, or null. */
-export async function getUnitStateByRef(
-  ref: string,
-  asOf?: StayDate,
-): Promise<UnitState | null> {
+export async function getUnitStateByRef(ref: string, asOf?: StayDate): Promise<UnitState | null> {
   const units = await listUnitStates(asOf)
 
   return units.find((unit) => unit.ref === ref) ?? null
@@ -124,11 +126,10 @@ function toUnitState(row: UnitStateRow): UnitState {
   // The occupancy's five fields travel together or not at all. The
   // `occupancy_id` check is what narrows the rest; a row with an id always
   // carries the others, because the lateral selects them from one row.
+  // `end_date` is deliberately absent from the narrowing: an open-ended lease
+  // has none, and requiring it here would drop the tenant off the board.
   const occupant: UnitOccupant | null =
-    row.occupancy_id !== null &&
-    row.occupancy_status !== null &&
-    row.start_date !== null &&
-    row.end_date !== null
+    row.occupancy_id !== null && row.occupancy_status !== null && row.start_date !== null
       ? {
           occupancyId: row.occupancy_id,
           status: row.occupancy_status as OccupancyStatus,
@@ -206,9 +207,7 @@ export interface UnitWriteError {
   message: string
 }
 
-export type UnitWriteResult<T = object> =
-  | ({ ok: true } & T)
-  | { ok: false; error: UnitWriteError }
+export type UnitWriteResult<T = object> = ({ ok: true } & T) | { ok: false; error: UnitWriteError }
 
 interface RpcRefusal {
   ok: false
@@ -304,7 +303,8 @@ export async function markUnitLeased(input: {
   unitId: string
   occupantName: string
   start: StayDate
-  end: StayDate
+  /** Null for a lease with no agreed last day; it runs until somebody ends it. */
+  end: StayDate | null
   actorId: string | null
 }): Promise<UnitWriteResult<{ occupancyId: string }>> {
   const propertyId = await currentPropertyId()

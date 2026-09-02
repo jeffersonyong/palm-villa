@@ -392,6 +392,111 @@ describe('a long lease (B9)', () => {
     expect((await findAvailableUnits({ range: RANGE })).map((u) => u.ref)).toContain('3B-01')
   })
 
+  // ── A lease with no end date (N19) ────────────────────────────────────────
+  //
+  // The whole reason this is four lines of schema rather than a new concept is
+  // that prd.md §6.1 modelled occupancy as a range: `daterange(start, null)` is
+  // unbounded above, so an open-ended lease overlaps every future range and G1
+  // holds without a line of new logic. These tests exist to prove that claim
+  // rather than to assert that the column is nullable.
+
+  test('an open-ended lease blocks a booking a decade out', async () => {
+    await givenLease({ unitRef: '3B-01', start: '2026-10-01', end: null })
+
+    const available = await findAvailableUnits({
+      range: { start: '2036-01-05', end: '2036-01-08' },
+    })
+
+    expect(available.map((unit) => unit.ref)).not.toContain('3B-01')
+  })
+
+  test('and still frees the unit for the days before it starts', async () => {
+    await givenLease({ unitRef: '3B-01', start: '2026-11-01', end: null })
+
+    const before = await findAvailableUnits({ range: { start: '2026-10-05', end: '2026-10-08' } })
+
+    expect(before.map((unit) => unit.ref)).toContain('3B-01')
+  })
+
+  test('a booking over it is refused by the constraint, not by the query', async () => {
+    // The screen never offers the unit, but G1 promises the *database* refuses
+    // it — so the write is attempted directly rather than through availability.
+    await givenLease({ unitRef: '3B-01', start: '2026-10-01', end: null })
+
+    const { createWalkInBooking } = await import('./bookings')
+    const { bookingInput } = await import('./test/factory')
+
+    const result = await createWalkInBooking(
+      await bookingInput({ unitRef: '3B-01', checkIn: RANGE.start, checkOut: RANGE.end }),
+    )
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.code).toBe('unit_unavailable')
+  })
+
+  test('the board shows the tenant, with no end date rather than no occupant', async () => {
+    // `o.end_date > as_of.day` is null for an open-ended lease, so before the
+    // fix the lateral found nothing and the board called a tenanted unit
+    // available — a screen lying about a unit the database would refuse to sell.
+    await givenLease({
+      unitRef: '3B-01',
+      occupantName: 'Tan Family',
+      start: '2020-01-01',
+      end: null,
+    })
+
+    const unit = await getUnitStateByRef('3B-01')
+
+    expect(unit?.status).toBe('leased_long_term')
+    expect(unit?.occupant?.name).toBe('Tan Family')
+    expect(unit?.occupant?.end).toBeNull()
+  })
+
+  test('a tenanted unit cannot be taken out of service under its tenant', async () => {
+    // The blocking count used the same `>` comparison, so an open-ended lease
+    // counted as nothing still to come.
+    await givenLease({ unitRef: '3B-01', start: '2020-01-01', end: null })
+    const unitId = await unitIdByRef('3B-01')
+
+    const result = await markUnitOutOfService({ unitId, reason: 'Rewiring', actorId: null })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.code).toBe('unit_has_bookings')
+  })
+
+  test('it can be given an end date later, through the same ending', async () => {
+    const { occupancyId } = await givenLease({
+      unitRef: '3B-01',
+      start: '2026-10-01',
+      end: null,
+    })
+
+    const result = await endUnitLease({ occupancyId, end: '2026-12-01', actorId: null })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.outcome).toBe('ended')
+    expect((await getUnitStateByRef('3B-01', '2026-11-01'))?.occupant?.end).toBe('2026-12-01')
+  })
+
+  test('a booking may never be open-ended, whatever the lease may be', async () => {
+    // The occupancy table now allows a null end date, and a stay with no
+    // checkout has no price and no unit to hand back. The check constraint is
+    // what stops the relaxation leaking from leases into bookings.
+    const booking = await givenBooking({
+      unitRef: '3B-05',
+      checkIn: RANGE.start,
+      checkOut: RANGE.end,
+    })
+
+    const { error } = await dataClient()
+      .from('occupancy')
+      .update({ end_date: null })
+      .eq('booking_id', booking.id)
+
+    expect(error?.message).toContain('occupancy_only_a_lease_is_open_ended')
+  })
+
   test('records the lease and its ending against the unit', async () => {
     const { occupancyId, unitId } = await givenLease({
       unitRef: '3B-01',

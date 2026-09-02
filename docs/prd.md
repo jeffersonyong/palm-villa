@@ -211,7 +211,9 @@ any → out_of_service → available
 
 **[C] A unit carries its own note** (capability B14, answering the second half of open-questions.md N18). A standing fact about the unit — a sticking door, where the spare key lives — belongs to the unit rather than to whoever is staying in it, so it survives every booking. One editable block rather than an append-only thread, because the fact stops being true when somebody fixes it; every edit is an audit event carrying the text before and after, so the trail is the thread. Written under `unit.manage`, which is what makes it a thing Housekeeping can record.
 
-**[A] A lease records a name and two dates, and nothing else.** §6.2 sketches a `Tenancy` with a tenant record and a monthly rent, and §16 makes that Phase 3. B9 asks only that availability reflects reality and that staff can see who is in the unit, so the occupant is free text on the occupancy row until the tenancy module gives it a real relationship. No rent, agreement or renewal is recorded, and the screen says so.
+**[A] A lease records a name, a start date, and nothing else that is required.** §6.2 sketches a `Tenancy` with a tenant record and a monthly rent, and §16 makes that Phase 3. B9 asks only that availability reflects reality and that staff can see who is in the unit, so the occupant is free text on the occupancy row until the tenancy module gives it a real relationship. No rent, agreement or renewal is recorded, and the screen says so.
+
+**[C] A lease's end date is optional** (open-questions.md N19, answered 3 September 2026). A month-to-month tenancy has no agreed last day, and requiring one made staff invent a date so the system would accept the truth — a made-up date in a field that drives availability is worse than no date at all, because nothing on screen distinguishes it from a real one. A lease with no end date runs until somebody ends it, and "End the lease" is the same action whether it is moving a last day or setting the first one. This costs availability nothing: an occupancy is a range, and an open-ended one is unbounded above, so the exclusion constraint blocks every future booking over the unit by construction (architecture.md §5.2). **A booking's end date stays required** — a stay is sold and priced by nights, and one with no checkout is not a thing the product can express.
 
 ---
 
@@ -569,7 +571,7 @@ Unit occupancy by tenant, tenancy records with start and end dates, rent periods
 
 **On rent tracking:** rent status must be modelled as **one row per rent period** (due date, amount, status, date paid, method, reference), not a boolean on the tenancy. The boolean version looks identical in the UI for the first month and becomes unusable thereafter, by which point real data is in the wrong shape.
 
-**On lease end dates:** in scope even in the thin version, because forward availability cannot be answered without them. Renewal alerts then fall out as a date filter with no additional machinery.
+**On lease end dates:** in scope even in the thin version, because forward availability cannot be answered without them. Renewal alerts then fall out as a date filter with no additional machinery. **They are optional rather than required** — see §6.4 **[C]**: an open-ended tenancy is an unbounded range, which availability answers perfectly well ("occupied, indefinitely"), and the alternative was staff typing dates nobody had agreed. Renewal alerts filter the leases that *have* an end date; a month-to-month tenancy is not a renewal question.
 
 ### Deferred beyond v1
 Card gateway, automated statement matching, WhatsApp Business API, full tenancy management, events and parties as a product, multi-property administration UI, channel management.

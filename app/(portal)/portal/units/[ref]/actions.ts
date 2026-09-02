@@ -87,6 +87,18 @@ function requiredDate(missing: string) {
 }
 
 /**
+ * A date the form may leave blank.
+ *
+ * An unfilled `DateField` submits an empty string through its hidden input, so
+ * "not given" arrives as `''` rather than as an absent key. Normalised to null
+ * here, at the boundary, so nothing downstream has to know that.
+ */
+const optionalDate = z
+  .string()
+  .refine((value) => value === '' || isStayDate(value), 'Use a real date.')
+  .transform((value): string | null => (value === '' ? null : value))
+
+/**
  * A reason is required, and it is the useful half of the record.
  *
  * "Out of service" on its own tells the next person nothing — they still have
@@ -164,13 +176,19 @@ export async function returnToServiceAction(
 }
 
 /**
- * A lease is a name and two dates, and nothing else.
+ * A lease is a name, a start, and an end date only if there is one.
  *
  * prd.md §6.2 sketches a `Tenancy` with a tenant record and a monthly rent, and
  * scope X5 makes that phase three. B9 asks only that availability reflects
  * reality and that the board can say who is in the unit — so the name is free
  * text **[A]**, and the day the tenancy module lands it becomes a real
  * relationship rather than a second system.
+ *
+ * The end date is optional (open-questions.md N19). A month-to-month tenancy
+ * has no agreed last day, and requiring one made staff invent a date so the
+ * software would accept the truth. An open-ended lease is an unbounded
+ * `daterange` in the database, so it still blocks every booking over the unit
+ * by construction — nothing about G1 is relaxed by allowing it.
  */
 const leaseSchema = z
   .object({
@@ -182,9 +200,9 @@ const leaseSchema = z
       .min(2, 'Who is the unit let to?')
       .max(120, 'Keep the name under 120 characters.'),
     start: requiredDate('Pick the day the lease starts.'),
-    end: requiredDate('Pick the day the lease ends.'),
+    end: optionalDate,
   })
-  .refine((value) => value.end > value.start, {
+  .refine((value) => value.end === null || value.end > value.start, {
     path: ['end'],
     message: 'A lease has to end after it starts.',
   })

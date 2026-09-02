@@ -349,7 +349,8 @@ export async function givenLease(spec: {
   unitId?: string
   occupantName?: string
   start: StayDate
-  end: StayDate
+  /** Omit, or pass null, for an open-ended lease (N19). */
+  end?: StayDate | null
 }): Promise<{ occupancyId: string; unitId: string }> {
   const unitId = spec.unitId ?? (await unitIdByRef(spec.unitRef ?? '3B-01'))
 
@@ -357,7 +358,7 @@ export async function givenLease(spec: {
     unitId,
     occupantName: spec.occupantName ?? 'Test Tenant',
     start: spec.start,
-    end: spec.end,
+    end: spec.end ?? null,
     actorId: null,
   })
 

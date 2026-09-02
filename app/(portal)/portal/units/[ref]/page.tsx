@@ -179,7 +179,16 @@ export default async function UnitPage({ params, searchParams }: PageProps) {
                   label={unit.occupant.bookingReference ? 'Guest' : 'Tenant'}
                   value={unit.occupant.name}
                 />
-                <Fact label="Until" value={formatStayDate(unit.occupant.end)} />
+                <Fact
+                  label="Until"
+                  value={
+                    unit.occupant.end !== null ? (
+                      formatStayDate(unit.occupant.end)
+                    ) : (
+                      <span className="text-muted-foreground">No end date — until it is ended</span>
+                    )
+                  }
+                />
                 {unit.occupant.bookingReference ? (
                   <Fact
                     label="Booking"
