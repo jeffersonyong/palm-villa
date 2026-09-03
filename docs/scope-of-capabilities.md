@@ -99,9 +99,9 @@ A forwarded or leaked QR code grants nothing by itself — check-in authority co
 | E4 | Run a daily cash-up view: cash recorded in the system versus cash banked |
 | E5 | View reports: occupancy by unit and type, revenue by stream, outstanding deposits, outstanding charges, and day-pass volume against capacity |
 
-**E1–E3 delivered 6 September 2026, with one gap stated rather than absorbed.** The ledger answers what is held right now, a deposit has its own screen carrying the inspection, its itemised charges and the release approval, and a released deposit prints a statement to send on. Two things follow that are worth naming here:
+**E1–E3 delivered 6 September 2026.** The ledger answers what is held right now, a deposit has its own screen carrying the inspection, its itemised charges and the release approval, and a released deposit prints a statement to send on.
 
-- **Inspections do not yet record photographs.** C2 promises them and prd.md §11 calls photo evidence "the cheapest thing that improves dispute outcomes" — which is true, and why they are not faked. Storing evidence means private buckets, permission-gated access and automatic deletion on a retention schedule (G2–G4), and that is the document storage slice. The inspection records outcome and notes today, and the screens say where photographs arrive. **This is a delta against C2 and is flagged rather than quietly amended.**
+- **Photographs on an inspection arrived on 7 September 2026** with document storage, closing the gap this entry flagged. C2's evidence is now real: any number of photographs per inspection, stored privately, deleted automatically after two years.
 - **Checking a guest in and out became possible along the way**, because a deposit is collected on arrival and inspected after departure, and neither moment existed in the product before. It is a desk action under the same permission as amending a booking; **Security still cannot check anyone in**, which is what D3 needs and what open question N11 has to settle.
 
 **B8 is unchanged.** Awaiting inspection and cleaning are still the two unit states this build cannot show — what has changed is that the inspection they depend on is now a fact somebody records, so C2–C3 have something to derive from.
@@ -132,6 +132,19 @@ A forwarded or leaked QR code grants nothing by itself — check-in authority co
 | G5 | The accounting record pack (transfer slip + IC + confirmation + itemised booking) is generated automatically per booking — no more manual PDF assembly |
 | G6 | Automatic daily backups, with a restore procedure tested before go-live |
 | G7 | Errors are monitored and reported automatically, so problems announce themselves |
+
+**G2, G3 and G4 delivered 7 September 2026, along with B10 — and they close the two gaps flagged above.** Documents are now real throughout: a guest's IC on the booking, a transfer slip on a payment (**B4**), and photographs on an inspection (**C2**). All three sit in private storage that nothing on the public internet can reach, are opened only through a link that expires after a minute, and are deleted automatically when their period ends — twelve months after checkout for identity documents, seven years for slips, two years for photographs. Those periods are settings, not code.
+
+Four things worth saying plainly, because they are what the guarantees actually mean in daily use:
+
+- **Seeing that a document exists and being able to open it are different permissions.** Anyone who can view a booking can see that the IC was collected and when. Only Admin and Front Office can open it. Security and Housekeeping have no access to the file at all, as promised.
+- **Every opening is recorded on the booking's own history** — who opened which document and when — so G3 is something you can read rather than something you are told about.
+- **When a document is deleted, the record that it existed stays.** The file is destroyed; the trail of who attached it and who ever opened it survives, because those are the questions asked *after* a document is gone.
+- **A file is checked for what it actually is**, not what it is named. A document renamed to look like a photograph is stored as what it really is, or refused.
+
+**Still to come in this area:** **G5**, the automatic accounting pack, which assembles the slip, the IC and the itemised booking into one PDF. The storage it needs is now built, so it adds the assembly step and nothing else. **A7** — customers uploading their own IC and slip during booking — remains phase two; today staff attach what a guest sends them, which is what they do now anyway.
+
+**One question this raised for you:** what should happen to a guest's identity document when their booking is **cancelled**? It currently follows the same twelve-month clock counted from the stay they never took. You may want it destroyed sooner. See the register.
 
 ---
 

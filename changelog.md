@@ -6,6 +6,49 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-09-07 — the folder on somebody's computer
+
+[prd.md §2](docs/prd.md) lists five problems the platform exists to solve. The fourth is *"guest data, including identity documents, accumulates indefinitely in a folder on a computer with no retention or access control."* Until now the product could hold no file at all: three screens said so out loud, and `payment.slip_document_id` had sat without a foreign key since the payments slice, waiting for a table that did not exist.
+
+Capability refs: **B10**, **G2**, **G3** and **G4** in [scope-of-capabilities.md](docs/scope-of-capabilities.md), plus the two deltas this closes — **B4**'s slip and **C2**'s photographs. The rules are normative in [prd.md §13](docs/prd.md), which now carries an "As built" block; the shape is [architecture.md §8.1](docs/architecture.md). No new dependency.
+
+### The thing this slice had to get right
+
+Not the upload. **A document is a row in Postgres and an object in Storage, and every write has a crash in the middle of it** — so the orders are chosen for the state a crash leaves, and each one is the opposite of the obvious choice in at least one case:
+
+- **Attaching uploads first, then inserts.** A row pointing at nothing is a broken link on somebody's screen; an object with no row is invisible and swept up nightly. The database then closes even that gap by reading `storage.objects` to confirm the upload landed, and taking the file's size from there rather than believing the caller.
+- **Removing tombstones first, then deletes.** From the tombstone onward nothing will sign a URL, so a failed deletion is a retry rather than a live row offering a file that is gone.
+- **Opening logs first, then signs.** A signed URL with no record of who asked for it is the one failure that breaks **G3**. Over-recording is the safe direction.
+
+### Added
+
+- **A guest's IC on the booking** (B10). It sits in the Guest & stay card, because [prd.md §13](docs/prd.md) [C] makes the copy part of registering somebody, and that is the card that says who they are.
+- **The transfer slip** (B4), closing the delta the payments slice flagged. The queue's cell reads *On file* or *None*, and the paragraph promising uploads later has gone. What has not changed is the rule that made the queue shippable without it: the bank app is the check, and a slip is evidence rather than verification.
+- **Photographs on an inspection** (C2), closing the delta the deposits slice flagged. [prd.md §11](docs/prd.md) calls photo evidence "the cheapest thing that improves dispute outcomes", and it is now real: several per inspection, attached under the inspection's own permission.
+- **Deletion on a schedule** (G4) — the **first scheduled job in the product**. Daily at 03:00 Brunei. A route rather than a database job, because expiring the row is a Postgres act and deleting the file is a Storage call, and a policy that did the first without the second would satisfy nothing. It runs three passes: expire what is due, retry what was tombstoned but never deleted, and sweep objects no row claims.
+- **Every access logged, and the log on the screen** (G3). "Identity document opened", with who and when, in the booking's own history. A log the client cannot read is a control they were told about and cannot check.
+
+### Decided rather than assumed
+
+- **Existence is separated from content.** Anyone who can view a booking sees *that* an IC is on file; only opening it needs `document.view_identity`. A guard who can see the IC was collected is being told something useful and shown nothing, and hiding the row would make "did anyone take it?" unanswerable by the people whose job it is to ask.
+- **The stored type comes from the file's own header**, never from its name or from what the browser declared. A phone photograph renamed `passport.pdf` is stored as the JPEG it is; a text file wearing a `.png` name is refused with a sentence.
+- **A document is tombstoned, never deleted.** The file is destroyed on schedule; the row survives so the trail of who attached it and who opened it stays readable. Those are the questions asked *after* a document is gone.
+- **4 MB per file, and the number is Vercel's rather than a preference** — a function's request body is capped in front of the function, so a larger allowance would pass on a laptop and fail in production. Recorded with the upgrade path for when the housekeeping phone screen sends camera originals.
+
+### Fixed, before it shipped
+
+- **A document's trail vanished the moment the file did.** The booking screen folded in the events of the documents it *listed*, and a deleted document is not listed — so the record of who had opened somebody's identity document disappeared exactly when the retention job destroyed it, which is when a person would come asking. That defeated the reason a document is tombstoned at all. Found by watching the screen after a retention run, not by a test; there is a test now.
+- **A retention date read a day early, and looked like this week.** It rendered through the stay-date formatter, which reads UTC and carries no year, so a file kept until 6 September **2027** said "kept until Sun 5 Sept". Midnight in Brunei is the previous afternoon in UTC.
+
+### Stated rather than absorbed
+
+- **Two new open questions**, both raised by building rather than by the PRD. [N22](docs/open-questions.md): how long a **cancelled** booking's IC should be kept, given it is currently anchored to a stay that never happened — a real PDPO question, and the client's. [N23](docs/open-questions.md): whether attaching and removing an IC belong with `booking.amend`, which is what they borrow, and its non-obvious consequence — a role could be configured that may delete an identity document it may not open.
+- **The accounting pack (G5) is not in this slice.** Its kind and its bucket exist, so it adds an assembly step rather than a schema.
+- **Customers still do not upload their own documents.** A7 is phase two. What exists is staff attaching what a guest sent them over WhatsApp, which is what [§2](docs/prd.md) describes them doing today.
+
+---
+
+
 ## 2026-09-06 — what we are holding, and what we owe back
 
 [prd.md §2](docs/prd.md) lists five problems the platform exists to solve, and the fifth is *"deposit handling has no ledger — nobody can answer what deposits do we owe back right now."* [§20](docs/prd.md) then measures the whole project on six things, one of which is that same question answerable in one screen. Until now the product could not answer it at all: `booking.security_deposit_cents` was the BND 100 a booking *quoted*, and nothing collected, deducted from or released it.

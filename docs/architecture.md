@@ -43,7 +43,7 @@ app/
   (field)/           # Mobile web: security check-in, housekeeping checkout
   (print)/           # Printable documents in the portal's URL space, without its shell
   c/[token]/         # QR landing route (public entry, role-aware rendering)
-  api/               # Route handlers only where a server action doesn't fit
+  api/cron/          # Scheduled jobs, authorised by a shared secret (§8.1)
 lib/
   db/                # Query layer; all database access lives here
   domain/            # Pricing engine, booking state machine, availability
@@ -272,6 +272,26 @@ This is the judgement §5.1 already records about `unit.status` — "an unread s
 - Every document row carries `retain_until`, set from per-kind retention config at upload. A daily scheduled job hard-deletes expired objects and marks the rows deleted. Defaults (client-adjustable): identity docs 12 months after checkout; slips and packs 7 years (accounting records); inspection photos 24 months.
 - Accounting pack: generated server-side (`pdf-lib`) when a booking completes payment — itemised booking + slip + IC reference — stored in `packs`, replacing manual assembly.
 - **No legacy migration.** The system holds data from go-live onward (PRD §13).
+
+### 8.1 As built (capabilities B10, G2–G4, 7 September 2026)
+
+Everything above holds as written, with the accounting pack the one part still unbuilt. What follows is what the build had to decide, and where it departs from the PRD's sketch.
+
+**One table with typed pointers, not a polymorphic owner.** PRD §6.2 sketches `Document owner_type, owner_id, …`. A polymorphic pair cannot carry a foreign key, and this schema's whole posture is that referential rules belong to the database (§5.1's composite keys, §5.2's exclusion constraint). So `document` carries `booking_id` always, plus `payment_id` or `inspection_id` where the kind calls for one, each a composite FK, with a CHECK tying the pointer to the kind and a second tying the bucket to it. **This section supersedes that sketch.** `booking_id` is NOT NULL because all four v1 kinds have a booking; phase three relaxes it to an "exactly one owner" check when a lease inspection or a tenancy agreement needs one — the shape `occupancy.booking_id` already took.
+
+**A document is tombstoned, never deleted.** `deleted_at` plus a reason marks the row; `purged_at` records that the object itself is gone. Three reasons, and the second is the load-bearing one. The audit trail references the row and `audit_event` is append-only, so a hard delete would leave the trail pointing at nothing. Storage and Postgres are two systems, so the two-step is what makes a delete **recoverable rather than atomic** — the row is tombstoned first, at which point nothing will sign a URL for it, and the object removed second, with the nightly job retrying whatever did not finish. And G4 promises deletion of the *file*: the bytes go, the record that they existed and were destroyed stays, which is what a retention policy is for.
+
+**The orders of operations are the design.** Attaching uploads then inserts, because a row pointing at nothing is a broken link and an object with no row is invisible and swept up; `attach_document()` closes even that gap by reading `storage.objects` to confirm the upload landed, and taking the byte size from there rather than from the caller. Removing tombstones then deletes. **Opening logs then signs** — a signed URL with no record of who asked for it is the one failure that breaks G3, and over-logging is the safe direction.
+
+**Retention is read twice.** The nightly job deletes; every read also refuses a document past its date, so the gap between falling due and being deleted is invisible rather than a window. Periods are rows in `document_retention` (§11: policy figures are per-property configuration), seeded with the defaults above; `attach_document()` refuses `retention_unconfigured` rather than defaulting to a period nobody agreed. **An identity document's clock follows its stay**: an `after update of end_date on occupancy` trigger re-anchors it, because an amendment can move a checkout and "12 months after checkout" otherwise stops being true in the direction that destroys a record early.
+
+**Upload is capped at 4 MiB, and the number is Vercel's.** A function's request body is capped at 4.5 MB in front of the function, which `serverActions.bodySizeLimit` cannot raise, so a larger allowance would pass locally and fail in production. Multiple files are sent one request each. The upgrade path, when the housekeeping field screen (C2) sends camera originals, is a signed upload URL issued after the permission check with the browser PUTting directly and the server sniffing afterwards. Not built.
+
+**The stored type comes from the file's own header.** `sniffMimeType()` in `lib/domain/document.ts` reads magic numbers; the browser's declared type and the bucket's `allowed_mime_types` both check a claim the uploader made, so neither is a control. Storage keys are `{propertyId}/{documentId}.{ext}` — **flat**, because Storage's `list()` is prefix-only and does not recurse, and both the orphan sweep and the test cleanup have to enumerate a bucket. Encryption at rest is Storage's own, on its S3 backend; there is deliberately no application-level encryption, which would put the key on the same host as the data.
+
+**Two new route handlers, and both are firsts.** `/portal/documents/{id}` serves a file: a GET in the portal's URL space so `proxy.ts` has already demanded a session, re-checking the per-kind permission because a URL is guessable where a button is not, then 302-ing to the signed URL. It is `force-dynamic`, sends `no-store`, refuses HEAD with 405, and is only ever linked with a plain `<a>` — Next would answer HEAD from GET, and `next/link` prefetches on viewport entry, so either would write `document.viewed` rows for views nobody performed. `/api/cron/document-retention` is the **first scheduled job in the product** (`vercel.json`, 19:00 UTC = 03:00 Brunei). It sits outside the session gate, so a shared secret compared with `timingSafeEqual` is its whole authorisation, and it reports counts rather than naming guests — a cron log is not an access-controlled surface. It is a route rather than `pg_cron` because deleting the row is a Postgres act and deleting the file is a Storage call, and a policy that expires rows while leaving objects behind satisfies nothing G4 promises.
+
+**The permission table is [A] and is in one module.** `mayOpen` / `mayAttach` in `lib/domain/document.ts` — identity opens on `document.view_identity` and is attached under `booking.amend`; a slip is `payment.verify`; a photograph is `inspection.record`; a pack is written by nobody. **Existence is separated from content**: anyone with `booking.view` sees that a document is on file and only opening it is gated. See PRD §13 and open-questions N23.
 
 ---
 
