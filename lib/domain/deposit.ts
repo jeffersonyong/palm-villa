@@ -45,9 +45,9 @@ import type { Cents } from './money'
  *
  * Four stages, and they are a pipeline rather than a state machine: nothing
  * here moves backwards, because each step is a fact that has happened. The
- * names are the questions Finance actually asks — what is still in the
- * building, what is waiting on Housekeeping, what can be signed off now, and
- * what is done.
+ * names are the questions Finance actually asks — whose stay is still running,
+ * what is waiting on Housekeeping, what can be signed off now, and what is
+ * done.
  */
 export type DepositStage = 'in_house' | 'awaiting_inspection' | 'ready_for_release' | 'released'
 
@@ -61,7 +61,7 @@ export const DEPOSIT_STAGES = [
 
 /** How each stage is named on screen. Singular: a badge labels one deposit. */
 export const DEPOSIT_STAGE_LABELS: Readonly<Record<DepositStage, string>> = {
-  in_house: 'Guest in house',
+  in_house: 'Guest in stay',
   awaiting_inspection: 'Awaiting inspection',
   ready_for_release: 'Ready to release',
   released: 'Released',

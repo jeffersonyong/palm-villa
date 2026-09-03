@@ -161,6 +161,17 @@ export default async function DepositPage({ params }: PageProps) {
             <span className="text-body-md text-copy">{deposit.guestName}</span>
           </>
         }
+        // Why the approval is not offered, for whoever could otherwise give
+        // it. Stated rather than left to be worked out from an absent button —
+        // "waiting on Housekeeping" is the answer, and it names who to ask.
+        //
+        // In the header rather than loose beneath it, which is what bottom-
+        // aligns the buttons with it: `PageHeader` is `items-end`, so a
+        // sentence outside it leaves the actions hanging level with the title
+        // and a band of white space under them.
+        description={
+          mayApprove && !releaseCheck.ok && !facts.released ? releaseCheck.error.message : undefined
+        }
         actions={
           <>
             <Button asChild variant="tertiary">
@@ -186,13 +197,6 @@ export default async function DepositPage({ params }: PageProps) {
           </>
         }
       />
-
-      {/* Why the approval is not offered, for whoever could otherwise give it.
-          Stated rather than left to be worked out from an absent button —
-          "waiting on Housekeeping" is the answer, and it names who to ask. */}
-      {mayApprove && !releaseCheck.ok && !facts.released ? (
-        <p className="mt-lg text-body-sm text-muted-foreground">{releaseCheck.error.message}</p>
-      ) : null}
 
       <div className="mt-xl grid gap-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <DepositFigures deposit={deposit} actorNames={actorNames} />

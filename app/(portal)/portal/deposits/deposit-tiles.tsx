@@ -47,7 +47,7 @@ export function DepositTiles({ held, byStage, owed, current }: DepositTilesProps
       <Tile
         view="held"
         current={current}
-        label="Held right now"
+        label="Total held"
         value={`BND ${formatCents(held.amount)}`}
         hint={`${held.count} ${held.count === 1 ? 'deposit' : 'deposits'}`}
       />
@@ -100,7 +100,7 @@ function Tile({
 }) {
   const isCurrent = current === view
   // `held` is the default view, so choosing it is the absence of a param —
-  // an unfiltered ledger and the "Held right now" tile are one URL. Written
+  // an unfiltered ledger and the "Total held" tile are one URL. Written
   // inline rather than through a const, which typed routes widens to `string`.
   const isDefault = isCurrent || view === 'held'
 

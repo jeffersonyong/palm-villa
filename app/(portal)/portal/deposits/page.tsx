@@ -303,7 +303,7 @@ function LedgerEmptyState({ view }: { view: LedgerView }) {
   }
 
   const descriptions: Record<Exclude<LedgerView, 'held'>, string> = {
-    in_house: 'No guest with a deposit is in the building right now.',
+    in_house: 'No stay with a deposit against it is running right now.',
     awaiting_inspection: 'Every unit whose guest has left has been inspected.',
     ready_for_release: 'Nothing is waiting on an approval.',
     released: 'No deposit has been released yet.',
