@@ -427,8 +427,12 @@ export async function listBookings(
  * Matched on the code, with the message as a fallback: the code is the stable
  * contract, and the message is what a version that stopped setting one would
  * still say.
+ *
+ * Exported because every paged list needs the same answer to a bookmarked page
+ * past the end — ./deposits.ts is the second — and two copies of a PostgREST
+ * error code is one copy that stops being updated.
  */
-function isRangeNotSatisfiable(error: { code?: string; message?: string }): boolean {
+export function isRangeNotSatisfiable(error: { code?: string; message?: string }): boolean {
   return error.code === 'PGRST103' || /range not satisfiable/i.test(error.message ?? '')
 }
 
