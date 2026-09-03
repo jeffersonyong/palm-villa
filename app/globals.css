@@ -958,3 +958,22 @@
     }
   }
 }
+
+/* ── Printing ───────────────────────────────────────────────────────────────
+ *
+ * One rule, for the one thing in this product meant to leave the building: the
+ * deposit statement (capability E3). A4 because that is what Brunei prints on,
+ * and a margin the browser's own default would otherwise pick differently in
+ * every engine.
+ *
+ * The document's own layout is `app/(print)/layout.tsx`, which exists because
+ * the operations shell owns the scroll and a printed scroll container is one
+ * screenful. Everything else about the page prints as it renders; Tailwind's
+ * `print:` variant hides the toolbar.
+ */
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+}
