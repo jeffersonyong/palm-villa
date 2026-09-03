@@ -41,6 +41,7 @@ app/
   (public)/          # Customer-facing: availability, booking, payment, FAQ, lookup
   (portal)/          # Staff desktop: calendar, bookings, payment queue, config, reports
   (field)/           # Mobile web: security check-in, housekeeping checkout
+  (print)/           # Printable documents in the portal's URL space, without its shell
   c/[token]/         # QR landing route (public entry, role-aware rendering)
   api/               # Route handlers only where a server action doesn't fit
 lib/
@@ -54,6 +55,8 @@ components/
 supabase/
   migrations/        # SQL migrations, committed, applied via Supabase CLI
 ```
+
+**`(print)` is a layout boundary, not a fourth surface.** It holds one route today — the deposit statement (E3) — and it exists for a mechanical reason rather than a stylistic one: the operations shell is `h-dvh overflow-hidden` with the content panel owning the scroll (§Layout in design.md), and a browser printing a page whose content lives inside a scroll container prints exactly one screenful of it. A nested layout cannot remove its parent, so a document rendered inside the portal shell could never print past the fold. It keeps the portal's **URL space** — `/portal/deposits/PV-4821/statement` — so `proxy.ts`, which matches `/portal/:path*`, still requires a session; only the chrome differs.
 
 **Rendering and data rules:**
 
@@ -121,6 +124,14 @@ The PRD's entity list (§6.2) is the conceptual model. Normative implementation 
 - **`awaiting_inspection` and `cleaning` are still unbuilt, and are named in code rather than omitted.** `DEFERRED_UNIT_STATUSES` exists so the gap is visible where the statuses are. They are written and cleared by the inspection flow (capabilities C2–C3), and a board that invented them would show a state nothing can set and nobody can clear. B8 is therefore delivered across two slices, and scope-of-capabilities.md says so.
 - **Unit references are editable configuration** (capability F6), not fixed data. `unique (property_id, ref)` is **deferrable initially immediate**, because renumbering walks through references the old scheme still holds: Postgres checks a non-deferrable unique index as each *row's* index tuple is written, so a swap raises `23505` or does not depending on physical scan order. Deferring makes the constraint mean what it was always for — references are unique when the work is finished — and only `apply_unit_registry()` defers. A rename is consequently **retrospective**: `booking_summary.unit_ref` reads through to `unit.ref`, so a past stay is relabelled with the door's new name. That is the intent rather than a side effect (PRD §7.1 [A]); the `unit.renamed` events are the trail.
 
+- **Deposits are three tables and a derived stage.** `deposit` (one per booking, created at check-in), `inspection` (one per occupancy) and `deposit_charge` (many per deposit). None of them carries a status: the four stages a deposit passes through are consequences of the release columns, the inspection row and the booking's own status, so `depositStageOf()` in `lib/domain/deposit.ts` derives them — this section's argument about `unit.status`, applied a second time. `deposit_summary` returns facts and no stage.
+
+  Three shapes are worth naming because each is a departure from the PRD §6.2 sketch. **An inspection hangs off the occupancy**, as the sketch has it, which is what will let a lease that ends be inspected in phase three without a second table; the write path takes a *booking* id, because that is what every screen holds. **A charge hangs off the deposit** rather than the booking: it exists only because money is being held to answer for it, and `settled` is a fact about the excess as a whole — one guest, one balance — so it lives on the deposit and not once per charge. **Neither is a `booking_line`**: §8's lines *are* the price and `priceStay()` re-derives them on every amendment, so a damage charge there would be revenue on the booking and would be wiped by the next amend.
+
+  The approved figures are stored as well as audited, because "what do we owe back right now" is a query and answering it out of jsonb would be reading the audit trail as a data store. They are consistent by **constraint** rather than by code path: `deposit_release_arithmetic` repeats `depositFiguresOf()` in SQL, so the three figures somebody signed cannot disagree with each other however they were written. This is the one place the arithmetic is deliberately duplicated, and prd.md §11 [C] — the deposit is not a cap on liability — is why it is worth it.
+
+  **Lock order is deposit, then charge**, in every function that touches both, so an approval and a charge landing together queue rather than deadlock. The charges are summed *under* the deposit's lock at approval, which is what makes "signed against a list that moved" impossible rather than unlikely.
+
 ### 5.2 Double-booking prevention (structural)
 
 The availability invariant is enforced **in the database**, not in application logic:
@@ -152,11 +163,15 @@ Day passes have no unit; capacity is enforced by a transactional check against t
 
 A `completed` or `no_show` occupancy whose `end_date` has not yet passed still blocks availability, but the board derives it as `available`. **That divergence is the missing `awaiting_inspection` state**, not a bug in either half: a no-show recorded on the arrival day leaves the unit unsellable for the rest of the stay, which predates this slice. It is left alone rather than patched with a seventh status nothing could clear — the inspection flow (C2–C3) truncates the occupancy and owns the fix. Two tests in `lib/domain/unit-status.test.ts` assert the current behaviour so that closing the gap is a deliberate act.
 
+**Recording an inspection does not truncate the occupancy**, and the divergence above is therefore unchanged by the deposits slice. What that slice added is the *fact* — an inspection row against the occupancy — which is what C2–C3 will derive `awaiting_inspection` and `cleaning` from, along with a rule about when a unit becomes bookable again that nobody has written yet. Truncating a stay because somebody looked at the room would be this slice deciding that rule quietly.
+
 A unit that is out of service is refused as an occupancy target by a `before insert or update` trigger, scoped to rows arriving at a unit or changing the days they cover — a status mirrored down from a booking is not re-checked, or completing a stay that ended before the unit broke would be refused.
 
 ### 5.3 Booking state machine
 
 States per PRD §9.2: `draft → held → awaiting_payment_verification → confirmed → checked_in → completed`, with exits to `expired`, `cancelled`, `no_show`. Transitions are implemented as a single function in `lib/domain` that validates legality; no code path sets `status` directly. Every transition writes an audit event.
+
+**`check_in` and `check_out` became reachable from the portal with the deposits slice** (prd.md §11), having existed in the machine and been invoked only by tests since the schema slice. `check_out` goes through `transition_booking()` unchanged — nothing else moves when a guest leaves. `check_in` does not: `check_in_booking()` inlines the status update so the move and the deposit insert are one transaction, for the reason `verify_payment()` inlines its own — a plpgsql `return` does not roll back, so calling `transition_booking()` and then inserting would leave a moved booking behind a refusal. Legality still lives here: the caller passes the pair `transition()` derived, and the schema never chooses a status.
 
 `submit_payment` leaves `draft` as well as `held`. The two are the same event for the same reason — the customer says they have paid and somebody must check — and differ only in whether a hold preceded it. A booking taken at the desk and paid by transfer needs to reach the queue, and the alternative, walking it through `held`, would fabricate a state that is never persisted and that carries hold semantics (`hold_expires_at`, §6.3's expiry job) this path does not have. The routes to `confirmed` are unchanged, so "no booking is confirmed without a verified payment or a walk-in payment" still holds.
 

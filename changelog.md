@@ -6,6 +6,45 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-09-06 — what we are holding, and what we owe back
+
+[prd.md §2](docs/prd.md) lists five problems the platform exists to solve, and the fifth is *"deposit handling has no ledger — nobody can answer what deposits do we owe back right now."* [§20](docs/prd.md) then measures the whole project on six things, one of which is that same question answerable in one screen. Until now the product could not answer it at all: `booking.security_deposit_cents` was the BND 100 a booking *quoted*, and nothing collected, deducted from or released it.
+
+Capability refs: **E1**, **E2** and **E3** in [scope-of-capabilities.md](docs/scope-of-capabilities.md). The rules are normative in [prd.md §11](docs/prd.md), which now carries an "As built" block of the assumptions; the shape is [architecture.md §5.1](docs/architecture.md). No new dependency.
+
+### The three things this slice had to decide first
+
+- **A deposit needed a moment to be collected at.** `check_in` and `check_out` had sat in the state machine since the first slice, invoked only by tests. Nothing in the product marked an arrival, so there was nowhere to take BND 100.
+- **E2's gate needed a fact to gate on** — "approval is only available once the inspection is recorded" — and no inspection existed. The housekeeping phone screen (C2) is phase two, so the fact is recorded in the portal now and that screen reuses the write path when it lands.
+- **A release could not be a booking status.** `completed` is terminal, and a deposit is released days later. [prd.md §11](docs/prd.md) requirement 5 asks for an approval *event* rather than a flag, which is what the schema does.
+
+### Added
+
+- **The deposits ledger** (E1). Leads with the liability as a figure, then narrows it: what is in the building, what is waiting on Housekeeping, what can be signed off now, and what guests owe. **Two reads, and the split is the design** — held deposits are read whole and narrowed in TypeScript, because that set is bounded by the building and is a queue meant to be emptied, while released ones page in SQL because the archive grows for the life of the property. The order is a **work queue rather than a register**: ready to release first, oldest first inside each stage. The bookings list leads with the newest record because that is the one most likely to need correcting; this leads with the one costing somebody their money back.
+- **A deposit has its own screen**, carrying three people's work behind three permissions. [prd.md §4](docs/prd.md) [C] separates them deliberately — Housekeeping records the inspection, Front Office raises a charge, Finance approves — so each button is absent rather than disabled for whoever does not hold it. Where an approver could sign but the state refuses, the screen says which of the two things is missing rather than leaving an absent button to be interpreted.
+- **Itemised charges, with a reason the database requires** (E3), open from check-in until the release is approved. A broken window on the second night is a charge against that deposit, and making somebody wait for the guest to leave is how it ends up in WhatsApp. A charge is **waived rather than deleted**: `charge.waive` is Finance's, so dropping one is a decision, and a decision that leaves no row is one nobody can review.
+- **The release approval** (E2) — who, when, and three figures — **and it moves no money.** The figures are computed in the database under the deposit's own row lock, so a charge added while the dialog was open is either counted or refuses the approval; it can never be signed against a list that moved. `deposit_release_arithmetic` then repeats the arithmetic as a constraint, so the figures somebody signed cannot disagree with each other however they were written.
+- **Where charges exceed the deposit, the excess is tracked as owed**, with a printable statement to send. [prd.md §11](docs/prd.md) [C] — the deposit is not a cap on liability — is what makes that a real figure rather than an overflow to discard. The statement lives in a new **`(print)` route group**, which exists for a mechanical reason: the operations shell owns the scroll, and a browser prints a scroll container as one screenful. It keeps the portal's URL space, so the session gate is unchanged.
+- **Checking a guest in and out**, from the booking screen. Check-in moves the booking and records the deposit in **one transaction**, because a guest checked in with no deposit written down is exactly the gap in the spreadsheet this replaces.
+
+### Changed
+
+- **The Money card's deposit line stops being a claim.** It read the quoted figure and said "collected on arrival", which was a sentence about money nobody had recorded taking. It now says which of the two it is, with the stage, so money in the safe and money already given back are distinguishable without inferring from a date. The dashboard's "Deposit held" column does the same, and says *Not collected* rather than showing a figure for a booking that has none.
+- **The demo seed checks its guests in through the real function**, and takes one stay all the way to a released deposit with BND 30 owed — so a fresh stack opens the ledger on three stages rather than an empty screen.
+
+### Fixed, before it shipped
+
+- **A check-in reported a figure it had not written.** The amount came from a read taken *before* the call; `confirmed` is an amendable status and an amendment can reprice the deposit, so a badly-timed amend would have told a clerk one number while the ledger held another — and the number on screen is the one somebody says out loud to a guest. The function now returns what it wrote under the lock. Found by review, with the two unscoped `property_id` lookups and the missing ceilings on the free text attached to money.
+
+### Stated rather than absorbed
+
+- **No photographs.** [prd.md §11](docs/prd.md) requirement 2 asks for them and calls photo evidence the cheapest thing that improves dispute outcomes — which is true, and why they are not faked. Storing evidence means private buckets, permission-gated access and deletion on a retention schedule ([architecture.md §8](docs/architecture.md)), and that is the documents slice. **A delta against capability C2, flagged to the client.**
+- **Security cannot check a guest in.** Both moves are gated by `booking.amend` because the PRD's permission set has no check-in string and the seed declines to mint one. That is capability D3's whole job, so [N11](docs/open-questions.md) has to be answered before the arrivals screen — it stopped being a tidying question and became a blocking one.
+- **Two new open questions.** [N20](docs/open-questions.md): Finance approves a release and waives a charge but cannot raise one. [N21](docs/open-questions.md): what happens to an amount owed that nobody ever pays. Both are seed lines or a screen, not schema.
+- **B8 is unchanged.** `awaiting_inspection` and `cleaning` are still the two unit states this build cannot show. What changed is that the inspection they depend on is now a fact somebody records, so C2–C3 have something to derive from rather than a state nothing can set.
+
+---
+
 ## 2026-09-04 — the state of the building, and the building names itself
 
 `/portal/units` was the last stub in the operations nav. It now answers "what is every unit doing right now", and — the part that was not asked for in the scope but removes two questions from the critical path — it lets an administrator say what the units are **called** and how many there are.

@@ -115,6 +115,8 @@ report.view           document.view_identity
 
 **[C]** Deposit release approval sits at the end of the pipeline, with Finance or Jason, not with Housekeeping or Front Office. Housekeeping records the inspection; a separate role approves.
 
+**[A] Checking a guest in and out is gated by `booking.amend`**, added when the deposits slice made those two moves reachable at all (§11). There is no check-in permission in the set above — [N11](open-questions.md) is the question of who may check a guest in, and minting a string before it is answered would be this document deciding it. `booking.amend` is the nearest true thing: it already means "may move this booking on", and Front Office holds it, which is where an arriving guest is standing. **The consequence is that Security cannot check anyone in**, which is exactly what capability D3 will need, so N11 has to be answered before the arrivals screen is built rather than before this one shipped.
+
 ### Predefined roles
 
 **[C]** v1 ships with a fixed set of roles, each pre-assigned a permission set. Users may hold **more than one role**, which is what makes the uncertain team structure a non-issue. Roles and their permissions are editable in the admin UI later without code changes.
@@ -205,7 +207,7 @@ any → out_of_service → available
 | `available`, `held`, `booked`, `occupied` | **Derived** from the occupancy rows that already exist. There is no `unit.status` column and there will not be one; storing these would be a second copy of a fact recorded elsewhere. See architecture.md §5.1. |
 | `out_of_service` | **Stored** on the unit, as a since-date and a required reason. The one part of the lifecycle nothing else can tell you. |
 | `leased_long_term` | **Stored** as an occupancy row with no booking, so §6.1's "one Occupancy concept" gives it the same availability guarantee a booking gets. |
-| `awaiting_inspection`, `cleaning` | **Not built.** Written and cleared by the inspection flow (C2–C3). Named in code as deferred rather than omitted, so the gap is visible. |
+| `awaiting_inspection`, `cleaning` | **Not built.** Written and cleared by the inspection flow (C2–C3). Named in code as deferred rather than omitted, so the gap is visible. The *inspection itself* now exists (§11), so what these two are waiting on is the housekeeping field screen and a rule about when a unit becomes bookable again — not a fact nobody records. |
 
 **[A] A unit with a live booking on it cannot be taken out of service.** The PRD does not say either way. Out of service means nobody can be put in the unit, so allowing it over a confirmed booking produces a unit that is simultaneously sold and unusable — and the guest finds out at the door. The refusal names how many bookings are in the way and the first reference, so the clerk can move or cancel them on a screen they already have. Warning and allowing was considered and rejected: it puts that decision in a toast nobody reads.
 
@@ -473,6 +475,30 @@ Added when the amendment path made the gap real. Nothing in §10 described what 
 6. Where charges exceed the deposit, the balance becomes an outstanding amount owed, with a shareable statement.
 
 **Note for the client conversation.** Recovery of charges above BND 100, with no card on file and no legal step, will be poor in practice. The system provides the record, not the collection. If damage above the deposit proves recurrent, the commercial fix is raising the deposit, which is the client's decision.
+
+### As built (capabilities E1–E3, 6 September 2026)
+
+Six requirements above; five are met as written and one is not. The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
+
+**[A] The deposit is collected at check-in, as part of checking the guest in.** One action, one transaction: the booking moves to `checked_in` and the deposit row is written together, because a guest checked in with no deposit recorded is precisely the gap in the spreadsheet this replaces. It is taken in cash or by bank transfer, for the amount the booking quoted, and it cannot be skipped or waived — a deposit somebody decided not to take is a conversation, not a field. A booking quoting no deposit checks in without one, and the screen says so rather than implying money changed hands.
+
+**[A] `booking.security_deposit_cents` stays the quote; the deposit row is what was taken.** The two can differ, because an amendment can reprice a booking after it was quoted, and what is held must not move with it. Every screen that used to read the quoted figure and call it "held" now says which of the two it means.
+
+**[A] An inspection is recorded once per stay, after check-out, with one of two outcomes** — *clean* or *issues found* — and notes are required when something was found. Two outcomes because this section branches exactly once: condition confirmed, or damages to deduct. A finer taxonomy would be categories nobody asked for, and the notes carry the detail in the inspector's own words.
+
+**Requirement 2 is not met: there are no photographs.** Private buckets, signed URLs, permission-gated access and retention expiry are the documents slice (architecture.md §8), and a column pointing at nothing would be a promise the product cannot keep. The inspection carries outcome and notes, the screens say photographs arrive with document storage, and this is **flagged to the client as a delta against scope-of-capabilities.md C2** rather than quietly amended.
+
+**[A] Requirement 4's "charges entered" is satisfied by the approver seeing them.** The inspection is a hard gate — the database refuses a release without one — but a release with no charges against it is the ordinary case, so there is nothing to require. What the approval screen does instead is state the itemised charges and the three resulting figures before the click.
+
+**[A] Charges can be raised from check-in until the release is approved, and approval closes them.** A broken window on the second night is a charge against that deposit, and making somebody wait for the guest to leave is how it ends up in WhatsApp. Approval freezes the list, because the statement a guest is given has to be what was signed off. A charge is **waived rather than deleted** — `charge.waive` is Finance's, so dropping one is a decision, and a decision that leaves no row is one nobody can review.
+
+**[A] Approval records who, when, and three figures — returned, charges, owed — and moves no money.** Requirement 5 read literally. The figures are computed in the database under the deposit's own row lock, so a charge added while the dialog was open is either counted or refuses the approval; it can never be signed against a list that moved. Handing the notes back happens at the desk, which is the position architecture.md §6.4 already takes on refunds.
+
+**[A] Where charges exceed the deposit, the excess is recorded as settled by whoever may record a payment** (`payment.record_cash`). It is not a booking payment: it settles no booking and appears in no cash-up. Whole amounts only — a part payment against an excess, and what happens to one nobody ever pays, are [N21](open-questions.md).
+
+**[A] A deposit's stage is derived, never stored** — from the release, the inspection and the booking's status. The same reasoning architecture.md §5.1 gives for `unit.status`.
+
+**The statement is a printable page rather than a generated file.** Every browser prints to PDF, staff already forward images over WhatsApp, and a document that is also a URL is one a colleague can open. It renders only once a release is approved, because before that the figures can still move and a statement whose numbers change after it was sent is worse than none.
 
 ---
 

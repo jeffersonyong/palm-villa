@@ -99,6 +99,13 @@ A forwarded or leaked QR code grants nothing by itself — check-in authority co
 | E4 | Run a daily cash-up view: cash recorded in the system versus cash banked |
 | E5 | View reports: occupancy by unit and type, revenue by stream, outstanding deposits, outstanding charges, and day-pass volume against capacity |
 
+**E1–E3 delivered 6 September 2026, with one gap stated rather than absorbed.** The ledger answers what is held right now, a deposit has its own screen carrying the inspection, its itemised charges and the release approval, and a released deposit prints a statement to send on. Two things follow that are worth naming here:
+
+- **Inspections do not yet record photographs.** C2 promises them and prd.md §11 calls photo evidence "the cheapest thing that improves dispute outcomes" — which is true, and why they are not faked. Storing evidence means private buckets, permission-gated access and automatic deletion on a retention schedule (G2–G4), and that is the document storage slice. The inspection records outcome and notes today, and the screens say where photographs arrive. **This is a delta against C2 and is flagged rather than quietly amended.**
+- **Checking a guest in and out became possible along the way**, because a deposit is collected on arrival and inspected after departure, and neither moment existed in the product before. It is a desk action under the same permission as amending a booking; **Security still cannot check anyone in**, which is what D3 needs and what open question N11 has to settle.
+
+**B8 is unchanged.** Awaiting inspection and cleaning are still the two unit states this build cannot show — what has changed is that the inspection they depend on is now a fact somebody records, so C2–C3 have something to derive from.
+
 ---
 
 ## F. What the Owner / Admin can do (portal)
