@@ -11,15 +11,18 @@
  * closed list below is mirrored by a CHECK constraint on the `inspection`
  * table, so widening it is a code change and a migration, together.
  *
- * ── What this deliberately does not carry ─────────────────────────────────
+ * ── Where the photographs live ────────────────────────────────────────────
  *
- * **Photographs.** prd.md §11 requirement 2 asks for them and calls them "the
- * cheapest thing that improves dispute outcomes", which is true and is why they
- * are not faked here: private buckets, signed URLs, permission-gated access and
- * retention expiry are the documents slice (architecture.md §8), and an
- * `inspection_photos` column pointing at nothing would be a promise the product
- * cannot keep. The gap is flagged to the client in scope-of-capabilities.md
- * rather than quietly absorbed.
+ * **Not here, and that is still right.** prd.md §11 requirement 2 asks for
+ * photographs and they exist as of the documents slice — as `document` rows of
+ * kind `inspection_photo` pointing at this inspection, not as a column on it
+ * (lib/domain/document.ts, architecture.md §8.1). An `inspection_photos` column
+ * would have been a second way to store a file, with its own retention rule and
+ * its own access log to keep in step with the real ones.
+ *
+ * So this module still owns the vocabulary and nothing else, and the
+ * housekeeping field screen can import the outcomes without pulling in either a
+ * ledger or a storage layer.
  */
 
 /**
