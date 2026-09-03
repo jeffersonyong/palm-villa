@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach } from 'vitest'
 
+import { BUCKET_FOR_KIND, DOCUMENT_KINDS } from '@/lib/domain/document'
 import { dataClient } from '@/lib/supabase/data'
 
 import { resetPropertyCache } from '../property'
@@ -81,6 +82,44 @@ async function assertDatabaseReady(): Promise<void> {
       'The database is running but holds no units. Run `npm run db:reset` to apply supabase/seed.sql.',
     )
   }
+
+  await assertStorageReady()
+}
+
+/**
+ * Storage is part of the stack these tests need, and its absence looks
+ * different from Postgres being down.
+ *
+ * The documents slice stores objects as well as rows, so a stack whose Storage
+ * container is not running fails deep inside an upload with a fetch error
+ * rather than at the door. Checked here for the reason the unit count is: a
+ * green run has to mean the capability was actually exercised.
+ */
+async function assertStorageReady(): Promise<void> {
+  const { data, error } = await dataClient().storage.listBuckets()
+
+  if (error) {
+    throw new Error(
+      [
+        'The local Supabase stack is up but its Storage API is not reachable.',
+        '',
+        '  npm run db:start     # Postgres, Auth AND Storage',
+        '',
+        `Underlying error: ${error.message}`,
+      ].join('\n'),
+    )
+  }
+
+  const buckets = new Set((data ?? []).map((bucket) => bucket.id))
+  const missing = DOCUMENT_KINDS.map((kind) => BUCKET_FOR_KIND[kind]).filter(
+    (bucket) => !buckets.has(bucket),
+  )
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Storage is missing the ${missing.join(', ')} bucket(s). Run \`npm run db:reset\` to replay supabase/migrations.`,
+    )
+  }
 }
 
 /**
@@ -140,5 +179,52 @@ async function clearTransactionalData(): Promise<void> {
 
   if (serviceError) {
     throw new Error(`Could not return units to service between tests: ${serviceError.message}`)
+  }
+
+  await emptyDocumentBuckets()
+}
+
+/**
+ * Empties the four private buckets.
+ *
+ * The `document` rows go with their bookings — they hang off one, and the
+ * delete above cascades — but the OBJECTS do not: Storage is a second system,
+ * and nothing in Postgres knows how to reach into it. Left alone they
+ * accumulate across every run of the suite, and worse, an orphan-sweep test
+ * would find another test's leftovers and report a number nobody can predict.
+ *
+ * Two levels of listing, because keys are `{propertyId}/{documentId}.{ext}` and
+ * Storage's `list()` is prefix-only: the root lists property folders, and each
+ * folder lists its objects. A folder entry is distinguishable from an object by
+ * having no `id`.
+ */
+async function emptyDocumentBuckets(): Promise<void> {
+  const db = dataClient()
+
+  for (const kind of DOCUMENT_KINDS) {
+    const bucket = BUCKET_FOR_KIND[kind]
+    const folders = await db.storage.from(bucket).list('', { limit: 1000 })
+
+    if (folders.error || !folders.data) {
+      continue
+    }
+
+    for (const folder of folders.data) {
+      if (folder.id) {
+        // An object at the root, which nothing this product writes produces.
+        await db.storage.from(bucket).remove([folder.name])
+        continue
+      }
+
+      const objects = await db.storage.from(bucket).list(folder.name, { limit: 1000 })
+
+      if (objects.error || !objects.data || objects.data.length === 0) {
+        continue
+      }
+
+      await db.storage
+        .from(bucket)
+        .remove(objects.data.map((object) => `${folder.name}/${object.name}`))
+    }
   }
 }

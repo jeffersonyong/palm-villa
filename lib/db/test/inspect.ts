@@ -26,6 +26,14 @@ export async function givenGuestNames(): Promise<string[]> {
 
 export interface AuditEvent {
   action: string
+  /**
+   * Null where nobody performed the act.
+   *
+   * Read by the documents tests, which assert that retention expiry credits no
+   * one: a scheduled deletion attributed to whichever staff member happened to
+   * be nearby would be worse than one attributed to nobody.
+   */
+  actorId: string | null
   before: Record<string, unknown> | null
   after: Record<string, unknown> | null
 }
@@ -34,7 +42,7 @@ export interface AuditEvent {
 export async function auditEventsFor(entityId: string): Promise<AuditEvent[]> {
   const { data, error } = await dataClient()
     .from('audit_event')
-    .select('action, before, after')
+    .select('action, actor_id, before, after')
     .eq('entity_id', entityId)
     .order('at')
 
@@ -42,7 +50,14 @@ export async function auditEventsFor(entityId: string): Promise<AuditEvent[]> {
     throw new Error(`Could not read audit events: ${error.message}`)
   }
 
-  return data as AuditEvent[]
+  return (data as { action: string; actor_id: string | null; before: never; after: never }[]).map(
+    (row) => ({
+      action: row.action,
+      actorId: row.actor_id,
+      before: row.before,
+      after: row.after,
+    }),
+  )
 }
 
 export interface PaymentRow {
