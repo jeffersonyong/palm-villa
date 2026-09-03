@@ -177,3 +177,29 @@ where r.slug = 'finance';
 
 -- No user_role rows: there are no staff accounts yet. Supabase Auth users and
 -- their role grants arrive with the auth slice.
+
+-- ── Document retention (capability G4, architecture.md §8) ─────────────────
+--
+-- The defaults architecture.md §8 states, as rows rather than constants: §11
+-- makes every policy figure per-property configuration, and G4 promises the
+-- client a retention policy they can change. Capability F3 is the screen that
+-- edits them; until it exists these are what the system ships with.
+--
+-- Seeded rather than defaulted in code on purpose. attach_document() REFUSES a
+-- kind with no row here, so a missing period is a visible error at a desk
+-- rather than a number nobody agreed applied to somebody's identity document.
+--
+--   identity          12 months after checkout
+--   payment_slip      84 months (7 years, accounting records)
+--   accounting_pack   84 months (7 years, same)
+--   inspection_photo  24 months
+insert into document_retention (property_id, kind, months)
+select p.id, spec.kind, spec.months
+from property p
+cross join (
+  values
+    ('identity', 12),
+    ('payment_slip', 84),
+    ('inspection_photo', 24),
+    ('accounting_pack', 84)
+) as spec (kind, months);
