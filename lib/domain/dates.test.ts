@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 import {
   elapsedMinutes,
   formatElapsed,
+  formatInstantAsDate,
   formatStayDates,
   formatStayRange,
   formatTimestamp,
@@ -119,5 +120,23 @@ describe('formatElapsed', () => {
     // The queue is refreshed by hand, so minute accuracy on a three-day wait
     // is precision the screen cannot honour.
     expect(formatElapsed(4321)).toBe(formatElapsed(4400))
+  })
+})
+
+describe('formatInstantAsDate', () => {
+  test('reads the day in Brunei, not in UTC', () => {
+    // Midnight on 6 September in Brunei is 16:00 on the 5th in UTC. Formatting
+    // in UTC — or slicing the ISO string — reports the day before the one a
+    // document is actually deleted on.
+    expect(formatInstantAsDate('2027-09-05T16:00:00Z')).toBe('6 Sept 2027')
+  })
+
+  test('carries the year, because a retention date is years out', () => {
+    // "Kept until 6 Sept" against a file kept until 2027 reads as this week.
+    expect(formatInstantAsDate('2027-09-05T16:00:00Z')).toContain('2027')
+  })
+
+  test('formats an ordinary instant as the day it falls on', () => {
+    expect(formatInstantAsDate('2026-09-15T03:30:00Z')).toBe('15 Sept 2026')
   })
 })

@@ -14,7 +14,11 @@ import { getActor } from '@/lib/auth/require-permission'
 import { listAuditEvents, listAuditEventsForEntities, type AuditEvent } from '@/lib/db/audit'
 import { getBookingByReference, type Booking } from '@/lib/db/bookings'
 import { getDepositByBookingId, type Deposit } from '@/lib/db/deposits'
-import { listDocumentsForBooking, type Document } from '@/lib/db/documents'
+import {
+  listDocumentIdsForBooking,
+  listDocumentsForBooking,
+  type Document,
+} from '@/lib/db/documents'
 import { listBookingNotes } from '@/lib/db/notes'
 import { listPaymentsForBooking, type Payment } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
@@ -94,14 +98,16 @@ export default async function BookingDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  const [bookingEvents, payments, staff, notes, deposit, documents] = await Promise.all([
-    listAuditEvents('booking', booking.id),
-    listPaymentsForBooking(booking.id),
-    listStaff(),
-    listBookingNotes(booking.id),
-    getDepositByBookingId(booking.id),
-    listDocumentsForBooking(booking.id),
-  ])
+  const [bookingEvents, payments, staff, notes, deposit, documents, everyDocumentId] =
+    await Promise.all([
+      listAuditEvents('booking', booking.id),
+      listPaymentsForBooking(booking.id),
+      listStaff(),
+      listBookingNotes(booking.id),
+      getDepositByBookingId(booking.id),
+      listDocumentsForBooking(booking.id),
+      listDocumentIdsForBooking(booking.id),
+    ])
 
   // Payment events are typed against the payment, not the booking, so a trail
   // built from `listAuditEvents('booking', ...)` alone would show this booking
@@ -122,14 +128,15 @@ export default async function BookingDetailPage({ params }: PageProps) {
   const depositEvents = deposit ? await listAuditEvents('deposit', deposit.id) : []
 
   // Documents are typed against themselves, like payments, so their trail is
-  // folded in the same way — and it is the trail capability G3 promises:
-  // every time somebody opened an identity document, on the record it belongs
-  // to. One query for all of them rather than one each, because a booking can
-  // carry an IC, a slip and several photographs.
-  const documentEvents = await listAuditEventsForEntities(
-    'document',
-    documents.map((document) => document.id),
-  )
+  // folded in the same way — and it is the trail capability G3 promises: every
+  // time somebody opened an identity document, on the record it belongs to.
+  //
+  // Built from EVERY document id, tombstones included, rather than from the
+  // list rendered above. A deleted document is not on file and does not appear
+  // in the panel, but its history has to survive it — otherwise the record of
+  // who opened somebody's IC disappears the moment the retention job deletes
+  // it, which is precisely when a person would come asking.
+  const documentEvents = await listAuditEventsForEntities('document', everyDocumentId)
 
   const events: readonly AuditEvent[] = [
     ...bookingEvents,

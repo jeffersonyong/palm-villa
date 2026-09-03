@@ -10,6 +10,7 @@ import {
   attachDocument,
   getDocument,
   issueDocumentUrl,
+  listDocumentIdsForBooking,
   listDocumentsForBooking,
   purgeTombstoned,
   removeDocument,
@@ -441,6 +442,31 @@ describe('removing a document', () => {
     const events = await auditEventsFor(documentId)
 
     expect(events.map((event) => event.action)).toContain('document.removed')
+  })
+
+  test('the trail outlives the file, which is the whole reason for a tombstone', async () => {
+    // Found on the screen rather than here: the booking page folded in the
+    // events of the documents it *listed*, and a deleted document is not
+    // listed — so the record of who had opened somebody's IC vanished at the
+    // exact moment the retention job destroyed it, which is when a person
+    // would come asking. `listDocumentIdsForBooking` is what the history reads
+    // instead, and it has to keep returning a document after the file is gone.
+    const booking = await givenBooking({ checkIn: TOMORROW, checkOut: NEXT_WEEK })
+    const documentId = await givenDocument({ kind: 'identity', bookingId: booking.id })
+
+    await issueDocumentUrl({ documentId, actorId: null })
+    await removeDocument({ documentId, actorId: null })
+
+    expect(await listDocumentsForBooking(booking.id)).toHaveLength(0)
+    expect(await listDocumentIdsForBooking(booking.id)).toContain(documentId)
+
+    const events = await auditEventsFor(documentId)
+
+    expect(events.map((event) => event.action)).toEqual([
+      'document.attached',
+      'document.viewed',
+      'document.removed',
+    ])
   })
 
   test('refuses to remove the same document twice', async () => {

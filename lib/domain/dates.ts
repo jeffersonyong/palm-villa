@@ -142,6 +142,34 @@ export function formatTimestamp(timestamp: string): string {
   }).format(new Date(timestamp))
 }
 
+/**
+ * Formats an instant as a calendar date in the property's timezone, with the
+ * year — e.g. `6 Sept 2027`.
+ *
+ * For an instant a reader thinks of as a *day* rather than a moment: a
+ * document's retention date, which is stored as a `timestamptz` because it is
+ * computed by adding months to a stay, but which nobody needs to the minute.
+ *
+ * Two things it does that `formatStayDate` deliberately does not, and both are
+ * why this exists rather than reusing it:
+ *
+ * - **It converts into Brunei time** instead of reading UTC. A retention date
+ *   of midnight in Brunei is 16:00 the previous day in UTC, so slicing the ISO
+ *   string — or formatting it in UTC — reports the day before the one the
+ *   system will actually delete on.
+ * - **It carries the year.** A stay is always within two months (prd.md §9.1)
+ *   so its year is never in doubt; a retention date is usually years out, and
+ *   "kept until 6 Sept" against a file kept until 2027 reads as this week.
+ */
+export function formatInstantAsDate(timestamp: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: PROPERTY_TIME_ZONE,
+  }).format(new Date(timestamp))
+}
+
 const MINUTES_PER_HOUR = 60
 const MINUTES_PER_DAY = 1440
 

@@ -25,7 +25,11 @@ import { listAuditEvents, listAuditEventsForEntities, type AuditEvent } from '@/
 import { getBookingByReference } from '@/lib/db/bookings'
 import { listDepositCharges, type DepositCharge } from '@/lib/db/deposit-charges'
 import { getDepositByBookingReference, type Deposit } from '@/lib/db/deposits'
-import { listDocumentsForBooking, type Document } from '@/lib/db/documents'
+import {
+  listDocumentIdsForBooking,
+  listDocumentsForBooking,
+  type Document,
+} from '@/lib/db/documents'
 import { listStaff } from '@/lib/db/staff'
 import { canAddCharge, canApproveRelease, owedStateOf } from '@/lib/domain/deposit'
 import { formatStayDates, formatTimestamp } from '@/lib/domain/dates'
@@ -126,9 +130,18 @@ export default async function DepositPage({ params }: PageProps) {
   // deduction disputed a year later is argued from the evidence, and "who
   // attached this photograph, and did anybody remove one" is part of that
   // story. One query for all of them rather than one each.
-  const photographEvents = await listAuditEventsForEntities(
-    'document',
-    photographs.map((photograph) => photograph.id),
+  //
+  // Every document on the booking, tombstones included, rather than the
+  // photographs listed above — a removed photograph is exactly the one a
+  // dispute asks about, and its trail has to outlive the file. Non-photograph
+  // documents on this booking contribute nothing here: their events are
+  // labelled on the booking's own screen, and a deposit's history is about the
+  // deposit.
+  const photographEvents = (
+    await listAuditEventsForEntities('document', await listDocumentIdsForBooking(deposit.bookingId))
+  ).filter(
+    (event) =>
+      event.after?.kind === 'inspection_photo' || event.before?.kind === 'inspection_photo',
   )
 
   const events: readonly AuditEvent[] = [

@@ -40,3 +40,7 @@ yarn-error.log*
 /.playwright-mcp/
 /test-results/
 /playwright-report/
+
+# Playwright MCP scratch output — screenshots, snapshots and upload fixtures
+# from driving the app in a browser. Never part of the repository.
+.playwright-mcp/

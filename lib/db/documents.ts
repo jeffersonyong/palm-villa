@@ -158,6 +158,32 @@ export async function listDocumentsForBooking(
   return (data as unknown as DocumentRow[]).map((row) => toDocument(row, now))
 }
 
+/**
+ * The id of every document this booking has ever carried, tombstones included.
+ *
+ * For the history panels, and the distinction from `listDocumentsForBooking` is
+ * the point. That one lists what is *on file* — a deleted document is not — but
+ * an audit trail that forgets a document the moment it is deleted would lose
+ * the record of who opened it, which is capability G3's whole promise, and it
+ * would lose it at exactly the moment somebody is asking. A tombstone is kept
+ * so the trail stays resolvable; this is what resolves it.
+ */
+export async function listDocumentIdsForBooking(bookingId: string): Promise<readonly string[]> {
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await dataClient()
+    .from('document')
+    .select('id')
+    .eq('property_id', propertyId)
+    .eq('booking_id', bookingId)
+
+  if (error) {
+    throw new Error(`Could not read the documents for booking ${bookingId}: ${error.message}`)
+  }
+
+  return (data as { id: string }[]).map((row) => row.id)
+}
+
 /** One document, live or not — the route handler decides what to do about it. */
 export async function getDocument(documentId: string): Promise<Document | null> {
   const row = await readRow(documentId)

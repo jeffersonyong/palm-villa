@@ -14,7 +14,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { FieldError } from '@/components/ui/field-error'
-import { Label } from '@/components/ui/label'
 import { toast } from '@/components/ui/toast-store'
 import {
   acceptAttributeFor,
@@ -164,7 +163,14 @@ function AttachDialog({
 
         <div className="grid gap-lg">
           <div className="grid gap-sm">
-            <Label htmlFor="document-file">{multiple ? 'Photographs' : 'File'}</Label>
+            {/* A span rather than a `Label`, and the input is pointed at it by
+                `aria-labelledby`. The visible trigger below has to be a real
+                `<label>` — that is the only element that opens a file picker
+                without script — so a second labelling `<label>` here would give
+                the control two names and have a screen reader read both. */}
+            <span id="document-file-label" className="text-body-sm-strong text-foreground">
+              {multiple ? 'Photographs' : 'File'}
+            </span>
 
             {/* The native control is the input, and it keeps the keyboard and
                 the operating system's own picker. What is drawn is a label
@@ -181,6 +187,7 @@ function AttachDialog({
                 ref={inputRef}
                 id="document-file"
                 type="file"
+                aria-labelledby="document-file-label"
                 accept={acceptAttributeFor(kind)}
                 multiple={multiple}
                 className="sr-only"

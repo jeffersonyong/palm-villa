@@ -16,7 +16,7 @@ import {
 import { FieldError } from '@/components/ui/field-error'
 import { toast } from '@/components/ui/toast-store'
 import type { Document } from '@/lib/db/documents'
-import { formatStayDate } from '@/lib/domain/dates'
+import { formatInstantAsDate } from '@/lib/domain/dates'
 import { formatByteSize } from '@/lib/domain/document'
 
 import { removeDocumentAction } from './actions'
@@ -62,9 +62,13 @@ export function DocumentRow({ document, mayOpen, mayRemove, attachedBy }: Docume
     <div className="flex items-start justify-between gap-md py-sm">
       <div className="min-w-0">
         <p className="truncate text-body-sm text-foreground">{document.filename}</p>
+        {/* `formatInstantAsDate`, not `formatStayDate`: the retention date is a
+            timestamp, and reading its UTC day names the day before the one the
+            file is deleted on. The year is there because it is usually years
+            out — "kept until 6 Sept" reads as this week. */}
         <p className="text-caption text-muted-foreground">
           {formatByteSize(document.byteSize)} · {attachedBy} · kept until{' '}
-          {formatStayDate(document.retainUntil.slice(0, 10))}
+          {formatInstantAsDate(document.retainUntil)}
         </p>
       </div>
 
