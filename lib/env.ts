@@ -30,4 +30,19 @@ export const env = {
   get supabaseServiceRoleKey(): string {
     return required('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY)
   },
+  /**
+   * The shared secret on the nightly retention job's route (capability G4).
+   *
+   * That route is outside the session gate — `proxy.ts` matches `/portal` and
+   * `/field`, and a cron caller has no cookies — so this string is the whole of
+   * its authorisation. Vercel sends it as `Authorization: Bearer` on a
+   * scheduled invocation; locally it is whatever `.env.local` says.
+   *
+   * Read through `required`, like the rest: a deployment with no secret set
+   * should fail loudly at the first request rather than quietly leave a
+   * deletion endpoint open.
+   */
+  get cronSecret(): string {
+    return required('CRON_SECRET', process.env.CRON_SECRET)
+  },
 }
