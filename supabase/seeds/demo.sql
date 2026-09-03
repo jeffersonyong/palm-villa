@@ -24,6 +24,11 @@
 --      could not itself produce would be a fixture layer by another name —
 --      exactly what ./seed.sql's note was written to prevent.
 --
+-- The deposits ledger (E1) needs a deposit to be about, so the two stays that
+-- have begun go through check_in_booking() and the one that ended last week is
+-- inspected, charged and released — the shape that exercises an amount owed and
+-- the statement. Same rule as everything else here: real functions only.
+--
 -- Nothing is priced by hand: the nightly figure is read from the unit type's
 -- base_rate_cents, seeded from prd.md §7.1, and the BND 100 security deposit
 -- is the [C] figure from prd.md §11. Dates are relative to today in
@@ -39,6 +44,7 @@ declare
   v_status text;
   v_result jsonb;
   v_booking_id uuid;
+  v_deposit_id uuid;
   v_check_in date;
   spec record;
 begin
@@ -73,7 +79,8 @@ begin
       ('DEMO — Awaiting transfer',            '+673 000 0002', '3B-02',  3, 3, 4, array[]::text[],              true,  'bank_transfer', 'awaiting_payment_verification'),
       ('DEMO — Awaiting transfer (4-bed)',    '+673 000 0003', '4B-01',  7, 3, 6, array['BAB 5678', 'BAD 3456'], false, 'bank_transfer', 'awaiting_payment_verification'),
       ('DEMO — In residence',                 '+673 000 0004', 'SD-01', -1, 3, 8, array['BAC 9012'],            false, 'cash',          'checked_in'),
-      ('DEMO — Departed last week',           '+673 000 0005', '3B-03', -5, 3, 2, array['BAE 7788'],            false, 'cash',          'completed')
+      ('DEMO — Departed last week',           '+673 000 0005', '3B-03', -5, 3, 2, array['BAE 7788'],            false, 'cash',          'completed'),
+      ('DEMO — Left today, not inspected',    '+673 000 0006', '3B-04', -2, 2, 3, array['BAF 2244'],            false, 'cash',          'completed')
     ) as t (
       guest_name, phone, unit_ref, start_offset, nights,
       chargeable_guests, vehicles, no_vehicle, payment_method, settles_at
@@ -139,9 +146,16 @@ begin
     -- Walk the rest of the machine. Each step is a real transition with its
     -- own audit event, so the trail reads as it would for a booking that
     -- actually checked in.
+    --
+    -- Checking in goes through check_in_booking() rather than
+    -- transition_booking(), because that is the path the portal takes and it
+    -- is what collects the BND 100 deposit in the same transaction. A demo
+    -- guest in residence with no deposit against them would show the deposits
+    -- ledger as empty on a fresh stack, which is the one screen prd.md §20
+    -- names.
     if spec.settles_at in ('checked_in', 'completed') then
-      perform transition_booking(
-        v_property_id, v_booking_id, 'confirmed', 'checked_in', 'check_in', null
+      perform check_in_booking(
+        v_property_id, v_booking_id, 'confirmed', 'checked_in', 'cash', null
       );
     end if;
 
@@ -168,6 +182,38 @@ begin
           'DEMO — Extra towels on arrival, four guests rather than two.',
           null
         );
+    end if;
+
+    -- The deposit walk-through, so a fresh stack shows every stage of the
+    -- ledger rather than one. The stay that left last week goes all the way:
+    -- inspected with something found, charged past the BND 100 held, and
+    -- released — which is the only shape that exercises an amount owed and a
+    -- statement. The one that left today stops at the inspection, so the
+    -- "awaiting inspection" tile is not always zero.
+    --
+    -- Through the real functions, like everything else here: a demo deposit
+    -- inserted directly would be a fixture layer by another name.
+    if spec.settles_at = 'completed' and spec.start_offset = -5 then
+      perform record_inspection(
+        v_property_id, v_booking_id, 'issues_found',
+        'DEMO — Shower screen cracked, bottom left. Two towels missing.',
+        null
+      );
+
+      select id into v_deposit_id
+      from deposit
+      where booking_id = v_booking_id and property_id = v_property_id;
+
+      perform add_deposit_charge(
+        v_property_id, v_deposit_id, 13000,
+        'DEMO — Shower screen replacement, quoted', null
+      );
+
+      perform approve_deposit_release(
+        v_property_id, v_deposit_id,
+        'DEMO — Charged for the screen only; the marks by the door were pre-existing.',
+        null
+      );
     end if;
   end loop;
 end;

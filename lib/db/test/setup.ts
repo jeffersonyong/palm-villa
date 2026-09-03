@@ -98,6 +98,11 @@ async function assertDatabaseReady(): Promise<void> {
  * mysteriously unavailable — which reads as a schema fault rather than as
  * contamination, and costs an afternoon to find.
  *
+ * The deposits slice (20260906000100) added three tables and needed no line
+ * here, which is worth saying so the next reader does not re-derive it: a
+ * deposit hangs off the booking, a charge off the deposit, and an inspection
+ * off the occupancy — so all three go with the bookings above.
+ *
  * `audit_event` is deliberately left alone: it is append-only by design
  * (architecture.md §4) and no test asserts a global count — the ones that care
  * filter by the entity they just acted on. Wiping an audit trail between tests

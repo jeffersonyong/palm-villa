@@ -39,6 +39,15 @@ const ACTION_LABELS: Record<string, string> = {
   'payment.verified': 'Payment verified',
   'payment.amount_overridden': 'Confirmed at an amount other than the total',
   'payment.matched_manually': 'Matched to this booking by hand',
+  // The deposit's own verbs, folded in by the page for the reason the
+  // payments' are: a booking whose trail shows a guest checking in with no
+  // record of the money taken is a trail lying by omission. Its charges and
+  // its inspection stay on the deposit's own screen — that is a second record
+  // with a history of its own, and repeating it here would make a booking's
+  // trail the whole ledger.
+  'deposit.collected': 'Security deposit collected',
+  'deposit.release_approved': 'Deposit release approved',
+  'deposit.owed_settled': 'Amount owed on the deposit settled',
 }
 
 /**
@@ -99,7 +108,7 @@ function actionLabel(event: AuditEvent): string {
 
   return (
     ACTION_LABELS[event.action] ??
-    event.action.replace(/^(booking|payment)\./, '').replace(/_/g, ' ')
+    event.action.replace(/^(booking|payment|deposit)\./, '').replace(/_/g, ' ')
   )
 }
 

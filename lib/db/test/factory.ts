@@ -5,9 +5,17 @@ import { line, totalOf } from '@/lib/domain/lines'
 import { bnd } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
 
-import { createWalkInBooking, type Booking, type CreateWalkInBookingInput } from '../bookings'
+import {
+  createWalkInBooking,
+  transitionBooking,
+  type Booking,
+  type CreateWalkInBookingInput,
+} from '../bookings'
+import { checkInBooking } from '../deposits'
+import { recordInspection } from '../inspections'
 import { listPaymentsForBooking, type Payment } from '../payments'
 import { markUnitLeased, markUnitOutOfService } from '../units'
+import type { InspectionOutcome } from '@/lib/domain/inspection'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { currentPropertyId } from '../property'
 
@@ -24,6 +32,10 @@ import { currentPropertyId } from '../property'
  * `givenBookingInState` is the one exception, for the two states no code path
  * creates yet; its own note explains why it exists and what still constrains
  * it.
+ *
+ * The deposit helpers at the foot of this file are the same discipline applied
+ * to a longer walk: a released deposit needs a booking checked in, checked out
+ * and inspected, and each of those goes through the function the portal calls.
  */
 
 const NIGHTLY_RATE = bnd(200)
@@ -382,4 +394,71 @@ export async function givenUnitOutOfService(
   }
 
   return unitId
+}
+
+/**
+ * Checks a guest in, which is how a deposit comes to exist.
+ *
+ * Through `checkInBooking`, so the booking moves by the state machine and the
+ * deposit row is the one the product writes. `depositId` is null where the
+ * booking quoted none — pass `securityDeposit: 0` through `spec` to exercise
+ * that path.
+ */
+export async function givenCheckedInBooking(
+  spec: BookingSpec,
+  method: PaymentMethod = 'cash',
+): Promise<{ booking: Booking; depositId: string | null }> {
+  const booking = await givenBooking(spec)
+  const result = await checkInBooking({ bookingId: booking.id, method, actorId: null })
+
+  if (!result.ok) {
+    throw new Error(`Test setup could not check the guest in: ${result.error.message}`)
+  }
+
+  return { booking, depositId: result.depositId }
+}
+
+/** A stay that has ended: checked in, deposit taken, then checked out. */
+export async function givenDepartedBooking(
+  spec: BookingSpec,
+  method: PaymentMethod = 'cash',
+): Promise<{ booking: Booking; depositId: string | null }> {
+  const checked = await givenCheckedInBooking(spec, method)
+  const result = await transitionBooking(checked.booking.id, 'check_out', null)
+
+  if (!result.ok) {
+    throw new Error(`Test setup could not check the guest out: ${result.error.message}`)
+  }
+
+  return checked
+}
+
+/** A departed stay whose unit has been looked at — the state a release needs. */
+export async function givenInspectedDeposit(
+  spec: BookingSpec,
+  inspection: { outcome?: InspectionOutcome; notes?: string | null } = {},
+): Promise<{ booking: Booking; depositId: string; inspectionId: string }> {
+  const departed = await givenDepartedBooking(spec)
+
+  if (!departed.depositId) {
+    throw new Error('Test setup expected a deposit; this booking quoted none.')
+  }
+
+  const outcome = inspection.outcome ?? 'clean'
+  const result = await recordInspection({
+    bookingId: departed.booking.id,
+    outcome,
+    notes: inspection.notes ?? (outcome === 'issues_found' ? 'Test issue' : null),
+    actorId: null,
+  })
+
+  if (!result.ok) {
+    throw new Error(`Test setup could not record an inspection: ${result.error.message}`)
+  }
+
+  return {
+    booking: departed.booking,
+    depositId: departed.depositId,
+    inspectionId: result.inspectionId,
+  }
 }

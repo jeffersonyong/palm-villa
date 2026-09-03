@@ -9,16 +9,16 @@ import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionCard } from '@/components/portal/section-card'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listAuditEvents, type AuditEvent } from '@/lib/db/audit'
 import { getBookingByReference, type Booking } from '@/lib/db/bookings'
+import { getDepositByBookingId, type Deposit } from '@/lib/db/deposits'
 import { listBookingNotes } from '@/lib/db/notes'
 import { listPaymentsForBooking, type Payment } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
 import { allowedEvents, canAmend } from '@/lib/domain/booking-state'
-import { formatStayDate, formatTimestamp, nightsBetween } from '@/lib/domain/dates'
+import { formatStayDate, formatTimestamp, nightsBetween, todayInBrunei } from '@/lib/domain/dates'
 import { balanceOf, canSettle } from '@/lib/domain/balance'
 import { describeDiscount } from '@/lib/domain/discount'
 import { formatCents } from '@/lib/domain/money'
@@ -32,6 +32,8 @@ import { BookingActions } from './booking-actions'
 import { BookingHistory } from './booking-history'
 import { BookingNotes } from './booking-notes'
 import { RecordPayment } from './record-payment'
+import { SecurityDepositInset } from './security-deposit-inset'
+import { StayButtons } from './stay-buttons'
 
 /**
  * One booking, everything known about it, and what can still be done to it
@@ -87,11 +89,12 @@ export default async function BookingDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  const [bookingEvents, payments, staff, notes] = await Promise.all([
+  const [bookingEvents, payments, staff, notes, deposit] = await Promise.all([
     listAuditEvents('booking', booking.id),
     listPaymentsForBooking(booking.id),
     listStaff(),
     listBookingNotes(booking.id),
+    getDepositByBookingId(booking.id),
   ])
 
   // Payment events are typed against the payment, not the booking, so a trail
@@ -104,15 +107,31 @@ export default async function BookingDetailPage({ params }: PageProps) {
     payments.map((payment) => listAuditEvents('payment', payment.id)),
   )
 
-  const events: readonly AuditEvent[] = [...bookingEvents, ...paymentEvents.flat()].sort((a, b) =>
-    a.at < b.at ? 1 : a.at > b.at ? -1 : 0,
-  )
+  // The deposit's own events are folded in for the reason the payments' are:
+  // they carry `entity_type = 'deposit'`, so a trail built from the booking
+  // alone would show a guest checking in with no record of the money that
+  // changed hands. Its charges and its inspection stay on the deposit's own
+  // screen — that is a second record with its own history, and repeating it
+  // here would make a booking's trail the whole ledger.
+  const depositEvents = deposit ? await listAuditEvents('deposit', deposit.id) : []
+
+  const events: readonly AuditEvent[] = [
+    ...bookingEvents,
+    ...paymentEvents.flat(),
+    ...depositEvents,
+  ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
 
   const actorNames = new Map(staff.map((account) => [account.id, account.displayName]))
   const pending = payments.find((payment) => payment.status === 'pending_verification')
   const mayVerify = hasPermission(actor.permissions, 'payment.verify')
 
   const mayAmend = canAmend(booking.status) && hasPermission(actor.permissions, 'booking.amend')
+  // Both moves are gated by `booking.amend` until N11 settles who checks a
+  // guest in — see stay-actions.ts. Which one is offered comes from the state
+  // machine, never from a hand-written list of statuses.
+  const mayMoveStay = hasPermission(actor.permissions, 'booking.amend')
+  const canCheckIn = mayMoveStay && allowedEvents(booking.status).includes('check_in')
+  const canCheckOut = mayMoveStay && allowedEvents(booking.status).includes('check_out')
   const mayCancel =
     allowedEvents(booking.status).includes('cancel') &&
     hasPermission(actor.permissions, 'booking.cancel')
@@ -136,6 +155,16 @@ export default async function BookingDetailPage({ params }: PageProps) {
         }
         actions={
           <>
+            <StayButtons
+              bookingId={booking.id}
+              reference={booking.reference}
+              guestName={booking.guestName}
+              securityDeposit={booking.securityDeposit}
+              checkInDate={booking.stay?.range.start ?? null}
+              today={todayInBrunei()}
+              canCheckIn={canCheckIn}
+              canCheckOut={canCheckOut}
+            />
             {mayAmend ? (
               <Button asChild variant="tertiary">
                 <Link href={`/portal/bookings/${booking.reference}/amend`}>
@@ -158,7 +187,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
       {!canAmend(booking.status) ? (
         <p className="mt-lg text-body-sm text-muted-foreground">
           {booking.status === 'checked_in'
-            ? 'This guest has checked in, so the booking can no longer be amended here.'
+            ? 'This guest has checked in, so the booking can no longer be amended. Checking them out ends the stay.'
             : 'This booking is closed. Its details are kept as a record and cannot be changed.'}
         </p>
       ) : null}
@@ -168,6 +197,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
         <MoneySummary
           booking={booking}
           payments={payments}
+          deposit={deposit}
           mayRecordPayment={hasPermission(actor.permissions, 'payment.record_cash')}
         />
       </div>
@@ -304,10 +334,13 @@ function VehicleField({ booking }: { booking: Booking }) {
 function MoneySummary({
   booking,
   payments,
+  deposit,
   mayRecordPayment,
 }: {
   booking: Booking
   payments: readonly Payment[]
+  /** What is actually held, once the guest has checked in. Null before that. */
+  deposit: Deposit | null
   mayRecordPayment: boolean
 }) {
   // The balance, at last. This card used to state what had been taken and
@@ -398,18 +431,11 @@ function MoneySummary({
       {/* Never summed into the total. prd.md §11: the security deposit is a
             refundable liability held against the booking, not revenue, and
             folding it in would misstate both the price and the deposit ledger. */}
-      <Card surface="inset" className="mt-lg">
-        <div className="flex items-baseline justify-between gap-lg">
-          <span className="text-body-sm text-muted-foreground">Security deposit</span>
-          <span className="text-body-sm text-foreground tabular-nums">
-            BND {formatCents(booking.securityDeposit)}
-          </span>
-        </div>
-        <p className="mt-xs text-caption text-muted-foreground">
-          Refundable, collected on arrival and released after inspection. Held separately from the
-          total above.
-        </p>
-      </Card>
+      <SecurityDepositInset
+        reference={booking.reference}
+        quoted={booking.securityDeposit}
+        deposit={deposit}
+      />
     </SectionCard>
   )
 }
