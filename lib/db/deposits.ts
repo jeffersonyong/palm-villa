@@ -473,7 +473,7 @@ export async function checkInBooking(
 
   const { data: booking, error: readError } = await dataClient()
     .from('booking')
-    .select('status, security_deposit_cents')
+    .select('status')
     .eq('property_id', propertyId)
     .eq('id', input.bookingId)
     .maybeSingle()
@@ -486,7 +486,10 @@ export async function checkInBooking(
     return { ok: false, error: { code: 'not_found', message: 'That booking no longer exists.' } }
   }
 
-  const current = booking as { status: BookingStatus; security_deposit_cents: number }
+  // Read for its status alone: the state machine decides legality here
+  // (architecture.md §5.3) and the function re-checks the same status under a
+  // lock. The deposit's amount is deliberately NOT read here — see below.
+  const current = booking as { status: BookingStatus }
   const next = transition(current.status, 'check_in')
 
   if (!next.ok) {
@@ -506,17 +509,25 @@ export async function checkInBooking(
     throw new Error(`Could not check the guest in: ${error.message}`)
   }
 
-  const result = data as { ok: true; status: BookingStatus; deposit_id: string | null } | RpcRefusal
+  const result = data as
+    | { ok: true; status: BookingStatus; deposit_id: string | null; amount_cents: number }
+    | RpcRefusal
 
   if (!result.ok) {
     return { ok: false, error: describeCheckInFailure(result) }
   }
 
+  // The amount comes back from the function rather than from the read above.
+  // `confirmed` is amendable and `amend_booking()` can reprice the deposit, so
+  // an amendment landing between the two would leave this reporting one figure
+  // while the ledger held another — and the figure a clerk is shown is the one
+  // they say out loud to the guest. What comes back was written under the row
+  // lock.
   return {
     ok: true,
     status: result.status,
     depositId: result.deposit_id,
-    amount: result.deposit_id ? current.security_deposit_cents : 0,
+    amount: result.amount_cents,
   }
 }
 

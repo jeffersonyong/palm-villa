@@ -140,6 +140,10 @@ create table deposit (
     )
   ),
 
+  constraint deposit_release_note_length check (
+    release_note is null or length(release_note) <= 280
+  ),
+
   constraint deposit_settlement_is_whole check (
     (owed_settled_at is null) = (owed_settled_method is null)
   ),
@@ -211,6 +215,10 @@ create table inspection (
   -- An inspection that says something is wrong without saying what cannot
   -- support the charge that follows it. checkInspectionNotes() refuses first,
   -- with a sentence; this refuses last.
+  -- MAX_INSPECTION_NOTES_LENGTH in lib/domain/inspection.ts, said again here
+  -- so the ceiling holds for a caller that never asked the domain.
+  constraint inspection_notes_length check (notes is null or length(notes) <= 2000),
+
   constraint inspection_issues_need_notes check (
     outcome <> 'issues_found' or btrim(coalesce(notes, '')) <> ''
   )
@@ -263,6 +271,14 @@ create table deposit_charge (
   unique (property_id, id),
   foreign key (property_id, deposit_id) references deposit (property_id, id) on delete cascade,
 
+  -- Ceilings on both, for the reason the discount's reason has one: this is
+  -- staff prose attached to money, and an unbounded text column is a row
+  -- nobody can render in a table and a statement nobody can print.
+  constraint deposit_charge_reason_length check (length(reason) <= 280),
+  constraint deposit_charge_waive_reason_length check (
+    waive_reason is null or length(waive_reason) <= 280
+  ),
+
   constraint deposit_charge_waiver_is_whole check (
     (waived_at is null and waive_reason is null)
     or (waived_at is not null and btrim(coalesce(waive_reason, '')) <> '')
@@ -281,6 +297,13 @@ alter table deposit_charge enable row level security;
 -- machine and was reachable only from a test. It becomes a portal action here,
 -- gated by `booking.amend` until open question N11 settles who may check a
 -- guest in (**[A]**, prd.md §4).
+--
+-- Not restricted by stream, and that is deliberate rather than missed: today
+-- only a short stay can be created at all, and what makes a booking checkable
+-- in is its status rather than what it sold. When day passes land (phase two)
+-- the question is whether one is "checked in" at the gate at all — a D-series
+-- question about arrivals, not one this function should answer early. A day
+-- pass has no occupancy, so record_inspection() refuses it by name.
 --
 -- The status move and the deposit insert are ONE transaction on purpose. A
 -- guest checked in with no deposit recorded is exactly the gap in the
@@ -396,7 +419,17 @@ begin
     end
   );
 
-  return jsonb_build_object('ok', true, 'status', p_to_status, 'deposit_id', v_deposit_id);
+  -- The amount is returned as well as the id, and the caller reads it from
+  -- here rather than from its own earlier read of the booking. `confirmed` is
+  -- an amendable status and amend_booking() can reprice the deposit, so a
+  -- caller that quoted its pre-call read could tell a clerk one figure while
+  -- the ledger recorded another. This one was written under the row lock.
+  return jsonb_build_object(
+    'ok', true,
+    'status', p_to_status,
+    'deposit_id', v_deposit_id,
+    'amount_cents', case when v_deposit_id is null then 0 else v_booking.security_deposit_cents end
+  );
 end;
 $function$;
 
@@ -479,7 +512,9 @@ begin
   values (p_property_id, v_occupancy.id, p_outcome, v_notes, p_actor_id)
   returning id into v_inspection_id;
 
-  select ref into v_unit_ref from unit where id = v_occupancy.unit_id;
+  select ref into v_unit_ref
+  from unit
+  where id = v_occupancy.unit_id and property_id = p_property_id;
 
   insert into audit_event (
     property_id, actor_id, action, entity_type, entity_id, before, after
@@ -556,7 +591,9 @@ begin
   values (p_property_id, p_deposit_id, p_amount_cents, v_reason, p_actor_id)
   returning id into v_charge_id;
 
-  select * into v_booking from booking where id = v_deposit.booking_id;
+  select * into v_booking
+  from booking
+  where id = v_deposit.booking_id and property_id = p_property_id;
 
   -- `reason` under that key deliberately: EventHistory quotes after.reason, so
   -- the trail carries what the charge was for without a per-verb reader.

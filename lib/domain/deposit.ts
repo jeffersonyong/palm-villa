@@ -67,6 +67,23 @@ export const DEPOSIT_STAGE_LABELS: Readonly<Record<DepositStage, string>> = {
   released: 'Released',
 }
 
+/**
+ * Ceilings on the three pieces of prose this slice collects.
+ *
+ * 280 each, matching a discount's reason and a cancellation's: they are all
+ * the same act — a sentence explaining a decision about money, written at a
+ * desk — and they are read back in a table cell and on a printed statement,
+ * neither of which can hold an essay. The inspection's notes are the deliberate
+ * exception at 2000 (see ./inspection.ts): that one is evidence rather than a
+ * justification, and an inspector describing damage should not be editing down.
+ *
+ * Enforced by the server actions' schemas, and again by CHECK constraints, so
+ * the rule survives a caller that never asked.
+ */
+export const MAX_CHARGE_REASON_LENGTH = 280
+export const MAX_WAIVE_REASON_LENGTH = 280
+export const MAX_RELEASE_NOTE_LENGTH = 280
+
 export interface DepositStageFacts {
   /** A release has been approved. */
   released: boolean

@@ -23,6 +23,7 @@ import { currentPropertyId } from './property'
 import {
   bookingInput,
   givenBooking,
+  givenDayPassBooking,
   givenCheckedInBooking,
   givenDepartedBooking,
   givenInspectedDeposit,
@@ -229,6 +230,26 @@ describe('recordInspection', () => {
     expect(await getInspectionForBooking(booking.id)).toBeNull()
   })
 
+  test('a booking that occupies no unit has nothing to inspect', async () => {
+    // Not defensive: a day pass consumes facility capacity and no unit
+    // (prd.md §6.1), so when that stream can be checked in there is nothing
+    // here for Housekeeping to look at. Refused by name rather than by a null
+    // reference further down.
+    const dayPass = await givenDayPassBooking({ guestName: 'Test Day Guest' })
+
+    await dataClient().from('booking').update({ status: 'checked_in' }).eq('id', dayPass.id)
+    await transitionBooking(dayPass.id, 'check_out', null)
+
+    expect(
+      await recordInspection({
+        bookingId: dayPass.id,
+        outcome: 'clean',
+        notes: null,
+        actorId: null,
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'no_occupancy' } })
+  })
+
   test('writes its own event, carrying the outcome and the unit', async () => {
     const { inspectionId } = await givenInspectedDeposit(
       { unitRef: '3B-12', ...STAY },
@@ -336,8 +357,42 @@ describe('charges against a deposit', () => {
     ])
   })
 
-  test('a charge cannot be waived twice', async () => {
+  test('a charge of nothing, or with no reason, is refused', async () => {
+    // Both guards are in the SQL as well as the form, because this is money
+    // being kept and the reason is the first thing asked about it later.
     const { depositId } = await givenInspectedDeposit({ unitRef: '4B-05', ...STAY })
+
+    expect(
+      await addDepositCharge({ depositId, amount: 0, reason: 'Nothing', actorId: null }),
+    ).toMatchObject({ ok: false, error: { code: 'invalid_amount' } })
+
+    expect(
+      await addDepositCharge({ depositId, amount: bnd(10), reason: '   ', actorId: null }),
+    ).toMatchObject({ ok: false, error: { code: 'reason_required' } })
+
+    expect(await listDepositCharges(depositId)).toHaveLength(0)
+  })
+
+  test('a waiver with no reason is refused', async () => {
+    const { depositId } = await givenInspectedDeposit({ unitRef: '4B-06', ...STAY })
+    const charge = await addDepositCharge({
+      depositId,
+      amount: bnd(20),
+      reason: 'Lamp',
+      actorId: null,
+    })
+
+    if (!charge.ok) {
+      throw new Error('Test setup could not add a charge.')
+    }
+
+    expect(
+      await waiveDepositCharge({ chargeId: charge.chargeId, reason: ' ', actorId: null }),
+    ).toMatchObject({ ok: false, error: { code: 'reason_required' } })
+  })
+
+  test('a charge cannot be waived twice', async () => {
+    const { depositId } = await givenInspectedDeposit({ unitRef: '3B-27', ...STAY })
     const charge = await addDepositCharge({
       depositId,
       amount: bnd(20),
@@ -357,7 +412,7 @@ describe('charges against a deposit', () => {
   })
 
   test('close when the release is approved — the statement is what was signed', async () => {
-    const { depositId } = await givenInspectedDeposit({ unitRef: '4B-06', ...STAY })
+    const { depositId } = await givenInspectedDeposit({ unitRef: '3B-28', ...STAY })
     const charge = await addDepositCharge({
       depositId,
       amount: bnd(20),

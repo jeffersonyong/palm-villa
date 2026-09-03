@@ -23,6 +23,13 @@ import type { DepositWriteError, DepositWriteResult } from './deposits'
  * a release was approved against it. Correcting one should be a deliberate
  * addition to this module rather than something a screen can already do.
  *
+ * **Notes arrive already trimmed and length-checked**, by
+ * `checkInspectionNotes()` in lib/domain/inspection.ts — called by the server
+ * action, where the refusal can be shown against the field that failed. The
+ * same contract `lib/db/notes.ts` states, and the same arrangement
+ * `checkPaymentMatch()` has with the payments layer. The database refuses last
+ * either way (`inspection_issues_need_notes`, `inspection_notes_length`).
+ *
  * No photographs. See the note on the table.
  */
 
