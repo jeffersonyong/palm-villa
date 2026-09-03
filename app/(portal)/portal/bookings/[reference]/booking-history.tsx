@@ -1,5 +1,6 @@
 import { EventHistory } from '@/components/portal/event-history'
 import type { AuditEvent } from '@/lib/db/audit'
+import { DOCUMENT_KIND_LABELS, isDocumentKind } from '@/lib/domain/document'
 
 /**
  * Everything recorded against this booking, newest first.
@@ -48,6 +49,14 @@ const ACTION_LABELS: Record<string, string> = {
   'deposit.collected': 'Security deposit collected',
   'deposit.release_approved': 'Deposit release approved',
   'deposit.owed_settled': 'Amount owed on the deposit settled',
+  // Documents (capabilities B10, G3). `document.viewed` is here because it IS
+  // the promise: scope G3 is "every access to an identity document is logged —
+  // who viewed which document, and when", and a log nobody can read is a
+  // control the client was told about and cannot check. It is the only verb in
+  // this table recording a *read* rather than a change, which is why it is
+  // worded as somebody doing something rather than as something happening.
+  // The four document verbs are labelled by `documentLabel` below rather than
+  // here, because which document it was is the useful half of the sentence.
 }
 
 /**
@@ -91,6 +100,37 @@ function discountLabel(event: AuditEvent): string {
 }
 
 /**
+ * Which document, not just that there was one.
+ *
+ * A booking can carry an IC, a transfer slip and several inspection
+ * photographs, and the four document verbs are the same for all of them — so a
+ * trail reading "Document opened" three times answers none of the question a
+ * reader brought to it. The kind is in the payload of every one of them,
+ * including `document.expired`, which is written by a scheduled job with no
+ * screen behind it.
+ *
+ * This matters most on `document.viewed`. Capability G3 promises the client a
+ * record of who looked at an **identity document**; "Document opened" beside a
+ * slip and an IC makes that record something a reader has to cross-reference
+ * rather than read.
+ */
+function documentLabel(event: AuditEvent): string {
+  const kind = event.after?.kind ?? event.before?.kind
+  const noun =
+    typeof kind === 'string' && isDocumentKind(kind) ? DOCUMENT_KIND_LABELS[kind] : 'Document'
+  const verb = DOCUMENT_VERBS[event.action]
+
+  return verb ? `${noun} ${verb}` : noun
+}
+
+const DOCUMENT_VERBS: Record<string, string> = {
+  'document.attached': 'attached',
+  'document.viewed': 'opened',
+  'document.removed': 'removed',
+  'document.expired': 'deleted — retention period ended',
+}
+
+/**
  * An unmapped action still renders, as its raw verb.
  *
  * Falling back rather than hiding it: an event nobody wrote a label for is
@@ -106,9 +146,13 @@ function actionLabel(event: AuditEvent): string {
     return discountLabel(event)
   }
 
+  if (event.action.startsWith('document.')) {
+    return documentLabel(event)
+  }
+
   return (
     ACTION_LABELS[event.action] ??
-    event.action.replace(/^(booking|payment|deposit)\./, '').replace(/_/g, ' ')
+    event.action.replace(/^(booking|payment|deposit|document)\./, '').replace(/_/g, ' ')
   )
 }
 

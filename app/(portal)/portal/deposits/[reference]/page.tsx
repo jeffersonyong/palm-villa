@@ -21,16 +21,21 @@ import {
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listAuditEvents, type AuditEvent } from '@/lib/db/audit'
+import { listAuditEvents, listAuditEventsForEntities, type AuditEvent } from '@/lib/db/audit'
 import { getBookingByReference } from '@/lib/db/bookings'
 import { listDepositCharges, type DepositCharge } from '@/lib/db/deposit-charges'
 import { getDepositByBookingReference, type Deposit } from '@/lib/db/deposits'
+import { listDocumentsForBooking, type Document } from '@/lib/db/documents'
 import { listStaff } from '@/lib/db/staff'
 import { canAddCharge, canApproveRelease, owedStateOf } from '@/lib/domain/deposit'
 import { formatStayDates, formatTimestamp } from '@/lib/domain/dates'
+import { mayAttach, mayOpen } from '@/lib/domain/document'
 import { INSPECTION_OUTCOME_LABELS, isInspectionOutcome } from '@/lib/domain/inspection'
 import { formatCents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
+
+import { AttachDocument } from '../../documents/attach-document'
+import { DocumentRow } from '../../documents/document-row'
 
 import { AddCharge, WaiveCharge } from './charge-actions'
 import { ApproveRelease, SettleOwed } from './deposit-actions'
@@ -102,11 +107,12 @@ export default async function DepositPage({ params }: PageProps) {
     return <NoDepositYet reference={reference} />
   }
 
-  const [charges, staff, depositEvents, inspectionEvents] = await Promise.all([
+  const [charges, staff, depositEvents, inspectionEvents, photographs] = await Promise.all([
     listDepositCharges(deposit.id),
     listStaff(),
     listAuditEvents('deposit', deposit.id),
     deposit.inspection ? listAuditEvents('inspection', deposit.inspection.id) : [],
+    listDocumentsForBooking(deposit.bookingId, 'inspection_photo'),
   ])
 
   // A charge is its own entity with its own verbs — which is what makes "every
@@ -116,10 +122,20 @@ export default async function DepositPage({ params }: PageProps) {
     charges.map((charge) => listAuditEvents('deposit_charge', charge.id)),
   )
 
+  // The photographs' own events, for the reason the charges' are folded in: a
+  // deduction disputed a year later is argued from the evidence, and "who
+  // attached this photograph, and did anybody remove one" is part of that
+  // story. One query for all of them rather than one each.
+  const photographEvents = await listAuditEventsForEntities(
+    'document',
+    photographs.map((photograph) => photograph.id),
+  )
+
   const events: readonly AuditEvent[] = [
     ...depositEvents,
     ...inspectionEvents,
     ...chargeEvents.flat(),
+    ...photographEvents,
   ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
 
   const actorNames = new Map(staff.map((account) => [account.id, account.displayName]))
@@ -204,6 +220,9 @@ export default async function DepositPage({ params }: PageProps) {
           deposit={deposit}
           actorNames={actorNames}
           mayInspect={mayInspect && !facts.inspected && deposit.bookingStatus === 'completed'}
+          photographs={photographs}
+          mayAddPhotographs={mayAttach('inspection_photo', actor.permissions)}
+          mayOpenPhotographs={mayOpen('inspection_photo', actor.permissions)}
         />
       </div>
 
@@ -304,10 +323,16 @@ function InspectionSection({
   deposit,
   actorNames,
   mayInspect,
+  photographs,
+  mayAddPhotographs,
+  mayOpenPhotographs,
 }: {
   deposit: Deposit
   actorNames: ReadonlyMap<string, string>
   mayInspect: boolean
+  photographs: readonly Document[]
+  mayAddPhotographs: boolean
+  mayOpenPhotographs: boolean
 }) {
   const { inspection } = deposit
   const outcome = inspection && isInspectionOutcome(inspection.outcome) ? inspection.outcome : null
@@ -334,9 +359,48 @@ function InspectionSection({
             </p>
           )}
 
-          <p className="mt-lg text-caption text-muted-foreground">
-            Photographs are not recorded yet — they arrive with document storage.
-          </p>
+          {/* prd.md §11 requirement 2, and the one the deposits slice could
+              not meet: "Inspection records outcome, notes, and photographs.
+              Photo evidence is the cheapest thing that improves dispute
+              outcomes." An inset rather than a section of its own, because a
+              photograph is part of the inspection rather than a record beside
+              it — and a charge raised off the back of one is read against both
+              together. */}
+          <Card surface="inset" className="mt-lg">
+            <span className="text-micro text-muted-foreground">Photographs</span>
+
+            {photographs.length === 0 ? (
+              <p className="mt-sm text-body-sm text-muted-foreground">
+                None taken. A photograph is the cheapest evidence in a disputed charge.
+              </p>
+            ) : (
+              <div className="mt-xs divide-y divide-border">
+                {photographs.map((photograph) => (
+                  <DocumentRow
+                    key={photograph.id}
+                    document={photograph}
+                    mayOpen={mayOpenPhotographs}
+                    mayRemove={mayAddPhotographs}
+                    attachedBy={nameOf(photograph.uploadedBy, actorNames)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {mayAddPhotographs && deposit.inspection ? (
+              <div className="mt-md">
+                <AttachDocument
+                  kind="inspection_photo"
+                  bookingId={deposit.bookingId}
+                  inspectionId={deposit.inspection.id}
+                  label={photographs.length === 0 ? 'Add photographs' : 'Add more'}
+                  title={`Photographs of ${deposit.stay?.unitRef ?? deposit.bookingReference}`}
+                  description="Evidence for anything charged against this deposit. Kept privately for two years, then deleted."
+                  multiple
+                />
+              </div>
+            ) : null}
+          </Card>
         </>
       ) : (
         <>
