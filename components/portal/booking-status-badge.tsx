@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge'
+import type { StatusTone } from '@/components/portal/status-tone'
 import type { BookingStatus } from '@/lib/domain/booking-state'
 
 /**
@@ -26,12 +27,12 @@ const STATUS_PRESENTATION = {
   expired: { label: 'Expired', tone: 'negative' },
   cancelled: { label: 'Cancelled', tone: 'negative' },
   no_show: { label: 'No show', tone: 'negative' },
-} as const satisfies Record<
-  BookingStatus,
-  { label: string; tone: 'positive' | 'warning' | 'negative' | 'active' | 'neutral' }
->
+} as const satisfies Record<BookingStatus, { label: string; tone: StatusTone }>
 
-/** The semantic tones design.md allows a status to carry. */
+/**
+ * The tones a booking status actually uses — a subset of {@link StatusTone},
+ * narrowed by this table rather than restated.
+ */
 export type BookingStatusTone = (typeof STATUS_PRESENTATION)[BookingStatus]['tone']
 
 /** The staff-facing name for a status, for filter options and prose. */

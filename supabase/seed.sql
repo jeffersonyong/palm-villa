@@ -126,13 +126,18 @@ cross join unnest(array[
 ]) as permission
 where r.slug = 'admin';
 
+-- Front Office holds `tenancy.manage` because declaring a unit leased
+-- long-term (capability B9) is a commercial statement rather than an
+-- operational one, and prd.md §4 gives Housekeeping `unit.manage` "(status
+-- only)" — the desk marks a lease, the cleaner does not.
 insert into role_permission (property_id, role_id, permission)
 select r.property_id, r.id, permission
 from staff_role r
 cross join unnest(array[
   'booking.view', 'booking.create', 'booking.amend', 'booking.cancel',
   'booking.override_hold', 'booking.discount', 'payment.verify',
-  'payment.record_cash', 'charge.create', 'unit.manage', 'document.view_identity'
+  'payment.record_cash', 'charge.create', 'unit.manage', 'tenancy.manage',
+  'document.view_identity'
 ]) as permission
 where r.slug = 'front-office';
 

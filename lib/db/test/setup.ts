@@ -90,6 +90,14 @@ async function assertDatabaseReady(): Promise<void> {
  * frees the units for the next test. Guests follow, since a guest exists only
  * because a booking created one.
  *
+ * Two things do NOT cascade, and both arrived with the units slice
+ * (20260904000100). A lease is an occupancy row with no booking, so nothing
+ * deletes it when the bookings go; and out-of-service is a flag on a seeded
+ * unit, which is a row this function is otherwise careful not to touch. Left
+ * alone, either one leaks into the next test file as a unit that is
+ * mysteriously unavailable — which reads as a schema fault rather than as
+ * contamination, and costs an afternoon to find.
+ *
  * `audit_event` is deliberately left alone: it is append-only by design
  * (architecture.md §4) and no test asserts a global count — the ones that care
  * filter by the entity they just acted on. Wiping an audit trail between tests
@@ -106,9 +114,26 @@ async function clearTransactionalData(): Promise<void> {
     throw new Error(`Could not clear bookings between tests: ${bookingError.message}`)
   }
 
+  const { error: leaseError } = await db.from('occupancy').delete().is('booking_id', null)
+
+  if (leaseError) {
+    throw new Error(`Could not clear leases between tests: ${leaseError.message}`)
+  }
+
   const { error: guestError } = await db.from('guest').delete().gte('created_at', EPOCH)
 
   if (guestError) {
     throw new Error(`Could not clear guests between tests: ${guestError.message}`)
+  }
+
+  // Notes ride along here for the same reason: they are a column on a seeded
+  // row, so nothing else clears them between tests.
+  const { error: serviceError } = await db
+    .from('unit')
+    .update({ out_of_service_since: null, out_of_service_reason: null, notes: null })
+    .or('out_of_service_since.not.is.null,notes.not.is.null')
+
+  if (serviceError) {
+    throw new Error(`Could not return units to service between tests: ${serviceError.message}`)
   }
 }

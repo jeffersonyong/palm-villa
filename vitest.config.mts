@@ -56,15 +56,18 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           // `lib/domain` plus the handful of pure functions that live beside
-          // the components consuming them (route matching, breadcrumbs), and
-          // lib/auth's pure permission logic. The components themselves are
-          // chrome over tested primitives and are verified on /tokens, not
-          // here.
+          // the components and screens consuming them (route matching,
+          // breadcrumbs, a history window), and lib/auth's pure permission
+          // logic. The components themselves are chrome over tested primitives
+          // and are verified on /tokens, not here — and nothing under `app/`
+          // that touches the database or renders is eligible, which is why the
+          // glob catches `*.test.ts` and never `*.test.tsx`.
           include: [
             'lib/domain/**/*.test.ts',
             'lib/auth/**/*.test.ts',
             'lib/utils.test.ts',
             'components/**/*.test.ts',
+            'app/**/*.test.ts',
           ],
         },
       },

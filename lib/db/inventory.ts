@@ -1,3 +1,4 @@
+import type { StayDate } from '@/lib/domain/dates'
 import type { UnitTypeConfig } from '@/lib/domain/config'
 import { dataClient } from '@/lib/supabase/data'
 
@@ -19,11 +20,18 @@ import { currentPropertyId } from './property'
 
 export interface Unit {
   id: string
-  /** Human-facing unit reference, e.g. `3B-04`. */
+  /** Human-facing unit reference, e.g. `3B-04`. Editable by an administrator. */
   ref: string
   /** The unit type's slug — see the module note above. */
   unitTypeId: string
   unitTypeName: string
+  /**
+   * Null unless the unit has been taken out of service (capability B9).
+   *
+   * Carried on the ordinary unit shape rather than only on the board's, so a
+   * caller counting inventory cannot forget that some of it cannot be sold.
+   */
+  outOfServiceSince: StayDate | null
 }
 
 interface UnitTypeRow {
@@ -37,6 +45,7 @@ interface UnitTypeRow {
 interface UnitRow {
   id: string
   ref: string
+  out_of_service_since: string | null
   unit_type: { slug: string; name: string } | null
 }
 
@@ -79,7 +88,7 @@ export async function getUnits(unitTypeId?: string): Promise<readonly Unit[]> {
 
   const query = dataClient()
     .from('unit')
-    .select('id, ref, unit_type!inner(slug, name)')
+    .select('id, ref, out_of_service_since, unit_type!inner(slug, name)')
     .eq('property_id', propertyId)
     .order('ref')
 
@@ -96,19 +105,41 @@ export async function getUnits(unitTypeId?: string): Promise<readonly Unit[]> {
   return (data as unknown as UnitRow[]).map(toUnit)
 }
 
+export interface UnitCountOptions {
+  /**
+   * Count only units that could actually take a guest — the denominator of
+   * "3 of 36 free".
+   *
+   * This exists because that summary is a claim about the building, and a
+   * denominator that includes a unit nobody can be put in states it wrongly:
+   * "3 of 36" when four are out of service means three of thirty-two, and the
+   * clerk reading it is deciding whether to turn a walk-in away. The plain
+   * count still answers "how many units are there", which is a different
+   * question and the one the registry editor asks.
+   */
+  serviceableOnly?: boolean
+}
+
 /**
  * How many units exist of each type. Drives the "N of M free" summary.
  *
- * Every type appears, including one with no units — the 2-bedroom, whose count
- * is prd.md §18 N1 and is deliberately unseeded. A missing key would read on
- * screen as an absent unit type rather than an unanswered question.
+ * Every type appears, including one with no units — the 2-bedroom, whose
+ * count was prd.md §18 N1 and is now something an administrator sets on the
+ * unit registry screen. A missing key would read on screen as an absent unit
+ * type rather than an empty one.
  */
-export async function getUnitCounts(): Promise<Readonly<Record<string, number>>> {
+export async function getUnitCounts(
+  options: UnitCountOptions = {},
+): Promise<Readonly<Record<string, number>>> {
   const [types, units] = await Promise.all([getUnitTypes(), getUnits()])
 
   const counts: Record<string, number> = Object.fromEntries(types.map((type) => [type.id, 0]))
 
   for (const unit of units) {
+    if (options.serviceableOnly && unit.outOfServiceSince !== null) {
+      continue
+    }
+
     counts[unit.unitTypeId] = (counts[unit.unitTypeId] ?? 0) + 1
   }
 
@@ -128,5 +159,6 @@ function toUnit(row: UnitRow): Unit {
     ref: row.ref,
     unitTypeId: row.unit_type.slug,
     unitTypeName: row.unit_type.name,
+    outOfServiceSince: row.out_of_service_since,
   }
 }
