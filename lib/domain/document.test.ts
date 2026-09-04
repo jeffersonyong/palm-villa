@@ -8,6 +8,7 @@ import {
   BUCKET_FOR_KIND,
   DOCUMENT_KIND_LABELS,
   DOCUMENT_KINDS,
+  MAX_BYTES_FOR_KIND,
   MAX_DOCUMENT_BYTES,
   MAX_FILENAME_LENGTH,
   acceptAttributeFor,
@@ -195,6 +196,32 @@ describe('checkUpload', () => {
     exact.set(JPEG)
 
     expect(checkUpload('identity', exact).ok).toBe(true)
+  })
+
+  test('a pack has the bucket’s ceiling, not the upload’s, because it never crosses the request boundary', () => {
+    // 25 MiB, the `packs` bucket's own file_size_limit. The three uploaded
+    // kinds keep the 4 MiB the platform imposes on a request body.
+    expect(MAX_BYTES_FOR_KIND.accounting_pack).toBe(25 * 1024 * 1024)
+    expect(MAX_BYTES_FOR_KIND.identity).toBe(MAX_DOCUMENT_BYTES)
+    expect(MAX_BYTES_FOR_KIND.payment_slip).toBe(MAX_DOCUMENT_BYTES)
+    expect(MAX_BYTES_FOR_KIND.inspection_photo).toBe(MAX_DOCUMENT_BYTES)
+
+    const large = new Uint8Array(MAX_DOCUMENT_BYTES + 1)
+    large.set(PDF)
+
+    expect(checkUpload('accounting_pack', large).ok).toBe(true)
+    expect(checkUpload('payment_slip', large).ok).toBe(false)
+
+    const beyond = new Uint8Array(MAX_BYTES_FOR_KIND.accounting_pack + 1)
+    beyond.set(PDF)
+    const result = checkUpload('accounting_pack', beyond)
+
+    expect(result.ok).toBe(false)
+
+    if (!result.ok) {
+      expect(result.error.code).toBe('too_large')
+      expect(result.error.message).toContain('25 MB')
+    }
   })
 
   test('an unreadable file is refused before it reaches storage', () => {
