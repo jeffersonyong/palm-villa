@@ -36,6 +36,7 @@ import { AttachDocument } from '../../documents/attach-document'
 import { DocumentRow } from '../../documents/document-row'
 import { PaymentActions } from '../../payments/payment-actions'
 
+import { AccountingPack } from './accounting-pack'
 import { BookingActions } from './booking-actions'
 import { BookingHistory } from './booking-history'
 import { BookingNotes } from './booking-notes'
@@ -242,6 +243,16 @@ export default async function BookingDetailPage({ params }: PageProps) {
         mayAttachSlip={mayAttach('payment_slip', actor.permissions)}
         maySeeSlip={mayOpen('payment_slip', actor.permissions)}
       />
+
+      {/* Below the payments it records, above the notes. The newest live
+          pack; `listDocumentsForBooking` reads oldest first. */}
+      <SectionCard id="pack-heading" title="Accounting pack" className="mt-xl">
+        <AccountingPack
+          pack={documents.filter((document) => document.kind === 'accounting_pack').at(-1) ?? null}
+          mayOpen={mayOpen('accounting_pack', actor.permissions)}
+          hasVerifiedPayment={payments.some((payment) => payment.status === 'verified')}
+        />
+      </SectionCard>
 
       {/* Above the history, below the money. The history is the system's
           account of what happened; this is the staff's, and the two read
