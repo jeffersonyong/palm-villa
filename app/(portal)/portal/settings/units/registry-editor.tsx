@@ -150,11 +150,7 @@ export function RegistryEditor({ units, unitTypes }: RegistryEditorProps) {
     Object.fromEntries(
       unitTypes.map((type) => [
         type.id,
-        inferDraft(
-          units
-            .filter((unit) => unit.unitTypeId === type.id)
-            .map((unit) => unit.ref),
-        ),
+        inferDraft(units.filter((unit) => unit.unitTypeId === type.id).map((unit) => unit.ref)),
       ]),
     ),
   )
@@ -213,7 +209,9 @@ export function RegistryEditor({ units, unitTypes }: RegistryEditorProps) {
         next.prefix !== undefined || next.numbering !== undefined || next.suffix !== undefined
 
       const refs = patternChanged
-        ? merged.refs.map((_, index) => formatUnitRef(schemeOf(merged), schemeOf(merged).startAt + index))
+        ? merged.refs.map((_, index) =>
+            formatUnitRef(schemeOf(merged), schemeOf(merged).startAt + index),
+          )
         : merged.refs
 
       return { ...current, [typeId]: { ...merged, refs } }
@@ -416,9 +414,7 @@ export function RegistryEditor({ units, unitTypes }: RegistryEditorProps) {
         <Callout tone="negative" placement="page" role="alert">
           <div className="grid gap-xs">
             <p>{state.message}</p>
-            {state.blocked?.length ? (
-              <p className="font-mono">{state.blocked.join(', ')}</p>
-            ) : null}
+            {state.blocked?.length ? <p className="font-mono">{state.blocked.join(', ')}</p> : null}
           </div>
         </Callout>
       ) : null}

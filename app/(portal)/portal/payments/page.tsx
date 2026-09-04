@@ -133,11 +133,12 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
 
         {/* Decision 2, kept where it is actually load-bearing rather than only
             in a doc: prd.md §10.4 treats the slip as evidence, not
-            verification, which is what lets this screen ship complete before
-            document storage exists. */}
+            verification. The sentence about uploads arriving later has gone —
+            they are here (capability B10) — and what stays is the half that
+            still governs how this screen is worked. */}
         <p className="mt-md text-caption text-muted-foreground">
-          Slip uploads arrive with the documents slice, alongside the public booking flow. The bank
-          app remains the check either way — a slip is evidence, not verification.
+          The bank app remains the check — a slip is evidence, not verification. Attach one from the
+          booking.
         </p>
       </section>
     </>
@@ -186,7 +187,26 @@ function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
-      <TableCell className="text-muted-foreground">No slip on file</TableCell>
+      <TableCell>
+        {payment.slipDocumentId ? (
+          // Above the stretched row link, or the anchor cannot be clicked —
+          // the same `relative z-10` the action buttons already need. A plain
+          // anchor rather than next/link, because the href behind it writes an
+          // audit row and a prefetch on scroll would log a view nobody made.
+          <span className="relative z-10">
+            <a
+              href={`/portal/documents/${payment.slipDocumentId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground underline underline-offset-2"
+            >
+              On file
+            </a>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">None</span>
+        )}
+      </TableCell>
       {mayVerify ? (
         <TableCell className="text-right">
           {isPending ? (

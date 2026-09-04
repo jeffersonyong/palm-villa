@@ -100,6 +100,44 @@ export async function listAuditEventWindow(
   return readTrail(entityType, entityId, limit)
 }
 
+/**
+ * Everything recorded against several entities of one type, newest first.
+ *
+ * One query for a set of ids rather than one per id. The booking screen is
+ * what needs it: a booking's trail already folds in each payment's events and
+ * the deposit's, and the documents slice adds a row per identity document,
+ * slip and photograph — which turns a handful of round trips into a dozen on a
+ * screen prd.md §20 measures in seconds.
+ *
+ * An empty id list returns nothing without asking the database, because
+ * PostgREST reads `in.()` as a syntax error rather than as an empty set.
+ */
+export async function listAuditEventsForEntities(
+  entityType: string,
+  entityIds: readonly string[],
+): Promise<readonly AuditEvent[]> {
+  if (entityIds.length === 0) {
+    return []
+  }
+
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await dataClient()
+    .from('audit_event')
+    .select('id, actor_id, action, before, after, at')
+    .eq('property_id', propertyId)
+    .eq('entity_type', entityType)
+    .in('entity_id', [...new Set(entityIds)])
+    .order('at', { ascending: false })
+    .order('id', { ascending: false })
+
+  if (error) {
+    throw new Error(`Could not read the history for ${entityType}: ${error.message}`)
+  }
+
+  return (data as AuditRow[]).map(toAuditEvent)
+}
+
 interface AuditRow {
   id: string
   actor_id: string | null
@@ -107,6 +145,17 @@ interface AuditRow {
   before: Record<string, unknown> | null
   after: Record<string, unknown> | null
   at: string
+}
+
+function toAuditEvent(row: AuditRow): AuditEvent {
+  return {
+    id: row.id,
+    actorId: row.actor_id,
+    action: row.action,
+    before: row.before,
+    after: row.after,
+    at: row.at,
+  }
 }
 
 /**
@@ -143,14 +192,7 @@ async function readTrail(
     throw new Error(`Could not read the history for ${entityType} ${entityId}: ${error.message}`)
   }
 
-  const events = (data as AuditRow[]).map((row) => ({
-    id: row.id,
-    actorId: row.actor_id,
-    action: row.action,
-    before: row.before,
-    after: row.after,
-    at: row.at,
-  }))
+  const events = (data as AuditRow[]).map(toAuditEvent)
 
   return { events, total: count ?? events.length }
 }

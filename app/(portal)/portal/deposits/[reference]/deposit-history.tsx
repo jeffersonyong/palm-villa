@@ -31,6 +31,16 @@ const ACTION_LABELS: Record<string, string> = {
   'inspection.recorded': 'Inspection recorded',
   'charge.created': 'Charge added',
   'charge.waived': 'Charge waived',
+  // The photographs (prd.md §11 requirement 2). Folded in by the page because
+  // a disputed deduction is argued from the evidence, and whether a photograph
+  // was added — or quietly removed — belongs in the same story as the charge.
+  // Named as photographs rather than as documents: on this screen there is
+  // only one kind, and "Document attached" would make the reader look for
+  // which one.
+  'document.attached': 'Photograph attached',
+  'document.viewed': 'Photograph opened',
+  'document.removed': 'Photograph removed',
+  'document.expired': 'Photograph deleted — retention period ended',
 }
 
 function cents(value: unknown): string | null {

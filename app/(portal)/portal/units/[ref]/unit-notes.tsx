@@ -53,14 +53,7 @@ export function UnitNotes({ unitId, ref_, notes, canEdit }: UnitNotesProps) {
   const [isEditing, setIsEditing] = useState(false)
 
   if (isEditing) {
-    return (
-      <NoteForm
-        unitId={unitId}
-        ref_={ref_}
-        notes={notes}
-        onDone={() => setIsEditing(false)}
-      />
-    )
+    return <NoteForm unitId={unitId} ref_={ref_} notes={notes} onDone={() => setIsEditing(false)} />
   }
 
   return (

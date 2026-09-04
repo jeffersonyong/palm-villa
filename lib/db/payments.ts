@@ -69,7 +69,14 @@ export interface Payment {
   verifiedAt: string | null
   /** The waiting clock behind the queue's "time waiting" column. */
   createdAt: string
-  /** Always null in this slice; the documents slice fills it (§8). */
+  /**
+   * The transfer slip on file, or null (capability B4).
+   *
+   * prd.md §10.4: evidence, not verification — staff still check the bank, and
+   * this changes nothing about how a payment is confirmed. Read from the
+   * payment rather than joined, because the verification queue asks it once per
+   * row and that screen is measured in seconds (prd.md §20).
+   */
   slipDocumentId: string | null
   checkIn: StayDate | null
   unitRef: string | null

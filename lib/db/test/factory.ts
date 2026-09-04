@@ -12,9 +12,11 @@ import {
   type CreateWalkInBookingInput,
 } from '../bookings'
 import { checkInBooking } from '../deposits'
+import { attachDocument } from '../documents'
 import { recordInspection } from '../inspections'
 import { listPaymentsForBooking, type Payment } from '../payments'
 import { markUnitLeased, markUnitOutOfService } from '../units'
+import type { DocumentKind } from '@/lib/domain/document'
 import type { InspectionOutcome } from '@/lib/domain/inspection'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { currentPropertyId } from '../property'
@@ -431,6 +433,58 @@ export async function givenDepartedBooking(
   }
 
   return checked
+}
+
+/**
+ * The smallest thing that is genuinely a PNG.
+ *
+ * The eight-byte signature plus a token of body, so `sniffMimeType` recognises
+ * it and `checkUpload` accepts it. Bytes rather than a file on disk: a fixture
+ * that reads from the repository would make the suite depend on a binary
+ * nobody can review in a diff.
+ */
+export const TEST_PNG = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+])
+
+/** The same, as a PDF — for the cases where the kind refuses an image or a PDF. */
+export const TEST_PDF = new Uint8Array([
+  0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37, 0x0a, 0x25, 0xe2, 0xe3, 0xcf, 0xd3,
+])
+
+/**
+ * Attaches a document through the real write path.
+ *
+ * Through `attachDocument`, so the object is really uploaded, the row really
+ * written and the audit event really recorded — the discipline this whole file
+ * keeps. A test that inserted a `document` row directly would be asserting
+ * against a state the product cannot produce: one whose object does not exist,
+ * which `attach_document()` refuses by design.
+ */
+export async function givenDocument(input: {
+  kind: DocumentKind
+  bookingId: string
+  paymentId?: string | null
+  inspectionId?: string | null
+  bytes?: Uint8Array
+  filename?: string
+  actorId?: string | null
+}): Promise<string> {
+  const result = await attachDocument({
+    kind: input.kind,
+    bookingId: input.bookingId,
+    paymentId: input.paymentId ?? null,
+    inspectionId: input.inspectionId ?? null,
+    bytes: input.bytes ?? TEST_PNG,
+    filename: input.filename ?? 'test-document.png',
+    actorId: input.actorId ?? null,
+  })
+
+  if (!result.ok) {
+    throw new Error(`Test setup could not attach a document: ${result.error.message}`)
+  }
+
+  return result.documentId
 }
 
 /** A departed stay whose unit has been looked at — the state a release needs. */

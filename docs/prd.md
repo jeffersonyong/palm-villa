@@ -425,7 +425,7 @@ Each row shows reference, guest name, amount expected, time waiting, and the upl
 
 **As built.** A mismatched amount can only be confirmed through an explicit override that records a reason — architecture.md §6.2 tightened "must flag" into that, and it is enforced by a database constraint, not only by the screen. An overpayment is refused without a reason exactly as firmly as a short payment: an overpayment is a refund conversation, and refunds are [N5](open-questions.md), open.
 
-**[A] Slip display is deferred.** The queue ships showing "No slip on file" and says on screen where upload arrives. Nothing could upload one yet — the customer-facing upload is phase two (A6) and document storage is its own slice — and this bullet's own "evidence, not verification" is what makes the queue complete without it. **This is a delta against scope-of-capabilities.md B4, which promises the slip; it is flagged to the client rather than quietly amended.**
+**The slip arrived with the documents slice** (7 September 2026, capability B10), and the delta against scope-of-capabilities.md B4 is closed. The queue's cell reads *On file* or *None*, and a slip is attached from the booking. Two things are deliberately unchanged by it: the bank app is still the check — the slip is filed under the payment as a record rather than presented as something to approve against — and **a slip belongs to a bank transfer** [A], because cash was counted at the desk and has no slip to send. Customer-facing upload (A6) is still phase two; what exists is staff attaching what a guest sent them over WhatsApp, which is exactly what §2 describes them doing today.
 
 ### 10.5 Cash
 
@@ -486,7 +486,7 @@ Six requirements above; five are met as written and one is not. The following ar
 
 **[A] An inspection is recorded once per stay, after check-out, with one of two outcomes** — *clean* or *issues found* — and notes are required when something was found. Two outcomes because this section branches exactly once: condition confirmed, or damages to deduct. A finer taxonomy would be categories nobody asked for, and the notes carry the detail in the inspector's own words.
 
-**Requirement 2 is not met: there are no photographs.** Private buckets, signed URLs, permission-gated access and retention expiry are the documents slice (architecture.md §8), and a column pointing at nothing would be a promise the product cannot keep. The inspection carries outcome and notes, the screens say photographs arrive with document storage, and this is **flagged to the client as a delta against scope-of-capabilities.md C2** rather than quietly amended.
+**Requirement 2 is now met: photographs arrived with the documents slice** (7 September 2026, capability B10). An inspection carries any number of them, stored privately, deleted automatically after two years, with every access logged and who attached each one on the record — see §13's as-built block. They are attached under `inspection.record`, the inspection's own permission rather than a second one, and are **not frozen when the release is approved**: a photograph taken to support a charge is evidence, and locking the evidence at the moment of approval was a rule nobody asked for. The delta against scope-of-capabilities.md C2 is closed.
 
 **[A] Requirement 4's "charges entered" is satisfied by the approver seeing them.** The inspection is a hard gate — the database refuses a release without one — but a release with no charges against it is the ordinary case, so there is nothing to require. What the approval screen does instead is state the itemised charges and the three resulting figures before the click.
 
@@ -543,6 +543,26 @@ Brunei's Personal Data Protection Order 2025 commenced most substantive provisio
 **Migration position.** The system holds data from go-live onward. The existing folder of accumulated documents is **not** migrated. Taking custody of historical identity documents with unverifiable consent imports a liability that was not created by this project.
 
 **Note.** This document does not constitute legal advice. The client should take their own advice on their obligations.
+
+### As built (capabilities B10, G2–G4, 7 September 2026)
+
+Requirements 1, 2 and 3 are met; requirement 4 (the accounting pack) is not built and requirement 5 (data export) is capability F5, unbuilt. The technical shape is [architecture.md §8.1](architecture.md). The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
+
+**[A] Three kinds of document, one mechanism.** A guest's IC on the booking, a transfer slip on a payment, and photographs on an inspection all use the same private storage, the same permission gate, the same access log and the same retention clock. That is why the slip (§10.4) and the inspection photographs (§11 requirement 2) arrive with this and not separately: they were never a different problem.
+
+**[A] Who may open what, and who may attach it.** §4 mints exactly one document permission, `document.view_identity`, held by Admin and Front Office. That settles the sensitive half. The rest reuse the permission that already means the same job — a slip is attached and opened by whoever verifies payments, a photograph by whoever records the inspection — and **an identity document is attached and removed under `booking.amend`**, because putting an IC on file is a change to the booking's record. Attaching is deliberately *not* limited by booking status the way an amendment is: an IC that turns up after check-out is still the record this system exists to keep. **[O] [N23](open-questions.md)** puts the whole table to the client, along with its one non-obvious consequence — a role configured with `booking.amend` and without `document.view_identity` could remove an identity document it cannot open. No seeded role is in that position.
+
+**[A] Existence is not content.** Anyone who may view a booking sees *that* an identity document is on file, what kind it is, how big it is and when it arrived; only opening it is gated. **The filename is not among them**, and that was a correction: an IC arrives named by whoever scanned it, so printing it would hand the guest's name — and often their IC number — to every reader the file itself was withheld from, through the one field nobody had gated. A reader who may not open it is shown the kind of document instead. A guard who can see the IC was collected is being told something useful and shown nothing, and hiding the row entirely would make "did anyone take it?" unanswerable by the people whose job it is to ask. Security and Housekeeping therefore see the row and never the file, which is the principle §4 states.
+
+**[A] Retention is anchored differently per kind.** An identity document is kept twelve months after **checkout**, and its clock follows the stay — extending a booking moves it. A slip and a pack run seven years from when they were taken, because an accounting record dates from the transaction; a photograph two years from the inspection. Periods are configuration, not code, and capability F3 is the screen that edits them.
+
+**[O] What a cancelled booking's identity document should do is [N22](open-questions.md).** It keeps an anchor on a checkout that never happened. Under the PDPO the client may well want it destroyed sooner, and that is their call rather than an assumption to bury in a default.
+
+**[A] A document is destroyed but its record is not.** When a retention period ends the file is deleted from storage permanently; the row survives as a tombstone, so the trail of who attached it and who opened it stays readable afterwards. That is the point rather than a technicality — the questions asked about an identity document are usually asked once it is gone.
+
+**Every access is logged, and the log is on the screen.** Requirement 2's "every access logged" is an audit event per issued link, and it renders in the booking's own history as "Identity document opened", with who and when. A log the client cannot read is a control they were told about and cannot check.
+
+**One limit is the platform's rather than a policy: 4 MB per file.** Phone photographs and WhatsApp screenshots sit well under it. See architecture.md §8.1 for what raises it when the housekeeping phone screen needs more.
 
 ---
 

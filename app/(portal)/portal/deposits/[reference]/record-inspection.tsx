@@ -168,11 +168,15 @@ function InspectionDialog({
             )}
           </div>
 
-          {/* Said here rather than left to be discovered: prd.md §11 asks for
-              photographs and this build cannot take them. */}
+          {/* This used to say photographs were not recorded yet. They are
+              (capability B10), so it now says where — the inspection appears on
+              this screen the moment it is recorded, and the photographs attach
+              to it there. Kept as a notice rather than deleted because the
+              order is not obvious: there is nothing to attach a photograph to
+              until the inspection exists. */}
           <Notice>
-            Photographs are not recorded yet. They arrive with document storage, which is when
-            evidence can be kept privately and deleted on schedule.
+            Photographs are added to the inspection once it is recorded, from the card this dialog
+            came from.
           </Notice>
 
           {state.status === 'error' && !state.fieldErrors ? (

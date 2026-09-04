@@ -11,9 +11,14 @@ import { SectionCard } from '@/components/portal/section-card'
 import { Button } from '@/components/ui/button'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listAuditEvents, type AuditEvent } from '@/lib/db/audit'
+import { listAuditEvents, listAuditEventsForEntities, type AuditEvent } from '@/lib/db/audit'
 import { getBookingByReference, type Booking } from '@/lib/db/bookings'
 import { getDepositByBookingId, type Deposit } from '@/lib/db/deposits'
+import {
+  listDocumentIdsForBooking,
+  listDocumentsForBooking,
+  type Document,
+} from '@/lib/db/documents'
 import { listBookingNotes } from '@/lib/db/notes'
 import { listPaymentsForBooking, type Payment } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
@@ -23,14 +28,18 @@ import { balanceOf, canSettle } from '@/lib/domain/balance'
 import { describeDiscount } from '@/lib/domain/discount'
 import { formatCents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
+import { mayAttach, mayOpen } from '@/lib/domain/document'
 import { formatVehicles } from '@/lib/domain/vehicle'
 import { cn } from '@/lib/utils'
 
+import { AttachDocument } from '../../documents/attach-document'
+import { DocumentRow } from '../../documents/document-row'
 import { PaymentActions } from '../../payments/payment-actions'
 
 import { BookingActions } from './booking-actions'
 import { BookingHistory } from './booking-history'
 import { BookingNotes } from './booking-notes'
+import { IdentityDocuments } from './identity-documents'
 import { RecordPayment } from './record-payment'
 import { SecurityDepositInset } from './security-deposit-inset'
 import { StayButtons } from './stay-buttons'
@@ -89,13 +98,16 @@ export default async function BookingDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  const [bookingEvents, payments, staff, notes, deposit] = await Promise.all([
-    listAuditEvents('booking', booking.id),
-    listPaymentsForBooking(booking.id),
-    listStaff(),
-    listBookingNotes(booking.id),
-    getDepositByBookingId(booking.id),
-  ])
+  const [bookingEvents, payments, staff, notes, deposit, documents, everyDocumentId] =
+    await Promise.all([
+      listAuditEvents('booking', booking.id),
+      listPaymentsForBooking(booking.id),
+      listStaff(),
+      listBookingNotes(booking.id),
+      getDepositByBookingId(booking.id),
+      listDocumentsForBooking(booking.id),
+      listDocumentIdsForBooking(booking.id),
+    ])
 
   // Payment events are typed against the payment, not the booking, so a trail
   // built from `listAuditEvents('booking', ...)` alone would show this booking
@@ -115,10 +127,22 @@ export default async function BookingDetailPage({ params }: PageProps) {
   // here would make a booking's trail the whole ledger.
   const depositEvents = deposit ? await listAuditEvents('deposit', deposit.id) : []
 
+  // Documents are typed against themselves, like payments, so their trail is
+  // folded in the same way — and it is the trail capability G3 promises: every
+  // time somebody opened an identity document, on the record it belongs to.
+  //
+  // Built from EVERY document id, tombstones included, rather than from the
+  // list rendered above. A deleted document is not on file and does not appear
+  // in the panel, but its history has to survive it — otherwise the record of
+  // who opened somebody's IC disappears the moment the retention job deletes
+  // it, which is precisely when a person would come asking.
+  const documentEvents = await listAuditEventsForEntities('document', everyDocumentId)
+
   const events: readonly AuditEvent[] = [
     ...bookingEvents,
     ...paymentEvents.flat(),
     ...depositEvents,
+    ...documentEvents,
   ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
 
   const actorNames = new Map(staff.map((account) => [account.id, account.displayName]))
@@ -193,7 +217,13 @@ export default async function BookingDetailPage({ params }: PageProps) {
       ) : null}
 
       <div className="mt-xl grid gap-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <GuestAndStaySummary booking={booking} />
+        <GuestAndStaySummary
+          booking={booking}
+          identityDocuments={documents.filter((document) => document.kind === 'identity')}
+          mayOpenIdentity={mayOpen('identity', actor.permissions)}
+          mayAttachIdentity={mayAttach('identity', actor.permissions)}
+          actorNames={actorNames}
+        />
         <MoneySummary
           booking={booking}
           payments={payments}
@@ -208,6 +238,9 @@ export default async function BookingDetailPage({ params }: PageProps) {
         mayVerify={mayVerify}
         actorNames={actorNames}
         booking={booking}
+        slips={documents.filter((document) => document.kind === 'payment_slip')}
+        mayAttachSlip={mayAttach('payment_slip', actor.permissions)}
+        maySeeSlip={mayOpen('payment_slip', actor.permissions)}
       />
 
       {/* Above the history, below the money. The history is the system's
@@ -246,7 +279,19 @@ export default async function BookingDetailPage({ params }: PageProps) {
  * which is a better answer than shortening the card and letting the pair sit
  * ragged.
  */
-function GuestAndStaySummary({ booking }: { booking: Booking }) {
+function GuestAndStaySummary({
+  booking,
+  identityDocuments,
+  mayOpenIdentity,
+  mayAttachIdentity,
+  actorNames,
+}: {
+  booking: Booking
+  identityDocuments: readonly Document[]
+  mayOpenIdentity: boolean
+  mayAttachIdentity: boolean
+  actorNames: Map<string, string>
+}) {
   const { stay } = booking
   const nights = stay ? nightsBetween(stay.range.start, stay.range.end) : null
 
@@ -295,6 +340,19 @@ function GuestAndStaySummary({ booking }: { booking: Booking }) {
         />
         <VehicleField booking={booking} />
       </dl>
+
+      {/* Under the fields rather than beside them: prd.md §13 [C] makes the IC
+          part of registering a guest, so it belongs on the card that says who
+          they are — and an inset is what a card's own sub-panel is
+          (design.md §Components). */}
+      <IdentityDocuments
+        bookingId={booking.id}
+        guestName={booking.guestName}
+        documents={identityDocuments}
+        mayOpen={mayOpenIdentity}
+        mayAttach={mayAttachIdentity}
+        actorNames={actorNames}
+      />
     </SectionCard>
   )
 }
@@ -308,6 +366,73 @@ function GuestAndStaySummary({ booking }: { booking: Booking }) {
  * required — nobody asserted anything, and it is worth fixing on the next
  * amendment. Neither is a blank, which would read as a rendering fault.
  */
+/**
+ * The transfer slip against one payment (capability B4).
+ *
+ * prd.md §10.4's third required behaviour: "Treat the slip as evidence, not
+ * verification. Slips can be edited. Staff still check the bank. The slip's
+ * value is dispute resolution and automatic inclusion in the accounting pack."
+ * Both halves of that are visible here — the slip is recorded under the payment
+ * rather than presented as something to approve against, and nothing about the
+ * verification controls changes when one is attached.
+ *
+ * The delta this closes was flagged in prd.md §10.4 and scope B4: the queue
+ * shipped saying "No slip on file" on every row because nothing could upload
+ * one.
+ */
+function SlipLine({
+  payment,
+  slip,
+  bookingId,
+  mayAttach,
+  maySee,
+  actorNames,
+}: {
+  payment: Payment
+  slip: Document | undefined
+  bookingId: string
+  mayAttach: boolean
+  maySee: boolean
+  actorNames: ReadonlyMap<string, string>
+}) {
+  if (slip) {
+    return (
+      <div className="-mx-md">
+        <div className="px-md">
+          <DocumentRow
+            document={slip}
+            mayOpen={maySee}
+            mayRemove={mayAttach}
+            attachedBy={
+              slip.uploadedBy
+                ? (actorNames.get(slip.uploadedBy) ?? 'a former colleague')
+                : 'the system'
+            }
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (!mayAttach) {
+    return <p className="text-caption text-muted-foreground">No slip on file</p>
+  }
+
+  return (
+    <div className="mt-xs flex items-center gap-md">
+      <span className="text-caption text-muted-foreground">No slip on file</span>
+      <AttachDocument
+        kind="payment_slip"
+        bookingId={bookingId}
+        paymentId={payment.id}
+        label="Attach slip"
+        title="Attach the transfer slip"
+        description="The bank app is still the check — a slip is evidence, not verification. Kept privately for seven years as an accounting record."
+      />
+    </div>
+  )
+}
+
 function VehicleField({ booking }: { booking: Booking }) {
   const plates = formatVehicles(booking.vehicles)
   const label = booking.vehicles.length === 1 ? 'Vehicle' : 'Vehicles'
@@ -507,13 +632,22 @@ function PaymentsSection({
   mayVerify,
   actorNames,
   booking,
+  slips,
+  mayAttachSlip,
+  maySeeSlip,
 }: {
   payments: readonly Payment[]
   pending: Payment | undefined
   mayVerify: boolean
   actorNames: ReadonlyMap<string, string>
   booking: Booking
+  /** The slips on file, at most one live per payment. */
+  slips: readonly Document[]
+  mayAttachSlip: boolean
+  maySeeSlip: boolean
 }) {
+  const slipFor = new Map(slips.map((slip) => [slip.paymentId ?? '', slip]))
+
   return (
     <SectionCard id="payments-heading" title="Payments" className="mt-xl">
       {payments.length === 0 ? (
@@ -563,9 +697,27 @@ function PaymentsSection({
                   </p>
                 ) : (
                   <p className="text-caption text-muted-foreground">
-                    Raised {formatTimestamp(payment.createdAt)} · no slip on file
+                    Raised {formatTimestamp(payment.createdAt)}
                   </p>
                 )}
+
+                {/* The slip, which used to be the words "no slip on file" on
+                    every row. prd.md §10.4 keeps it evidence rather than
+                    verification — staff still check the bank — so it sits under
+                    the payment as a record, not beside the Verify button as a
+                    thing to read before confirming. Cash has no slip to attach,
+                    and the row says nothing rather than offering a control that
+                    would be refused. */}
+                {payment.method === 'bank_transfer' ? (
+                  <SlipLine
+                    payment={payment}
+                    slip={slipFor.get(payment.id)}
+                    bookingId={booking.id}
+                    mayAttach={mayAttachSlip}
+                    maySee={maySeeSlip}
+                    actorNames={actorNames}
+                  />
+                ) : null}
 
                 {/* Only shown when it differs — the ordinary case is that the
                       customer quoted the booking reference and there is nothing
