@@ -44,6 +44,17 @@ import { checkInAction, checkOutAction, type StayActionState } from './stay-acti
  * board's do: to say in plain sentences what is about to happen. Check-in also
  * collects money, so it asks the one question it cannot answer itself — how
  * the deposit was taken.
+ *
+ * **The screen's one primary fill** (2026-09-04; it was `tertiary` beside
+ * Edit). Arriving and leaving is the record's forward action — what the desk
+ * came to this screen to do with the guest standing there — where Edit is an
+ * errand and Cancel an exception. Because the button exists only when the
+ * state machine allows the move, the fill is on screen exactly when it is
+ * actionable and absent otherwise. A record screen has no control line, so
+ * design.md's rule keeping the fill out of a list screen's header does not
+ * apply; the Payments card's Confirm is a fill in its own region. It leads
+ * the row rather than sitting between Edit and the overflow, where a filled
+ * button flanked by two bordered ones read as a pattern rather than a rank.
  */
 
 const initialState: StayActionState = { status: 'idle' }
@@ -71,7 +82,7 @@ export function StayButtons({ canCheckIn, canCheckOut, ...stay }: StayButtonsPro
 
   return (
     <>
-      <Button variant="tertiary" onClick={() => setIsOpen(true)}>
+      <Button onClick={() => setIsOpen(true)}>
         {canCheckIn ? <LogIn aria-hidden /> : <LogOut aria-hidden />}
         {canCheckIn ? 'Check in' : 'Check out'}
       </Button>
