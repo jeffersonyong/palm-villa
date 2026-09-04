@@ -19,7 +19,7 @@ import { addDays, isStayDate, todayInBrunei } from '@/lib/domain/dates'
 import { AmendForm } from './amend-form'
 
 export const metadata: Metadata = {
-  title: 'Amend booking',
+  title: 'Edit booking',
 }
 
 /**
@@ -50,12 +50,12 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
   if (!actor || !hasPermission(actor.permissions, 'booking.amend')) {
     return (
       <>
-        <PageHeader title="Amend booking" />
+        <PageHeader title="Edit booking" />
         <EmptyState
           className="mt-xl"
           title="You don't have access to this screen"
           description={
-            'Changing a booking needs the "Amend bookings" permission. Ask an administrator if this is part of your job.'
+            'Changing a booking needs the "Edit bookings" permission. Ask an administrator if this is part of your job.'
           }
         />
       </>
@@ -80,7 +80,7 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
   if (!canAmend(booking.status)) {
     return (
       <>
-        <PageHeader title={`Amend ${booking.reference}`} />
+        <PageHeader title={`Edit ${booking.reference}`} />
         <EmptyState
           className="mt-xl"
           title={`This booking is ${booking.status.replace(/_/g, ' ')}`}
@@ -108,10 +108,10 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
   if (!booking.stay) {
     return (
       <>
-        <PageHeader title={`Amend ${booking.reference}`} />
+        <PageHeader title={`Edit ${booking.reference}`} />
         <EmptyState
           className="mt-xl"
-          title="This booking has no stay to amend"
+          title="This booking has no stay to edit"
           description="It occupies no unit, so there are no dates or unit to change here."
           action={
             <Button asChild variant="tertiary">
@@ -146,7 +146,7 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
   return (
     <div className="max-w-[1120px]">
       <PageHeader
-        title={`Amend ${booking.reference}`}
+        title={`Edit ${booking.reference}`}
         description="Everything that changes is recorded against the booking."
         actions={
           <Button asChild variant="ghost">

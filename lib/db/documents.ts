@@ -168,14 +168,25 @@ export async function listDocumentsForBooking(
  * would lose it at exactly the moment somebody is asking. A tombstone is kept
  * so the trail stays resolvable; this is what resolves it.
  */
-export async function listDocumentIdsForBooking(bookingId: string): Promise<readonly string[]> {
+export async function listDocumentIdsForBooking(
+  bookingId: string,
+  kind?: DocumentKind,
+): Promise<readonly string[]> {
   const propertyId = await currentPropertyId()
 
-  const { data, error } = await dataClient()
+  let query = dataClient()
     .from('document')
     .select('id')
     .eq('property_id', propertyId)
     .eq('booking_id', bookingId)
+
+  // A deposit's history wants the photographs alone, tombstones included —
+  // the other kinds are labelled on the booking's own screen.
+  if (kind) {
+    query = query.eq('kind', kind)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     throw new Error(`Could not read the documents for booking ${bookingId}: ${error.message}`)

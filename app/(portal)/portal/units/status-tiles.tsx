@@ -39,7 +39,7 @@ interface UnitStatusTilesProps {
 
 export function UnitStatusTiles({ counts, selected, otherParams }: UnitStatusTilesProps) {
   return (
-    <div className="mt-md grid grid-cols-2 gap-md sm:grid-cols-3 lg:grid-cols-6">
+    <div className="mt-xl grid grid-cols-2 gap-md sm:grid-cols-3 lg:grid-cols-6">
       {UNIT_STATUSES.map((status) => {
         const isSelected = selected.includes(status)
         const params = new URLSearchParams(otherParams)

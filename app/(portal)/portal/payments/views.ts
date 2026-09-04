@@ -1,27 +1,35 @@
 import type { PaymentStatus } from '@/lib/domain/payment'
 
 /**
- * What the verification queue is showing.
+ * What the verification queue is showing, and in what order.
  *
  * Shared by the page, which validates the URL, and the filter island, which
  * writes it — a client component cannot import from a server page.
  *
- * ── Why this is not "empty means everything" ────────────────────────────────
+ * ── Everything, waiting first ──────────────────────────────────────────────
  *
- * The bookings list treats a cleared filter as "show me all bookings", and
- * that is right for a list. This is a queue. architecture.md §6.2 defines it
- * as "backed by bookings in awaiting_payment_verification", and a queue that
- * opens showing a year of settled payments is not a queue — the outstanding
- * work is the screen's whole subject. So `waiting` is the default, it stays
- * out of the URL, and seeing everything is a deliberate choice.
+ * The screen opens on every bank transfer, with the ones still waiting at the
+ * top and the verified ones beneath them (changed 2026-09-04; it opened on
+ * the waiting ones alone before). architecture.md §6.2 defines the queue as
+ * "backed by bookings in awaiting_payment_verification", and that is still
+ * what the top of the table is — but a clerk who has just confirmed a
+ * transfer wants to see it move down the list, not vanish, and "did we
+ * already verify PV-4821" is a question this screen is asked as often as
+ * "what is waiting". The order keeps the queue a queue: the outstanding work
+ * is always first, and nothing settled sits above it.
+ *
+ * `all` is the default, so it stays out of the URL; the two narrower views
+ * are a deliberate choice.
  */
 export const PAYMENT_VIEWS = {
+  all: 'Everything',
   waiting: 'Waiting',
   verified: 'Verified',
-  all: 'Everything',
 } as const
 
 export type PaymentView = keyof typeof PAYMENT_VIEWS
+
+export const DEFAULT_PAYMENT_VIEW: PaymentView = 'all'
 
 /**
  * The view named in the URL, or the default.
@@ -32,7 +40,7 @@ export type PaymentView = keyof typeof PAYMENT_VIEWS
 export function readView(value: string | string[] | undefined): PaymentView {
   const raw = Array.isArray(value) ? value[0] : value
 
-  return raw && raw in PAYMENT_VIEWS ? (raw as PaymentView) : 'waiting'
+  return raw && raw in PAYMENT_VIEWS ? (raw as PaymentView) : DEFAULT_PAYMENT_VIEW
 }
 
 /** The statuses a view asks for. An empty list means no filter. */
@@ -45,4 +53,41 @@ export function statusesForView(view: PaymentView): readonly PaymentStatus[] {
     default:
       return []
   }
+}
+
+/** One payment, as the ordering needs to see it. */
+interface QueueRow {
+  status: PaymentStatus
+  /** When the guest was told what to send — when the wait began. */
+  createdAt: string
+  verifiedAt: string | null
+}
+
+/**
+ * The order the queue is worked in.
+ *
+ * Waiting payments first, and **oldest first** among them: a queue is worked
+ * from the top and the longest wait belongs there — for now the only thing
+ * standing between a forgotten transfer and a unit blocked indefinitely
+ * (prd.md §18 N7 is open, and no job expires a pending transfer yet). Then the
+ * verified ones, **newest first**, because that half is read as a log: the one
+ * just confirmed is the one somebody is checking for.
+ */
+export function sortQueue<T extends QueueRow>(payments: readonly T[]): T[] {
+  return [...payments].sort((a, b) => {
+    const aWaiting = a.status === 'pending_verification'
+    const bWaiting = b.status === 'pending_verification'
+
+    if (aWaiting !== bWaiting) {
+      return aWaiting ? -1 : 1
+    }
+
+    return aWaiting
+      ? a.createdAt.localeCompare(b.createdAt)
+      : settledAt(b).localeCompare(settledAt(a))
+  })
+}
+
+function settledAt(payment: QueueRow): string {
+  return payment.verifiedAt ?? payment.createdAt
 }

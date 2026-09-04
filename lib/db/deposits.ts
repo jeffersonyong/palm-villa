@@ -14,6 +14,7 @@ import { dataClient } from '@/lib/supabase/data'
 
 import { isRangeNotSatisfiable, type PageRequest } from './bookings'
 import { currentPropertyId } from './property'
+import { applySearch } from './search'
 
 /**
  * The deposit ledger (capabilities E1, E2, E3).
@@ -281,8 +282,18 @@ export interface DepositPage {
  * that left a guest owing something nobody has recorded as paid — the "Owed"
  * tile's list, and the closest thing this product has to a debtors' report.
  */
+/** How the archive is narrowed. */
+export interface ReleasedDepositFilter {
+  /** Only the guests who still owe something. */
+  owedOnly?: boolean
+  /** Stays touching this half-open range, matching availability semantics. */
+  overlaps?: DateRange
+  /** A term the booking reference, guest name or unit contains. */
+  search?: string
+}
+
 export async function listReleasedDeposits(
-  filter: { owedOnly?: boolean } = {},
+  filter: ReleasedDepositFilter = {},
   page?: PageRequest,
 ): Promise<DepositPage> {
   const propertyId = await currentPropertyId()
@@ -295,9 +306,7 @@ export async function listReleasedDeposits(
     .order('released_at', { ascending: false })
     .order('id', { ascending: false })
 
-  if (filter.owedOnly) {
-    query.gt('owed_cents', 0).is('owed_settled_at', null)
-  }
+  applyReleasedFilter(query, filter)
 
   if (page) {
     const from = (page.page - 1) * page.pageSize
@@ -326,7 +335,7 @@ export async function listReleasedDeposits(
 
 async function countReleasedDeposits(
   propertyId: string,
-  filter: { owedOnly?: boolean },
+  filter: ReleasedDepositFilter,
 ): Promise<number> {
   const query = dataClient()
     .from('deposit_summary')
@@ -334,9 +343,7 @@ async function countReleasedDeposits(
     .eq('property_id', propertyId)
     .not('released_at', 'is', null)
 
-  if (filter.owedOnly) {
-    query.gt('owed_cents', 0).is('owed_settled_at', null)
-  }
+  applyReleasedFilter(query, filter)
 
   const { count, error } = await query
 
@@ -345,6 +352,49 @@ async function countReleasedDeposits(
   }
 
   return count ?? 0
+}
+
+/**
+ * The archive's predicates, in one place so the page and its count cannot
+ * disagree — the register's rule for a list and its summary.
+ *
+ * The overlap is the register's too (`applyListFilter` in ./bookings.ts): a
+ * stay touches the window when it begins before the window ends and ends
+ * after it begins. A deposit with no stay behind it has null dates and so
+ * never matches a window, which is the right answer to a question about
+ * dates it cannot answer.
+ */
+function applyReleasedFilter(query: ArchiveQuery, filter: ReleasedDepositFilter): void {
+  // Each call mutates the builder, so nothing is chained on a return value.
+  if (filter.owedOnly) {
+    query.gt('owed_cents', 0)
+    query.is('owed_settled_at', null)
+  }
+
+  if (filter.overlaps) {
+    query.lt('check_in', filter.overlaps.end)
+    query.gt('check_out', filter.overlaps.start)
+  }
+
+  if (filter.search) {
+    applySearch(query, ['booking_reference', 'guest_name', 'unit_ref'], filter.search)
+  }
+}
+
+/**
+ * The three predicates `applyReleasedFilter` uses, structurally — the
+ * register's `FilterableQuery` for the same reason: the data client is
+ * untyped, so naming the concrete builder would mean naming five generic
+ * parameters that carry no information here. Not generic over the builder,
+ * unlike the register's: the builder mutates in place, which is what the
+ * callers already rely on, and inferring it against the summary's column
+ * list sends the type checker into a recursion it gives up on.
+ */
+interface ArchiveQuery {
+  gt(column: string, value: unknown): unknown
+  lt(column: string, value: unknown): unknown
+  is(column: string, value: unknown): unknown
+  or(filters: string): unknown
 }
 
 /**

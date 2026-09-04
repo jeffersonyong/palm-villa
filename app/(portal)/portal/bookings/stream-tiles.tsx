@@ -46,7 +46,7 @@ interface StreamTilesProps {
 
 export function StreamTiles({ counts, selected, otherParams }: StreamTilesProps) {
   return (
-    <div className="mt-md grid grid-cols-3 gap-md">
+    <div className="mt-xl grid grid-cols-3 gap-md">
       {BOOKING_STREAMS.map((stream) => {
         const isSelected = selected.includes(stream)
         const params = new URLSearchParams(otherParams)

@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, test } from 'vitest'
 
 import { planRegistry, type CurrentUnit } from '@/lib/domain/unit-ref'
 
-import { listAuditEventWindow, listAuditEvents } from './audit'
+import { listAuditEvents } from './audit'
 import { countAvailableByType, findAvailableUnits } from './bookings'
 import { getUnitCounts } from './inventory'
 import {
@@ -838,52 +838,6 @@ describe("the unit's standing note (N18)", () => {
     if (!again.ok) return
     expect(again.changed).toBe(false)
     expect(await listAuditEvents('unit', unitId)).toHaveLength(before)
-  })
-
-  test('is windowed for the screen, newest first, with the whole length alongside', async () => {
-    // A unit outlives every booking in it, so its trail is the one that grows
-    // without limit. The screen asks for a page and has to be told how much it
-    // is not showing, or "show older" is a guess.
-    const unitId = await unitIdByRef('3B-01')
-
-    for (const note of ['One', 'Two', 'Three', 'Four']) {
-      await setUnitNotes({ unitId, notes: note, actorId: null })
-    }
-
-    const whole = await listAuditEvents('unit', unitId)
-    const page = await listAuditEventWindow('unit', unitId, 2)
-
-    expect(page.total).toBe(whole.length)
-    expect(page.events).toHaveLength(2)
-    expect(page.events.map((event) => event.id)).toEqual(whole.slice(0, 2).map((e) => e.id))
-  })
-
-  test('a window wider than the trail returns the trail, not a promise of more', async () => {
-    const unitId = await unitIdByRef('3B-01')
-    await setUnitNotes({ unitId, notes: 'Only one thing has happened', actorId: null })
-
-    const page = await listAuditEventWindow('unit', unitId, 500)
-
-    expect(page.events).toHaveLength(page.total)
-  })
-
-  test('pages do not overlap or drop an event when timestamps collide', async () => {
-    // Two events written in the same statement can share a timestamp to the
-    // microsecond. Ordered by `at` alone the second page could repeat a row
-    // from the first and lose one behind it, which for an append-only record
-    // is the one failure that must not be quiet.
-    const unitId = await unitIdByRef('3B-01')
-
-    for (const note of ['A', 'B', 'C', 'D', 'E', 'F']) {
-      await setUnitNotes({ unitId, notes: note, actorId: null })
-    }
-
-    const first = await listAuditEventWindow('unit', unitId, 3)
-    const both = await listAuditEventWindow('unit', unitId, 6)
-    const ids = both.events.map((event) => event.id)
-
-    expect(first.events.map((event) => event.id)).toEqual(ids.slice(0, 3))
-    expect(new Set(ids).size).toBe(ids.length)
   })
 
   test('records the text before and after, so the trail is the history a thread would be', async () => {

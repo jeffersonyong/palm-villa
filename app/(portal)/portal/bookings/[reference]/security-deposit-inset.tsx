@@ -37,11 +37,13 @@ export function SecurityDepositInset({ reference, quoted, deposit }: SecurityDep
     return (
       <Card surface="inset" className="mt-lg">
         <Row label="Security deposit" value={`BND ${formatCents(quoted)}`} />
-        <p className="mt-xs text-caption text-muted-foreground">
-          {quoted > 0
-            ? 'Collected at check-in and held separately from the total above. Released after the unit has been inspected.'
-            : 'This booking quotes no security deposit, so nothing is collected at check-in.'}
-        </p>
+        {/* How a deposit is held is the Money card's hint; only the exception
+            is worth a sentence here. */}
+        {quoted === 0 ? (
+          <p className="mt-xs text-caption text-muted-foreground">
+            This booking quotes no security deposit, so nothing is collected at check-in.
+          </p>
+        ) : null}
       </Card>
     )
   }
@@ -81,8 +83,7 @@ export function SecurityDepositInset({ reference, quoted, deposit }: SecurityDep
         />
       ) : null}
 
-      <p className="mt-md text-caption text-muted-foreground">
-        Held apart from the total above, and never counted as revenue.{' '}
+      <p className="mt-md text-caption">
         <Link
           href={`/portal/deposits/${reference}`}
           className="text-foreground underline underline-offset-2"

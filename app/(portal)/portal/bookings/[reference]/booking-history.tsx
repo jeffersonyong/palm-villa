@@ -1,5 +1,5 @@
 import { EventHistory } from '@/components/portal/event-history'
-import type { AuditEvent } from '@/lib/db/audit'
+import type { AuditEvent, AuditEventPage } from '@/lib/db/audit'
 import { DOCUMENT_KIND_LABELS, isDocumentKind } from '@/lib/domain/document'
 
 /**
@@ -18,7 +18,7 @@ import { DOCUMENT_KIND_LABELS, isDocumentKind } from '@/lib/domain/document'
  */
 
 const ACTION_LABELS: Record<string, string> = {
-  'booking.amended': 'Amended',
+  'booking.amended': 'Edited',
   // Its own row rather than a detail inside the amendment, because "show me
   // every discount given" is a question about this verb alone.
   'booking.discounted': 'Discount changed',
@@ -160,15 +160,18 @@ function actionLabel(event: AuditEvent): string {
 }
 
 interface BookingHistoryProps {
-  events: readonly AuditEvent[]
+  history: AuditEventPage
+  /** The booking's own address, which page 1 of its history shares. */
+  path: string
   /** Display names by `auth.users.id`; an actor with no name renders as system. */
   actorNames: ReadonlyMap<string, string>
 }
 
-export function BookingHistory({ events, actorNames }: BookingHistoryProps) {
+export function BookingHistory({ history, path, actorNames }: BookingHistoryProps) {
   return (
     <EventHistory
-      events={events}
+      history={history}
+      path={path}
       actorNames={actorNames}
       label={actionLabel}
       emptyMessage="Nothing recorded against this booking yet."

@@ -9,7 +9,7 @@ import type { Permission } from '@/lib/auth/permissions'
 export const PERMISSION_LABELS: Record<Permission, string> = {
   'booking.view': 'View bookings',
   'booking.create': 'Create bookings',
-  'booking.amend': 'Amend bookings',
+  'booking.amend': 'Edit bookings',
   'booking.cancel': 'Cancel bookings',
   'booking.override_hold': 'Override booking holds',
   'booking.discount': 'Discount bookings',

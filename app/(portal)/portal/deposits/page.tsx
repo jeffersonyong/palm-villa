@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 
 import { DepositStageBadge } from '@/components/portal/deposit-stage-badge'
 import { EmptyState } from '@/components/portal/empty-state'
+import { overlapRangeOf, readSearch, readStayWindow } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
 import { Button } from '@/components/ui/button'
 import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
@@ -28,12 +30,14 @@ import { formatStayDates, formatTimestamp } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 
 import { DepositTiles } from './deposit-tiles'
+import { DepositsFilters } from './deposits-filters'
 import { DepositsPagination } from './deposits-pagination'
 import {
   countByStage,
   filterHeld,
   isArchiveView,
   owedTotalOf,
+  readHeldStages,
   readLedgerView,
   sortForLedger,
   totalsOf,
@@ -75,8 +79,13 @@ export const metadata: Metadata = {
  */
 
 interface PageProps {
+  /** `stage` repeats, one param per chosen value. */
   searchParams: Promise<{
     show?: string | string[]
+    stage?: string | string[]
+    from?: string
+    to?: string
+    q?: string | string[]
     page?: string
     size?: string
   }>
@@ -122,8 +131,20 @@ export default async function DepositsPage({ searchParams }: PageProps) {
     )
   }
 
+  // Anything unusable — a hand-edited URL, half a date pair, a reversed range —
+  // falls back to no filter rather than erroring, like every other param in
+  // the portal.
   const view = readLedgerView(params.show)
+  const window = readStayWindow(params.from, params.to)
+  const search = readSearch(params.q)
   const pageSize = readPageSize(params.size)
+  const requestedPage = readPage(params.page)
+
+  // A stage narrows what is held and nothing else, so in an archive view it
+  // is dropped here rather than read: the chips may only ever show a filter
+  // the server actually applied, and `?show=released&stage=in_house` is a URL
+  // nothing on this screen builds but a hand can.
+  const stages = isArchiveView(view) ? [] : readHeldStages(params.stage)
 
   // The tiles count the whole ledger, not the view — five figures that all
   // moved when you clicked one of them would stop being the answer to "what
@@ -134,24 +155,61 @@ export default async function DepositsPage({ searchParams }: PageProps) {
   const heldTotals = totalsOf(held)
   const byStage = countByStage(held)
 
-  const archive = isArchiveView(view)
-    ? await listReleasedDeposits(
-        { owedOnly: view === 'owed' },
-        { page: readPage(params.page), pageSize },
-      )
+  // The stay window narrows either set — in the database for the archive, here
+  // for what is held, both on the same half-open overlap.
+  const overlaps = window ? overlapRangeOf(window) : undefined
+  const archiveFilter = { owedOnly: view === 'owed', overlaps, search: search ?? undefined }
+  const firstAttempt = isArchiveView(view)
+    ? await listReleasedDeposits(archiveFilter, { page: requestedPage, pageSize })
     : null
 
-  const visible = archive ? archive.deposits : sortForLedger(filterHeld(held, view))
-  const total = archive ? archive.total : visible.length
+  const visible = firstAttempt
+    ? firstAttempt.deposits
+    : sortForLedger(filterHeld(held, { stages, window, search }))
+  const total = firstAttempt ? firstAttempt.total : visible.length
 
-  // The held views page over the array in hand; the archive is already paged
-  // by the database. Either way the page is clamped against the real total, so
-  // a bookmarked `?page=4` that has outlived its rows lands on a page that
-  // exists rather than an empty table under a footer claiming otherwise.
-  const currentPage = clampPage(readPage(params.page), pageCountFor(total, pageSize))
+  // The held view pages over the array in hand; the archive is paged by the
+  // database. Either way the page is clamped against the real total, so a
+  // bookmarked `?page=4` that has outlived its rows lands on a page that
+  // exists rather than an empty table under a footer claiming otherwise. For
+  // the archive that means a second read — the register's arrangement — and
+  // only when the page was genuinely out of range.
+  const currentPage = clampPage(requestedPage, pageCountFor(total, pageSize))
+  const archive =
+    firstAttempt && currentPage !== requestedPage
+      ? await listReleasedDeposits(archiveFilter, { page: currentPage, pageSize })
+      : firstAttempt
   const rows = archive
     ? archive.deposits
     : visible.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  const isFiltered = stages.length > 0 || window !== null || search !== null
+
+  // Carried through every tile: the stay window, which narrows whichever set a
+  // tile opens. The tiles *set* `stage` and `show`, so this holds neither.
+  // Nor the page: narrowing a list drops you back to page 1, the only page
+  // guaranteed to exist afterwards.
+  const tileParams = new URLSearchParams()
+
+  if (window) {
+    tileParams.set('from', window.from)
+    tileParams.set('to', window.to)
+  }
+
+  if (search) {
+    tileParams.set('q', search)
+  }
+
+  // The footer moves *within* the current view, so it carries everything.
+  const pageParams = new URLSearchParams(tileParams)
+
+  if (view !== 'held') {
+    pageParams.set('show', view)
+  }
+
+  for (const stage of stages) {
+    pageParams.append('stage', stage)
+  }
 
   return (
     <>
@@ -160,16 +218,37 @@ export default async function DepositsPage({ searchParams }: PageProps) {
         description="Every security deposit the property is holding, what stands against it, and what has been given back."
       />
 
+      {/* The strip first, straight under the title: it is the screen's
+          headline — what we are holding — and every list screen now reads
+          the same way down the page: the figures, then the chips, then the
+          rows (design.md §Components — stat tiles). */}
       <DepositTiles
         held={heldTotals}
         byStage={byStage}
         owed={{ count: owed.length, amount: owedTotalOf(owed) }}
-        current={view}
+        selectedStages={stages}
+        view={view}
+        otherParams={tileParams}
       />
+
+      {/* The control line, directly above the table it narrows. Chips only:
+          a ledger has nothing to create — a deposit is recorded when a guest
+          is checked in — and nowhere else to go, so the slot on the right
+          that other list screens fill stays empty rather than holding
+          something to fill it. */}
+      <div className="mt-md flex flex-wrap items-center gap-md">
+        <DepositsFilters
+          stages={stages}
+          from={window?.from}
+          to={window?.to}
+          view={view}
+          search={search ?? ''}
+        />
+      </div>
 
       <section aria-label="Deposits" className="mt-md">
         {rows.length === 0 ? (
-          <LedgerEmptyState view={view} />
+          <LedgerEmptyState view={view} isFiltered={isFiltered} />
         ) : (
           <Table
             footer={
@@ -181,7 +260,7 @@ export default async function DepositsPage({ searchParams }: PageProps) {
                   page={currentPage}
                   pageSize={pageSize}
                   total={total}
-                  params={view === 'held' ? '' : `show=${view}`}
+                  params={pageParams.toString()}
                 />
               ) : undefined
             }
@@ -191,7 +270,7 @@ export default async function DepositsPage({ searchParams }: PageProps) {
                 <TableHead>Booking</TableHead>
                 <TableHead>Guest</TableHead>
                 <TableHead>Unit</TableHead>
-                <TableHead>Stay</TableHead>
+                <TableHead>Stay date</TableHead>
                 <TableHead>Stage</TableHead>
                 <TableHead className="text-right">Held</TableHead>
                 <TableHead className="text-right">Charges</TableHead>
@@ -281,6 +360,16 @@ function DepositRow({ deposit }: { deposit: Deposit }) {
           </span>
         )}
       </TableCell>
+
+      {/* The affordance, not a control: the row is already the link, so this
+          says the row opens something — the register's arrow, following the
+          row's hover. The header has named this column all along. */}
+      <TableCell className="w-0 pl-0 text-right">
+        <ChevronRight
+          aria-hidden
+          className="size-4 text-muted-foreground transition-colors group-hover:text-foreground"
+        />
+      </TableCell>
     </TableRow>
   )
 }
@@ -289,10 +378,26 @@ function DepositRow({ deposit }: { deposit: Deposit }) {
  * Two questions, two answers.
  *
  * "Nothing here yet" names where records come from; "nothing matched" names
- * the view as the cause and offers the same escape every list screen offers,
- * worded identically so staff who learn it on one recognise it on the next.
+ * the filters as the cause and offers the same escape every list screen
+ * offers, worded identically so staff who learn it on one recognise it on the
+ * next. An empty archive view is neither: nothing has been released yet, and
+ * the way out is back to what is held.
  */
-function LedgerEmptyState({ view }: { view: LedgerView }) {
+function LedgerEmptyState({ view, isFiltered }: { view: LedgerView; isFiltered: boolean }) {
+  if (isFiltered) {
+    return (
+      <EmptyState
+        title="No deposits match these filters"
+        description="Try a wider date range, or clear the filters to see everything."
+        action={
+          <Button asChild variant="tertiary">
+            <Link href="/portal/deposits">Clear filters</Link>
+          </Button>
+        }
+      />
+    )
+  }
+
   if (view === 'held') {
     return (
       <EmptyState
@@ -303,9 +408,6 @@ function LedgerEmptyState({ view }: { view: LedgerView }) {
   }
 
   const descriptions: Record<Exclude<LedgerView, 'held'>, string> = {
-    in_house: 'No stay with a deposit against it is running right now.',
-    awaiting_inspection: 'Every unit whose guest has left has been inspected.',
-    ready_for_release: 'Nothing is waiting on an approval.',
     released: 'No deposit has been released yet.',
     owed: 'No guest owes anything beyond their deposit.',
   }

@@ -154,8 +154,8 @@ function RemoveDialog({
         <DialogHeader>
           <DialogTitle>Remove {name}?</DialogTitle>
           <DialogDescription>
-            The file is deleted from storage and cannot be recovered. The record that it existed,
-            who attached it and who removed it stays in this booking&rsquo;s history.
+            The file is deleted from storage and cannot be recovered. The record stays in this
+            booking&rsquo;s history.
           </DialogDescription>
         </DialogHeader>
 

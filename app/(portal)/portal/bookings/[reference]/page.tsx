@@ -5,13 +5,15 @@ import { Pencil } from 'lucide-react'
 
 import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { Badge } from '@/components/ui/badge'
+import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/portal/empty-state'
+import { HISTORY_PAGE_SIZE, historyPage } from '@/components/portal/history-page'
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionCard } from '@/components/portal/section-card'
 import { Button } from '@/components/ui/button'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listAuditEvents, listAuditEventsForEntities, type AuditEvent } from '@/lib/db/audit'
+import { listAuditEventPage } from '@/lib/db/audit'
 import { getBookingByReference, type Booking } from '@/lib/db/bookings'
 import { getDepositByBookingId, type Deposit } from '@/lib/db/deposits'
 import {
@@ -39,7 +41,7 @@ import { PaymentActions } from '../../payments/payment-actions'
 import { AccountingPack } from './accounting-pack'
 import { BookingActions } from './booking-actions'
 import { BookingHistory } from './booking-history'
-import { BookingNotes } from './booking-notes'
+import { AddNote, BookingNotes } from './booking-notes'
 import { IdentityDocuments } from './identity-documents'
 import { RecordPayment } from './record-payment'
 import { SecurityDepositInset } from './security-deposit-inset'
@@ -62,6 +64,7 @@ import { StayButtons } from './stay-buttons'
 
 interface PageProps {
   params: Promise<{ reference: string }>
+  searchParams: Promise<{ history?: string }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -70,8 +73,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return { title: decodeURIComponent(reference).toUpperCase() }
 }
 
-export default async function BookingDetailPage({ params }: PageProps) {
-  const { reference } = await params
+export default async function BookingDetailPage({ params, searchParams }: PageProps) {
+  const [{ reference }, search] = await Promise.all([params, searchParams])
   const actor = await getActor()
 
   // Render is gated per-permission server-side (architecture.md §3). The gate
@@ -99,56 +102,65 @@ export default async function BookingDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  const [bookingEvents, payments, staff, notes, deposit, documents, everyDocumentId] =
-    await Promise.all([
-      listAuditEvents('booking', booking.id),
-      listPaymentsForBooking(booking.id),
-      listStaff(),
-      listBookingNotes(booking.id),
-      getDepositByBookingId(booking.id),
-      listDocumentsForBooking(booking.id),
-      listDocumentIdsForBooking(booking.id),
-    ])
+  const [payments, staff, notes, deposit, documents, everyDocumentId] = await Promise.all([
+    listPaymentsForBooking(booking.id),
+    listStaff(),
+    listBookingNotes(booking.id),
+    getDepositByBookingId(booking.id),
+    listDocumentsForBooking(booking.id),
+    listDocumentIdsForBooking(booking.id),
+  ])
 
-  // Payment events are typed against the payment, not the booking, so a trail
-  // built from `listAuditEvents('booking', ...)` alone would show this booking
-  // reaching `confirmed` with no record of what was banked. Payments per
-  // booking are few, so fetching each one's events and merging is cheap and
-  // keeps `entity_type` honest — a payment is its own entity, and the F4 audit
-  // screen will want to filter on it.
-  const paymentEvents = await Promise.all(
-    payments.map((payment) => listAuditEvents('payment', payment.id)),
-  )
-
-  // The deposit's own events are folded in for the reason the payments' are:
-  // they carry `entity_type = 'deposit'`, so a trail built from the booking
-  // alone would show a guest checking in with no record of the money that
-  // changed hands. Its charges and its inspection stay on the deposit's own
-  // screen — that is a second record with its own history, and repeating it
-  // here would make a booking's trail the whole ledger.
-  const depositEvents = deposit ? await listAuditEvents('deposit', deposit.id) : []
-
-  // Documents are typed against themselves, like payments, so their trail is
-  // folded in the same way — and it is the trail capability G3 promises: every
-  // time somebody opened an identity document, on the record it belongs to.
+  // The trail is the booking's own events with three other records' folded
+  // in, read as one page in one query (`listAuditEventPage`). Each keeps its
+  // own `entity_type` — the F4 audit screen will want to filter on it — and
+  // each is here because leaving it out would make the trail lie by omission:
   //
-  // Built from EVERY document id, tombstones included, rather than from the
-  // list rendered above. A deleted document is not on file and does not appear
-  // in the panel, but its history has to survive it — otherwise the record of
-  // who opened somebody's IC disappears the moment the retention job deletes
-  // it, which is precisely when a person would come asking.
-  const documentEvents = await listAuditEventsForEntities('document', everyDocumentId)
-
-  const events: readonly AuditEvent[] = [
-    ...bookingEvents,
-    ...paymentEvents.flat(),
-    ...depositEvents,
-    ...documentEvents,
-  ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+  // - Payments are typed against the payment, not the booking, so the
+  //   booking's events alone would show it reaching `confirmed` with no
+  //   record of what was banked.
+  // - The deposit's, for the same reason: a guest checking in with no record
+  //   of the money that changed hands. Its charges and its inspection stay on
+  //   the deposit's own screen — a second record with its own history, and
+  //   repeating it here would make a booking's trail the whole ledger.
+  // - Every document's, which is the trail capability G3 promises: every time
+  //   somebody opened an identity document, on the record it belongs to. From
+  //   EVERY document id, tombstones included, rather than the list rendered
+  //   above — a deleted document is not on file, but its history has to
+  //   survive it, or the record of who opened somebody's IC disappears the
+  //   moment the retention job deletes it, precisely when a person would come
+  //   asking.
+  const history = await listAuditEventPage(
+    [
+      { entityType: 'booking', entityIds: [booking.id] },
+      { entityType: 'payment', entityIds: payments.map((payment) => payment.id) },
+      { entityType: 'deposit', entityIds: deposit ? [deposit.id] : [] },
+      { entityType: 'document', entityIds: everyDocumentId },
+    ],
+    historyPage(search.history),
+    HISTORY_PAGE_SIZE,
+  )
 
   const actorNames = new Map(staff.map((account) => [account.id, account.displayName]))
   const pending = payments.find((payment) => payment.status === 'pending_verification')
   const mayVerify = hasPermission(actor.permissions, 'payment.verify')
+
+  // Whether the live pack is behind the money it records. A pack is filed
+  // seconds after a verification by `after()`, so a pack older than the newest
+  // verified payment is one still on its way — or one whose assembly failed
+  // and is waiting for tonight. The panel tells the two apart by the clock.
+  const pack = documents.filter((document) => document.kind === 'accounting_pack').at(-1) ?? null
+  const newestVerifiedAt =
+    payments
+      .filter((payment) => payment.status === 'verified' && payment.verifiedAt)
+      .map((payment) => payment.verifiedAt!)
+      .sort()
+      .at(-1) ?? null
+  const packPendingSince =
+    newestVerifiedAt !== null &&
+    (pack === null || Date.parse(pack.uploadedAt) < Date.parse(newestVerifiedAt))
+      ? newestVerifiedAt
+      : null
 
   const mayAmend = canAmend(booking.status) && hasPermission(actor.permissions, 'booking.amend')
   // Both moves are gated by `booking.amend` until N11 settles who checks a
@@ -194,7 +206,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
               <Button asChild variant="tertiary">
                 <Link href={`/portal/bookings/${booking.reference}/amend`}>
                   <Pencil aria-hidden />
-                  Amend
+                  Edit
                 </Link>
               </Button>
             ) : null}
@@ -212,12 +224,14 @@ export default async function BookingDetailPage({ params }: PageProps) {
       {!canAmend(booking.status) ? (
         <p className="mt-lg text-body-sm text-muted-foreground">
           {booking.status === 'checked_in'
-            ? 'This guest has checked in, so the booking can no longer be amended. Checking them out ends the stay.'
+            ? 'This guest has checked in, so the booking can no longer be edited. Checking them out ends the stay.'
             : 'This booking is closed. Its details are kept as a record and cannot be changed.'}
         </p>
       ) : null}
 
-      <div className="mt-xl grid gap-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      {/* `lg`, one step under the sections' `xl`: a title sits closer to its
+          content than two cards sit to each other. */}
+      <div className="mt-lg grid gap-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <GuestAndStaySummary
           booking={booking}
           identityDocuments={documents.filter((document) => document.kind === 'identity')}
@@ -245,24 +259,42 @@ export default async function BookingDetailPage({ params }: PageProps) {
       />
 
       {/* Below the payments it records, above the notes. The newest live
-          pack; `listDocumentsForBooking` reads oldest first. */}
-      <SectionCard id="pack-heading" title="Accounting pack" className="mt-xl">
+          pack; `listDocumentsForBooking` reads oldest first. How the pack
+          comes to exist is the section's hint rather than a paragraph under
+          it — read once, not on every visit. */}
+      <SectionCard
+        id="pack-heading"
+        title="Accounting pack"
+        hint="Built when a payment is verified, and rebuilt overnight after any change to the booking, its payments or its documents. Earlier versions stay on the history. The identity document is referenced, not copied in."
+        className="mt-xl"
+      >
         <AccountingPack
-          pack={documents.filter((document) => document.kind === 'accounting_pack').at(-1) ?? null}
+          bookingId={booking.id}
+          pack={pack}
           mayOpen={mayOpen('accounting_pack', actor.permissions)}
-          hasVerifiedPayment={payments.some((payment) => payment.status === 'verified')}
+          hasVerifiedPayment={newestVerifiedAt !== null}
+          pendingSince={packPendingSince}
         />
       </SectionCard>
 
       {/* Above the history, below the money. The history is the system's
           account of what happened; this is the staff's, and the two read
           better in that order — what people said, then what was recorded. */}
-      <SectionCard id="notes-heading" title="Notes" className="mt-xl">
-        <BookingNotes bookingId={booking.id} notes={notes} actorNames={actorNames} />
+      <SectionCard
+        id="notes-heading"
+        title="Notes"
+        actions={<AddNote bookingId={booking.id} />}
+        className="mt-xl"
+      >
+        <BookingNotes notes={notes} actorNames={actorNames} />
       </SectionCard>
 
       <SectionCard id="history-heading" title="History" className="mt-xl">
-        <BookingHistory events={events} actorNames={actorNames} />
+        <BookingHistory
+          history={history}
+          path={`/portal/bookings/${encodeURIComponent(booking.reference)}`}
+          actorNames={actorNames}
+        />
       </SectionCard>
     </div>
   )
@@ -406,10 +438,16 @@ function SlipLine({
   maySee: boolean
   actorNames: ReadonlyMap<string, string>
 }) {
-  if (slip) {
-    return (
-      <div className="-mx-md">
-        <div className="px-md">
+  // The same inset the identity document sits in on the Guest & stay card: a
+  // file on a record is one construction wherever it appears, and a bare
+  // "No slip on file" line among the payment's captions read as one more
+  // caption rather than as a place a file goes.
+  return (
+    <Card surface="inset" className="mt-xs">
+      <span className="text-micro text-muted-foreground">Transfer slip</span>
+
+      {slip ? (
+        <div className="mt-xs divide-y divide-border">
           <DocumentRow
             document={slip}
             mayOpen={maySee}
@@ -421,26 +459,24 @@ function SlipLine({
             }
           />
         </div>
-      </div>
-    )
-  }
-
-  if (!mayAttach) {
-    return <p className="text-caption text-muted-foreground">No slip on file</p>
-  }
-
-  return (
-    <div className="mt-xs flex items-center gap-md">
-      <span className="text-caption text-muted-foreground">No slip on file</span>
-      <AttachDocument
-        kind="payment_slip"
-        bookingId={bookingId}
-        paymentId={payment.id}
-        label="Attach slip"
-        title="Attach the transfer slip"
-        description="The bank app is still the check — a slip is evidence, not verification. Kept privately for seven years as an accounting record."
-      />
-    </div>
+      ) : (
+        // One line, as the identity panel's: the absence on the left and the
+        // control that ends it on the right, bottoms level.
+        <div className="mt-sm flex items-end justify-between gap-md">
+          <p className="text-body-sm text-muted-foreground">No slip on file.</p>
+          {mayAttach ? (
+            <AttachDocument
+              kind="payment_slip"
+              bookingId={bookingId}
+              paymentId={payment.id}
+              label="Attach slip"
+              title="Attach the transfer slip"
+              description="The bank app is still the check — a slip is evidence, not verification. Kept privately for seven years as an accounting record."
+            />
+          ) : null}
+        </div>
+      )}
+    </Card>
   )
 }
 
@@ -459,7 +495,7 @@ function VehicleField({ booking }: { booking: Booking }) {
       hint={
         booking.noVehicle
           ? 'The guest is arriving without one.'
-          : 'Taken before a registration was required — add it when amending.'
+          : 'Taken before a registration was required — add it when editing the booking.'
       }
     />
   )
@@ -492,7 +528,14 @@ function MoneySummary({
   const awaiting = payments.some((payment) => payment.status === 'pending_verification')
 
   return (
-    <SectionCard id="money-heading" title="Money">
+    <SectionCard
+      id="money-heading"
+      title="Money"
+      // prd.md §11: the security deposit is a refundable liability held
+      // against the booking, not revenue. Said once here rather than under
+      // the inset on every booking.
+      hint="The security deposit is collected at check-in and held apart from the total — never counted as revenue. It is released after the unit has been inspected."
+    >
       <ul className="grid gap-sm">
         {booking.lines.map((entry, index) => (
           <li key={`${entry.type}-${index}`} className="flex items-baseline justify-between gap-lg">
@@ -712,6 +755,38 @@ function PaymentsSection({
                   </p>
                 )}
 
+                {/* Only shown when it differs — the ordinary case is that the
+                    customer quoted the booking reference and there is nothing
+                    to say about it. Directly under who verified it, because it
+                    is the second half of the same fact: what the bank showed
+                    them. The sender and the reference are badges rather than
+                    run-in text, so the two things a clerk compares against the
+                    statement stand apart from the sentence around them — a 6px
+                    rectangle, never a capsule (design.md §Geometry). */}
+                {payment.observedSender || payment.observedReference ? (
+                  <div className="flex flex-wrap items-center gap-xs text-caption text-muted-foreground">
+                    <span>Bank showed</span>
+                    {payment.observedSender ? (
+                      <Badge tone="neutral">{payment.observedSender}</Badge>
+                    ) : null}
+                    {payment.observedReference ? (
+                      <Badge tone="neutral" className="font-mono">
+                        {payment.observedReference}
+                      </Badge>
+                    ) : null}
+                    {payment.observedOn ? (
+                      <span>on {formatStayDate(payment.observedOn)}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {payment.amountOverrideReason ? (
+                  <p className="text-body-sm text-copy">“{payment.amountOverrideReason}”</p>
+                ) : null}
+                {payment.matchReason ? (
+                  <p className="text-body-sm text-copy">“{payment.matchReason}”</p>
+                ) : null}
+
                 {/* The slip, which used to be the words "no slip on file" on
                     every row. prd.md §10.4 keeps it evidence rather than
                     verification — staff still check the bank — so it sits under
@@ -728,28 +803,6 @@ function PaymentsSection({
                     maySee={maySeeSlip}
                     actorNames={actorNames}
                   />
-                ) : null}
-
-                {/* Only shown when it differs — the ordinary case is that the
-                      customer quoted the booking reference and there is nothing
-                      to say about it. */}
-                {payment.observedSender || payment.observedReference ? (
-                  <p className="text-caption text-muted-foreground">
-                    Bank showed{' '}
-                    {payment.observedSender ? <strong>{payment.observedSender}</strong> : null}
-                    {payment.observedSender && payment.observedReference ? ' · ' : null}
-                    {payment.observedReference ? (
-                      <span className="font-mono">{payment.observedReference}</span>
-                    ) : null}
-                    {payment.observedOn ? ` on ${formatStayDate(payment.observedOn)}` : null}
-                  </p>
-                ) : null}
-
-                {payment.amountOverrideReason ? (
-                  <p className="text-body-sm text-copy">“{payment.amountOverrideReason}”</p>
-                ) : null}
-                {payment.matchReason ? (
-                  <p className="text-body-sm text-copy">“{payment.matchReason}”</p>
                 ) : null}
               </div>
             </li>

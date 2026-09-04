@@ -7,28 +7,39 @@ import {
   countByStage,
   DEFAULT_LEDGER_VIEW,
   filterHeld,
+  HELD_STAGES,
   isArchiveView,
   LEDGER_VIEWS,
   owedTotalOf,
+  readHeldStages,
   readLedgerView,
   sortForLedger,
-  stageFor,
   totalsOf,
 } from './ledger-view'
 
 /**
  * What the ledger shows, and in what order.
  *
- * Colocated with the screen and tested for the reason `history-window.ts` is:
+ * Colocated with the screen and tested for the reason `history-page.ts` is:
  * it turns a string somebody may have typed into which query runs, and it
  * decides the order Finance works in.
  */
 
-const row = (stage: DepositStage, end: string | null, collectedAt = '2026-09-01T00:00:00Z') => ({
+const row = (
+  stage: DepositStage,
+  end: string | null,
+  collectedAt = '2026-09-01T00:00:00Z',
+  start = '2026-08-25',
+  identity = { bookingReference: 'PV-4821', guestName: 'Lim Wei', unitRef: '3B-04' },
+) => ({
   stage,
   collectedAt,
-  stay: end === null ? null : { range: { end } },
+  bookingReference: identity.bookingReference,
+  guestName: identity.guestName,
+  stay: end === null ? null : { unitRef: identity.unitRef, range: { start, end } },
 })
+
+const everything = { stages: [], window: null, search: null } as const
 
 describe('readLedgerView', () => {
   test.each(LEDGER_VIEWS)('%s is read back as itself', (view) => {
@@ -45,6 +56,12 @@ describe('readLedgerView', () => {
     expect(readLedgerView('')).toBe('held')
   })
 
+  test('a stage is a filter now, not a view', () => {
+    // `?show=in_house` was how the tiles narrowed the ledger before the Stage
+    // chip existed. An old bookmark opens the ledger whole rather than erroring.
+    expect(readLedgerView('in_house')).toBe('held')
+  })
+
   test('a repeated param takes the first value', () => {
     // Next gives an array when a param appears twice; the alternative is
     // deciding a screen cannot render because a link was built twice.
@@ -58,26 +75,27 @@ describe('isArchiveView', () => {
     expect(isArchiveView('owed')).toBe(true)
   })
 
-  test('every held view is read whole and narrowed here', () => {
+  test('held is read whole and narrowed here', () => {
     expect(isArchiveView('held')).toBe(false)
-    expect(isArchiveView('in_house')).toBe(false)
-    expect(isArchiveView('awaiting_inspection')).toBe(false)
-    expect(isArchiveView('ready_for_release')).toBe(false)
   })
 })
 
-describe('stageFor', () => {
-  test('the three stage views name their stage', () => {
-    expect(stageFor('in_house')).toBe('in_house')
-    expect(stageFor('ready_for_release')).toBe('ready_for_release')
+describe('readHeldStages', () => {
+  test('the three held stages, in pipeline order, and never released', () => {
+    expect(HELD_STAGES).toEqual(['in_house', 'awaiting_inspection', 'ready_for_release'])
+    expect(readHeldStages(['ready_for_release', 'in_house'])).toEqual([
+      'in_house',
+      'ready_for_release',
+    ])
   })
 
-  test('held is every stage, so it names none', () => {
-    expect(stageFor('held')).toBeNull()
+  test('released is the archive, not a stage of something held', () => {
+    expect(readHeldStages('released')).toEqual([])
+    expect(readHeldStages(['released', 'in_house'])).toEqual(['in_house'])
   })
 
-  test('owed is a fact about a released deposit, not a stage', () => {
-    expect(stageFor('owed')).toBeNull()
+  test('nothing asked for is every stage', () => {
+    expect(readHeldStages(undefined)).toEqual([])
   })
 })
 
@@ -88,27 +106,92 @@ describe('filterHeld', () => {
     row('ready_for_release', '2026-09-01'),
   ]
 
-  test('held keeps everything', () => {
-    expect(filterHeld(deposits, 'held')).toHaveLength(3)
+  test('no filter keeps everything', () => {
+    expect(filterHeld(deposits, everything)).toHaveLength(3)
   })
 
-  test('a stage view keeps only that stage', () => {
-    const visible = filterHeld(deposits, 'awaiting_inspection')
-
-    expect(visible).toHaveLength(1)
-    expect(visible[0]?.stage).toBe('awaiting_inspection')
+  test('a stage keeps only that stage, and two stages keep both', () => {
+    expect(
+      filterHeld(deposits, { stages: ['awaiting_inspection'], window: null, search: null }),
+    ).toEqual([deposits[1]])
+    expect(
+      filterHeld(deposits, {
+        stages: ['in_house', 'ready_for_release'],
+        window: null,
+        search: null,
+      }).map((deposit) => deposit.stage),
+    ).toEqual(['in_house', 'ready_for_release'])
   })
 
   test('a stage nothing is in produces the empty state rather than everything', () => {
     // The filter has to be able to come back with nothing, or the URL would
     // lie about what is on screen.
-    expect(filterHeld([row('in_house', '2026-09-10')], 'ready_for_release')).toHaveLength(0)
+    expect(
+      filterHeld([row('in_house', '2026-09-10')], {
+        stages: ['ready_for_release'],
+        window: null,
+        search: null,
+      }),
+    ).toHaveLength(0)
+  })
+
+  test('a stay window keeps the stays that touch it', () => {
+    // All three stays begin 25 August. A window on the first week of
+    // September touches the two that run past the 1st; the stay that ends
+    // on the 1st checked out that morning and does not.
+    const visible = filterHeld(deposits, {
+      stages: [],
+      window: { from: '2026-09-01', to: '2026-09-07' },
+      search: null,
+    })
+
+    expect(visible.map((deposit) => deposit.stage)).toEqual(['in_house', 'awaiting_inspection'])
+  })
+
+  test('a deposit with no stay cannot answer a question about dates', () => {
+    expect(
+      filterHeld([row('in_house', null)], {
+        stages: [],
+        window: { from: '2026-09-01', to: '2026-09-07' },
+        search: null,
+      }),
+    ).toHaveLength(0)
+  })
+
+  test('stage and window narrow together', () => {
+    expect(
+      filterHeld(deposits, {
+        stages: ['awaiting_inspection'],
+        window: { from: '2026-09-01', to: '2026-09-07' },
+        search: null,
+      }),
+    ).toEqual([deposits[1]])
+  })
+
+  test('a search answers by reference, guest or unit, whatever the case', () => {
+    const tan = row('in_house', '2026-09-10', undefined, undefined, {
+      bookingReference: 'PV-9001',
+      guestName: 'Tan Mei',
+      unitRef: '2A-02',
+    })
+    const both = [...deposits, tan]
+
+    expect(filterHeld(both, { stages: [], window: null, search: 'tan' })).toEqual([tan])
+    expect(filterHeld(both, { stages: [], window: null, search: '2a-' })).toEqual([tan])
+    expect(filterHeld(both, { stages: [], window: null, search: 'pv-48' })).toHaveLength(3)
+  })
+
+  test('a deposit with no stay still answers a search by its booking or guest', () => {
+    const noStay = row('in_house', null)
+
+    expect(filterHeld([noStay], { stages: [], window: null, search: 'lim' })).toEqual([noStay])
+    expect(filterHeld([noStay], { stages: [], window: null, search: '3b-04' })).toEqual([])
   })
 
   test('does not mutate what it was given', () => {
     const original = [row('in_house', '2026-09-10')]
 
-    filterHeld(original, 'held')
+    filterHeld(original, everything)
 
     expect(original).toHaveLength(1)
   })

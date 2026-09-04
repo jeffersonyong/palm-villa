@@ -5,6 +5,7 @@ import type { PaymentMatchKind, PaymentMethod, PaymentStatus } from '@/lib/domai
 import { dataClient } from '@/lib/supabase/data'
 
 import { currentPropertyId } from './property'
+import { applySearch } from './search'
 
 /**
  * Payment reads and writes (capabilities B4–B7, prd.md §10).
@@ -163,6 +164,8 @@ export interface PaymentListFilter {
    * query, so which end is "the top" is the caller's to say.
    */
   newestFirst?: boolean
+  /** A term the booking reference, guest name, phone or unit contains. */
+  search?: string
 }
 
 /**
@@ -196,6 +199,14 @@ export async function listPayments(filter: PaymentListFilter = {}): Promise<read
 
   if (filter.collectedBefore) {
     query = query.lt('collected_at', filter.collectedBefore)
+  }
+
+  if (filter.search) {
+    applySearch(
+      query,
+      ['booking_reference', 'guest_name', 'guest_phone', 'unit_ref'],
+      filter.search,
+    )
   }
 
   const { data, error } = await query.order(filter.newestFirst ? 'collected_at' : 'created_at', {
