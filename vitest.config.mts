@@ -58,13 +58,18 @@ export default defineConfig({
           // `lib/domain` plus the handful of pure functions that live beside
           // the components and screens consuming them (route matching,
           // breadcrumbs, a history window), and lib/auth's pure permission
-          // logic. The components themselves are chrome over tested primitives
-          // and are verified on /tokens, not here — and nothing under `app/`
-          // that touches the database or renders is eligible, which is why the
-          // glob catches `*.test.ts` and never `*.test.tsx`.
+          // logic. `lib/pdf` is here too: it drives pdf-lib rather than being
+          // pure, but it needs no database and no network, and what its tests
+          // assert — page counts, a header, a placeholder where an attachment
+          // could not be embedded — is answered in memory. The components
+          // themselves are chrome over tested primitives and are verified on
+          // /tokens, not here — and nothing under `app/` that touches the
+          // database or renders is eligible, which is why the glob catches
+          // `*.test.ts` and never `*.test.tsx`.
           include: [
             'lib/domain/**/*.test.ts',
             'lib/auth/**/*.test.ts',
+            'lib/pdf/**/*.test.ts',
             'lib/utils.test.ts',
             'components/**/*.test.ts',
             'app/**/*.test.ts',
