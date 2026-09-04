@@ -17,7 +17,7 @@ import { FieldError } from '@/components/ui/field-error'
 import { toast } from '@/components/ui/toast-store'
 import type { Document } from '@/lib/db/documents'
 import { formatInstantAsDate } from '@/lib/domain/dates'
-import { formatByteSize } from '@/lib/domain/document'
+import { DOCUMENT_KIND_LABELS, formatByteSize } from '@/lib/domain/document'
 
 import { removeDocumentAction } from './actions'
 
@@ -43,6 +43,15 @@ import { removeDocumentAction } from './actions'
  * shown nothing (see the permission table in lib/domain/document.ts). A screen
  * that hid the row entirely would make "did anyone take it?" unanswerable by
  * exactly the people whose job it is to ask.
+ *
+ * **The filename is content.** An identity document arrives named by whoever
+ * scanned it, and `IC_Ahmad_98765432.jpg` is the ordinary case rather than the
+ * exotic one — so a row that printed it regardless would hand the guest's name
+ * and number to every reader the Open link was withheld from, which is the one
+ * thing `document.view_identity` exists to prevent. A reader who may not open
+ * the file is shown what kind of file it is, which is the whole of what the row
+ * is promising them. Same substitution `sanitiseFilename()` already makes when
+ * a name cleans away to nothing.
  */
 
 interface DocumentRowProps {
@@ -57,11 +66,12 @@ interface DocumentRowProps {
 
 export function DocumentRow({ document, mayOpen, mayRemove, attachedBy }: DocumentRowProps) {
   const [isConfirming, setIsConfirming] = useState(false)
+  const name = mayOpen ? document.filename : DOCUMENT_KIND_LABELS[document.kind]
 
   return (
     <div className="flex items-start justify-between gap-md py-sm">
       <div className="min-w-0">
-        <p className="truncate text-body-sm text-foreground">{document.filename}</p>
+        <p className="truncate text-body-sm text-foreground">{name}</p>
         {/* `formatInstantAsDate`, not `formatStayDate`: the retention date is a
             timestamp, and reading its UTC day names the day before the one the
             file is deleted on. The year is there because it is usually years
@@ -91,7 +101,7 @@ export function DocumentRow({ document, mayOpen, mayRemove, attachedBy }: Docume
       </div>
 
       {isConfirming ? (
-        <RemoveDialog document={document} onClose={() => setIsConfirming(false)} />
+        <RemoveDialog document={document} name={name} onClose={() => setIsConfirming(false)} />
       ) : null}
     </div>
   )
@@ -101,7 +111,18 @@ export function DocumentRow({ document, mayOpen, mayRemove, attachedBy }: Docume
  * The confirmation, per design.md: plain sentences about what will happen
  * rather than "are you sure", and the safe choice worded as the thing itself.
  */
-function RemoveDialog({ document, onClose }: { document: Document; onClose: () => void }) {
+function RemoveDialog({
+  document,
+  name,
+  onClose,
+}: {
+  document: Document
+  /** What the row called it — never the raw filename to a reader who may not
+      open the file, since `booking.amend` alone can remove an identity
+      document without holding `document.view_identity`. */
+  name: string
+  onClose: () => void
+}) {
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -131,7 +152,7 @@ function RemoveDialog({ document, onClose }: { document: Document; onClose: () =
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent className="max-w-[440px]">
         <DialogHeader>
-          <DialogTitle>Remove {document.filename}?</DialogTitle>
+          <DialogTitle>Remove {name}?</DialogTitle>
           <DialogDescription>
             The file is deleted from storage and cannot be recovered. The record that it existed,
             who attached it and who removed it stays in this booking&rsquo;s history.

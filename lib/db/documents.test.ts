@@ -17,7 +17,7 @@ import {
   runRetention,
   sweepOrphanObjects,
 } from './documents'
-import { listPaymentsForBooking } from './payments'
+import { listPaymentsForBooking, verifyPayment } from './payments'
 import { currentPropertyId } from './property'
 import { auditEventsFor } from './test/inspect'
 import {
@@ -260,6 +260,56 @@ describe('a slip on a payment', () => {
     const slips = await listDocumentsForBooking(booking.id, 'payment_slip')
 
     expect(slips).toHaveLength(1)
+  })
+
+  test('a slip attaches to a payment being verified at the same moment', async () => {
+    // The desk attaches the screenshot while Finance confirms the transfer —
+    // two people, the same payment and booking rows, seconds apart. Both must
+    // succeed: prd.md §10.4 makes a slip evidence rather than the verification,
+    // so one arriving after confirmation is the ordinary case.
+    //
+    // **This does not prove the lock ordering, and is not named as though it
+    // does.** attach_document() takes the PAYMENT's lock before the booking's
+    // because verify_payment() does, and taken the other way round the two
+    // deadlock. But the window between the two locks is a handful of statements
+    // — microseconds — so forcing the cycle from out here needs a delay injected
+    // between them, which would mean test-only code in a production function.
+    // Reverting the order and running this passes, which is exactly why the
+    // claim is not attached to it. What protects the invariant is the ordering
+    // itself and the comment on it, the same way verify_payment() protects it.
+    const pairs = await Promise.all(
+      Array.from({ length: 6 }, (_, index) =>
+        givenTransferBooking({
+          checkIn: addDays(TOMORROW, index * 4),
+          checkOut: addDays(TOMORROW, index * 4 + 2),
+        }),
+      ),
+    )
+
+    const outcomes = await Promise.all(
+      pairs.flatMap(({ booking, payment }, index) => [
+        attachDocument({
+          kind: 'payment_slip',
+          bookingId: booking.id,
+          paymentId: payment.id,
+          bytes: TEST_PNG,
+          filename: `slip-${index}.png`,
+          actorId: null,
+        }),
+        verifyPayment({
+          paymentId: payment.id,
+          observedAmount: booking.total,
+          match: 'reference' as const,
+          actorId: null,
+        }),
+      ]),
+    )
+
+    expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([])
+
+    for (const { booking } of pairs) {
+      expect(await listDocumentsForBooking(booking.id, 'payment_slip')).toHaveLength(1)
+    }
   })
 
   test('a removed slip clears the payment, so a corrected one can be attached', async () => {
@@ -564,6 +614,39 @@ describe('the retention run', () => {
 
     expect(await sweepOrphanObjects()).toBe(0)
     expect(await listDocumentsForBooking(booking.id)).toHaveLength(1)
+  })
+
+  test('a removal and the run racing the same document settle on one tombstone', async () => {
+    // `for update skip locked` in expire_due_documents() is what keeps the
+    // nightly run from blocking on a document somebody is deleting by hand at
+    // that moment. Asserted here rather than in a migration comment: the run
+    // takes the row or steps over it, and either way the document ends up
+    // removed exactly once, with one reason and one deletion.
+    const booking = await givenBooking({ checkIn: TOMORROW, checkOut: NEXT_WEEK })
+    const documentId = await givenDocument({ kind: 'identity', bookingId: booking.id })
+
+    await expireByHand(documentId)
+
+    const [removed, run] = await Promise.all([
+      removeDocument({ documentId, actorId: null }),
+      runRetention(),
+    ])
+
+    // Whichever got there first: nothing threw, nothing was left stuck, and
+    // the document is off the screens.
+    expect(run.failed).toBe(0)
+    expect(await listDocumentsForBooking(booking.id)).toHaveLength(0)
+    expect(removed.ok || run.expired === 1).toBe(true)
+
+    // Ended once, not twice. The loser of the race is refused rather than
+    // writing a second tombstone over the first — which would put two endings
+    // in a trail the client is promised is the record of what happened.
+    const events = await auditEventsFor(documentId)
+    const endings = events.filter(
+      (event) => event.action === 'document.removed' || event.action === 'document.expired',
+    )
+
+    expect(endings).toHaveLength(1)
   })
 })
 

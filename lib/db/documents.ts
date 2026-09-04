@@ -415,8 +415,17 @@ async function purge(documentId: string, bucket: string, storageKey: string): Pr
   return true
 }
 
-function isNotFound(error: { message: string }): boolean {
-  return /not.?found/i.test(error.message)
+/**
+ * Did Storage say the object is not there?
+ *
+ * Read from the status rather than the sentence. Matching on the message meant
+ * any future wording carrying "not found" — a missing *bucket*, say — counted
+ * as a successful delete, which would mark a row purged whose file is still
+ * sitting in a private bucket. A status is the machine-readable half, and it is
+ * what the rest of this layer already keys on.
+ */
+function isNotFound(error: { status?: number; statusCode?: string }): boolean {
+  return error.status === 404 || error.statusCode === '404'
 }
 
 /* ── Opening ──────────────────────────────────────────────────────────────── */
@@ -534,10 +543,13 @@ export async function runRetention(
     documents: readonly { id: string; bucket_id: string; storage_key: string }[]
   }
 
+  const attempted: string[] = []
   let purged = 0
   let failed = 0
 
   for (const document of result.documents) {
+    attempted.push(document.id)
+
     if (await purge(document.id, document.bucket_id, document.storage_key)) {
       purged += 1
     } else {
@@ -545,7 +557,12 @@ export async function runRetention(
     }
   }
 
-  const retried = await purgeTombstoned()
+  // The rows just tombstoned are excluded from the retry pass. Without that
+  // they are still tombstoned-and-unpurged, so the pass below picks up every
+  // one that just failed, tries it a second time in the same run, and counts it
+  // twice — and `failed` is the figure the job reports for a deletion nobody
+  // else is watching.
+  const retried = await purgeTombstoned({ skip: attempted })
   const sweptOrphans = await sweepOrphanObjects({ now })
 
   return {
@@ -562,8 +579,11 @@ export async function runRetention(
  * The retry queue for both halves of the two-step delete: a removal whose
  * Storage call failed, and an expiry interrupted mid-run.
  */
-export async function purgeTombstoned(): Promise<{ purged: number; failed: number }> {
+export async function purgeTombstoned(
+  options: { skip?: readonly string[] } = {},
+): Promise<{ purged: number; failed: number }> {
   const propertyId = await currentPropertyId()
+  const skip = new Set(options.skip ?? [])
 
   const { data, error } = await dataClient()
     .from('document')
@@ -577,7 +597,9 @@ export async function purgeTombstoned(): Promise<{ purged: number; failed: numbe
     throw new Error(`Could not read the documents awaiting deletion: ${error.message}`)
   }
 
-  const rows = data as unknown as { id: string; bucket_id: string; storage_key: string }[]
+  const rows = (data as unknown as { id: string; bucket_id: string; storage_key: string }[]).filter(
+    (row) => !skip.has(row.id),
+  )
   let purged = 0
   let failed = 0
 
@@ -614,32 +636,74 @@ export async function sweepOrphanObjects(options: { now?: Date } = {}): Promise<
 
   for (const kind of DOCUMENT_KINDS) {
     const bucket = BUCKET_FOR_KIND[kind]
-    const listed = await db.storage.from(bucket).list(prefix, { limit: 1000 })
+    const candidates: string[] = []
 
-    if (listed.error || !listed.data || listed.data.length === 0) {
-      continue
+    // Storage lists a page at a time, so the sweep pages too. A single request
+    // would examine the first thousand objects for the life of the property and
+    // silently never look past them — which is the same class of quiet failure
+    // the sweep exists to catch.
+    //
+    // Every page is listed BEFORE anything is deleted. Removing objects while
+    // paging shifts each later page's offset by however many went, so the sweep
+    // would step over the files that moved up into the gap.
+    for (let offset = 0; ; offset += STORAGE_PAGE) {
+      const listed = await db.storage.from(bucket).list(prefix, {
+        limit: STORAGE_PAGE,
+        offset,
+        sortBy: { column: 'name', order: 'asc' },
+      })
+
+      if (listed.error || !listed.data || listed.data.length === 0) {
+        break
+      }
+
+      for (const object of listed.data) {
+        if (new Date(object.created_at ?? now.toISOString()) < cutoff) {
+          candidates.push(`${prefix}/${object.name}`)
+        }
+      }
+
+      if (listed.data.length < STORAGE_PAGE) {
+        break
+      }
     }
 
-    const keys = listed.data
-      .filter((object) => new Date(object.created_at ?? now.toISOString()) < cutoff)
-      .map((object) => `${prefix}/${object.name}`)
+    swept += await removeUnclaimed(bucket, propertyId, candidates)
+  }
 
-    if (keys.length === 0) {
-      continue
-    }
+  return swept
+}
+
+/**
+ * Of these keys, deletes the ones no document row claims.
+ *
+ * Asked in batches because PostgREST sends `in` as a query string: a thousand
+ * 45-character keys in one filter is a URL long enough for a proxy to refuse,
+ * which would abort the sweep for that bucket rather than skip a file.
+ */
+async function removeUnclaimed(
+  bucket: string,
+  propertyId: string,
+  keys: readonly string[],
+): Promise<number> {
+  const db = dataClient()
+  let swept = 0
+
+  for (let from = 0; from < keys.length; from += CLAIM_BATCH) {
+    const batch = keys.slice(from, from + CLAIM_BATCH)
 
     const { data, error } = await db
       .from('document')
       .select('storage_key')
       .eq('property_id', propertyId)
-      .in('storage_key', keys)
+      .in('storage_key', batch)
 
     if (error) {
       throw new Error(`Could not check for orphaned files: ${error.message}`)
     }
 
     const known = new Set((data as { storage_key: string }[]).map((row) => row.storage_key))
-    const orphans = keys.filter((key) => !known.has(key))
+    const orphans = batch.filter((key) => !known.has(key))
 
     if (orphans.length === 0) {
       continue
@@ -654,6 +718,10 @@ export async function sweepOrphanObjects(options: { now?: Date } = {}): Promise<
 
   return swept
 }
+
+/** Objects per Storage listing request, and keys per claim lookup. */
+const STORAGE_PAGE = 1000
+const CLAIM_BATCH = 200
 
 /**
  * How old an unclaimed object must be before the sweep takes it.

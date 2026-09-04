@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import type { Permission } from '@/lib/auth/permissions'
+import { PERMISSIONS, type Permission } from '@/lib/auth/permissions'
 
 import {
   ACCEPTED_MIME_TYPES,
@@ -383,9 +383,15 @@ describe('mayAttach and mayRemove', () => {
   test('nobody attaches an accounting pack by hand', () => {
     // Generated server-side by capability G5. A permission that let a person
     // upload one would make the pack something other than what it claims.
-    const everything = permissions(...(Object.keys(ATTACH_PERMISSION) as never[]))
+    //
+    // Every permission the product has, so the assertion is what the sentence
+    // above says it is. Built from `ATTACH_PERMISSION`'s keys until review
+    // caught it: those are document *kinds*, so the set held no permission at
+    // all and the test passed on an empty one.
+    const everything = permissions(...PERMISSIONS)
 
     expect(mayAttach('accounting_pack', everything)).toBe(false)
+    expect(mayRemove('accounting_pack', everything)).toBe(false)
     expect(ATTACH_PERMISSION.accounting_pack).toBeNull()
   })
 

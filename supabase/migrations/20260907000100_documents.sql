@@ -399,18 +399,17 @@ begin
     return jsonb_build_object('ok', false, 'error', 'filename_required');
   end if;
 
-  -- Lock the booking, not the document: the document does not exist yet, and
-  -- the booking is what every pointer below is checked against.
-  select * into v_booking
-  from booking
-  where id = p_booking_id and property_id = p_property_id
-  for update;
-
-  if not found then
-    return jsonb_build_object('ok', false, 'error', 'not_found');
-  end if;
-
-  -- ── The pointer belongs to this booking ─────────────────────────────────
+  -- ── Two locks, and the order they are taken in ──────────────────────
+  --
+  -- A slip takes the PAYMENT's lock before the booking's, because
+  -- verify_payment() takes them in that order and says so in as many words:
+  -- "nothing else in this schema takes them in the opposite order". Attaching
+  -- the slip and verifying the transfer it evidences are two things staff do to
+  -- the same pair of rows within seconds of each other, so taking them
+  -- booking-first here would deadlock on the ordinary case rather than the
+  -- exotic one — and Postgres settles a deadlock by aborting somebody's work.
+  --
+  -- ── The pointer belongs to this booking ─────────────────────────────
   --
   -- Without this a slip could be filed against a payment on somebody else's
   -- booking and would then be served to anyone who could view THAT booking.
@@ -449,7 +448,21 @@ begin
     ) then
       return jsonb_build_object('ok', false, 'error', 'slip_already_attached');
     end if;
-  elsif p_kind = 'inspection_photo' then
+  end if;
+
+  -- The booking is locked second, or alone for a kind that points at no
+  -- payment. It is read as well as held: the retention anchor and the audit
+  -- event below both come off it.
+  select * into v_booking
+  from booking
+  where id = p_booking_id and property_id = p_property_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'error', 'not_found');
+  end if;
+
+  if p_kind = 'inspection_photo' then
     if p_inspection_id is null then
       return jsonb_build_object('ok', false, 'error', 'pointer_missing');
     end if;
@@ -466,7 +479,9 @@ begin
     ) then
       return jsonb_build_object('ok', false, 'error', 'not_on_this_booking');
     end if;
-  elsif p_payment_id is not null or p_inspection_id is not null then
+  elsif p_kind <> 'payment_slip'
+    and (p_payment_id is not null or p_inspection_id is not null)
+  then
     return jsonb_build_object('ok', false, 'error', 'pointer_not_allowed');
   end if;
 
