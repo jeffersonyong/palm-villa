@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 
 import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { EmptyState } from '@/components/portal/empty-state'
+import { overlapRangeOf, readSearch, readStayWindow } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { initials } from '@/components/ui/avatar-identity'
@@ -21,7 +23,7 @@ import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listPayments } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
-import { addDays, formatTimestamp, isStayDate } from '@/lib/domain/dates'
+import { formatTimestamp } from '@/lib/domain/dates'
 import { formatCents, sumCents } from '@/lib/domain/money'
 
 import { CashFilters } from './cash-filters'
@@ -46,7 +48,7 @@ export const metadata: Metadata = {
  */
 
 interface PageProps {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{ from?: string; to?: string; q?: string | string[] }>
 }
 
 export default async function CashPaymentsPage({ searchParams }: PageProps) {
@@ -74,20 +76,16 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
 
   // Both ends inclusive — the days the calendar shows as selected — converted
   // to a half-open range at this boundary and nowhere else.
-  const hasRange =
-    Boolean(params.from && params.to) &&
-    isStayDate(params.from!) &&
-    isStayDate(params.to!) &&
-    params.from! <= params.to!
-
-  const from = hasRange ? params.from! : undefined
-  const to = hasRange ? params.to! : undefined
+  const window = readStayWindow(params.from, params.to)
+  const search = readSearch(params.q)
+  const isFiltered = window !== null || search !== null
 
   const [payments, staff] = await Promise.all([
     listPayments({
       methods: ['cash'],
-      collectedFrom: from,
-      collectedBefore: to ? addDays(to, 1) : undefined,
+      collectedFrom: window?.from,
+      collectedBefore: window ? overlapRangeOf(window).end : undefined,
+      search: search ?? undefined,
       newestFirst: true,
     }),
     listStaff(),
@@ -104,7 +102,7 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
       />
 
       <div className="mt-xl flex flex-wrap items-center gap-md">
-        <CashFilters from={from} to={to} />
+        <CashFilters from={window?.from} to={window?.to} search={search ?? ''} />
 
         <div className="ml-auto flex items-center gap-lg">
           <h2 id="cash-heading" className="micro-label text-muted-foreground">
@@ -117,14 +115,14 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
       <section aria-labelledby="cash-heading" className="mt-md">
         {payments.length === 0 ? (
           <EmptyState
-            title={hasRange ? 'No cash recorded in these dates' : 'No cash recorded yet'}
+            title={isFiltered ? 'No cash payments match these filters' : 'No cash recorded yet'}
             description={
-              hasRange
+              isFiltered
                 ? 'Try a wider date range, or clear the filters to see everything.'
                 : 'Cash taken at the desk appears here as soon as it is recorded.'
             }
             action={
-              hasRange ? (
+              isFiltered ? (
                 <Button asChild variant="tertiary">
                   <Link href="/portal/payments/cash">Clear filters</Link>
                 </Button>
@@ -141,11 +139,17 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Collected by</TableHead>
                 <TableHead>Booking</TableHead>
+                {/* The chevron's column. Named for screen readers and hidden
+                    from sight: a visible header over a decorative glyph would
+                    claim the arrow is data. */}
+                <TableHead className="w-0">
+                  <span className="sr-only">Open</span>
+                </TableHead>
               </TableHeaderRow>
             </TableHeader>
             <TableBody>
               {payments.map((payment) => (
-                <TableRow key={payment.id} interactive>
+                <TableRow key={payment.id} interactive className="group">
                   <TableCell className="tabular-nums">
                     {payment.collectedAt ? formatTimestamp(payment.collectedAt) : '—'}
                   </TableCell>
@@ -170,6 +174,15 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
                   </TableCell>
                   <TableCell>
                     <BookingStatusBadge status={payment.bookingStatus} />
+                  </TableCell>
+                  {/* The affordance, not a control: the row is already the
+                      link, so this says the row opens something — the
+                      register's arrow, following the row's hover. */}
+                  <TableCell className="w-0 pl-0 text-right">
+                    <ChevronRight
+                      aria-hidden
+                      className="size-4 text-muted-foreground transition-colors group-hover:text-foreground"
+                    />
                   </TableCell>
                 </TableRow>
               ))}

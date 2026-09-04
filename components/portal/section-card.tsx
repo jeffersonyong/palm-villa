@@ -1,6 +1,8 @@
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
+import { SectionHint } from './section-hint'
+
 /**
  * A card that names itself: the `micro` heading sits **inside** the card, above
  * its content — exactly as `FormSection` does inside a form.
@@ -18,25 +20,44 @@ import { cn } from '@/lib/utils'
  * `h-full` lets two of these sit side by side in a grid and end level — the
  * section stretches to the row, and the card fills it. In normal flow the
  * parent's height is auto and it resolves to auto, so it costs nothing.
+ *
+ * The title line has two optional companions. A `hint` is the section's
+ * explanation, folded into a tooltip beside the title (see `SectionHint`).
+ * `actions` sit opposite the title — the one control that acts on the section
+ * as a whole, such as adding a note to the notes — so it is found where a
+ * reader looks for it and the section's body stays the section's content.
  */
 export function SectionCard({
   id,
   title,
+  hint,
+  actions,
   className,
   children,
 }: {
   /** Anchors `aria-labelledby`, so the section is announced by its heading. */
   id: string
   title: string
+  /** Plain text for the tooltip beside the title. */
+  hint?: string
+  actions?: React.ReactNode
   className?: string
   children: React.ReactNode
 }) {
   return (
     <section aria-labelledby={id} className={cn(className)}>
       <Card className="h-full">
-        <h2 id={id} className="micro-label text-muted-foreground">
-          {title}
-        </h2>
+        <div className="flex items-center justify-between gap-lg">
+          {/* The hint sits beside the heading, not inside it, so the heading's
+              accessible name stays the title alone. */}
+          <div className="flex items-center gap-xs">
+            <h2 id={id} className="micro-label text-muted-foreground">
+              {title}
+            </h2>
+            {hint ? <SectionHint label={`About ${title.toLowerCase()}`}>{hint}</SectionHint> : null}
+          </div>
+          {actions}
+        </div>
         <div className="mt-md">{children}</div>
       </Card>
     </section>

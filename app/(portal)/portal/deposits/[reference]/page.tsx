@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, FileText } from 'lucide-react'
+import { ArrowLeft, ArrowUpLeft, FileText } from 'lucide-react'
 
 import { DepositStageBadge } from '@/components/portal/deposit-stage-badge'
 import { EmptyState } from '@/components/portal/empty-state'
+import { HISTORY_PAGE_SIZE, historyPage } from '@/components/portal/history-page'
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionCard } from '@/components/portal/section-card'
 import { Badge } from '@/components/ui/badge'
@@ -21,7 +22,7 @@ import {
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listAuditEvents, listAuditEventsForEntities, type AuditEvent } from '@/lib/db/audit'
+import { listAuditEventPage } from '@/lib/db/audit'
 import { getBookingByReference } from '@/lib/db/bookings'
 import { listDepositCharges, type DepositCharge } from '@/lib/db/deposit-charges'
 import { getDepositByBookingReference, type Deposit } from '@/lib/db/deposits'
@@ -48,6 +49,7 @@ import { RecordInspection } from './record-inspection'
 
 interface PageProps {
   params: Promise<{ reference: string }>
+  searchParams: Promise<{ history?: string }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -83,8 +85,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  * which is prd.md §11 requirement 4. The same rule refuses in the database, so
  * this decides what to draw rather than what is allowed.
  */
-export default async function DepositPage({ params }: PageProps) {
-  const { reference: encoded } = await params
+export default async function DepositPage({ params, searchParams }: PageProps) {
+  const [{ reference: encoded }, search] = await Promise.all([params, searchParams])
   const reference = decodeURIComponent(encoded).toUpperCase()
   const actor = await getActor()
 
@@ -111,45 +113,37 @@ export default async function DepositPage({ params }: PageProps) {
     return <NoDepositYet reference={reference} />
   }
 
-  const [charges, staff, depositEvents, inspectionEvents, photographs] = await Promise.all([
+  const [charges, staff, photographs, photographIds] = await Promise.all([
     listDepositCharges(deposit.id),
     listStaff(),
-    listAuditEvents('deposit', deposit.id),
-    deposit.inspection ? listAuditEvents('inspection', deposit.inspection.id) : [],
     listDocumentsForBooking(deposit.bookingId, 'inspection_photo'),
+    listDocumentIdsForBooking(deposit.bookingId, 'inspection_photo'),
   ])
 
+  // Four records, one trail, one page in one query (`listAuditEventPage`).
+  //
   // A charge is its own entity with its own verbs — which is what makes "every
   // charge raised this month" one lookup — but a reader following a disputed
   // deduction should not have to visit three screens to assemble one story.
-  const chargeEvents = await Promise.all(
-    charges.map((charge) => listAuditEvents('deposit_charge', charge.id)),
-  )
-
-  // The photographs' own events, for the reason the charges' are folded in: a
-  // deduction disputed a year later is argued from the evidence, and "who
-  // attached this photograph, and did anybody remove one" is part of that
-  // story. One query for all of them rather than one each.
   //
-  // Every document on the booking, tombstones included, rather than the
-  // photographs listed above — a removed photograph is exactly the one a
-  // dispute asks about, and its trail has to outlive the file. Non-photograph
-  // documents on this booking contribute nothing here: their events are
-  // labelled on the booking's own screen, and a deposit's history is about the
-  // deposit.
-  const photographEvents = (
-    await listAuditEventsForEntities('document', await listDocumentIdsForBooking(deposit.bookingId))
-  ).filter(
-    (event) =>
-      event.after?.kind === 'inspection_photo' || event.before?.kind === 'inspection_photo',
+  // The photographs' events are folded in for the same reason: a deduction
+  // disputed a year later is argued from the evidence, and "who attached this
+  // photograph, and did anybody remove one" is part of that story. Every
+  // photograph the booking has carried, tombstones included, rather than the
+  // ones listed above — a removed photograph is exactly the one a dispute
+  // asks about, and its trail has to outlive the file. The booking's other
+  // documents contribute nothing here: their events are labelled on the
+  // booking's own screen, and a deposit's history is about the deposit.
+  const history = await listAuditEventPage(
+    [
+      { entityType: 'deposit', entityIds: [deposit.id] },
+      { entityType: 'inspection', entityIds: deposit.inspection ? [deposit.inspection.id] : [] },
+      { entityType: 'deposit_charge', entityIds: charges.map((charge) => charge.id) },
+      { entityType: 'document', entityIds: photographIds },
+    ],
+    historyPage(search.history),
+    HISTORY_PAGE_SIZE,
   )
-
-  const events: readonly AuditEvent[] = [
-    ...depositEvents,
-    ...inspectionEvents,
-    ...chargeEvents.flat(),
-    ...photographEvents,
-  ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
 
   const actorNames = new Map(staff.map((account) => [account.id, account.displayName]))
 
@@ -204,7 +198,10 @@ export default async function DepositPage({ params }: PageProps) {
         actions={
           <>
             <Button asChild variant="tertiary">
-              <Link href={`/portal/bookings/${deposit.bookingReference}`}>The booking</Link>
+              <Link href={`/portal/bookings/${deposit.bookingReference}`}>
+                <ArrowUpLeft aria-hidden />
+                View booking details
+              </Link>
             </Button>
             {deposit.release ? (
               <Button asChild variant="tertiary">
@@ -227,7 +224,9 @@ export default async function DepositPage({ params }: PageProps) {
         }
       />
 
-      <div className="mt-xl grid gap-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      {/* `lg`, one step under the sections' `xl`: a title sits closer to its
+          content than two cards sit to each other. */}
+      <div className="mt-lg grid gap-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <DepositFigures deposit={deposit} actorNames={actorNames} />
         <InspectionSection
           deposit={deposit}
@@ -254,7 +253,11 @@ export default async function DepositPage({ params }: PageProps) {
       ) : null}
 
       <SectionCard id="history-heading" title="History" className="mt-xl">
-        <DepositHistory events={events} actorNames={actorNames} />
+        <DepositHistory
+          history={history}
+          path={`/portal/deposits/${encodeURIComponent(reference)}`}
+          actorNames={actorNames}
+        />
       </SectionCard>
     </div>
   )
@@ -273,7 +276,14 @@ function DepositFigures({
   const owes = figures.owed > 0
 
   return (
-    <SectionCard id="deposit-heading" title="Deposit">
+    <SectionCard
+      id="deposit-heading"
+      title="Deposit"
+      // The sentence that keeps this honest — every money-out path in this
+      // product records rather than moves (architecture.md §6.4) — as the
+      // section's hint rather than a paragraph under its figures.
+      hint="Held as a liability, never counted as revenue. Released after the unit has been inspected and somebody has approved it; the approval is a record of who authorised what, and handing the money back happens outside the system."
+    >
       {/* The gray inset is the panel for grouped figures (design.md). */}
       <Card surface="inset" className="grid gap-xs">
         <FigureRow label="Held" value={figures.amount} />
@@ -318,14 +328,6 @@ function DepositFigures({
       {release?.note ? (
         <p className="mt-lg text-body-sm text-copy">&ldquo;{release.note}&rdquo;</p>
       ) : null}
-
-      {/* The sentence that keeps this honest. Every money-out path in this
-          product records rather than moves (architecture.md §6.4). */}
-      <p className="mt-lg text-caption text-muted-foreground">
-        {release
-          ? 'The approval is a record of who authorised this and at what figures. Handing the money back happens outside the system.'
-          : 'Held as a liability, never counted as revenue. Released after the unit has been inspected and somebody has approved it.'}
-      </p>
     </SectionCard>
   )
 }
@@ -555,7 +557,14 @@ function OwedSection({
   maySettle: boolean
 }) {
   return (
-    <SectionCard id="owed-heading" title="Owed by the guest" className="mt-xl">
+    <SectionCard
+      id="owed-heading"
+      title="Owed by the guest"
+      // prd.md §11's own note to the client, kept on the screen where it
+      // matters rather than only in a document — as the hint, read once.
+      hint="The system keeps the record; recovering the money is a conversation. If this becomes common, the deposit itself is the thing to revisit."
+      className="mt-xl"
+    >
       <div className="flex flex-wrap items-center justify-between gap-md">
         <div>
           <p className="text-display-xs text-foreground tabular-nums">
@@ -578,15 +587,6 @@ function OwedSection({
           />
         ) : null}
       </div>
-
-      {/* prd.md §11's own note to the client, said on the screen where it
-          matters rather than only in a document. */}
-      {!settled ? (
-        <p className="mt-lg text-caption text-muted-foreground">
-          The system keeps the record; recovering the money is a conversation. If this becomes
-          common, the deposit itself is the thing to revisit.
-        </p>
-      ) : null}
     </SectionCard>
   )
 }
@@ -619,7 +619,10 @@ async function NoDepositYet({ reference }: { reference: string }) {
         }
         action={
           <Button asChild variant="tertiary">
-            <Link href={`/portal/bookings/${booking.reference}`}>Open the booking</Link>
+            <Link href={`/portal/bookings/${booking.reference}`}>
+              <ArrowUpLeft aria-hidden />
+              View booking details
+            </Link>
           </Button>
         }
       />

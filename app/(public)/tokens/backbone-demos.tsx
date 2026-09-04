@@ -300,7 +300,7 @@ export function DropdownDemos() {
           onChange={setStatuses}
         />
 
-        <DateRangePicker label="Staying" value={range} onChange={setRange} />
+        <DateRangePicker label="Stay date" value={range} onChange={setRange} />
       </Row>
 
       <Row

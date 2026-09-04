@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ChevronRight, SlidersHorizontal } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { matchesSearch, readChoices, readSearch } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
 import { UnitStatusBadge } from '@/components/portal/unit-status-badge'
 import { Button } from '@/components/ui/button'
@@ -70,25 +71,10 @@ interface PageProps {
   searchParams: Promise<{
     status?: string | string[]
     type?: string | string[]
+    q?: string | string[]
     page?: string
     size?: string
   }>
-}
-
-/**
- * The chosen values of a repeating param, in canonical order rather than the
- * URL's. Unknown values are dropped rather than erroring — a hand-edited URL
- * should narrow the list, not break the screen.
- */
-function readChoices<T extends string>(
-  value: string | string[] | undefined,
-  canonical: readonly T[],
-  isMember: (candidate: string) => candidate is T,
-): readonly T[] {
-  const raw = value === undefined ? [] : Array.isArray(value) ? value : [value]
-  const chosen = new Set(raw.filter(isMember))
-
-  return canonical.filter((entry) => chosen.has(entry))
 }
 
 /**
@@ -148,13 +134,18 @@ export default async function UnitsPage({ searchParams }: PageProps) {
   // "what is the state of the building this morning".
   const counts = countByStatus(units.map((unit) => unit.status))
 
+  const search = readSearch(params.q)
+
+  // The fields a unit is known by: its door, who is in it, what kind it is.
   const visible = units.filter(
     (unit) =>
       (statuses.length === 0 || statuses.includes(unit.status)) &&
-      (types.length === 0 || types.includes(unit.unitTypeId)),
+      (types.length === 0 || types.includes(unit.unitTypeId)) &&
+      (search === null ||
+        matchesSearch(search, [unit.ref, unit.occupant?.name, unit.unitTypeName])),
   )
 
-  const isFiltered = statuses.length > 0 || types.length > 0
+  const isFiltered = statuses.length > 0 || types.length > 0 || search !== null
 
   // Paged over the filtered set rather than in SQL — see units-pagination.tsx.
   // Clamped against the real total so a bookmarked `?page=4` that has outlived
@@ -174,6 +165,10 @@ export default async function UnitsPage({ searchParams }: PageProps) {
     tileParams.append('type', type)
   }
 
+  if (search) {
+    tileParams.set('q', search)
+  }
+
   // The footer moves *within* the current view, so it carries every filter.
   const pageParams = new URLSearchParams(tileParams)
 
@@ -190,17 +185,29 @@ export default async function UnitsPage({ searchParams }: PageProps) {
         description="Every unit in the building, and what it is doing right now."
       />
 
-      {/* The control row: what is being shown on the left, what can be done
-          about it on the right. "Manage units" sits here rather than in the
-          header — design.md keeps a header's actions only for screens with no
-          control line, and a button level with the h1 would be the loudest
-          thing on a screen whose point is the table. It is `tertiary` and
-          carries a settings glyph: renaming the building is a rare, deliberate
-          act, not this screen's primary one. There is no primary fill here at
-          all, because a units board has nothing to create — units arrive
-          through the registry editor, which is where that button lives. */}
-      <div className="mt-xl flex flex-wrap items-center gap-md">
-        <UnitsFilters statuses={statuses} types={types} unitTypes={unitTypes} />
+      {/* The strip first, straight under the title: it is the screen's
+          headline — the state of the building — and every list screen reads
+          the same way down the page: the figures, then the chips, then the
+          rows (design.md §Components — stat tiles). */}
+      <UnitStatusTiles counts={counts} selected={statuses} otherParams={tileParams} />
+
+      {/* The control line, directly above the table it narrows: what is being
+          shown on the left, what can be done about it on the right. "Manage
+          units" sits here rather than in the header — design.md keeps a
+          header's actions only for screens with no control line, and a button
+          level with the h1 would be the loudest thing on a screen whose point
+          is the table. It is `tertiary` and carries a settings glyph:
+          renaming the building is a rare, deliberate act, not this screen's
+          primary one. There is no primary fill here at all, because a units
+          board has nothing to create — units arrive through the registry
+          editor, which is where that button lives. */}
+      <div className="mt-md flex flex-wrap items-center gap-md">
+        <UnitsFilters
+          statuses={statuses}
+          types={types}
+          unitTypes={unitTypes}
+          search={search ?? ''}
+        />
 
         <div className="ml-auto flex items-center gap-md">
           {/* No count here: the table's own footer states it properly
@@ -221,11 +228,6 @@ export default async function UnitsPage({ searchParams }: PageProps) {
           ) : null}
         </div>
       </div>
-
-      {/* Below the control row: these figures are an effect of the filters'
-          neighbour, and a summary that moves above the control that changed it
-          reads as two unrelated things moving at once. */}
-      <UnitStatusTiles counts={counts} selected={statuses} otherParams={tileParams} />
 
       <section aria-label="Units" className="mt-md">
         {visible.length === 0 ? (

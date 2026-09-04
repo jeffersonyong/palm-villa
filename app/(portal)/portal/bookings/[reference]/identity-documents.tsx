@@ -58,33 +58,35 @@ export function IdentityDocuments({
         ) : null}
       </div>
 
+      {/* The absence and the way to end it share a line — the sentence on the
+          left, the control on the right, bottoms level — so the panel is one
+          row rather than a caption with a button stacked under it. With files
+          on file the control keeps that right edge, under the list. */}
       {documents.length === 0 ? (
-        <p className="mt-sm text-body-sm text-muted-foreground">No identity document on file.</p>
+        <div className="mt-sm flex items-end justify-between gap-md">
+          <p className="text-body-sm text-muted-foreground">No identity document on file.</p>
+          {mayAttach ? <AttachIdentity bookingId={bookingId} guestName={guestName} /> : null}
+        </div>
       ) : (
-        <div className="mt-xs divide-y divide-border">
-          {documents.map((document) => (
-            <DocumentRow
-              key={document.id}
-              document={document}
-              mayOpen={mayOpen}
-              mayRemove={mayAttach}
-              attachedBy={nameOf(document.uploadedBy, actorNames)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="mt-xs divide-y divide-border">
+            {documents.map((document) => (
+              <DocumentRow
+                key={document.id}
+                document={document}
+                mayOpen={mayOpen}
+                mayRemove={mayAttach}
+                attachedBy={nameOf(document.uploadedBy, actorNames)}
+              />
+            ))}
+          </div>
+          {mayAttach ? (
+            <div className="mt-md flex justify-end">
+              <AttachIdentity bookingId={bookingId} guestName={guestName} another />
+            </div>
+          ) : null}
+        </>
       )}
-
-      {mayAttach ? (
-        <div className="mt-md">
-          <AttachDocument
-            kind="identity"
-            bookingId={bookingId}
-            label={documents.length === 0 ? 'Attach ID' : 'Attach another'}
-            title={`Attach ${guestName}'s identity document`}
-            description="Stored privately, opened only by staff who are allowed to, and every time somebody opens it is recorded. Deleted automatically twelve months after the guest checks out."
-          />
-        </div>
-      ) : null}
 
       {!mayOpen && documents.length > 0 ? (
         <p className="mt-md text-caption text-muted-foreground">
@@ -92,6 +94,26 @@ export function IdentityDocuments({
         </p>
       ) : null}
     </Card>
+  )
+}
+
+function AttachIdentity({
+  bookingId,
+  guestName,
+  another,
+}: {
+  bookingId: string
+  guestName: string
+  another?: boolean
+}) {
+  return (
+    <AttachDocument
+      kind="identity"
+      bookingId={bookingId}
+      label={another ? 'Attach another' : 'Attach ID'}
+      title={`Attach ${guestName}'s identity document`}
+      description="Stored privately, opened only by staff who are allowed to, and every time somebody opens it is recorded. Deleted automatically twelve months after the guest checks out."
+    />
   )
 }
 

@@ -1,8 +1,12 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { Check, ChevronRight } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { readSearch } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -21,7 +25,7 @@ import { formatCents } from '@/lib/domain/money'
 
 import { PaymentActions } from './payment-actions'
 import { PaymentsFilters } from './payments-filters'
-import { PAYMENT_VIEWS, readView, statusesForView } from './views'
+import { readView, sortQueue, statusesForView, type PaymentView } from './views'
 
 export const metadata: Metadata = {
   title: 'Payment verification',
@@ -34,19 +38,23 @@ export const metadata: Metadata = {
  * expected, time waiting, and the uploaded slip". Those are the columns, in
  * that order.
  *
- * Oldest first. A queue is worked from the top and the longest wait belongs
- * there, which is the opposite of every other list in the portal — and it is
- * also, for now, the only thing standing between a forgotten transfer and a
- * unit blocked indefinitely. prd.md §18 N7 (hold duration) is open and no job
- * expires a pending transfer yet, so the screen makes the wait visible rather
- * than pretending something is handling it.
+ * Every bank transfer, the waiting ones first and the longest wait at the
+ * top — a queue is worked from the top, which is the opposite of every other
+ * list in the portal — and the verified ones beneath, newest first. The
+ * reasoning, and why the screen no longer opens on the waiting ones alone, is
+ * in `views.ts`. The wait is made visible rather than handled: prd.md §18 N7
+ * (hold duration) is open and no job expires a pending transfer yet.
+ *
+ * Bank transfers only. Cash has no verification to wait for and its own log;
+ * a cash payment marked "verified" in this table would be a row with nothing
+ * to do and no slip to open.
  *
  * The row's action is the point of the screen, so it sits in the row rather
  * than behind a menu. Opening the booking is the reference cell's link.
  */
 
 interface PageProps {
-  searchParams: Promise<{ show?: string | string[] }>
+  searchParams: Promise<{ show?: string | string[]; q?: string | string[] }>
 }
 
 export default async function PaymentVerificationPage({ searchParams }: PageProps) {
@@ -72,18 +80,25 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
   }
 
   const view = readView(params.show)
-  const payments = await listPayments({ statuses: statusesForView(view) })
+  const search = readSearch(params.q)
+  const payments = sortQueue(
+    await listPayments({
+      methods: ['bank_transfer'],
+      statuses: statusesForView(view),
+      search: search ?? undefined,
+    }),
+  )
   const mayVerify = hasPermission(actor.permissions, 'payment.verify')
 
   return (
     <>
       <PageHeader
         title="Payment verification"
-        description="Bookings waiting on a bank transfer. Check the amount in your bank app, then confirm — oldest first."
+        description="Every bank transfer, the ones still waiting first. Check the amount in your bank app, then confirm — the longest wait is at the top."
       />
 
       <div className="mt-xl flex flex-wrap items-center gap-md">
-        <PaymentsFilters view={view} />
+        <PaymentsFilters view={view} search={search ?? ''} />
 
         <div className="ml-auto">
           <h2 id="queue-heading" className="micro-label text-muted-foreground">
@@ -96,11 +111,18 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
       <section aria-labelledby="queue-heading" className="mt-md">
         {payments.length === 0 ? (
           <EmptyState
-            title={view === 'waiting' ? 'Nothing waiting on a transfer' : 'No payments to show'}
+            title={search !== null ? 'No payments match these filters' : EMPTY_TITLES[view]}
             description={
-              view === 'waiting'
-                ? 'Bookings paid by bank transfer appear here until someone confirms the money landed.'
-                : `Nothing matches "${PAYMENT_VIEWS[view]}" yet.`
+              search !== null
+                ? 'Try a different name or reference, or clear the filters to see everything.'
+                : EMPTY_DESCRIPTIONS[view]
+            }
+            action={
+              search !== null ? (
+                <Button asChild variant="tertiary">
+                  <Link href="/portal/payments">Clear filters</Link>
+                </Button>
+              ) : undefined
             }
           />
         ) : (
@@ -121,6 +143,12 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
                 <TableHead className="text-right">Waiting</TableHead>
                 <TableHead>Slip</TableHead>
                 {mayVerify ? <TableHead className="text-right">Action</TableHead> : null}
+                {/* The chevron's column. Named for screen readers and hidden
+                    from sight: a visible header over a decorative glyph would
+                    claim the arrow is data. */}
+                <TableHead className="w-0">
+                  <span className="sr-only">Open</span>
+                </TableHead>
               </TableHeaderRow>
             </TableHeader>
             <TableBody>
@@ -145,6 +173,19 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
   )
 }
 
+/** What an empty view says, by view — each names its own subject. */
+const EMPTY_TITLES: Readonly<Record<PaymentView, string>> = {
+  all: 'No bank transfers yet',
+  waiting: 'Nothing waiting on a transfer',
+  verified: 'No payments verified yet',
+}
+
+const EMPTY_DESCRIPTIONS: Readonly<Record<PaymentView, string>> = {
+  all: 'Bookings paid by bank transfer appear here — the ones still waiting first, then the ones confirmed.',
+  waiting: 'Bookings paid by bank transfer appear here until someone confirms the money landed.',
+  verified: 'A payment appears here once someone has confirmed the money landed.',
+}
+
 function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean }) {
   const waiting = formatElapsed(elapsedMinutes(payment.createdAt))
   // The booking was repriced after the guest was told what to send. Without
@@ -153,7 +194,7 @@ function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean
   const isPending = payment.status === 'pending_verification'
 
   return (
-    <TableRow interactive>
+    <TableRow interactive className="group">
       <TableCell className="font-mono text-foreground tabular-nums">
         <TableRowLink href={`/portal/bookings/${payment.bookingReference}`}>
           {payment.bookingReference}
@@ -220,12 +261,26 @@ function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean
               />
             </div>
           ) : (
-            <span className="text-caption text-muted-foreground">
+            // A tick in the success hue before the date, so a settled row is
+            // read as settled before the caption is — the saturated status
+            // hues are for icons and dots (design.md §Color), and this is
+            // one. Right-aligned with the buttons it stands in for.
+            <span className="inline-flex items-center gap-xs text-caption text-muted-foreground">
+              <Check aria-hidden className="size-3.5 shrink-0 text-positive" />
               {payment.verifiedAt ? `Verified ${formatTimestamp(payment.verifiedAt)}` : 'Verified'}
             </span>
           )}
         </TableCell>
       ) : null}
+      {/* After the action, not before it: the buttons act on the payment, the
+          arrow says the row opens the booking, and a glyph between the figures
+          and the buttons would read as part of the action. */}
+      <TableCell className="w-0 pl-0 text-right">
+        <ChevronRight
+          aria-hidden
+          className="size-4 text-muted-foreground transition-colors group-hover:text-foreground"
+        />
+      </TableCell>
     </TableRow>
   )
 }

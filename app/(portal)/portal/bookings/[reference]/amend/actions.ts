@@ -130,7 +130,7 @@ export async function amendBookingAction(
   if (!canAmend(booking.status)) {
     return {
       status: 'error',
-      message: `This booking is ${booking.status.replace(/_/g, ' ')} and can no longer be amended.`,
+      message: `This booking is ${booking.status.replace(/_/g, ' ')} and can no longer be edited.`,
     }
   }
 

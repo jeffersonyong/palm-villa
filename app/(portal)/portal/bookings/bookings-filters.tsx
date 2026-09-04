@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 
 import { bookingStatusLabel, bookingStatusTone } from '@/components/portal/booking-status-badge'
+import { SearchField } from '@/components/portal/search-field'
 import { StatusDot } from '@/components/portal/status-dot'
 import { StreamDot } from '@/components/portal/stream-dot'
 import { Button } from '@/components/ui/button'
@@ -26,7 +27,7 @@ import { cn } from '@/lib/utils'
  * used to stand between the two goes away.
  *
  * The list itself stays a server component. Nothing here knows what a booking
- * is; it only knows how to write three search params.
+ * is; it only knows how to write four search params.
  *
  * The current values arrive as props rather than through `useSearchParams`,
  * which keeps this out of a Suspense boundary and, more usefully, means the
@@ -42,6 +43,8 @@ interface BookingsFiltersProps {
   /** Both ends inclusive — the days the calendar shows as selected. */
   from?: StayDate
   to?: StayDate
+  /** The search the server applied. Empty means none. */
+  search: string
 }
 
 /**
@@ -72,17 +75,17 @@ const STREAM_OPTIONS: readonly MultiSelectOption<BookingStream>[] = BOOKING_STRE
   }),
 )
 
-export function BookingsFilters({ statuses, streams, from, to }: BookingsFiltersProps) {
+export function BookingsFilters({ statuses, streams, from, to, search }: BookingsFiltersProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
   const range: StayDateRange | null = from && to ? { start: from, end: to } : null
-  const isFiltered = statuses.length > 0 || streams.length > 0 || range !== null
+  const isFiltered = statuses.length > 0 || streams.length > 0 || range !== null || search !== ''
 
   /**
    * Writes the whole filter set, not a patch of it.
    *
-   * Every control passes the values the other two currently hold, so the URL is
+   * Every control passes the values the others currently hold, so the URL is
    * rebuilt from one place. Merging into the existing query string instead would
    * mean this island had to know which params belong to it — and it would carry
    * forward a param the page had already rejected as malformed.
@@ -91,8 +94,13 @@ export function BookingsFilters({ statuses, streams, from, to }: BookingsFilters
     nextStatuses: readonly BookingStatus[],
     nextStreams: readonly BookingStream[],
     nextRange: StayDateRange | null,
+    nextSearch: string,
   ) {
     const params = new URLSearchParams()
+
+    if (nextSearch) {
+      params.set('q', nextSearch)
+    }
 
     // One param per status rather than one comma-joined value — see the page's
     // reader for why.
@@ -127,13 +135,21 @@ export function BookingsFilters({ statuses, streams, from, to }: BookingsFilters
         isPending && 'opacity-60',
       )}
     >
+      {/* First, because it is the control most often reached for: a reference
+          read off a phone, a surname, a door. */}
+      <SearchField
+        value={search}
+        placeholder="Reference, guest, phone or unit"
+        onChange={(next) => apply(statuses, streams, range, next)}
+      />
+
       {/* Several statuses at once, because "confirmed and checked in" — who is
           actually in the building — is a real question this list is asked. */}
       <MultiSelectFilter
         label="Status"
         options={STATUS_OPTIONS}
         selected={statuses}
-        onChange={(next) => apply(next, streams, range)}
+        onChange={(next) => apply(next, streams, range, search)}
       />
 
       {/* The plural control for the same param the stat tiles set. A tile is
@@ -146,19 +162,19 @@ export function BookingsFilters({ statuses, streams, from, to }: BookingsFilters
         label="Type"
         options={STREAM_OPTIONS}
         selected={streams}
-        onChange={(next) => apply(statuses, next, range)}
+        onChange={(next) => apply(statuses, next, range, search)}
       />
 
-      {/* "Staying", not "from / to": the filter matches stays that overlap the
+      {/* "Stay date", not "from / to": the filter matches stays that overlap the
           range, not stays that begin inside it. */}
       <DateRangePicker
-        label="Staying"
+        label="Stay date"
         value={range}
-        onChange={(next) => apply(statuses, streams, next)}
+        onChange={(next) => apply(statuses, streams, next, search)}
       />
 
       {isFiltered ? (
-        <Button variant="ghost" onClick={() => apply([], [], null)}>
+        <Button variant="ghost" onClick={() => apply([], [], null, '')}>
           {/* A funnel struck through, not a bare cross: this clears the whole
               filter set, where a cross elsewhere in the row clears one field. */}
           <FunnelX aria-hidden />

@@ -102,3 +102,34 @@ describe('paginationRange', () => {
     expect(paginationRange(1, 0)).toEqual([])
   })
 })
+
+describe('paginationRange with no siblings', () => {
+  // The inline control — a history's footer inside a 360px column — has no
+  // room for neighbours around the current page: five slots, not seven.
+  test('lists every page while five fit', () => {
+    expect(paginationRange(3, 5, 0)).toEqual([1, 2, 3, 4, 5])
+  })
+
+  test('near the start, shows the first three and the last', () => {
+    expect(paginationRange(1, 15, 0)).toEqual([1, 2, 3, 'ellipsis', 15])
+    expect(paginationRange(2, 15, 0)).toEqual([1, 2, 3, 'ellipsis', 15])
+  })
+
+  test('in the middle, the current page stands alone between two gaps', () => {
+    expect(paginationRange(8, 15, 0)).toEqual([1, 'ellipsis', 8, 'ellipsis', 15])
+  })
+
+  test('near the end, shows the first and the last three', () => {
+    expect(paginationRange(14, 15, 0)).toEqual([1, 'ellipsis', 13, 14, 15])
+  })
+
+  test('a gap of one page is the page', () => {
+    expect(paginationRange(3, 15, 0)).toEqual([1, 2, 3, 'ellipsis', 15])
+  })
+
+  test('the slot count stays constant while paging', () => {
+    const widths = [1, 3, 8, 13, 15].map((page) => paginationRange(page, 15, 0).length)
+
+    expect(new Set(widths).size).toBe(1)
+  })
+})

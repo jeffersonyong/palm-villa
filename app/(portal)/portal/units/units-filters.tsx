@@ -4,6 +4,7 @@ import { FunnelX } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 
+import { SearchField } from '@/components/portal/search-field'
 import { StatusDot } from '@/components/portal/status-dot'
 import { unitStatusTone } from '@/components/portal/unit-status-badge'
 import { Button } from '@/components/ui/button'
@@ -17,7 +18,7 @@ import { cn } from '@/lib/utils'
  * Filters are URL state, exactly as they are on the bookings register: "what is
  * out of service" can be kept in a tab, bookmarked, or sent to whoever is
  * fixing it. This island knows nothing about a unit; it only knows how to write
- * two search params.
+ * three search params.
  *
  * The current values arrive as props rather than through `useSearchParams`,
  * which keeps this out of a Suspense boundary and means the chips can only ever
@@ -36,6 +37,8 @@ interface UnitsFiltersProps {
   types: readonly string[]
   /** Every unit type, for the Type panel's options. */
   unitTypes: readonly UnitTypeOption[]
+  /** The search the server applied. Empty means none. */
+  search: string
 }
 
 /** Each status carries its badge colour as a dot, so the choices read in the
@@ -46,11 +49,11 @@ const STATUS_OPTIONS: readonly MultiSelectOption<UnitStatus>[] = UNIT_STATUSES.m
   leading: <StatusDot tone={unitStatusTone(status)} />,
 }))
 
-export function UnitsFilters({ statuses, types, unitTypes }: UnitsFiltersProps) {
+export function UnitsFilters({ statuses, types, unitTypes, search }: UnitsFiltersProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  const isFiltered = statuses.length > 0 || types.length > 0
+  const isFiltered = statuses.length > 0 || types.length > 0 || search !== ''
 
   // No dot on a unit type. A type is not a state, and the semantic hues mean
   // status and nothing else (design.md §Color roles) — the bookings register
@@ -62,8 +65,16 @@ export function UnitsFilters({ statuses, types, unitTypes }: UnitsFiltersProps) 
   }))
 
   /** Writes the whole filter set, so the URL is rebuilt from one place. */
-  function apply(nextStatuses: readonly UnitStatus[], nextTypes: readonly string[]) {
+  function apply(
+    nextStatuses: readonly UnitStatus[],
+    nextTypes: readonly string[],
+    nextSearch: string,
+  ) {
     const params = new URLSearchParams()
+
+    if (nextSearch) {
+      params.set('q', nextSearch)
+    }
 
     for (const status of nextStatuses) {
       params.append('status', status)
@@ -89,22 +100,28 @@ export function UnitsFilters({ statuses, types, unitTypes }: UnitsFiltersProps) 
         isPending && 'opacity-60',
       )}
     >
+      <SearchField
+        value={search}
+        placeholder="Unit, occupant or type"
+        onChange={(next) => apply(statuses, types, next)}
+      />
+
       <MultiSelectFilter
         label="Status"
         options={STATUS_OPTIONS}
         selected={statuses}
-        onChange={(next) => apply(next, types)}
+        onChange={(next) => apply(next, types, search)}
       />
 
       <MultiSelectFilter
         label="Type"
         options={typeOptions}
         selected={types}
-        onChange={(next) => apply(statuses, next)}
+        onChange={(next) => apply(statuses, next, search)}
       />
 
       {isFiltered ? (
-        <Button variant="ghost" onClick={() => apply([], [])}>
+        <Button variant="ghost" onClick={() => apply([], [], '')}>
           <FunnelX aria-hidden />
           Clear
         </Button>

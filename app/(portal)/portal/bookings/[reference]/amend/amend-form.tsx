@@ -137,7 +137,7 @@ export function AmendForm({
   // here sets state — a `setIsConfirming(false)` would only race the unmount.
   useEffect(() => {
     if (state.status === 'amended' && state.reference) {
-      toast({ tone: 'positive', title: `${state.reference} amended` })
+      toast({ tone: 'positive', title: `${state.reference} edited` })
       router.push(`/portal/bookings/${state.reference}`)
     }
   }, [state.status, state.reference, router])
@@ -454,7 +454,7 @@ function ConfirmAmendmentDialog({
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent className="max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Amend {reference}?</DialogTitle>
+          <DialogTitle>Edit {reference}?</DialogTitle>
           <DialogDescription>
             Recorded against the booking with your name and the time, and both the old and new
             values are kept.
@@ -490,7 +490,7 @@ function ConfirmAmendmentDialog({
           {/* Submits the form outside this portal by id, so the dialog stays a
               confirmation and never becomes a second copy of the fields. */}
           <Button type="submit" form={FORM_ID} disabled={isPending}>
-            {isPending ? 'Saving…' : 'Save amendment'}
+            {isPending ? 'Saving…' : 'Save changes'}
           </Button>
         </DialogFooter>
       </DialogContent>

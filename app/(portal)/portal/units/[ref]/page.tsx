@@ -4,18 +4,18 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { HISTORY_PAGE_SIZE, historyPage } from '@/components/portal/history-page'
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionCard } from '@/components/portal/section-card'
 import { UnitStatusBadge } from '@/components/portal/unit-status-badge'
 import { Button } from '@/components/ui/button'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listAuditEventWindow } from '@/lib/db/audit'
+import { listAuditEventPage } from '@/lib/db/audit'
 import { listStaff } from '@/lib/db/staff'
 import { getUnitStateByRef } from '@/lib/db/units'
 import { formatStayDate } from '@/lib/domain/dates'
 
-import { HISTORY_PAGE_SIZE, historyWindow } from './history-window'
 import { UnitActions } from './unit-actions'
 import { UnitHistory } from './unit-history'
 import { UnitNotes } from './unit-notes'
@@ -79,12 +79,14 @@ export default async function UnitPage({ params, searchParams }: PageProps) {
     notFound()
   }
 
-  // How much of the trail this request asks for. A unit's history grows for
-  // the life of the building, so the read is windowed rather than whole — the
-  // reasoning is in `history-window.ts`.
-  const shown = historyWindow(search.history)
+  // One page of the trail. A unit's history grows for the life of the
+  // building, so the read is paged rather than whole — see `history-page.ts`.
   const [history, staff] = await Promise.all([
-    listAuditEventWindow('unit', unit.id, shown),
+    listAuditEventPage(
+      [{ entityType: 'unit', entityIds: [unit.id] }],
+      historyPage(search.history),
+      HISTORY_PAGE_SIZE,
+    ),
     listStaff(),
   ])
   const actorNames = new Map(staff.map((account) => [account.id, account.displayName]))
@@ -137,7 +139,9 @@ export default async function UnitPage({ params, searchParams }: PageProps) {
         }
       />
 
-      <div className="mt-xl grid items-start gap-md lg:grid-cols-[minmax(0,1fr)_360px]">
+      {/* `lg`, one step under the sections' `xl`: a title sits closer to its
+          content than two cards sit to each other. */}
+      <div className="mt-lg grid items-start gap-md lg:grid-cols-[minmax(0,1fr)_400px]">
         {/* `content-start`, or the column's rows stretch to match the history
             beside them and a two-line note becomes a card six hundred pixels
             tall. */}
@@ -218,11 +222,9 @@ export default async function UnitPage({ params, searchParams }: PageProps) {
 
         <SectionCard id="unit-history" title="History">
           <UnitHistory
-            events={history.events}
-            total={history.total}
+            history={history}
+            path={`/portal/units/${encodeURIComponent(unit.ref)}`}
             actorNames={actorNames}
-            ref_={unit.ref}
-            nextWindow={shown + HISTORY_PAGE_SIZE}
           />
         </SectionCard>
       </div>

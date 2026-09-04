@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { requirePermission } from '@/lib/auth/require-permission'
 import { getBookingById, transitionBooking } from '@/lib/db/bookings'
+import { listDocumentsForBooking } from '@/lib/db/documents'
 import { addBookingNote } from '@/lib/db/notes'
 import { recordCashPayment, recordTransferPayment } from '@/lib/db/payments'
 import { centsFromInput } from '@/lib/domain/money'
@@ -342,4 +343,22 @@ function revalidateBooking(reference: string): void {
   revalidatePath('/portal/payments')
   revalidatePath('/portal/payments/cash')
   revalidatePath('/portal')
+}
+
+/**
+ * The id of the booking's newest live accounting pack, or null.
+ *
+ * Not a mutation: this is what the booking screen polls after a payment is
+ * verified, so the pack can appear the moment `after()` has filed it rather
+ * than on the next refresh (see accounting-pack.tsx). It is gated exactly as
+ * the screen is — `booking.view` — and answers with an id and nothing else,
+ * because the caller already holds everything a pack row shows and re-renders
+ * the route to get the new one.
+ */
+export async function latestAccountingPackIdAction(bookingId: string): Promise<string | null> {
+  await requirePermission('booking.view')
+
+  const packs = await listDocumentsForBooking(bookingId, 'accounting_pack')
+
+  return packs.at(-1)?.id ?? null
 }

@@ -217,7 +217,7 @@ function CheckOutDialog({ bookingId, reference, guestName, onClose }: DialogProp
         <DialogHeader>
           <DialogTitle>Check out {guestName}?</DialogTitle>
           <DialogDescription>
-            The stay ends and the booking is closed — it cannot be amended or reopened afterwards.
+            The stay ends and the booking is closed — it cannot be edited or reopened afterwards.
             Any deposit stays held until Housekeeping records an inspection and the release is
             approved.
           </DialogDescription>

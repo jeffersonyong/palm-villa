@@ -1,5 +1,5 @@
 import { EventHistory } from '@/components/portal/event-history'
-import type { AuditEvent } from '@/lib/db/audit'
+import type { AuditEvent, AuditEventPage } from '@/lib/db/audit'
 import { INSPECTION_OUTCOME_LABELS, isInspectionOutcome } from '@/lib/domain/inspection'
 import { formatCents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/lib/domain/payment'
@@ -109,15 +109,18 @@ function actionLabel(event: AuditEvent): string {
 }
 
 interface DepositHistoryProps {
-  events: readonly AuditEvent[]
+  history: AuditEventPage
+  /** The deposit's own address, which page 1 of its history shares. */
+  path: string
   /** Display names by `auth.users.id`; an actor with no name renders as system. */
   actorNames: ReadonlyMap<string, string>
 }
 
-export function DepositHistory({ events, actorNames }: DepositHistoryProps) {
+export function DepositHistory({ history, path, actorNames }: DepositHistoryProps) {
   return (
     <EventHistory
-      events={events}
+      history={history}
+      path={path}
       actorNames={actorNames}
       label={actionLabel}
       emptyMessage="Nothing recorded against this deposit yet."

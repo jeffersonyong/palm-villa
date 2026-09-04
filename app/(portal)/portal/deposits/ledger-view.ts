@@ -1,32 +1,40 @@
-import { DEPOSIT_STAGES, isDepositStage, type DepositStage } from '@/lib/domain/deposit'
+import {
+  matchesSearch,
+  overlapRangeOf,
+  readChoices,
+  staysOverlap,
+  type StayWindow,
+} from '@/components/portal/list-params'
+import { DEPOSIT_STAGES, type DepositStage } from '@/lib/domain/deposit'
 import type { Cents } from '@/lib/domain/money'
 
 /**
  * What the deposits ledger is showing (capability E1).
  *
- * The screen answers one question — "what do we owe back right now" — and four
- * narrower ones inside it. Those are a **view** rather than a filter, in the
- * URL as `?show=`, because two of them read a different set of rows entirely:
- * held deposits are read whole, and released ones page. A chip that quietly
- * changed which query ran would be one control doing two jobs.
+ * The screen answers one question — "what do we owe back right now" — and the
+ * controls on it narrow that answer. Two different kinds of control, because
+ * two different reads sit behind them:
  *
- * Pure, and tested, for the reason `history-window.ts` is: it decides what a
+ * - A **view** (`?show=`) says *which set* is on screen: what is held, or the
+ *   archive of what has been released. They are read by different queries —
+ *   held deposits whole, released ones a page at a time — so this is one param
+ *   with one value, and a chip that quietly changed which query ran would be
+ *   one control doing two jobs.
+ * - The **filters** (`?stage=`, `?from=`/`?to=`) narrow *within* a set. Stage
+ *   narrows what is held, and is written by the stage tiles and the Stage chip
+ *   alike, the way the units board's status tiles and chip share a param. The
+ *   stay window narrows either set.
+ *
+ * Pure, and tested, for the reason `history-page.ts` is: it decides what a
  * screen shows from a string somebody may have typed.
  */
 
 /**
- * `held` is the default and the ledger's real subject. The three stage views
- * narrow it. `released` and `owed` are the archive — the same rows, one of
- * them narrowed to the guests who still owe something.
+ * `held` is the default and the ledger's real subject. `released` and `owed`
+ * are the archive — the same rows, one of them narrowed to the guests who
+ * still owe something.
  */
-export const LEDGER_VIEWS = [
-  'held',
-  'in_house',
-  'awaiting_inspection',
-  'ready_for_release',
-  'released',
-  'owed',
-] as const
+export const LEDGER_VIEWS = ['held', 'released', 'owed'] as const
 
 export type LedgerView = (typeof LEDGER_VIEWS)[number]
 
@@ -60,23 +68,68 @@ export function isArchiveView(view: LedgerView): boolean {
   return view === 'released' || view === 'owed'
 }
 
-/** The stage a view narrows to, or null where it shows every held deposit. */
-export function stageFor(view: LedgerView): DepositStage | null {
-  return isDepositStage(view) ? view : null
+/**
+ * The stages a held deposit can be in — every stage but `released`, which is
+ * not a stage of something held but the archive's whole subject. That is why
+ * the Stage chip offers three and not four: "released" is a view (`?show=`),
+ * not a stage of something held, and a chip that mixed "in house" with
+ * "released" would need the two reads above stitched into one list.
+ */
+export const HELD_STAGES = DEPOSIT_STAGES.filter(
+  (stage): stage is HeldStage => stage !== 'released',
+)
+
+export type HeldStage = Exclude<DepositStage, 'released'>
+
+export function isHeldStage(value: string): value is HeldStage {
+  return (HELD_STAGES as readonly string[]).includes(value)
+}
+
+/** The chosen stages, in pipeline order. Empty means every held stage. */
+export function readHeldStages(value: string | string[] | undefined): readonly HeldStage[] {
+  return readChoices(value, HELD_STAGES, isHeldStage)
+}
+
+/** How the held set is narrowed. All three empty is every held deposit. */
+export interface HeldFilter {
+  stages: readonly HeldStage[]
+  window: StayWindow | null
+  /** A term the booking reference, guest name or unit contains. */
+  search: string | null
 }
 
 /** One deposit, as this module needs to see it. */
 interface LedgerRow {
   stage: DepositStage
   collectedAt: string
-  stay: { range: { end: string } } | null
+  bookingReference: string
+  guestName: string
+  stay: { unitRef: string; range: { start: string; end: string } } | null
 }
 
-/** Narrows the held set to a view's stage. `held` keeps all of them. */
-export function filterHeld<T extends LedgerRow>(deposits: readonly T[], view: LedgerView): T[] {
-  const stage = stageFor(view)
+/**
+ * Narrows the held set: any of the chosen stages, a stay touching the window,
+ * and a search the reference, guest or unit answers. A deposit with no stay
+ * behind it cannot answer a question about dates, so a window leaves it out —
+ * the register's rule for a row with no dates. The search matches what the
+ * archive's `ilike` matches, so a held deposit and a released one answer it
+ * the same way.
+ */
+export function filterHeld<T extends LedgerRow>(deposits: readonly T[], filter: HeldFilter): T[] {
+  const range = filter.window ? overlapRangeOf(filter.window) : null
 
-  return stage === null ? [...deposits] : deposits.filter((deposit) => deposit.stage === stage)
+  return deposits.filter(
+    (deposit) =>
+      (filter.stages.length === 0 ||
+        (filter.stages as readonly string[]).includes(deposit.stage)) &&
+      (range === null || (deposit.stay !== null && staysOverlap(deposit.stay.range, range))) &&
+      (filter.search === null ||
+        matchesSearch(filter.search, [
+          deposit.bookingReference,
+          deposit.guestName,
+          deposit.stay?.unitRef,
+        ])),
+  )
 }
 
 /**

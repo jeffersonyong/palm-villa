@@ -6,13 +6,15 @@
  * module reaching a server component is a client *reference* rather than the
  * value, so `PAGE_SIZE_OPTIONS.includes(...)` would throw at request time.
  *
- * 50 rather than the register's 25. The building is fifty-odd units, so the
- * default shows the whole of it on one page — the board's first job is "what is
- * the state of the building this morning", and paging that answer in halves
- * would be worse than not paging it. The footer is there for the property that
- * outgrows one screen, and for the reader who would rather work in tens.
+ * 25, the same default as the bookings register and the deposits ledger, so
+ * every list screen opens at one size (changed from 50 on 2026-09-04). The
+ * board first shipped showing the whole building on one page on the argument
+ * that "what is the state of the building this morning" should not be paged;
+ * in use the stat strip answers that question before the table does, and
+ * fifty rows was a longer scroll than a reader wanting one unit needed. The
+ * footer still offers 50 and 100 for anyone who would rather see it whole.
  */
 
-export const DEFAULT_PAGE_SIZE = 50
+export const DEFAULT_PAGE_SIZE = 25
 
 export const PAGE_SIZE_OPTIONS = [25, 50, 100] as const

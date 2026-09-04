@@ -11,6 +11,7 @@ import { dataClient } from '@/lib/supabase/data'
 
 import { type Unit } from './inventory'
 import { currentPropertyId } from './property'
+import { applySearch } from './search'
 
 /**
  * Booking reads and writes.
@@ -288,6 +289,8 @@ export interface BookingListFilter {
   streams?: readonly BookingStream[]
   /** Stays touching this half-open range, matching availability semantics. */
   overlaps?: DateRange
+  /** A term the reference, guest name, phone or unit contains. */
+  search?: string
 }
 
 /**
@@ -322,6 +325,12 @@ function applyListFilter<Query extends FilterableQuery<Query>>(
     query.lt('check_in', filter.overlaps.end).gt('check_out', filter.overlaps.start)
   }
 
+  // The fields a staff member identifies a booking by. Not the notes and not
+  // the lines: a search here is "find me PV-4821 / Lim / 3B-04", not full text.
+  if (filter.search) {
+    applySearch(query, ['reference', 'guest_name', 'guest_phone', 'unit_ref'], filter.search)
+  }
+
   return query
 }
 
@@ -337,6 +346,7 @@ interface FilterableQuery<Self> {
   in(column: string, values: unknown[]): Self
   lt(column: string, value: unknown): Self
   gt(column: string, value: unknown): Self
+  or(filters: string): Self
 }
 
 /** One page of a list. 1-based, because a page number is read by people. */

@@ -5,6 +5,12 @@ import { ChevronRight, Plus } from 'lucide-react'
 import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { StreamDot } from '@/components/portal/stream-dot'
 import { EmptyState } from '@/components/portal/empty-state'
+import {
+  overlapRangeOf,
+  readChoices,
+  readSearch,
+  readStayWindow,
+} from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
 import { Button } from '@/components/ui/button'
 import {
@@ -26,7 +32,7 @@ import {
   type BookingListFilter,
 } from '@/lib/db/bookings'
 import { BOOKING_STATUSES, type BookingStatus } from '@/lib/domain/booking-state'
-import { addDays, formatStayDates, isStayDate, nightsBetween } from '@/lib/domain/dates'
+import { formatStayDates, nightsBetween } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 import { BOOKING_STREAMS, BOOKING_STREAM_LABELS, isBookingStream } from '@/lib/domain/stream'
 
@@ -86,6 +92,7 @@ interface PageProps {
     stream?: string | string[]
     from?: string
     to?: string
+    q?: string | string[]
     page?: string
     size?: string
   }>
@@ -93,28 +100,6 @@ interface PageProps {
 
 function isBookingStatus(value: string): value is BookingStatus {
   return (BOOKING_STATUSES as readonly string[]).includes(value)
-}
-
-/**
- * The chosen values of a repeating param, in the canonical order rather than
- * the URL's.
- *
- * Repeated params (`?status=confirmed&status=checked_in`) rather than one
- * comma-joined value: it is what a browser does with a multi-valued field, what
- * `URLSearchParams` reads back without help, and it keeps each value a whole
- * token so a stray comma cannot invent a third status. Unknown values are
- * dropped rather than erroring — a hand-edited URL should narrow the list, not
- * break the screen.
- */
-function readChoices<T extends string>(
-  value: string | string[] | undefined,
-  canonical: readonly T[],
-  isMember: (candidate: string) => candidate is T,
-): readonly T[] {
-  const raw = value === undefined ? [] : Array.isArray(value) ? value : [value]
-  const chosen = new Set(raw.filter(isMember))
-
-  return canonical.filter((entry) => chosen.has(entry))
 }
 
 /**
@@ -166,24 +151,25 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
   const statuses = readChoices(params.status, BOOKING_STATUSES, isBookingStatus)
   const streams = readChoices(params.stream, BOOKING_STREAMS, isBookingStream)
 
-  const hasRange =
-    Boolean(params.from && params.to) &&
-    isStayDate(params.from!) &&
-    isStayDate(params.to!) &&
-    params.from! <= params.to!
+  const window = readStayWindow(params.from, params.to)
+  const from = window?.from
+  const to = window?.to
 
-  const from = hasRange ? params.from! : undefined
-  const to = hasRange ? params.to! : undefined
+  // `from` and `to` are **inclusive** — the days the filter row's calendar
+  // shows as selected — and the query range is half-open, matching the
+  // occupancy convention the exclusion constraint uses (architecture.md
+  // §5.2). `overlapRangeOf` makes that conversion at the boundary and nowhere
+  // else.
+  const range = window ? overlapRangeOf(window) : undefined
 
-  // `from` and `to` are **inclusive** — the first and last day the filter row's
-  // calendar shows as selected — because that is what the person clicking them
-  // meant. The query range is half-open, matching the occupancy convention the
-  // exclusion constraint uses (architecture.md §5.2), so the last day is pushed
-  // out by one here. This conversion belongs at the boundary and nowhere else:
-  // a single-day filter is `[d, d+1)`, which is exactly "stays touching d".
-  const range = from && to ? { start: from, end: addDays(to, 1) } : undefined
+  const search = readSearch(params.q)
 
-  const filter: BookingListFilter = { statuses, streams, overlaps: range }
+  const filter: BookingListFilter = {
+    statuses,
+    streams,
+    overlaps: range,
+    search: search ?? undefined,
+  }
 
   // Only a size the footer actually offers, so a hand-edited `?size=5000` is
   // not a way to ask for every booking at once.
@@ -209,7 +195,7 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
       ? firstAttempt
       : await listBookings(filter, { page: currentPage, pageSize })
 
-  const isFiltered = statuses.length > 0 || streams.length > 0 || Boolean(range)
+  const isFiltered = statuses.length > 0 || streams.length > 0 || Boolean(range) || search !== null
 
   // Two carry-sets, because the two controls carry different things. The
   // tiles *set* `stream`, so theirs must not already contain one; the footer
@@ -225,6 +211,10 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
   if (from && to) {
     tileParams.set('from', from)
     tileParams.set('to', to)
+  }
+
+  if (search) {
+    tileParams.set('q', search)
   }
 
   const pageParams = new URLSearchParams(tileParams)
@@ -244,15 +234,28 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
         description="Every booking across all streams — the single source of truth."
       />
 
-      {/* One control row: what is being shown on the left, and what can be done
-          about it on the right. The chips name their field and report their
-          value, so the state of the list is legible without opening anything;
-          the count sits next to the create action because the two together are
-          the whole answer to "what is here, and what now". The screen's one
-          primary fill lives here rather than in the header — design.md allows
-          one per screen region, and this row is now that region. */}
-      <div className="mt-xl flex flex-wrap items-center gap-md">
-        <BookingsFilters statuses={statuses} streams={streams} from={from} to={to} />
+      {/* The strip first, straight under the title: it is the screen's
+          headline — what is here — and every list screen reads the same way
+          down the page: the figures, then the chips, then the rows
+          (design.md §Components — stat tiles). The figures still answer the
+          filters below them; they are the answer a reader came for, not an
+          effect to be read after the control. */}
+      <StreamTiles counts={streamCounts} selected={streams} otherParams={tileParams} />
+
+      {/* The control line, directly above the table it narrows: what is being
+          shown on the left, and what can be done about it on the right. The
+          chips name their field and report their value, so the state of the
+          list is legible without opening anything. The screen's one primary
+          fill lives here rather than in the header — design.md allows one per
+          screen region, and this row is that region. */}
+      <div className="mt-md flex flex-wrap items-center gap-md">
+        <BookingsFilters
+          statuses={statuses}
+          streams={streams}
+          from={from}
+          to={to}
+          search={search ?? ''}
+        />
 
         {/* The count that used to sit here is gone: the table's own footer
             states it properly ("1–25 of 47 bookings") and is the thing that
@@ -265,11 +268,6 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
           </Link>
         </Button>
       </div>
-
-      {/* Under the control row, not above it: these figures are an effect of
-          the filters, and a summary that changes above the control that changed
-          it reads as two unrelated things moving at once. */}
-      <StreamTiles counts={streamCounts} selected={streams} otherParams={tileParams} />
 
       {/* Named directly now that the visible heading has gone. A `section`
           with no accessible name is not a landmark at all, so dropping the
