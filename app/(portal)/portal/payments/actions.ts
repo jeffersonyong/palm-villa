@@ -9,6 +9,8 @@ import { isStayDate } from '@/lib/domain/dates'
 import { centsFromInput } from '@/lib/domain/money'
 import { checkPaymentMatch } from '@/lib/domain/payment-match'
 
+import { scheduleAccountingPack } from '../schedule-accounting-pack'
+
 /**
  * Confirming a payment, and matching one by hand (capabilities B5 and B6).
  *
@@ -124,6 +126,9 @@ export async function verifyPaymentAction(
   }
 
   revalidateAfterPayment(result.payment.bookingReference)
+  // Money is verified, so the booking has an accounting record to write
+  // (capability G5). After the response, and never a reason to refuse.
+  scheduleAccountingPack(result.payment.bookingId)
 
   return { status: 'done' }
 }
@@ -185,6 +190,9 @@ export async function matchPaymentManuallyAction(
   }
 
   revalidateAfterPayment(result.payment.bookingReference)
+  // Money is verified, so the booking has an accounting record to write
+  // (capability G5). After the response, and never a reason to refuse.
+  scheduleAccountingPack(result.payment.bookingId)
 
   return { status: 'done' }
 }

@@ -1,9 +1,7 @@
-import { timingSafeEqual } from 'node:crypto'
-
 import { NextResponse } from 'next/server'
 
+import { isAuthorisedCron } from '@/lib/auth/cron'
 import { runRetention } from '@/lib/db/documents'
-import { env } from '@/lib/env'
 
 /**
  * The nightly deletion of documents past their retention period (capability
@@ -23,9 +21,8 @@ import { env } from '@/lib/env'
  * `proxy.ts` matches `/portal` and `/field`, so this path is not behind the
  * session gate — deliberately, because a scheduled caller has no cookies and
  * redirecting a cron job to a sign-in page would silently stop the deletions.
- * **The shared secret is therefore the whole of the authorisation**, and it is
- * compared in constant time: a byte-by-byte comparison that returns early tells
- * an attacker how much of a guess was right.
+ * **The shared secret is therefore the whole of the authorisation**; the
+ * comparison lives in lib/auth/cron.ts, shared with the accounting-pack job.
  *
  * ── Why this is a route and not a database job ────────────────────────────
  *
@@ -46,7 +43,7 @@ import { env } from '@/lib/env'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request): Promise<NextResponse> {
-  if (!isAuthorised(request)) {
+  if (!isAuthorisedCron(request)) {
     // No detail: a caller that got the secret wrong learns only that it was
     // wrong, and one that guessed the path learns nothing about what is here.
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
@@ -55,30 +52,4 @@ export async function GET(request: Request): Promise<NextResponse> {
   const run = await runRetention()
 
   return NextResponse.json({ ok: true, ...run }, { headers: { 'Cache-Control': 'no-store' } })
-}
-
-function isAuthorised(request: Request): boolean {
-  const header = request.headers.get('authorization')
-
-  if (!header?.startsWith('Bearer ')) {
-    return false
-  }
-
-  return matches(header.slice('Bearer '.length), env.cronSecret)
-}
-
-/**
- * Compares two secrets without leaking where they diverge.
- *
- * `timingSafeEqual` throws when the buffers differ in length, which is itself a
- * disclosure — so the lengths are checked first and a mismatch returns the same
- * answer a wrong value of the right length does. Hashing both sides would be
- * the alternative; a length check plus a constant-time compare is the smaller
- * thing that does the same job here.
- */
-function matches(offered: string, expected: string): boolean {
-  const a = Buffer.from(offered)
-  const b = Buffer.from(expected)
-
-  return a.length === b.length && timingSafeEqual(a, b)
 }
