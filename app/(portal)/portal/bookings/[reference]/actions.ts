@@ -11,6 +11,8 @@ import { centsFromInput } from '@/lib/domain/money'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { isNoteAudience, MAX_NOTE_LENGTH } from '@/lib/domain/note'
 
+import { scheduleAccountingPack } from '../../schedule-accounting-pack'
+
 /**
  * Cancelling a booking (capability B3, cancel half).
  *
@@ -318,6 +320,11 @@ export async function recordPaymentAction(
   }
 
   revalidateBooking(booking.reference)
+  // Cash settles now, so the accounting record is written now (capability
+  // G5). The transfer branch above schedules nothing: a promised transfer is
+  // not money until somebody has checked the bank, and verifying it is where
+  // the pack gets assembled.
+  scheduleAccountingPack(booking.id)
 
   return { status: 'done', recorded: { method: 'cash', amount } }
 }

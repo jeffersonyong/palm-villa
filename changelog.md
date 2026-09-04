@@ -6,6 +6,36 @@ Each entry answers: **what changed, and what decision or milestone drove it.** L
 
 ---
 
+## 2026-09-08 — the pack nobody assembles
+
+[prd.md §13](docs/prd.md) requirement 4 asks for *"automatic generation of the accounting record pack: transfer slip, IC, transaction confirmation, itemised booking. Replaces manual PDF assembly"*, and [§20](docs/prd.md) measures the project on it: *"accounting packs require no manual assembly."* Yesterday's slice built the kind, the bucket and the retention clock and left them with no writer — "a pack is written by nobody". Today it is written by the system.
+
+Capability ref: **G5** in [scope-of-capabilities.md](docs/scope-of-capabilities.md). The rules are normative in [prd.md §13](docs/prd.md)'s "As built" block; the shape is [architecture.md §8.2](docs/architecture.md). **One new dependency, `pdf-lib`**, the one architecture.md §1 had named for exactly this.
+
+### The thing this slice had to get right
+
+Not the PDF. **When a pack is stale.** A pack is rebuilt whenever what it records changes — the slip that arrives a day after the transfer, the IC collected at check-in, an amendment — so something has to say whether the pack on file is older than its inputs, and the obvious timestamp is the wrong one. The upload lands *after* the render, so a change made during the seconds of assembly is older than the upload and would never be seen again. The pack therefore carries a watermark taken **before** its facts are read, and the nightly due-list compares against that. The same watermark settles two assemblies of one booking in flight: the fresher facts win whatever order the uploads landed in, because the database refuses the older snapshot under the booking's lock.
+
+### Added
+
+- **The accounting pack** (G5). One PDF per booking with verified money: the cover, the itemised lines and balance, each payment's verification record — who confirmed it, what they saw in the bank, why an odd amount was accepted — each transfer slip copied in on its own page, and a reference to each identity document on file. Assembled within seconds of a payment being verified, from all four places money is confirmed, and rebuilt nightly by the **second scheduled job in the product**.
+- **A pack is replaced, never deleted.** The old one is tombstoned as *superseded* in the same transaction that files the new one, with a history row naming its replacement, so "what did the accountant get last month" has an answer.
+- **A section on the booking screen**, between the payments and the notes, where the pack opens like any other document and its two empty states say why there is none yet.
+
+### Decided rather than assumed
+
+- **The IC is referenced, not copied in.** The scope wording says "IC"; the pack says when it was collected, by whom, and which record it is — never the image. A pack is kept seven years and opens for every role that can view a booking; an IC is kept twelve months and opens for two roles. Copying it in would quietly undo both promises made yesterday. Put to the client as **[N24](docs/open-questions.md)** rather than decided in code.
+- **An expiring IC does not rebuild the pack.** A person removing a slip or an IC does; the retention job destroying one does not, or every pack would lose its identity page a year after checkout because a *different* record reached the end of its own life.
+- **Built-in fonts.** No font file, no second library; the cost is that a name in Chinese or Jawi script prints as `?`, and the pack says so on the page. **[C7](docs/open-questions.md)** asks whether that will do.
+- **A bad attachment never fails the pack.** A slip pdf-lib cannot read, a blank PDF page, a WebP, or a file removed mid-assembly becomes a placeholder page pointing at the booking. A booking with no accounting record because one screenshot was odd would be the manual assembly this replaces failing in a new way.
+
+### Stated rather than absorbed
+
+- **Two crons is the Vercel Hobby plan's ceiling.** Recorded in [architecture.md §10](docs/architecture.md), along with the fact that the five-minute hold-expiry job §6.3 plans cannot run on Hobby at all.
+- **Nothing attaches, removes or opens a pack by hand**, and it opens under `booking.view` precisely because it carries nothing an identity document does.
+
+---
+
 ## 2026-09-07 — the folder on somebody's computer
 
 [prd.md §2](docs/prd.md) lists five problems the platform exists to solve. The fourth is *"guest data, including identity documents, accumulates indefinitely in a folder on a computer with no retention or access control."* Until now the product could hold no file at all: three screens said so out loud, and `payment.slip_document_id` had sat without a foreign key since the payments slice, waiting for a table that did not exist.

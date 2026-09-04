@@ -1,11 +1,14 @@
 import { Badge } from '@/components/ui/badge'
 import type { StatusTone } from '@/components/portal/status-tone'
-import type { BookingStatus } from '@/lib/domain/booking-state'
+import { BOOKING_STATUS_LABELS, type BookingStatus } from '@/lib/domain/booking-state'
 
 /**
  * Booking status, rendered in the portal's status language.
  *
- * The status-to-tone mapping lives here and only here. design.md is normative
+ * The words come from the state machine's own table — a document with no
+ * screen behind it (the accounting pack) has to name a status too, and
+ * lib/domain cannot ask a component. The status-to-tone mapping lives here and
+ * only here. design.md is normative
  * for it — "aqua is never a success indicator; that is positive" — and a second
  * copy of this table somewhere else is how a screen quietly invents its own
  * colour meaning.
@@ -17,27 +20,27 @@ import type { BookingStatus } from '@/lib/domain/booking-state'
  * this table is the one place it changes.
  */
 
-const STATUS_PRESENTATION = {
-  draft: { label: 'Draft', tone: 'neutral' },
-  held: { label: 'Held', tone: 'neutral' },
-  awaiting_payment_verification: { label: 'Awaiting payment', tone: 'warning' },
-  confirmed: { label: 'Confirmed', tone: 'positive' },
-  checked_in: { label: 'Checked in', tone: 'active' },
-  completed: { label: 'Completed', tone: 'neutral' },
-  expired: { label: 'Expired', tone: 'negative' },
-  cancelled: { label: 'Cancelled', tone: 'negative' },
-  no_show: { label: 'No show', tone: 'negative' },
-} as const satisfies Record<BookingStatus, { label: string; tone: StatusTone }>
+const STATUS_TONE = {
+  draft: 'neutral',
+  held: 'neutral',
+  awaiting_payment_verification: 'warning',
+  confirmed: 'positive',
+  checked_in: 'active',
+  completed: 'neutral',
+  expired: 'negative',
+  cancelled: 'negative',
+  no_show: 'negative',
+} as const satisfies Record<BookingStatus, StatusTone>
 
 /**
  * The tones a booking status actually uses — a subset of {@link StatusTone},
  * narrowed by this table rather than restated.
  */
-export type BookingStatusTone = (typeof STATUS_PRESENTATION)[BookingStatus]['tone']
+export type BookingStatusTone = (typeof STATUS_TONE)[BookingStatus]
 
 /** The staff-facing name for a status, for filter options and prose. */
 export function bookingStatusLabel(status: BookingStatus): string {
-  return STATUS_PRESENTATION[status].label
+  return BOOKING_STATUS_LABELS[status]
 }
 
 /**
@@ -47,11 +50,9 @@ export function bookingStatusLabel(status: BookingStatus): string {
  * table being here.
  */
 export function bookingStatusTone(status: BookingStatus): BookingStatusTone {
-  return STATUS_PRESENTATION[status].tone
+  return STATUS_TONE[status]
 }
 
 export function BookingStatusBadge({ status }: { status: BookingStatus }) {
-  const { label, tone } = STATUS_PRESENTATION[status]
-
-  return <Badge tone={tone}>{label}</Badge>
+  return <Badge tone={STATUS_TONE[status]}>{BOOKING_STATUS_LABELS[status]}</Badge>
 }

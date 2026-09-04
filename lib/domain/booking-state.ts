@@ -181,3 +181,25 @@ const AMENDABLE: readonly BookingStatus[] = [
 export function canAmend(status: BookingStatus): boolean {
   return AMENDABLE.includes(status)
 }
+
+/**
+ * The staff-facing name for each status.
+ *
+ * The words live with the machine and the colours live with the badge
+ * (components/portal/booking-status-badge.tsx), because the two are answering
+ * different questions: what a state is called is a fact about the booking,
+ * and what tone it takes is a fact about a screen. The split was made for the
+ * accounting pack (capability G5), which has to name a status on a page with
+ * no screen behind it, and lib/domain cannot reach into components to ask.
+ */
+export const BOOKING_STATUS_LABELS: Readonly<Record<BookingStatus, string>> = {
+  draft: 'Draft',
+  held: 'Held',
+  awaiting_payment_verification: 'Awaiting payment',
+  confirmed: 'Confirmed',
+  checked_in: 'Checked in',
+  completed: 'Completed',
+  expired: 'Expired',
+  cancelled: 'Cancelled',
+  no_show: 'No show',
+}

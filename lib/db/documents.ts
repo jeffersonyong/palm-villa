@@ -221,6 +221,26 @@ export interface AttachDocumentInput {
   /** Whatever the browser called it. Sanitised here. */
   filename: string
   actorId: string | null
+  /**
+   * For an accounting pack only: the instant its facts were read, as an ISO
+   * string. Refused on every other kind. See `assembleAccountingPack` in
+   * ./packs.ts for why it is captured before the reads and not after.
+   */
+  assembledFrom?: string
+}
+
+/** A pack this one replaced, whose object is now the caller's to delete. */
+export interface SupersededObject {
+  id: string
+  bucketId: string
+  storageKey: string
+}
+
+export interface AttachedDocument {
+  documentId: string
+  retainUntil: string
+  /** Empty for every kind but a pack. */
+  superseded: readonly SupersededObject[]
 }
 
 /**
@@ -237,7 +257,7 @@ export interface AttachDocumentInput {
  */
 export async function attachDocument(
   input: AttachDocumentInput,
-): Promise<DocumentWriteResult<{ documentId: string; retainUntil: string }>> {
+): Promise<DocumentWriteResult<AttachedDocument>> {
   const checked = checkUpload(input.kind, input.bytes)
 
   if (!checked.ok) {
@@ -272,15 +292,35 @@ export async function attachDocument(
     p_mime_type: checked.mimeType,
     p_byte_size: input.bytes.length,
     p_actor_id: input.actorId,
+    p_assembled_from: input.assembledFrom ?? null,
   })
 
   if (error) {
-    await discard(bucket, storageKey)
+    // An error from the client is not proof the transaction failed: a dropped
+    // connection after the commit looks the same from here. Discarding the
+    // object on that evidence alone would leave a live row pointing at
+    // nothing — and for an accounting pack, whose predecessor was tombstoned
+    // in that same transaction, it would leave the booking with no pack at
+    // all and nothing due to rebuild it. So the row is looked for first, and
+    // the object is removed only when the database has no record of it. If
+    // the re-read fails too, nothing is discarded: an orphaned object is what
+    // the nightly sweep exists for, and it is the recoverable side to err on.
+    const landed = await readRow(documentId).catch(() => null)
+
+    if (!landed) {
+      await discard(bucket, storageKey)
+    }
 
     throw new Error(`Could not record the document: ${error.message}`)
   }
 
-  const result = data as { ok: true; retain_until: string } | RpcRefusal
+  const result = data as
+    | {
+        ok: true
+        retain_until: string
+        superseded: readonly { id: string; bucket_id: string; storage_key: string }[]
+      }
+    | RpcRefusal
 
   if (!result.ok) {
     await discard(bucket, storageKey)
@@ -288,7 +328,16 @@ export async function attachDocument(
     return { ok: false, error: describeAttachFailure(result) }
   }
 
-  return { ok: true, documentId, retainUntil: result.retain_until }
+  return {
+    ok: true,
+    documentId,
+    retainUntil: result.retain_until,
+    superseded: result.superseded.map((row) => ({
+      id: row.id,
+      bucketId: row.bucket_id,
+      storageKey: row.storage_key,
+    })),
+  }
 }
 
 /** Best-effort cleanup of an object no row will ever point at. */
@@ -337,6 +386,14 @@ function describeAttachFailure(result: RpcRefusal): DocumentWriteError {
       }
     case 'filename_required':
       return { code: result.error, message: 'That file has no usable name.' }
+    case 'superseded_by_newer':
+      return {
+        code: result.error,
+        message: 'A newer pack was assembled while this one was being built.',
+      }
+    case 'assembled_from_required':
+    case 'assembled_from_not_allowed':
+      return { code: result.error, message: 'That kind of document cannot be filed that way.' }
     case 'invalid_kind':
     case 'invalid_mime_type':
       return { code: result.error, message: 'That file cannot be stored.' }
@@ -394,8 +451,16 @@ export async function removeDocument(input: {
  * A 404 from Storage counts as success: the file is not there, which is the
  * outcome asked for, and treating it as a failure would leave the row in the
  * retry queue forever.
+ *
+ * Exported for ./packs.ts, whose superseded packs are tombstoned by the
+ * database and purged by this — the same two-step as a removal, so the same
+ * retry queue catches a deletion that did not finish.
  */
-async function purge(documentId: string, bucket: string, storageKey: string): Promise<boolean> {
+export async function purge(
+  documentId: string,
+  bucket: string,
+  storageKey: string,
+): Promise<boolean> {
   const db = dataClient()
   const removed = await db.storage.from(bucket).remove([storageKey])
 
@@ -426,6 +491,40 @@ async function purge(documentId: string, bucket: string, storageKey: string): Pr
  */
 function isNotFound(error: { status?: number; statusCode?: string }): boolean {
   return error.status === 404 || error.statusCode === '404'
+}
+
+/* ── Reading the bytes ────────────────────────────────────────────────────── */
+
+/**
+ * The file itself, for the server to work on.
+ *
+ * The one read of an object that is not a signed URL, and it exists for the
+ * accounting pack: copying a slip into the pack means having its bytes here.
+ * It is deliberately NOT a `document.viewed` event. That verb records a link
+ * issued to a person (capability G3), and the only kind read this way is a
+ * slip — the pack references an identity document and never opens one (see
+ * lib/domain/pack.ts), so the promise G3 makes about ICs is untouched. Were a
+ * pack ever to copy an IC in, this is where the audit row would have to go.
+ *
+ * Refuses the same facts `issueDocumentUrl` refuses: a tombstoned row and one
+ * past its retention date. Null rather than an error, because a slip removed
+ * between the listing and the read is an ordinary race, and the pack goes on
+ * without it.
+ */
+export async function readDocumentBytes(documentId: string): Promise<Uint8Array | null> {
+  const row = await readRow(documentId)
+
+  if (!row || row.deleted_at || isExpired(row.retain_until)) {
+    return null
+  }
+
+  const { data, error } = await dataClient().storage.from(row.bucket_id).download(row.storage_key)
+
+  if (error || !data) {
+    throw new Error(`Could not read document ${documentId}: ${error?.message ?? 'no data'}`)
+  }
+
+  return new Uint8Array(await data.arrayBuffer())
 }
 
 /* ── Opening ──────────────────────────────────────────────────────────────── */

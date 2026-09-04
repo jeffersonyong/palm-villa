@@ -35,9 +35,9 @@ import { hasPermission, type Permission } from '@/lib/auth/permissions'
  * - `payment_slip` — the transfer screenshot (prd.md §10.4). Evidence, never
  *   verification: staff still check the bank.
  * - `inspection_photo` — what Housekeeping found (prd.md §11 requirement 2).
- * - `accounting_pack` — the assembled PDF (capability G5). Nothing writes one
- *   yet; the kind and its bucket exist so that slice adds a writer rather than
- *   a schema.
+ * - `accounting_pack` — the assembled PDF (capability G5). Written by
+ *   lib/db/packs.ts after a payment is verified, and never uploaded by hand;
+ *   what it contains is lib/domain/pack.ts.
  *
  * Mirrored by a CHECK constraint on `document.kind`, the relationship
  * lib/domain/inspection.ts has to its table: widening this is a code change and
@@ -141,6 +141,24 @@ export function acceptAttributeFor(kind: DocumentKind): string {
  * directly and the server sniffing what arrived.
  */
 export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
+
+/**
+ * The ceiling on one stored file, by kind.
+ *
+ * Three kinds arrive through a server action and take the upload ceiling
+ * above. An accounting pack does not: it is assembled on the server and goes
+ * straight to Storage, never crossing the request-body boundary the 4 MiB
+ * number exists for — and it carries copies of the slips, so it can be larger
+ * than any one of them. Its figure is the `packs` bucket's own
+ * `file_size_limit` (25 MiB, migration 20260907000100), so the check here and
+ * the check in Storage agree on the number.
+ */
+export const MAX_BYTES_FOR_KIND: Readonly<Record<DocumentKind, number>> = {
+  identity: MAX_DOCUMENT_BYTES,
+  payment_slip: MAX_DOCUMENT_BYTES,
+  inspection_photo: MAX_DOCUMENT_BYTES,
+  accounting_pack: 25 * 1024 * 1024,
+}
 
 /** The longest filename kept for display. Longer names are truncated, not refused. */
 export const MAX_FILENAME_LENGTH = 120
@@ -246,12 +264,14 @@ export function checkUpload(kind: DocumentKind, bytes: Uint8Array): UploadCheck 
     }
   }
 
-  if (bytes.length > MAX_DOCUMENT_BYTES) {
+  const ceiling = MAX_BYTES_FOR_KIND[kind]
+
+  if (bytes.length > ceiling) {
     return {
       ok: false,
       error: {
         code: 'too_large',
-        message: `That file is larger than ${formatMegabytes(MAX_DOCUMENT_BYTES)}. A photograph taken on a phone is usually well under it.`,
+        message: `That file is larger than ${formatMegabytes(ceiling)}. A photograph taken on a phone is usually well under it.`,
       },
     }
   }
@@ -401,7 +421,7 @@ export function isExpired(retainUntil: string, now: Date = new Date()): boolean 
  * | identity | `booking.amend` | `document.view_identity` |
  * | payment_slip | `payment.verify` | `booking.view` |
  * | inspection_photo | `inspection.record` | `booking.view` |
- * | accounting_pack | nobody — written by G5, later | `booking.view` |
+ * | accounting_pack | nobody — assembled by the system (G5) | `booking.view` |
  *
  * **Existence is not content.** Whether a document is on file — its name, when
  * it was attached — is visible to anyone who may view the booking, and only
@@ -453,8 +473,11 @@ export function mayRemove(kind: DocumentKind, permissions: ReadonlySet<Permissio
  * - **inspection_photo → `inspection.record`.** prd.md §11 requirement 2 makes
  *   the photograph part of the inspection, so it takes the inspection's
  *   permission rather than a second one.
- * - **accounting_pack → nobody.** Generated server-side when a booking
- *   completes payment (capability G5); nothing attaches one by hand.
+ * - **accounting_pack → nobody.** Assembled by the system once a payment has
+ *   been verified, and rebuilt when what it records changes (capability G5,
+ *   architecture.md §8.2); nothing attaches or removes one by hand. It opens
+ *   under `booking.view` because it carries nothing an identity document
+ *   does — the IC is referenced in it, never copied into it.
  */
 export const ATTACH_PERMISSION: Readonly<Record<DocumentKind, Permission | null>> = {
   identity: 'booking.amend',

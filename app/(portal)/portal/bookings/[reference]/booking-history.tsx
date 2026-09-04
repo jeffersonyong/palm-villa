@@ -55,7 +55,7 @@ const ACTION_LABELS: Record<string, string> = {
   // control the client was told about and cannot check. It is the only verb in
   // this table recording a *read* rather than a change, which is why it is
   // worded as somebody doing something rather than as something happening.
-  // The four document verbs are labelled by `documentLabel` below rather than
+  // The five document verbs are labelled by `documentLabel` below rather than
   // here, because which document it was is the useful half of the sentence.
 }
 
@@ -128,6 +128,9 @@ const DOCUMENT_VERBS: Record<string, string> = {
   'document.viewed': 'opened',
   'document.removed': 'removed',
   'document.expired': 'deleted — retention period ended',
+  // A pack replaced by a fresher one (capability G5). The old row stays so
+  // "what did the accountant get last month" has an answer.
+  'document.superseded': 'replaced by a newer pack',
 }
 
 /**

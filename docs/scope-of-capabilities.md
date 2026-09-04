@@ -142,7 +142,12 @@ Four things worth saying plainly, because they are what the guarantees actually 
 - **When a document is deleted, the record that it existed stays.** The file is destroyed; the trail of who attached it and who ever opened it survives, because those are the questions asked *after* a document is gone.
 - **A file is checked for what it actually is**, not what it is named. A document renamed to look like a photograph is stored as what it really is, or refused.
 
-**Still to come in this area:** **G5**, the automatic accounting pack, which assembles the slip, the IC and the itemised booking into one PDF. The storage it needs is now built, so it adds the assembly step and nothing else. **A7** — customers uploading their own IC and slip during booking — remains phase two; today staff attach what a guest sends them, which is what they do now anyway.
+**G5 delivered 8 September 2026.** Every booking with a verified payment now carries an accounting pack — one PDF with the itemised booking, the record of who confirmed each payment and what they saw in the bank, the transfer slip copied in, and the record of the guest's identity document — assembled by the system the moment a payment is verified, and rebuilt overnight whenever a slip or IC is attached later, a payment is confirmed, or the booking changes. It sits on the booking beside the payments, opens like any other document, and is kept for seven years. Two things worth saying plainly:
+
+- **The IC is referenced in the pack, not copied into it.** The pack records that the IC was collected, when and by whom. It does not carry the image, because the pack is kept seven years and can be opened by every role that can view a booking, while the IC itself is kept twelve months and opened only by Admin and Front Office. Copying it in would quietly undo both of those promises. If the accountant needs the image inside the pack, that is a decision to make deliberately — see the register.
+- **An earlier version of a pack is never lost.** When a pack is rebuilt, the previous one is recorded as replaced on the booking's history, so what was sent to the accountant last month remains answerable.
+
+**Still to come in this area:** **A7** — customers uploading their own IC and slip during booking — remains phase two; today staff attach what a guest sends them, which is what they do now anyway.
 
 **One question this raised for you:** what should happen to a guest's identity document when their booking is **cancelled**? It currently follows the same twelve-month clock counted from the stay they never took. You may want it destroyed sooner. See the register.
 

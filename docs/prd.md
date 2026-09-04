@@ -544,9 +544,9 @@ Brunei's Personal Data Protection Order 2025 commenced most substantive provisio
 
 **Note.** This document does not constitute legal advice. The client should take their own advice on their obligations.
 
-### As built (capabilities B10, G2–G4, 7 September 2026)
+### As built (capabilities B10, G2–G4, 7 September 2026; G5, 8 September 2026)
 
-Requirements 1, 2 and 3 are met; requirement 4 (the accounting pack) is not built and requirement 5 (data export) is capability F5, unbuilt. The technical shape is [architecture.md §8.1](architecture.md). The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
+Requirements 1 to 4 are met — the accounting pack arrived a day after the rest — and requirement 5 (data export) is capability F5, unbuilt. The technical shape is [architecture.md §8.1 and §8.2](architecture.md). The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
 
 **[A] Three kinds of document, one mechanism.** A guest's IC on the booking, a transfer slip on a payment, and photographs on an inspection all use the same private storage, the same permission gate, the same access log and the same retention clock. That is why the slip (§10.4) and the inspection photographs (§11 requirement 2) arrive with this and not separately: they were never a different problem.
 
@@ -562,7 +562,19 @@ Requirements 1, 2 and 3 are met; requirement 4 (the accounting pack) is not buil
 
 **Every access is logged, and the log is on the screen.** Requirement 2's "every access logged" is an audit event per issued link, and it renders in the booking's own history as "Identity document opened", with who and when. A log the client cannot read is a control they were told about and cannot check.
 
-**One limit is the platform's rather than a policy: 4 MB per file.** Phone photographs and WhatsApp screenshots sit well under it. See architecture.md §8.1 for what raises it when the housekeeping phone screen needs more.
+**One limit is the platform's rather than a policy: 4 MB per file.** Phone photographs and WhatsApp screenshots sit well under it. See architecture.md §8.1 for what raises it when the housekeeping phone screen needs more. A pack is assembled on the server and never crosses that limit; its own ceiling is 25 MB.
+
+**The accounting pack (requirement 4, capability G5).** Assembled by the system, never by hand: the itemised booking, each payment's verification record, each transfer slip copied in, and the identity document referenced. It sits on the booking as a document like any other — opened by anyone who may view the booking, kept seven years, every opening logged. The following are **[A]**.
+
+**[A] The IC is referenced in the pack, not copied into it.** Requirement 4 says "IC" and the pack says *when it was collected, by whom, and which record it is* — never the image, never the filename. The reason is the two clocks above: a pack is kept seven years and opened by every role that can view a booking, an identity document twelve months and by Admin and Front Office only. A copy inside the pack would outlive the original by six years and reach Security and Housekeeping, which G2 promises never happens. **[O] [N24](open-questions.md)** asks whether that is what the accountant needs; the answer either way is a permission and a retention decision, not a rebuild.
+
+**[A] "Transaction confirmation" is the verification record.** Nothing in the system is called a confirmation. What confirms a transfer is a person checking the bank (§10.4), so the pack prints that act: who verified it and when, the reference and sender they saw, whether it was matched by reference or by hand and why, and why an odd amount was accepted. Cash prints who counted it.
+
+**[A] A pack is assembled the moment a payment is verified, and rebuilt overnight when what it records changes.** architecture.md §8 says "when a booking completes payment"; read literally that pack would usually be missing the IC, which arrives at check-in, and the slip, which arrives whenever the guest sends it. So the first pack exists within seconds of the money being confirmed, and every night any pack older than its newest slip, identity document, verified payment or booking change is assembled again. The earlier pack is kept on the history as replaced, never deleted. An identity document *expiring* on its own clock does not rebuild the pack: the pack states what was on file when it was assembled.
+
+**[A] The pack prints Latin script only.** It uses the PDF's built-in font, which spares the product a font file and a second library; a name in Chinese or Jawi characters is shown as `?` and the pack says so on the page, with the booking screen carrying the name in full. Whether that is acceptable is [C7](open-questions.md).
+
+**The security deposit is one line in the pack, pointing at its own statement.** §11 keeps it a separate liability with its own record, and repeating it here would make the pack the whole ledger.
 
 ---
 

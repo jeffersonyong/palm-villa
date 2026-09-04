@@ -8,6 +8,8 @@ import { getBookingByReference } from '@/lib/db/bookings'
 import { recordCashPayment } from '@/lib/db/payments'
 import { centsFromInput } from '@/lib/domain/money'
 
+import { scheduleAccountingPack } from '../../schedule-accounting-pack'
+
 /**
  * Recording cash collected against a booking (capability B7).
  *
@@ -126,6 +128,9 @@ export async function recordCashAction(
   revalidatePath(`/portal/bookings/${booking.reference}`)
   revalidatePath('/portal/bookings')
   revalidatePath('/portal')
+  // Cash is born verified, so the accounting record can be written now
+  // (capability G5). After the response.
+  scheduleAccountingPack(booking.id)
 
   return {
     status: 'done',
