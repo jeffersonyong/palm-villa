@@ -1,10 +1,11 @@
 import Link from 'next/link'
 
+import { DepositFigureTable, DepositMark, FigureRow } from '@/components/portal/deposit-figures'
 import { DepositStageBadge } from '@/components/portal/deposit-stage-badge'
 import { Card } from '@/components/ui/card'
 import type { Deposit } from '@/lib/db/deposits'
 import { formatTimestamp } from '@/lib/domain/dates'
-import { formatCents, type Cents } from '@/lib/domain/money'
+import type { Cents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
 
 /**
@@ -22,6 +23,11 @@ import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
  * actually *held* afterwards — with the stage, so the difference between money
  * sitting in the safe and money already given back is on the screen rather than
  * inferred from a date.
+ *
+ * The inset is one of four gray panels on this screen, so it wears the
+ * deposit's mark and shows the deposit screen's own table — the reasoning is
+ * on `deposit-figures.tsx`. The stage chip sits on the mark's line here because
+ * nothing else on the booking screen carries it.
  */
 
 interface SecurityDepositInsetProps {
@@ -36,7 +42,8 @@ export function SecurityDepositInset({ reference, quoted, deposit }: SecurityDep
   if (!deposit) {
     return (
       <Card surface="inset" className="mt-lg">
-        <Row label="Security deposit" value={`BND ${formatCents(quoted)}`} />
+        <DepositMark className="mb-sm" />
+        <FigureRow label="Due at check-in" value={quoted} />
         {/* How a deposit is held is the Money card's hint; only the exception
             is worth a sentence here. */}
         {quoted === 0 ? (
@@ -48,42 +55,18 @@ export function SecurityDepositInset({ reference, quoted, deposit }: SecurityDep
     )
   }
 
-  const { figures, release } = deposit
-
   return (
-    <Card surface="inset" className="mt-lg">
-      <div className="flex items-baseline justify-between gap-lg">
-        <span className="text-body-sm text-muted-foreground">Security deposit</span>
-        <span className="text-body-sm text-foreground tabular-nums">
-          BND {formatCents(deposit.amount)}
-        </span>
-      </div>
-
-      <div className="mt-sm flex flex-wrap items-center gap-sm">
-        <DepositStageBadge stage={deposit.stage} />
-        <span className="text-caption text-muted-foreground">
-          Taken in {PAYMENT_METHOD_LABELS[deposit.method].toLowerCase()} on{' '}
-          {formatTimestamp(deposit.collectedAt)}
-        </span>
-      </div>
-
-      {/* Only where there is something to say. A deposit with nothing against
-          it does not need a "Charges 0.00" line — a zero on a money screen
-          invites a second look and there is nothing there to find. */}
-      {figures.chargesTotal > 0 ? (
-        <Row className="mt-md" label="Charges" value={`BND ${formatCents(figures.chargesTotal)}`} />
-      ) : null}
-
-      {release ? (
-        <Row
-          className="mt-xs"
-          label={figures.owed > 0 ? 'Owed by guest' : 'Returned'}
-          value={`BND ${formatCents(figures.owed > 0 ? figures.owed : figures.releasable)}`}
-          strong
-        />
-      ) : null}
-
-      <p className="mt-md text-caption">
+    <DepositFigureTable
+      figures={deposit.figures}
+      release={deposit.release}
+      className="mt-lg"
+      header={<DepositMark badge={<DepositStageBadge stage={deposit.stage} />} />}
+    >
+      <p className="mt-md text-caption text-muted-foreground">
+        Taken in {PAYMENT_METHOD_LABELS[deposit.method].toLowerCase()} on{' '}
+        {formatTimestamp(deposit.collectedAt)}
+      </p>
+      <p className="mt-xs text-caption">
         <Link
           href={`/portal/deposits/${reference}`}
           className="text-foreground underline underline-offset-2"
@@ -91,39 +74,6 @@ export function SecurityDepositInset({ reference, quoted, deposit }: SecurityDep
           View the deposit
         </Link>
       </p>
-    </Card>
-  )
-}
-
-function Row({
-  label,
-  value,
-  strong,
-  className,
-}: {
-  label: string
-  value: string
-  strong?: boolean
-  className?: string
-}) {
-  return (
-    <div className={`flex items-baseline justify-between gap-lg ${className ?? ''}`}>
-      <span
-        className={
-          strong ? 'text-body-sm-strong text-foreground' : 'text-body-sm text-muted-foreground'
-        }
-      >
-        {label}
-      </span>
-      <span
-        className={
-          strong
-            ? 'text-body-sm-strong text-foreground tabular-nums'
-            : 'text-body-sm text-foreground tabular-nums'
-        }
-      >
-        {value}
-      </span>
-    </div>
+    </DepositFigureTable>
   )
 }

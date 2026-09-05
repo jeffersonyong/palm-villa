@@ -26,11 +26,17 @@ import { SectionHint } from './section-hint'
  * `actions` sit opposite the title — the one control that acts on the section
  * as a whole, such as adding a note to the notes — so it is found where a
  * reader looks for it and the section's body stays the section's content.
+ *
+ * An `icon` leads the title at the label's own 14px line, for the one section
+ * that is known by a mark rather than a word alone (the security deposit —
+ * `deposit-figures.tsx`). Decorative to a screen reader: the heading's name
+ * is still the title.
  */
 export function SectionCard({
   id,
   title,
   hint,
+  icon: Icon,
   actions,
   className,
   children,
@@ -38,6 +44,8 @@ export function SectionCard({
   /** Anchors `aria-labelledby`, so the section is announced by its heading. */
   id: string
   title: string
+  /** A lucide glyph drawn before the title. */
+  icon?: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>
   /** Plain text for the tooltip beside the title. */
   hint?: string
   actions?: React.ReactNode
@@ -51,6 +59,7 @@ export function SectionCard({
           {/* The hint sits beside the heading, not inside it, so the heading's
               accessible name stays the title alone. */}
           <div className="flex items-center gap-xs">
+            {Icon ? <Icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" /> : null}
             <h2 id={id} className="micro-label text-muted-foreground">
               {title}
             </h2>

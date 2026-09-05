@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, ArrowUpLeft, FileText } from 'lucide-react'
+import { ArrowLeft, ArrowUpLeft, FileText, Landmark } from 'lucide-react'
 
+import { DepositFigureTable } from '@/components/portal/deposit-figures'
 import { DepositStageBadge } from '@/components/portal/deposit-stage-badge'
 import { EmptyState } from '@/components/portal/empty-state'
 import { HISTORY_PAGE_SIZE, historyPage } from '@/components/portal/history-page'
@@ -273,33 +274,21 @@ function DepositFigures({
   actorNames: ReadonlyMap<string, string>
 }) {
   const { figures, release } = deposit
-  const owes = figures.owed > 0
 
   return (
     <SectionCard
       id="deposit-heading"
-      title="Deposit"
+      title="Security deposit"
+      // The deposit's mark (`deposit-figures.tsx`): the glyph the ledger wears
+      // in the nav, over the table the booking screen shows under the same words.
+      icon={Landmark}
       // The sentence that keeps this honest — every money-out path in this
       // product records rather than moves (architecture.md §6.4) — as the
       // section's hint rather than a paragraph under its figures.
       hint="Held as a liability, never counted as revenue. Released after the unit has been inspected and somebody has approved it; the approval is a record of who authorised what, and handing the money back happens outside the system."
     >
-      {/* The gray inset is the panel for grouped figures (design.md). */}
-      <Card surface="inset" className="grid gap-xs">
-        <FigureRow label="Held" value={figures.amount} />
-        {figures.chargesTotal > 0 ? (
-          <FigureRow label="Less charges" value={figures.chargesTotal} />
-        ) : null}
-        <div className="mt-xs border-t border-divider pt-xs">
-          <FigureRow
-            label={
-              release ? (owes ? 'Owed by guest' : 'Returned') : owes ? 'Would be owed' : 'To return'
-            }
-            value={owes ? figures.owed : figures.releasable}
-            strong
-          />
-        </div>
-      </Card>
+      {/* The deposit's own table — the one the Money card shows too. */}
+      <DepositFigureTable figures={figures} release={release} />
 
       <dl className="mt-lg grid gap-md sm:grid-cols-2">
         <Field
@@ -627,29 +616,6 @@ async function NoDepositYet({ reference }: { reference: string }) {
         }
       />
     </>
-  )
-}
-
-function FigureRow({ label, value, strong }: { label: string; value: number; strong?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-lg">
-      <span
-        className={
-          strong ? 'text-body-sm-strong text-foreground' : 'text-body-sm text-muted-foreground'
-        }
-      >
-        {label}
-      </span>
-      <span
-        className={
-          strong
-            ? 'text-body-sm-strong text-foreground tabular-nums'
-            : 'text-body-sm text-foreground tabular-nums'
-        }
-      >
-        BND {formatCents(value)}
-      </span>
-    </div>
   )
 }
 
