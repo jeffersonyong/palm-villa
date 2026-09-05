@@ -14,18 +14,26 @@ import { cn } from '@/lib/utils'
  * variant fighting its own component. It is also a different thing: a button
  * is an object on the surface, and this is a word in the text.
  *
- * **Underlined at rest, not only on hover.** It shipped hover-only for half a
- * day and the note said so; then somebody read it on a real screen and asked
- * why the action looked like a sentence. It did, because it was one. Ink text
- * with no fill, no border and no line is body copy, and a control nobody
- * recognises until they happen to point at it is not discoverable — it just
- * rewards the mouse. The underline is the affordance and it is always there.
+ * **Underlined at rest, and the underline is what changes on hover.** It
+ * shipped hover-only first, which was wrong: ink text with no fill, no border
+ * and no line is body copy, and a control nobody recognises until they happen
+ * to point at it is not discoverable — it just rewards the mouse.
  *
- * There is no colour to carry it instead: the operations surfaces are
- * monochrome (design.md — two accents, one system), `copy` and `foreground`
- * are the same ink, and the ladder's other step is mute, which reads as a
- * label rather than an offer. So the line does the work, the pointer gets a
- * cursor, and focus gets the standard ring.
+ * **The hover state is the line's tone, not its thickness.** Mute at rest,
+ * ink under the pointer. Thickening it was the first attempt and it reads as
+ * a jitter rather than a response — the word appears to move. Tone is the step
+ * the rest of the system already makes, and it lands where the ladder says it
+ * should: the label register at rest, the content register when addressed.
+ *
+ * That the *text* stays ink throughout is the point of putting the step on
+ * the line. `copy` and `foreground` are the same ink and the ladder's other
+ * step is mute, so muting the label itself would make the action read as
+ * something naming content rather than offering it. The underline carries the
+ * state instead, and the word keeps its weight.
+ *
+ * No hue does any of this: the operations surfaces are monochrome (design.md
+ * — two accents, one system), so the whole affordance is one tonal step on a
+ * 1px line, plus a pointer cursor and the standard focus ring.
  *
  * Monochrome, like everything else on the operations surfaces: no teal here,
  * ever (design.md — two accents, one system).
@@ -36,7 +44,7 @@ export function TextAction({ className, type, ...props }: React.ComponentProps<'
       data-slot="text-action"
       type={type ?? 'button'}
       className={cn(
-        'cursor-pointer rounded-sm text-body-sm text-copy underline underline-offset-2 outline-none hover:decoration-2 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
+        'cursor-pointer rounded-sm text-body-sm text-copy underline decoration-muted-foreground underline-offset-2 transition-colors outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
         className,
       )}
       {...props}
