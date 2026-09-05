@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { ActivityBar } from '@/components/ui/activity-bar'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Document } from '@/lib/db/documents'
@@ -89,9 +90,15 @@ export function AccountingPack({
         />
       </div>
       {isAssembling ? (
-        <p className="mt-sm text-caption text-muted-foreground" aria-live="polite">
-          Rebuilding to include the latest payment…
-        </p>
+        /* The bar spans the inset, under the row it is about. The ellipsis
+           went with it: three dots were the whole of the old signal, and next
+           to something that visibly moves they are a tic. */
+        <div className="mt-md grid gap-xs" aria-busy>
+          <ActivityBar />
+          <p className="text-caption text-muted-foreground" aria-live="polite">
+            Rebuilding to include the latest payment
+          </p>
+        </div>
       ) : pendingSince ? (
         <p className="mt-sm text-caption text-muted-foreground">
           A newer payment has been verified. The pack is rebuilt overnight.

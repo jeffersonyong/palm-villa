@@ -816,6 +816,22 @@
      interactive there uses the ≥48px `touch` size, which keys off
      `--spacing-touch`. */
   --spacing-control: 32px;
+
+  /* The one indeterminate motion in the system (design.md §Components —
+     Activity bar). A solid segment travelling a track, on `transform` alone
+     so it stays on the compositor, and both ends are token fills so the theme
+     flip is free. Deliberately not a gradient sweep: the rule against shimmer
+     is a rule against decoration, and this reports a state. */
+  --animate-indeterminate: indeterminate 1.5s ease-in-out infinite;
+
+  @keyframes indeterminate {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(250%);
+    }
+  }
 }
 
 @theme inline {

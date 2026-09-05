@@ -872,6 +872,10 @@ Never a **brand** fill — an avatar identifies a person, it is not an accent, a
 
 **Skeletons.** `muted` at the control radius, shaped to match the content arriving, pulsing gently and static under reduced motion. Never a shimmer sweep: that is decoration, and it does not survive the theme flip cleanly.
 
+**Activity bar.** A 2px `muted` track with a solid `muted-foreground` segment travelling across it, spanning the thing it reports on. The state a skeleton does not cover: a record that is **already on screen** while the server rebuilds part of it — the accounting pack being reassembled after a payment is verified. A skeleton stands in for content that has not arrived; a button says "Saving…" while you wait for something you started; this is neither, and before it existed that state was a caption with three dots, which nobody reads as *wait*.
+
+Not a spinner: round is for avatars and status dots, a spinner floats in a box of its own, and a bar that spans the record says *this* is being worked on rather than *something* is loading. It is also not the banned shimmer — the objection to a sweep is that a gradient is decoration and does not survive the theme flip, and this is two flat tokens reporting a state. Under reduced motion the segment goes **full width**, never frozen part-way: a bar stopped at 40% claims a percentage nothing here knows. `aria-hidden` always, with the sentence beside it carrying `aria-live`.
+
 ## Do's and Don'ts
 
 ### Do
