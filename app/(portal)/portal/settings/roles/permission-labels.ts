@@ -19,6 +19,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'charge.create': 'Create charges',
   'charge.waive': 'Waive charges',
   'deposit.approve_release': 'Approve deposit release',
+  'deposit.waive': 'Waive the security deposit',
   'unit.manage': 'Manage units',
   'tenancy.manage': 'Manage tenancies',
   'config.manage': 'Edit settings, roles & the unit registry',
@@ -44,7 +45,7 @@ export const PERMISSION_GROUPS: readonly { label: string; permissions: readonly 
   },
   {
     label: 'Deposits & inspections',
-    permissions: ['deposit.approve_release', 'inspection.record'],
+    permissions: ['deposit.approve_release', 'deposit.waive', 'inspection.record'],
   },
   {
     label: 'Property',

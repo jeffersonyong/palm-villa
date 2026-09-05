@@ -202,7 +202,12 @@ export async function amendBookingAction(
     exemptGuests: input.exemptGuests,
     lines: priced.lines,
     total: priced.total,
-    securityDeposit: priced.securityDeposit,
+    // A waived deposit stays waived. The engine quotes the configured figure
+    // on every reprice, and writing it back would put BND 100 on a booking
+    // that waived it — the database refuses that combination outright, so this
+    // is the courtesy that keeps the refusal from ever being reached. The same
+    // rule the discount above follows: an amendment carries the decision on.
+    securityDeposit: booking.depositWaiverReason !== null ? 0 : priced.securityDeposit,
     discount,
     reason: input.reason || null,
     actorId: actor.userId,

@@ -46,6 +46,9 @@ const ACTION_LABELS: Record<string, string> = {
   // its inspection stay on the deposit's own screen — that is a second record
   // with a history of its own, and repeating it here would make a booking's
   // trail the whole ledger.
+  // Written against the BOOKING rather than a deposit — there is none — so it
+  // needs no folding in. The reason is quoted by the panel from `after.reason`.
+  'deposit.waived': 'Security deposit waived',
   'deposit.collected': 'Security deposit collected',
   'deposit.release_approved': 'Deposit release approved',
   'deposit.owed_settled': 'Amount owed on the deposit settled',

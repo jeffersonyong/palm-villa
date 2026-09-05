@@ -106,12 +106,14 @@ booking.view          booking.create        booking.amend
 booking.cancel        booking.override_hold booking.discount
 payment.verify        payment.record_cash
 inspection.record     charge.create         charge.waive
-deposit.approve_release
+deposit.approve_release                     deposit.waive
 unit.manage           tenancy.manage        config.manage
 report.view           document.view_identity
 ```
 
 **[A] `booking.discount` is separate from `booking.create`** and is the one permission that gates discretion rather than an operation — see §8.4. Front Office holds it by default, because the desk is where a discount is asked for; withholding it from a role is one click in the Roles matrix.
+
+**[A] `deposit.waive` is the second such permission** (5 September 2026, capability B15). It gates deciding at the desk that no security deposit is taken on a booking — see §11. Same construction and same default as the discount: separate from `booking.create` because it decides money is not taken, held by Front Office because the guest asking to stay another night is standing at the desk, and one click to withhold.
 
 **[C]** Deposit release approval sits at the end of the pipeline, with Finance or Jason, not with Housekeeping or Front Office. Housekeeping records the inspection; a separate role approves.
 
@@ -124,7 +126,7 @@ report.view           document.view_identity
 | Role | Permission set |
 |---|---|
 | **Admin** | All permissions, including `config.manage` and `document.view_identity` |
-| **Front Office** | `booking.*`, `payment.verify`, `payment.record_cash`, `charge.create`, `unit.manage`, `tenancy.manage`, `document.view_identity` |
+| **Front Office** | `booking.*`, `payment.verify`, `payment.record_cash`, `charge.create`, `deposit.waive`, `unit.manage`, `tenancy.manage`, `document.view_identity` |
 | **Housekeeping** | `inspection.record`, `unit.manage` (status only), read-only booking view for today |
 
 **[A] What "(status only)" means concretely**, settled when the units screens were built. `unit.manage` opens the units board and the two service actions — taking a unit out of service and returning it — which is exactly the cleaner's job. Two neighbouring things are deliberately *not* on it:
@@ -379,6 +381,8 @@ The PRD has never stated rules for changing a booking after it exists — §4 gr
 
 **[O] Amending a booking whose guest has already checked in is not supported.** Extending an in-house guest by a night is a real front-office need, and this is the one exclusion likely to be felt in practice. It is excluded rather than half-built because §9.1's two-month advance window is implemented as "check-in cannot be in the past", so repricing a stay that has already begun is refused by the pricing engine. Enabling it means deciding what a mid-stay reprice charges for nights already taken — a pricing question, not an interface one. **To confirm with the client.**
 
+**[A] The stated procedure for an in-house extension is a second booking, with the deposit waived** (5 September 2026, Jeff). Occupancy ranges are half-open, so a booking ending on the 5th and a new one starting on the 5th on the same unit do not collide, and the desk can sell the extra night today. What made that unworkable was the deposit: check-in takes BND 100 in the same transaction, so the extension would have taken a second one off a guest who already has one in the safe. §11's waiver is the answer — the second booking is created quoting no deposit, with a reason naming the booking that holds it. Two consequences are accepted rather than solved: the stay is two references, two packs and two identity-document records, and Housekeeping sees a departure and an arrival on a unit nobody left. Amending a checked-in booking stays out until the pricing question above is answered.
+
 **[A] A cancellation requires a typed reason; an amendment's is optional.** B3 promises who, what and when. The reason adds why, and the two differ because an amendment already records both sides of every field it touched, whereas a cancellation would otherwise record only that it happened — and §9.5 forfeits a payment on one.
 
 **[A] Money is not moved by either action — but an amendment now records what it left owing.** A cancellation still calculates no refund or forfeiture at all. An amendment still moves no money, but the difference it creates is no longer only a sentence on screen: the booking carries it as an outstanding balance and it can be settled in cash or by bank transfer from the booking itself (§10.7). A price *reduction* is unchanged — that is a refund, and refunds are settled outside the system. This is a direct consequence of **N5 being open** (§9.5): the platform cannot state a forfeiture policy it has not been given. It is also consistent with architecture.md §6.4, where a v1 refund is a recorded instruction executed by a person in a banking app, never an automated movement.
@@ -487,7 +491,9 @@ Added when the amendment path made the gap real. Nothing in §10 described what 
 
 Six requirements above; five are met as written and one is not. The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
 
-**[A] The deposit is collected at check-in, as part of checking the guest in.** One action, one transaction: the booking moves to `checked_in` and the deposit row is written together, because a guest checked in with no deposit recorded is precisely the gap in the spreadsheet this replaces. It is taken in cash or by bank transfer, for the amount the booking quoted, and it cannot be skipped or waived — a deposit somebody decided not to take is a conversation, not a field. A booking quoting no deposit checks in without one, and the screen says so rather than implying money changed hands.
+**[A] The deposit is collected at check-in, as part of checking the guest in.** One action, one transaction: the booking moves to `checked_in` and the deposit row is written together, because a guest checked in with no deposit recorded is precisely the gap in the spreadsheet this replaces. It is taken in cash or by bank transfer, for the amount the booking quoted, and it cannot be skipped at the door. A booking quoting no deposit checks in without one, and the screen says so rather than implying money changed hands.
+
+**[A] The deposit can be waived — at creation, with a reason, under its own permission** (5 September 2026, capability B15). The first build held that "a deposit somebody decided not to take is a conversation, not a field", and the conversation turned out to be a real one: a guest who extends after checking in gets a second booking (§9.6), and a second booking takes a second BND 100. The waiver is a checkbox in a *Security deposit* section at the foot of the walk-in form, shown only to a holder of `deposit.waive`. Ticking it opens a dialog rather than a field — the register every other consequential act in the portal uses — which says what the tick means (nothing held, nothing to charge damage against) and takes the reason there, by convention naming the booking whose deposit covers the stay; it cannot be confirmed empty, and cancelling leaves the box unticked. Unticking clears the waiver at once. A waived booking quotes zero, which is the path check-in already had; what the waiver adds is the **record**: the reason on the booking, a `deposit.waived` event in its history carrying the figure not taken, and a schema constraint that a booking with a waiver cannot quote a deposit — so an amendment repricing the stay cannot quietly put it back. It is decided at creation only; there is no waiving at the door, for the reason above.
 
 **[A] `booking.security_deposit_cents` stays the quote; the deposit row is what was taken.** The two can differ, because an amendment can reprice a booking after it was quoted, and what is held must not move with it. Every screen that used to read the quoted figure and call it "held" now says which of the two it means.
 

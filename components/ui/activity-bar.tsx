@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils'
 export function ActivityBar({ className }: { className?: string }) {
   return (
     <div aria-hidden className={cn('h-[2px] w-full overflow-hidden bg-muted', className)}>
-      <div className="animate-indeterminate h-full w-2/5 bg-muted-foreground motion-reduce:w-full motion-reduce:animate-none" />
+      <div className="h-full w-2/5 animate-indeterminate bg-muted-foreground motion-reduce:w-full motion-reduce:animate-none" />
     </div>
   )
 }

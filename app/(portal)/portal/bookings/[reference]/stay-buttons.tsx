@@ -65,6 +65,8 @@ interface StayButtonsProps {
   guestName: string
   /** What this booking quotes as a deposit. Zero is a real answer. */
   securityDeposit: Cents
+  /** Why no deposit is taken, when the booking waived it. Null otherwise. */
+  depositWaiverReason: string | null
   /** The day the stay begins, so the dialog can say when today is not it. */
   checkInDate: string | null
   /** Today, in the property's timezone — resolved on the server. */
@@ -105,6 +107,7 @@ function CheckInDialog({
   bookingId,
   guestName,
   securityDeposit,
+  depositWaiverReason,
   checkInDate,
   today,
   onClose,
@@ -126,12 +129,14 @@ function CheckInDialog({
         title: `${guestName} is checked in`,
         description: state.collected
           ? `BND ${formatCents(state.collected.amount)} deposit held, taken in ${PAYMENT_METHOD_LABELS[state.collected.method].toLowerCase()}.`
-          : 'No security deposit was due on this booking.',
+          : depositWaiverReason
+            ? 'The security deposit was waived on this booking.'
+            : 'No security deposit was due on this booking.',
       })
       onClose()
       router.refresh()
     }
-  }, [state.status, state.collected, guestName, onClose, router])
+  }, [state.status, state.collected, guestName, depositWaiverReason, onClose, router])
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -141,7 +146,9 @@ function CheckInDialog({
           <DialogDescription>
             {takesDeposit
               ? `The stay begins now and the BND ${formatCents(securityDeposit)} security deposit is taken. It is held until the unit has been inspected and the release is approved.`
-              : 'The stay begins now. This booking quotes no security deposit, so nothing is collected.'}
+              : depositWaiverReason
+                ? `The stay begins now. The security deposit was waived when this booking was made — “${depositWaiverReason}” — so nothing is collected.`
+                : 'The stay begins now. This booking quotes no security deposit, so nothing is collected.'}
           </DialogDescription>
         </DialogHeader>
 

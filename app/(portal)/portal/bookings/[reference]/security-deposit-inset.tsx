@@ -34,11 +34,18 @@ interface SecurityDepositInsetProps {
   reference: string
   /** What the booking quotes. Shown before anything has been collected. */
   quoted: Cents
+  /** Why nothing is quoted, when the deposit was waived at creation (B15). */
+  waiverReason: string | null
   /** The deposit actually taken, once the guest has checked in. */
   deposit: Deposit | null
 }
 
-export function SecurityDepositInset({ reference, quoted, deposit }: SecurityDepositInsetProps) {
+export function SecurityDepositInset({
+  reference,
+  quoted,
+  waiverReason,
+  deposit,
+}: SecurityDepositInsetProps) {
   if (!deposit) {
     return (
       <Card surface="inset" className="mt-lg">
@@ -48,7 +55,14 @@ export function SecurityDepositInset({ reference, quoted, deposit }: SecurityDep
             is worth a sentence here. */}
         {quoted === 0 ? (
           <p className="mt-xs text-caption text-muted-foreground">
-            This booking quotes no security deposit, so nothing is collected at check-in.
+            {waiverReason ? (
+              <>
+                Waived when the booking was made: &ldquo;{waiverReason}&rdquo;. Nothing is collected
+                at check-in.
+              </>
+            ) : (
+              'This booking quotes no security deposit, so nothing is collected at check-in.'
+            )}
           </p>
         ) : null}
       </Card>

@@ -216,6 +216,7 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
               reference={booking.reference}
               guestName={booking.guestName}
               securityDeposit={booking.securityDeposit}
+              depositWaiverReason={booking.depositWaiverReason}
               checkInDate={booking.stay?.range.start ?? null}
               today={todayInBrunei()}
               canCheckIn={canCheckIn}
@@ -627,6 +628,7 @@ function MoneySummary({
       <SecurityDepositInset
         reference={booking.reference}
         quoted={booking.securityDeposit}
+        waiverReason={booking.depositWaiverReason}
         deposit={deposit}
       />
     </SectionCard>

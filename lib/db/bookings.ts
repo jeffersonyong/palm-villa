@@ -82,6 +82,13 @@ export interface Booking {
    */
   securityDeposit: Cents
   /**
+   * Why no security deposit is taken on this booking, or null when one is
+   * quoted as normal (capability B15). When set, `securityDeposit` is zero by
+   * constraint and `check_in_booking()` writes no deposit row. The ordinary
+   * reason is a stay continuing another booking whose deposit is already held.
+   */
+  depositWaiverReason: string | null
+  /**
    * The discount instruction, or null. Its EFFECT is already among `lines` as
    * a negative one; this is what a staff member actually asked for, which is
    * what an amendment has to re-derive from (see lib/domain/discount.ts).
@@ -140,13 +147,14 @@ interface BookingSummaryRow {
   discount_value: number | null
   discount_reason: string | null
   paid_cents: number
+  deposit_waiver_reason: string | null
 }
 
 const SUMMARY_COLUMNS =
   'id, reference, status, stream, guest_name, guest_phone, vehicles, no_vehicle, ' +
   'chargeable_guests, exempt_guests, total_cents, security_deposit_cents, ' +
   'created_at, updated_at, unit_id, unit_ref, unit_type_slug, check_in, check_out, lines, ' +
-  'discount_kind, discount_value, discount_reason, paid_cents'
+  'discount_kind, discount_value, discount_reason, paid_cents, deposit_waiver_reason'
 
 /**
  * The five occupancy columns are read as one fact.
@@ -202,6 +210,7 @@ function toBooking(row: BookingSummaryRow): Booking {
     lines: row.lines,
     total: row.total_cents,
     securityDeposit: row.security_deposit_cents,
+    depositWaiverReason: row.deposit_waiver_reason,
     discount: toDiscount(row),
     paid: row.paid_cents,
     createdAt: row.created_at,
@@ -648,6 +657,14 @@ export interface CreateWalkInBookingInput {
   total: Cents
   securityDeposit: Cents
   /**
+   * Why the deposit is waived, or null to quote it as normal (capability B15).
+   *
+   * `securityDeposit` stays the figure the engine QUOTED even when this is set:
+   * `create_walk_in_booking()` zeroes what the booking carries and records the
+   * quoted figure on the `deposit.waived` event as what was not taken.
+   */
+  depositWaiverReason: string | null
+  /**
    * The discount a staff member asked for, or null.
    *
    * The instruction only. Its resolved cents must ALREADY be among `lines` as
@@ -748,6 +765,7 @@ export async function createWalkInBooking(
     p_discount_kind: input.discount?.kind ?? null,
     p_discount_value: input.discount?.value ?? null,
     p_discount_reason: input.discount?.reason ?? null,
+    p_deposit_waiver_reason: input.depositWaiverReason,
     p_actor_id: input.actorId,
   })
 

@@ -73,6 +73,8 @@ export interface PackBookingFacts {
   total: Cents
   paid: Cents
   securityDeposit: Cents
+  /** Why nothing was quoted, when the deposit was waived at creation (B15). */
+  depositWaiverReason: string | null
   discount: Discount | null
 }
 
@@ -211,10 +213,14 @@ export function buildPackModel(input: BuildPackInput): PackModel {
       state: balance.state,
     },
     discountNote: booking.discount ? printer.text(describeDiscount(booking.discount)) : null,
+    // A waived deposit is a decision the accountant should see as one, with
+    // its reason, not as a booking that happened to quote nothing.
     securityDepositNote:
       booking.securityDeposit > 0
         ? `Security deposit quoted: BND ${formatCents(booking.securityDeposit)}. Held separately and not part of this total; see the deposit statement.`
-        : 'No security deposit was quoted on this booking.',
+        : booking.depositWaiverReason
+          ? `Security deposit waived at booking: ${printer.text(booking.depositWaiverReason)}. Nothing was held against this stay.`
+          : 'No security deposit was quoted on this booking.',
     payments,
     identity,
     identityNote: IDENTITY_NOTE,
