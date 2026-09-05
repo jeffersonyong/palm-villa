@@ -1,9 +1,10 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Paperclip } from 'lucide-react'
 
+import { FileField } from '@/components/portal/file-field'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -15,12 +16,7 @@ import {
 } from '@/components/ui/dialog'
 import { FieldError } from '@/components/ui/field-error'
 import { toast } from '@/components/ui/toast-store'
-import {
-  acceptAttributeFor,
-  formatByteSize,
-  MAX_DOCUMENT_BYTES,
-  type DocumentKind,
-} from '@/lib/domain/document'
+import { oversizedFiles, type DocumentKind } from '@/lib/domain/document'
 
 import { attachDocumentAction } from './actions'
 
@@ -90,10 +86,9 @@ function AttachDialog({
   const [files, setFiles] = useState<File[]>([])
   const [failures, setFailures] = useState<readonly string[]>([])
   const [isPending, startTransition] = useTransition()
-  const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  const oversized = files.filter((file) => file.size > MAX_DOCUMENT_BYTES)
+  const oversized = oversizedFiles(files)
 
   function submit() {
     setFailures([])
@@ -144,12 +139,10 @@ function AttachDialog({
         return
       }
 
+      // Emptying the selection empties the picker too — see FileField. The
+      // ones that landed are attached; re-sending them would duplicate them.
       setFailures(refused)
       setFiles([])
-
-      if (inputRef.current) {
-        inputRef.current.value = ''
-      }
     })
   }
 
@@ -162,61 +155,17 @@ function AttachDialog({
         </DialogHeader>
 
         <div className="grid gap-lg">
-          <div className="grid gap-sm">
-            {/* A span rather than a `Label`, and the input is pointed at it by
-                `aria-labelledby`. The visible trigger below has to be a real
-                `<label>` — that is the only element that opens a file picker
-                without script — so a second labelling `<label>` here would give
-                the control two names and have a screen reader read both. */}
-            <span id="document-file-label" className="text-body-sm-strong text-foreground">
-              {multiple ? 'Photographs' : 'File'}
-            </span>
-
-            {/* The native control is the input, and it keeps the keyboard and
-                the operating system's own picker. What is drawn is a label
-                styled as a tertiary button, because a bare file input carries
-                a browser's chrome rather than this product's. */}
-            <div className="flex flex-wrap items-center gap-md">
-              <label
-                htmlFor="document-file"
-                className="inline-flex h-[32px] cursor-pointer items-center gap-xs rounded-md border border-border bg-card px-md text-button-md text-foreground transition-colors focus-within:ring-2 focus-within:ring-ring hover:bg-muted"
-              >
-                {multiple ? 'Choose files' : 'Choose file'}
-              </label>
-              <input
-                ref={inputRef}
-                id="document-file"
-                type="file"
-                aria-labelledby="document-file-label"
-                accept={acceptAttributeFor(kind)}
-                multiple={multiple}
-                className="sr-only"
-                onChange={(event) => {
-                  setFiles(Array.from(event.target.files ?? []))
-                  setFailures([])
-                }}
-              />
-              <span className="text-body-sm text-muted-foreground">
-                {files.length === 0
-                  ? 'No file chosen'
-                  : files.length === 1
-                    ? `${files[0]!.name} · ${formatByteSize(files[0]!.size)}`
-                    : `${files.length} files`}
-              </span>
-            </div>
-
-            {oversized.length > 0 ? (
-              <FieldError
-                message={`${oversized.length === 1 ? oversized[0]!.name : `${oversized.length} files`} is larger than ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB. A photograph taken on a phone is usually well under it.`}
-              />
-            ) : (
-              <p className="text-caption text-muted-foreground">
-                JPEG, PNG, WebP{kind === 'inspection_photo' ? '' : ' or PDF'}, up to{' '}
-                {Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB each. Stored privately and
-                deleted automatically when its retention period ends.
-              </p>
-            )}
-          </div>
+          <FileField
+            id="document-file"
+            kind={kind}
+            label={multiple ? 'Photographs' : 'File'}
+            files={files}
+            multiple={multiple}
+            onChange={(chosen) => {
+              setFiles(chosen)
+              setFailures([])
+            }}
+          />
 
           {failures.length > 0 ? (
             <div className="grid gap-xs">

@@ -106,12 +106,20 @@ export const bookingSteps: BookingStep[] = [
 /**
  * Contact details as supplied by the client on 2026-08-27.
  *
- * TODO(client): three phone numbers were given without saying which carries
- * WhatsApp. The first is used for every WhatsApp link below — confirm, or say
- * which number should receive booking enquiries.
+ * [C] 2026-09-05 (N14): all three numbers carry WhatsApp, and all three are
+ * shown. A customer picks one and tries another if nobody answers — which is
+ * what they do today anyway, and it needs no routing rule nobody has agreed.
+ *
+ * `whatsappUrl` remains because a single "Message us on WhatsApp" button has to
+ * open one chat. It opens the first listed. Every surface that can show a
+ * *list* shows all three.
  */
 export const contact = {
-  phones: ['+673 8959798', '+673 8837118', '+673 8986733'],
+  phones: [
+    { display: '+673 8959798', whatsappUrl: 'https://wa.me/6738959798' },
+    { display: '+673 8837118', whatsappUrl: 'https://wa.me/6738837118' },
+    { display: '+673 8986733', whatsappUrl: 'https://wa.me/6738986733' },
+  ],
   whatsappUrl: 'https://wa.me/6738959798',
   instagramHandle: '@palmvilla.bn',
   instagramUrl: 'https://instagram.com/palmvilla.bn',

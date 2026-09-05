@@ -51,6 +51,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { ActivityBar } from '@/components/ui/activity-bar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
@@ -375,6 +376,21 @@ export function AvatarDemo() {
         </p>
       </div>
     </div>
+  )
+}
+
+export function ActivityBarDemo() {
+  return (
+    <Card className="w-full max-w-[420px]">
+      <div className="text-body-sm text-foreground">PV-4821 accounting pack.pdf</div>
+      <div className="text-caption text-muted-foreground">Assembled by the system</div>
+      <div className="mt-md grid gap-xs">
+        <ActivityBar />
+        <p className="text-caption text-muted-foreground">
+          Rebuilding to include the latest payment
+        </p>
+      </div>
+    </Card>
   )
 }
 
