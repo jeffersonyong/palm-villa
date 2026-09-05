@@ -7,10 +7,10 @@ import { SectionCard } from '@/components/portal/section-card'
 import { ActivityBar } from '@/components/ui/activity-bar'
 import { Card } from '@/components/ui/card'
 import { FieldError } from '@/components/ui/field-error'
-import { Skeleton } from '@/components/ui/skeleton'
 import { TextAction } from '@/components/ui/text-action'
 import { toast } from '@/components/ui/toast-store'
 import type { Document } from '@/lib/db/documents'
+import { cn } from '@/lib/utils'
 
 import { DocumentRow } from '../../documents/document-row'
 
@@ -163,7 +163,7 @@ export function AccountingPack({
       ) : (
         <Card surface="inset">
           {isBusy ? (
-            <AssemblingRow />
+            <Working label="Assembling the pack" />
           ) : (
             <p className="text-body-sm text-muted-foreground">
               {hasVerifiedPayment
@@ -200,12 +200,10 @@ function PackState({
 }) {
   if (isBusy) {
     return (
-      <div className="mt-md grid gap-xs" aria-busy>
-        <ActivityBar />
-        <p className="text-caption text-muted-foreground" aria-live="polite">
-          {isRebuilding ? 'Rebuilding the pack' : 'Rebuilding to include the latest payment'}
-        </p>
-      </div>
+      <Working
+        className="mt-md"
+        label={isRebuilding ? 'Rebuilding the pack' : 'Rebuilding to include the latest payment'}
+      />
     )
   }
 
@@ -232,18 +230,27 @@ function PackState({
 }
 
 /**
- * The row's shape, while the file is on its way. The bars take the card fill
- * rather than the skeleton's default `muted`, because this sits on the gray
- * inset — an object is whichever tone is a step away from what it sits on,
- * and a muted bar on a muted panel is not there at all.
+ * The panel is working. One construction for both cases.
+ *
+ * It used to be two: a `Skeleton` row while the first pack was assembled, and
+ * the activity bar while an existing one was rebuilt. Same job, two idioms,
+ * and a reader who verified a payment and then watched a pack rebuild saw the
+ * screen answer the same question two different ways.
+ *
+ * The activity bar wins both because a skeleton is the wrong claim here. A
+ * skeleton stands in for content that already exists and is on its way — the
+ * shape of a row being fetched. A pack does not exist yet; it is being
+ * *manufactured*, and nothing is in flight to stand in for. The honest
+ * distinction is **fetching against generating**, not absent against present,
+ * and generating is what the bar was built to say (design.md §Components).
  */
-function AssemblingRow() {
+function Working({ label, className }: { label: string; className?: string }) {
   return (
-    <div className="grid gap-xs py-sm" aria-live="polite" aria-busy>
-      <Skeleton className="h-4 w-[220px] bg-card" />
-      <Skeleton className="h-3 w-[300px] bg-card" />
-      <span className="sr-only">Assembling the accounting pack</span>
-      <p className="mt-xs text-caption text-muted-foreground">Being assembled…</p>
+    <div className={cn('grid gap-xs', className)} aria-busy>
+      <ActivityBar />
+      <p className="text-caption text-muted-foreground" aria-live="polite">
+        {label}
+      </p>
     </div>
   )
 }
