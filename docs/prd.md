@@ -31,7 +31,7 @@ This platform replaces that with one web application: a public booking site for 
 
 **How customers reach them.** An Instagram page advertises the units and displays contact numbers. Customers message on WhatsApp. Bookings are handled by the Reservations / Front Office team, who check availability, confirm details, and assist with payment.
 
-**[C] Public contact details** (confirmed 2026-08-27): Instagram and TikTok both `@palmvilla.bn`; phone **+673 8959798 / 8837118 / 8986733**; location 4.570085, 114.220738 (Bandar Seri Begawan). **[O]** Which of the three numbers carries WhatsApp for booking enquiries is not stated — the public site currently links the first.
+**[C] Public contact details** (confirmed 2026-08-27): Instagram and TikTok both `@palmvilla.bn`; phone **+673 8959798 / 8837118 / 8986733**; location 4.570085, 114.220738 (Bandar Seri Begawan). **[C] All three numbers carry WhatsApp** (2026-09-05). **[O]** Which one a booking enquiry should land on is still open — a single "Chat on WhatsApp" button has to pick one, and the site currently links the first (8959798). Worth noting the client's own price list directs event enquiries to **8986733 or 8837118** and not to the number being linked.
 
 **How bookings are recorded.** Manually into Excel, including payment status. Bookings are approved by a person before being confirmed, which is currently the only thing preventing double bookings.
 
@@ -232,6 +232,8 @@ any → out_of_service → available
 
 **[C]** Extra person charge: 7 per person per night. Guests aged 3 and below are not counted. See §8.2.
 
+**[A] The 2-bedroom's stated maximum is the only one that is not a single number.** "4 adults + 2 children" is carried into `lib/domain/config.ts` as `maxPax: 6`, which is a flattening: the literal reading caps adults at 4, so 5 adults + 1 child would be refused under it and allowed under the flattening. Six bodies however composed is the more permissive reading and the one that ships. Part of N2 — see §8.2.
+
 **[O]** Units of the same type are not interchangeable, because bed configuration differs. It is unconfirmed whether guests may choose or request a configuration, or whether it is assigned by staff.
 
 **[O]** The database seeds the 48 confirmed units only. The 2-bedroom **type** exists and prices correctly, with **zero units**, until N1 is answered. Unit references are provisional pending N10.
@@ -265,9 +267,10 @@ Pricing is a line-item calculation, never a single stored price. Every booking p
 ### 8.1 Day passes
 
 **[C]** Per-person rates: age 1 to 12 = 5. Age 12 and above = 10.
+**[A]** The boundary is **1 to 11 = 5, 12 and above = 10** (2026-09-05, Jeff). Decided by Jeff against the client's overlapping wording, not confirmed by Jason.
 **[C]** Family bundles: 2 adults + 1 child = 20. 2 adults + 2 children = 25.
 
-**[O] The age bands overlap at 12.** Must be resolved to a clean boundary. Pricing for under age 1 is undefined.
+**[O]** Pricing for under age 1 is undefined. Free by inference from the stays rule that guests aged 3 and below are not counted — an inference, not a stated rule. The overlap at 12 that used to sit here is resolved above.
 **[O]** Bundles are defined only for two combinations. Any other family shape (1 adult + 2 children, 2 adults + 3 children) has no stated rule.
 
 **[A] Implementation.** Price per person by age band, then apply the best matching bundle override automatically. The customer is never charged more than the cheapest applicable combination. This avoids a self-declared "family" category that cannot be verified and removes the need for two parallel pricing modes.
@@ -284,7 +287,11 @@ total = (base_rate × nights)
 
 **[C]** Extra person rate is 7 per person. Guests aged 3 and below are not counted.
 **[O]** The under-3 exemption is stated for the apartments but not for the semi-detached. Assume it applies unless told otherwise.
-**[O]** "Max for 8 pax" alongside "7 per extra person" is contradictory. Clarify whether max pax is a hard ceiling or a threshold above which the extra charge applies.
+**[O]** "Max for 8 pax" alongside "7 per extra person" is contradictory — and it is the client's own price list that says both, in one sentence, for every unit type. Clarify whether max pax is a hard ceiling or the threshold above which the extra charge applies.
+
+**[A] It ships as a threshold, not a ceiling.** `config.paxPolicy` is `surcharge_threshold`, so a 9th guest in a 3-bedroom books and pays 7 per night rather than being refused. This is the only reading under which the confirmed extra-person charge is ever chargeable at all — under a hard cap the rate is unreachable dead code. One field flips it.
+
+**[O] The 2-bedroom is a second question inside the same one.** Its stated maximum is a shape ("4 adults + 2 children"), not a count, so "six people" and "at most four adults" are different rules — see the [A] in §7.1 for which one ships.
 **[C]** Sofa bed: 28, includes one pillow and one blanket, subject to availability.
 **[O]** Total number of sofa beds available across the property is unknown. Model as property-level add-on stock, not per unit.
 

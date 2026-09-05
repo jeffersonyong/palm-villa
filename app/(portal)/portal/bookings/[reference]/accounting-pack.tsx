@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 
 import { SectionCard } from '@/components/portal/section-card'
 import { ActivityBar } from '@/components/ui/activity-bar'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { FieldError } from '@/components/ui/field-error'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TextAction } from '@/components/ui/text-action'
 import { toast } from '@/components/ui/toast-store'
 import type { Document } from '@/lib/db/documents'
 
@@ -132,11 +132,13 @@ export function AccountingPack({
         /* Only when there is something to rebuild. A control that is always
            there invites a click that changes nothing, and the pack is current
            almost all of the time. Hidden while an assembly is already running,
-           for the same reason. */
+           for the same reason.
+
+           Text rather than a button: it sits on a `micro` title line beside a
+           tooltip glyph, and a bordered rectangle there reads as chrome the
+           section has grown rather than as the offer it is. */
         mayRebuild && isBehind && !isBusy ? (
-          <Button variant="tertiary" onClick={rebuild}>
-            Rebuild now
-          </Button>
+          <TextAction onClick={rebuild}>Rebuild now</TextAction>
         ) : null
       }
     >
