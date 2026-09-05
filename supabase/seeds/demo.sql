@@ -24,6 +24,21 @@
 --      could not itself produce would be a fixture layer by another name —
 --      exactly what ./seed.sql's note was written to prevent.
 --
+-- ── The one thing this file cannot write ────────────────────────────────────
+--
+-- An accounting pack (capability G5). It is a rendered PDF uploaded to
+-- Storage, and SQL can do neither, so it is assembled straight afterwards by
+-- scripts/assemble-demo-packs.mjs through the nightly job's own route —
+-- `npm run db:seed-demo` runs both halves. Rule 2 is kept rather than bent:
+-- the pack is written by the code that writes every other pack.
+--
+-- Leaving it out told a lie on screen. The booking screen infers "a pack is
+-- being assembled" from a verification too recent for one to have landed —
+-- true after a clerk verifies a payment, because that path schedules the
+-- assembly, and false after a seed, because nothing did. So every settled
+-- demo booking claimed to be mid-assembly for two minutes, and no demo
+-- booking ever had the pack G5 exists to show.
+--
 -- The deposits ledger (E1) needs a deposit to be about, so the two stays that
 -- have begun go through check_in_booking() and the one that ended last week is
 -- inspected, charged and released — the shape that exercises an amount owed and
