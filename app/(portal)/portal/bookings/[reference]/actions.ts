@@ -7,6 +7,7 @@ import { requirePermission } from '@/lib/auth/require-permission'
 import { getBookingById, transitionBooking } from '@/lib/db/bookings'
 import { listDocumentsForBooking } from '@/lib/db/documents'
 import { addBookingNote } from '@/lib/db/notes'
+import { assembleAccountingPack } from '@/lib/db/packs'
 import { recordCashPayment, recordTransferPayment } from '@/lib/db/payments'
 import { centsFromInput } from '@/lib/domain/money'
 import type { PaymentMethod } from '@/lib/domain/payment'
@@ -361,4 +362,65 @@ export async function latestAccountingPackIdAction(bookingId: string): Promise<s
   const packs = await listDocumentsForBooking(bookingId, 'accounting_pack')
 
   return packs.at(-1)?.id ?? null
+}
+
+/**
+ * Rebuilding the accounting pack on demand (capability G5).
+ *
+ * ── Why a button exists at all ────────────────────────────────────────────
+ *
+ * A pack is assembled the moment a payment is verified, and rebuilt by the
+ * nightly job for everything else that changes what it records — a slip
+ * attached afterwards, an IC that turned up late, a booking amended. That is
+ * correct and it is also a wait: the desk can see the pack is behind and has
+ * no way to say "now". This is that way.
+ *
+ * ── The permission ────────────────────────────────────────────────────────
+ *
+ * **[A] `payment.verify`** — Admin, Front Office and Finance. Verifying a
+ * payment is what builds a pack automatically, so whoever may cause the build
+ * may ask for it again; Front Office is also the desk that attaches the late
+ * slip, which is what puts the pack behind in the first place. It mints no new
+ * permission string, which is the position prd.md §10.7 already took. Housekeeping
+ * and Security hold `booking.view` and see no button. Put to the client as
+ * [N25](docs/open-questions.md).
+ *
+ * ── Why this awaits rather than scheduling ────────────────────────────────
+ *
+ * `scheduleAccountingPack` hands the work to `after()` so a clerk verifying a
+ * payment is not kept waiting on a PDF. Here the PDF *is* what was asked for,
+ * so it is awaited and the answer is the truth about it: the screen shows the
+ * new pack when this returns, rather than polling for a file and hoping.
+ *
+ * A refusal is not a failure worth alarming anybody with. `superseded_by_newer`
+ * means the nightly job got there first — the pack is current, which is what
+ * the clicker wanted.
+ */
+export async function rebuildAccountingPackAction(
+  bookingId: string,
+): Promise<{ status: 'done' | 'error'; message?: string }> {
+  await requirePermission('payment.verify')
+
+  const booking = await getBookingById(bookingId)
+
+  if (!booking) {
+    return { status: 'error', message: 'That booking no longer exists.' }
+  }
+
+  const result = await assembleAccountingPack({ bookingId })
+
+  revalidateBooking(booking.reference)
+
+  if (result.ok || result.reason === 'superseded_by_newer') {
+    return { status: 'done' }
+  }
+
+  if (result.reason === 'no_verified_payment') {
+    return {
+      status: 'error',
+      message: 'There is no verified payment on this booking, so there is no pack to assemble.',
+    }
+  }
+
+  return { status: 'error', message: 'The pack could not be rebuilt. Try again in a moment.' }
 }

@@ -22,6 +22,7 @@ import {
   type Document,
 } from '@/lib/db/documents'
 import { listBookingNotes } from '@/lib/db/notes'
+import { accountingPackChangedAt } from '@/lib/db/packs'
 import { listPaymentsForBooking, type Payment } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
 import { allowedEvents, canAmend } from '@/lib/domain/booking-state'
@@ -156,9 +157,27 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
       .map((payment) => payment.verifiedAt!)
       .sort()
       .at(-1) ?? null
+  // Two questions, and they are not the same one (see accounting-pack.tsx).
+  //
+  // Behind: asked of the DATABASE, with the function the nightly due-list
+  // uses, so the screen and the job cannot disagree about it. Comparing here
+  // in TypeScript against verifications alone is what let a slip attached
+  // after the pack was built leave a stale pack looking current.
+  const packChangedAt = await accountingPackChangedAt(booking.id)
   const packPendingSince =
+    packChangedAt !== null &&
+    (pack === null ||
+      pack.assembledFrom === null ||
+      Date.parse(pack.assembledFrom) < Date.parse(packChangedAt))
+      ? packChangedAt
+      : null
+  // Expected: only a verification schedules an assembly, so only a
+  // verification means one is on its way and worth polling for.
+  const packVerifiedSince =
     newestVerifiedAt !== null &&
-    (pack === null || Date.parse(pack.uploadedAt) < Date.parse(newestVerifiedAt))
+    (pack === null ||
+      pack.assembledFrom === null ||
+      Date.parse(pack.assembledFrom) < Date.parse(newestVerifiedAt))
       ? newestVerifiedAt
       : null
 
@@ -259,23 +278,18 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
       />
 
       {/* Below the payments it records, above the notes. The newest live
-          pack; `listDocumentsForBooking` reads oldest first. How the pack
-          comes to exist is the section's hint rather than a paragraph under
-          it — read once, not on every visit. */}
-      <SectionCard
-        id="pack-heading"
-        title="Accounting pack"
-        hint="Built when a payment is verified, and rebuilt overnight after any change to the booking, its payments or its documents. Earlier versions stay on the history. The identity document is referenced, not copied in."
-        className="mt-xl"
-      >
-        <AccountingPack
-          bookingId={booking.id}
-          pack={pack}
-          mayOpen={mayOpen('accounting_pack', actor.permissions)}
-          hasVerifiedPayment={newestVerifiedAt !== null}
-          pendingSince={packPendingSince}
-        />
-      </SectionCard>
+          pack; `listDocumentsForBooking` reads oldest first. The section card
+          belongs to the component: the rebuild control sits on the title line,
+          and whether to draw it depends on state that lives in there. */}
+      <AccountingPack
+        bookingId={booking.id}
+        pack={pack}
+        mayOpen={mayOpen('accounting_pack', actor.permissions)}
+        hasVerifiedPayment={newestVerifiedAt !== null}
+        pendingSince={packPendingSince}
+        verifiedSince={packVerifiedSince}
+        mayRebuild={hasPermission(actor.permissions, 'payment.verify')}
+      />
 
       {/* Above the history, below the money. The history is the system's
           account of what happened; this is the staff's, and the two read
