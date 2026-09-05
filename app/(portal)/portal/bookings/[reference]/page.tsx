@@ -471,7 +471,7 @@ function SlipLine({
               paymentId={payment.id}
               label="Attach slip"
               title="Attach the transfer slip"
-              description="The bank app is still the check — a slip is evidence, not verification. Kept privately for seven years as an accounting record."
+              description="The bank app is still the check — a slip is evidence, not verification. Kept privately as an accounting record."
             />
           ) : null}
         </div>

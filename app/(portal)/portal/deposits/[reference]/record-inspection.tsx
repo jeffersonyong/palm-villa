@@ -286,11 +286,6 @@ function InspectionDialog({
               setFiles(chosen)
               setFailures([])
             }}
-            hint={
-              needsNotes
-                ? 'A photograph of what was found is the cheapest evidence in a disputed charge. JPEG, PNG or WebP, up to 4 MB each. Kept privately for two years, then deleted.'
-                : 'JPEG, PNG or WebP, up to 4 MB each. Kept privately for two years, then deleted.'
-            }
           />
 
           {isRecorded ? (

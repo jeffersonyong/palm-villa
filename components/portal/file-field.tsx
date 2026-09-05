@@ -104,16 +104,27 @@ export function FileField({
         />
       ) : (
         <p className="text-caption text-muted-foreground">
-          {hint ?? (
-            <>
-              JPEG, PNG, WebP{kind === 'inspection_photo' ? '' : ' or PDF'}, up to {megabytes()} MB
-              each. Stored privately and deleted automatically when its retention period ends.
-            </>
-          )}
+          {hint ?? formatsAndSize(kind, multiple)}
         </p>
       )}
     </div>
   )
+}
+
+/**
+ * What the picker says when the caller has nothing more specific to add.
+ *
+ * **It names no retention period, and neither should any caller.** Every kind
+ * has one and a file really is deleted when it runs out, but the number is
+ * configuration rather than code — prd.md §13 says so, and capability F3 is
+ * the screen that will let Jason edit it without going through a developer.
+ * Copy that states "two years" is a second copy of that setting, in the one
+ * place nothing will think to update.
+ */
+function formatsAndSize(kind: DocumentKind, multiple?: boolean): string {
+  const formats = kind === 'inspection_photo' ? 'JPEG, PNG or WebP' : 'JPEG, PNG, WebP or PDF'
+
+  return `${formats}, up to ${megabytes()} MB${multiple ? ' each' : ''}.`
 }
 
 function describe(files: readonly File[]): string {

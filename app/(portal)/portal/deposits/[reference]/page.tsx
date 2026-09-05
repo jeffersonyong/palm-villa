@@ -410,7 +410,7 @@ function InspectionSection({
                   inspectionId={deposit.inspection.id}
                   label={photographs.length === 0 ? 'Add photographs' : 'Add more'}
                   title={`Photographs of ${deposit.stay?.unitRef ?? deposit.bookingReference}`}
-                  description="Evidence for anything charged against this deposit. Kept privately for two years, then deleted."
+                  description="Evidence for anything charged against this deposit. Kept privately."
                   multiple
                 />
               </div>
