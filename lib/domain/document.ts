@@ -143,6 +143,22 @@ export function acceptAttributeFor(kind: DocumentKind): string {
 export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
 
 /**
+ * The chosen files an upload would refuse for being too large.
+ *
+ * The predicate rather than the boolean, because every caller has the same two
+ * jobs: disable the button, and name what is wrong. It lives here rather than
+ * in the picker so the number and the rule stay in the same file — a second
+ * copy of `size > MAX_DOCUMENT_BYTES` in a component is how a limit ends up
+ * being raised in one place and not the other.
+ *
+ * Structurally typed on `size` alone so the unit suite can check it without a
+ * DOM `File`.
+ */
+export function oversizedFiles<T extends { size: number }>(files: readonly T[]): readonly T[] {
+  return files.filter((file) => file.size > MAX_DOCUMENT_BYTES)
+}
+
+/**
  * The ceiling on one stored file, by kind.
  *
  * Three kinds arrive through a server action and take the upload ceiling
