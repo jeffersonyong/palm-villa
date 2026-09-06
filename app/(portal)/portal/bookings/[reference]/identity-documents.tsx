@@ -112,7 +112,7 @@ function AttachIdentity({
       bookingId={bookingId}
       label={another ? 'Attach another' : 'Attach ID'}
       title={`Attach ${guestName}'s identity document`}
-      description="Stored privately, opened only by staff who are allowed to, and every time somebody opens it is recorded. Deleted automatically twelve months after the guest checks out."
+      description="Stored privately, opened only by staff who are allowed to, and every time somebody opens it is recorded. Deleted automatically once its retention period ends."
     />
   )
 }

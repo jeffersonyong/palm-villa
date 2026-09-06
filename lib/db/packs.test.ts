@@ -11,7 +11,12 @@ import {
   removeDocument,
   runRetention,
 } from './documents'
-import { assembleAccountingPack, listBookingsDueAccountingPack, runPackAssembly } from './packs'
+import {
+  accountingPackChangedAt,
+  assembleAccountingPack,
+  listBookingsDueAccountingPack,
+  runPackAssembly,
+} from './packs'
 import { verifyPayment } from './payments'
 import { currentPropertyId } from './property'
 import { auditEventsFor } from './test/inspect'
@@ -299,5 +304,83 @@ describe('which bookings are due a pack', () => {
     const again = await runPackAssembly()
 
     expect(again.assembled).toBe(0)
+  })
+})
+
+/**
+ * The screen and the nightly job have to answer "is this pack behind?" the
+ * same way.
+ *
+ * They did not. The booking screen compared the pack against the newest
+ * verification in TypeScript, so a slip attached afterwards left the job
+ * treating the pack as due while the screen showed it as current — a pack
+ * presented as up to date that was missing a file somebody had just added.
+ * These assert the property that fixes it: one function, and the two agree
+ * by construction rather than by both being maintained.
+ */
+describe('the staleness a screen and the nightly job share', () => {
+  async function liveWatermark(bookingId: string): Promise<string | null> {
+    const packs = await listDocumentsForBooking(bookingId, 'accounting_pack')
+
+    return packs.at(-1)?.assembledFrom ?? null
+  }
+
+  test('is null when nothing is verified, because no pack is due', async () => {
+    const { booking } = await givenTransferBooking({ checkIn: TOMORROW, checkOut: NEXT_WEEK })
+
+    expect(await accountingPackChangedAt(booking.id)).toBeNull()
+  })
+
+  test('sits behind the watermark of a pack that is current', async () => {
+    const { booking } = await givenSettledBooking()
+
+    await assembleAccountingPack({ bookingId: booking.id })
+
+    const changedAt = await accountingPackChangedAt(booking.id)
+    const watermark = await liveWatermark(booking.id)
+
+    expect(changedAt).not.toBeNull()
+    expect(Date.parse(changedAt!)).toBeLessThan(Date.parse(watermark!))
+  })
+
+  test('passes the watermark when a slip is attached after the pack', async () => {
+    const { booking, payment } = await givenSettledBooking()
+
+    await assembleAccountingPack({ bookingId: booking.id })
+
+    const watermark = await liveWatermark(booking.id)
+
+    await givenDocument({ kind: 'payment_slip', bookingId: booking.id, paymentId: payment.id })
+
+    const changedAt = await accountingPackChangedAt(booking.id)
+
+    // The exact comparison the booking screen makes. Before this existed the
+    // screen looked at verifications only and read this booking as current.
+    expect(Date.parse(changedAt!)).toBeGreaterThan(Date.parse(watermark!))
+  })
+
+  test('agrees with the due-list, which is the whole point of it', async () => {
+    const { booking, payment } = await givenSettledBooking()
+
+    await assembleAccountingPack({ bookingId: booking.id })
+
+    const settled = {
+      screenSaysBehind:
+        Date.parse((await accountingPackChangedAt(booking.id))!) >
+        Date.parse((await liveWatermark(booking.id))!),
+      jobSaysDue: (await listBookingsDueAccountingPack()).includes(booking.id),
+    }
+
+    await givenDocument({ kind: 'payment_slip', bookingId: booking.id, paymentId: payment.id })
+
+    const stale = {
+      screenSaysBehind:
+        Date.parse((await accountingPackChangedAt(booking.id))!) >
+        Date.parse((await liveWatermark(booking.id))!),
+      jobSaysDue: (await listBookingsDueAccountingPack()).includes(booking.id),
+    }
+
+    expect(settled).toEqual({ screenSaysBehind: false, jobSaysDue: false })
+    expect(stale).toEqual({ screenSaysBehind: true, jobSaysDue: true })
   })
 })

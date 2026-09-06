@@ -36,6 +36,14 @@ export const PERMISSIONS = [
   'charge.create',
   'charge.waive',
   'deposit.approve_release',
+  /**
+   * Waiving the security deposit on a booking, at creation.
+   *
+   * Separate from `booking.create` for the reason `booking.discount` is: it
+   * decides that money is not taken. The ordinary case is a stay continuing
+   * another booking whose deposit is already held (prd.md §11, B15).
+   */
+  'deposit.waive',
   'unit.manage',
   'tenancy.manage',
   'config.manage',

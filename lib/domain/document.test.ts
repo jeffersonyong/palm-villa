@@ -21,6 +21,7 @@ import {
   mayAttach,
   mayOpen,
   mayRemove,
+  oversizedFiles,
   sanitiseFilename,
   sniffMimeType,
   storageKeyFor,
@@ -440,5 +441,30 @@ describe('mayAttach and mayRemove', () => {
 
     expect(mayRemove('identity', amenderOnly)).toBe(true)
     expect(mayOpen('identity', amenderOnly)).toBe(false)
+  })
+})
+
+describe('oversizedFiles', () => {
+  test('returns the files past the upload ceiling and nothing else', () => {
+    // Arrange
+    const files = [
+      { name: 'ok.jpg', size: MAX_DOCUMENT_BYTES },
+      { name: 'huge.jpg', size: MAX_DOCUMENT_BYTES + 1 },
+      { name: 'tiny.jpg', size: 1 },
+    ]
+
+    // Act
+    const refused = oversizedFiles(files)
+
+    // Assert
+    expect(refused.map((file) => file.name)).toEqual(['huge.jpg'])
+  })
+
+  test('the ceiling itself is allowed, not refused', () => {
+    expect(oversizedFiles([{ size: MAX_DOCUMENT_BYTES }])).toEqual([])
+  })
+
+  test('nothing chosen is nothing refused', () => {
+    expect(oversizedFiles([])).toEqual([])
   })
 })

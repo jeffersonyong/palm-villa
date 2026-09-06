@@ -72,10 +72,20 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                   Bandar Seri Begawan, Brunei Darussalam
                 </a>
               </p>
+              {/* All three carry WhatsApp (N14), so each row offers both: tap
+                  the number to call, or the label to open a chat. */}
               <ul className="mt-sm space-y-xxs">
                 {contact.phones.map((phone) => (
-                  <li key={phone}>
-                    <a href={`tel:${phone.replace(/\s/g, '')}`}>{phone}</a>
+                  <li key={phone.display} className="flex items-center gap-sm">
+                    <a href={`tel:${phone.display.replace(/\s/g, '')}`}>{phone.display}</a>
+                    <a
+                      href={phone.whatsappUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-mute"
+                    >
+                      WhatsApp
+                    </a>
                   </li>
                 ))}
               </ul>

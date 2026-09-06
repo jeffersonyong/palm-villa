@@ -46,6 +46,7 @@ function booking(overrides: Partial<PackBookingFacts> = {}): PackBookingFacts {
     total: bnd(430),
     paid: bnd(430),
     securityDeposit: bnd(100),
+    depositWaiverReason: null,
     discount: null,
     ...overrides,
   }
@@ -175,6 +176,21 @@ describe('the itemised booking', () => {
     const model = buildPackModel(input({ booking: booking({ securityDeposit: 0 }) }))
 
     expect(model.securityDepositNote).toBe('No security deposit was quoted on this booking.')
+  })
+
+  test('a waived deposit is named as a decision, with its reason', () => {
+    const model = buildPackModel(
+      input({
+        booking: booking({
+          securityDeposit: 0,
+          depositWaiverReason: 'Extends PV-1000 — deposit held there',
+        }),
+      }),
+    )
+
+    expect(model.securityDepositNote).toBe(
+      'Security deposit waived at booking: Extends PV-1000 — deposit held there. Nothing was held against this stay.',
+    )
   })
 })
 

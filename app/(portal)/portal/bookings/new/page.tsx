@@ -86,6 +86,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   // staff member a field they cannot use (architecture.md §3).
   const actor = await getActor()
   const mayDiscount = Boolean(actor && hasPermission(actor.permissions, 'booking.discount'))
+  const mayWaiveDeposit = Boolean(actor && hasPermission(actor.permissions, 'deposit.waive'))
 
   /* Header, date controls and availability tiles — everything that asks the
      question rather than answering it. Hoisted into a variable because
@@ -224,6 +225,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
           checkIn={checkIn}
           checkOut={checkOut}
           mayDiscount={mayDiscount}
+          mayWaiveDeposit={mayWaiveDeposit}
         />
       </div>
     )

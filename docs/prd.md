@@ -31,7 +31,7 @@ This platform replaces that with one web application: a public booking site for 
 
 **How customers reach them.** An Instagram page advertises the units and displays contact numbers. Customers message on WhatsApp. Bookings are handled by the Reservations / Front Office team, who check availability, confirm details, and assist with payment.
 
-**[C] Public contact details** (confirmed 2026-08-27): Instagram and TikTok both `@palmvilla.bn`; phone **+673 8959798 / 8837118 / 8986733**; location 4.570085, 114.220738 (Bandar Seri Begawan). **[O]** Which of the three numbers carries WhatsApp for booking enquiries is not stated — the public site currently links the first.
+**[C] Public contact details** (confirmed 2026-08-27): Instagram and TikTok both `@palmvilla.bn`; phone **+673 8959798 / 8837118 / 8986733**; location 4.570085, 114.220738 (Bandar Seri Begawan). **[C] All three numbers carry WhatsApp** (2026-09-05). **[O]** Which one a booking enquiry should land on is still open — a single "Chat on WhatsApp" button has to pick one, and the site currently links the first (8959798). Worth noting the client's own price list directs event enquiries to **8986733 or 8837118** and not to the number being linked.
 
 **How bookings are recorded.** Manually into Excel, including payment status. Bookings are approved by a person before being confirmed, which is currently the only thing preventing double bookings.
 
@@ -106,12 +106,14 @@ booking.view          booking.create        booking.amend
 booking.cancel        booking.override_hold booking.discount
 payment.verify        payment.record_cash
 inspection.record     charge.create         charge.waive
-deposit.approve_release
+deposit.approve_release                     deposit.waive
 unit.manage           tenancy.manage        config.manage
 report.view           document.view_identity
 ```
 
 **[A] `booking.discount` is separate from `booking.create`** and is the one permission that gates discretion rather than an operation — see §8.4. Front Office holds it by default, because the desk is where a discount is asked for; withholding it from a role is one click in the Roles matrix.
+
+**[A] `deposit.waive` is the second such permission** (5 September 2026, capability B15). It gates deciding at the desk that no security deposit is taken on a booking — see §11. Same construction and same default as the discount: separate from `booking.create` because it decides money is not taken, held by Front Office because the guest asking to stay another night is standing at the desk, and one click to withhold.
 
 **[C]** Deposit release approval sits at the end of the pipeline, with Finance or Jason, not with Housekeeping or Front Office. Housekeeping records the inspection; a separate role approves.
 
@@ -124,7 +126,7 @@ report.view           document.view_identity
 | Role | Permission set |
 |---|---|
 | **Admin** | All permissions, including `config.manage` and `document.view_identity` |
-| **Front Office** | `booking.*`, `payment.verify`, `payment.record_cash`, `charge.create`, `unit.manage`, `tenancy.manage`, `document.view_identity` |
+| **Front Office** | `booking.*`, `payment.verify`, `payment.record_cash`, `charge.create`, `deposit.waive`, `unit.manage`, `tenancy.manage`, `document.view_identity` |
 | **Housekeeping** | `inspection.record`, `unit.manage` (status only), read-only booking view for today |
 
 **[A] What "(status only)" means concretely**, settled when the units screens were built. `unit.manage` opens the units board and the two service actions — taking a unit out of service and returning it — which is exactly the cleaner's job. Two neighbouring things are deliberately *not* on it:
@@ -232,6 +234,8 @@ any → out_of_service → available
 
 **[C]** Extra person charge: 7 per person per night. Guests aged 3 and below are not counted. See §8.2.
 
+**[A] The 2-bedroom's stated maximum is the only one that is not a single number.** "4 adults + 2 children" is carried into `lib/domain/config.ts` as `maxPax: 6`, which is a flattening: the literal reading caps adults at 4, so 5 adults + 1 child would be refused under it and allowed under the flattening. Six bodies however composed is the more permissive reading and the one that ships. Part of N2 — see §8.2.
+
 **[O]** Units of the same type are not interchangeable, because bed configuration differs. It is unconfirmed whether guests may choose or request a configuration, or whether it is assigned by staff.
 
 **[O]** The database seeds the 48 confirmed units only. The 2-bedroom **type** exists and prices correctly, with **zero units**, until N1 is answered. Unit references are provisional pending N10.
@@ -265,9 +269,10 @@ Pricing is a line-item calculation, never a single stored price. Every booking p
 ### 8.1 Day passes
 
 **[C]** Per-person rates: age 1 to 12 = 5. Age 12 and above = 10.
+**[A]** The boundary is **1 to 11 = 5, 12 and above = 10** (2026-09-05, Jeff). Decided by Jeff against the client's overlapping wording, not confirmed by Jason.
 **[C]** Family bundles: 2 adults + 1 child = 20. 2 adults + 2 children = 25.
 
-**[O] The age bands overlap at 12.** Must be resolved to a clean boundary. Pricing for under age 1 is undefined.
+**[O]** Pricing for under age 1 is undefined. Free by inference from the stays rule that guests aged 3 and below are not counted — an inference, not a stated rule. The overlap at 12 that used to sit here is resolved above.
 **[O]** Bundles are defined only for two combinations. Any other family shape (1 adult + 2 children, 2 adults + 3 children) has no stated rule.
 
 **[A] Implementation.** Price per person by age band, then apply the best matching bundle override automatically. The customer is never charged more than the cheapest applicable combination. This avoids a self-declared "family" category that cannot be verified and removes the need for two parallel pricing modes.
@@ -284,7 +289,11 @@ total = (base_rate × nights)
 
 **[C]** Extra person rate is 7 per person. Guests aged 3 and below are not counted.
 **[O]** The under-3 exemption is stated for the apartments but not for the semi-detached. Assume it applies unless told otherwise.
-**[O]** "Max for 8 pax" alongside "7 per extra person" is contradictory. Clarify whether max pax is a hard ceiling or a threshold above which the extra charge applies.
+**[O]** "Max for 8 pax" alongside "7 per extra person" is contradictory — and it is the client's own price list that says both, in one sentence, for every unit type. Clarify whether max pax is a hard ceiling or the threshold above which the extra charge applies.
+
+**[A] It ships as a threshold, not a ceiling.** `config.paxPolicy` is `surcharge_threshold`, so a 9th guest in a 3-bedroom books and pays 7 per night rather than being refused. This is the only reading under which the confirmed extra-person charge is ever chargeable at all — under a hard cap the rate is unreachable dead code. One field flips it.
+
+**[O] The 2-bedroom is a second question inside the same one.** Its stated maximum is a shape ("4 adults + 2 children"), not a count, so "six people" and "at most four adults" are different rules — see the [A] in §7.1 for which one ships.
 **[C]** Sofa bed: 28, includes one pillow and one blanket, subject to availability.
 **[O]** Total number of sofa beds available across the property is unknown. Model as property-level add-on stock, not per unit.
 
@@ -371,6 +380,8 @@ The PRD has never stated rules for changing a booking after it exists — §4 gr
 **[A] Which bookings can be changed:** anything not yet checked in and not closed — `draft`, `held`, `awaiting_payment_verification`, `confirmed`. Closed bookings (`completed`, `expired`, `cancelled`, `no_show`) are kept as a record.
 
 **[O] Amending a booking whose guest has already checked in is not supported.** Extending an in-house guest by a night is a real front-office need, and this is the one exclusion likely to be felt in practice. It is excluded rather than half-built because §9.1's two-month advance window is implemented as "check-in cannot be in the past", so repricing a stay that has already begun is refused by the pricing engine. Enabling it means deciding what a mid-stay reprice charges for nights already taken — a pricing question, not an interface one. **To confirm with the client.**
+
+**[A] The stated procedure for an in-house extension is a second booking, with the deposit waived** (5 September 2026, Jeff). Occupancy ranges are half-open, so a booking ending on the 5th and a new one starting on the 5th on the same unit do not collide, and the desk can sell the extra night today. What made that unworkable was the deposit: check-in takes BND 100 in the same transaction, so the extension would have taken a second one off a guest who already has one in the safe. §11's waiver is the answer — the second booking is created quoting no deposit, with a reason naming the booking that holds it. Two consequences are accepted rather than solved: the stay is two references, two packs and two identity-document records, and Housekeeping sees a departure and an arrival on a unit nobody left. Amending a checked-in booking stays out until the pricing question above is answered.
 
 **[A] A cancellation requires a typed reason; an amendment's is optional.** B3 promises who, what and when. The reason adds why, and the two differ because an amendment already records both sides of every field it touched, whereas a cancellation would otherwise record only that it happened — and §9.5 forfeits a payment on one.
 
@@ -480,13 +491,17 @@ Added when the amendment path made the gap real. Nothing in §10 described what 
 
 Six requirements above; five are met as written and one is not. The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
 
-**[A] The deposit is collected at check-in, as part of checking the guest in.** One action, one transaction: the booking moves to `checked_in` and the deposit row is written together, because a guest checked in with no deposit recorded is precisely the gap in the spreadsheet this replaces. It is taken in cash or by bank transfer, for the amount the booking quoted, and it cannot be skipped or waived — a deposit somebody decided not to take is a conversation, not a field. A booking quoting no deposit checks in without one, and the screen says so rather than implying money changed hands.
+**[A] The deposit is collected at check-in, as part of checking the guest in.** One action, one transaction: the booking moves to `checked_in` and the deposit row is written together, because a guest checked in with no deposit recorded is precisely the gap in the spreadsheet this replaces. It is taken in cash or by bank transfer, for the amount the booking quoted, and it cannot be skipped at the door. A booking quoting no deposit checks in without one, and the screen says so rather than implying money changed hands.
+
+**[A] The deposit can be waived — at creation, with a reason, under its own permission** (5 September 2026, capability B15). The first build held that "a deposit somebody decided not to take is a conversation, not a field", and the conversation turned out to be a real one: a guest who extends after checking in gets a second booking (§9.6), and a second booking takes a second BND 100. The waiver is a checkbox in a *Security deposit* section at the foot of the walk-in form, shown only to a holder of `deposit.waive`. Ticking it opens a dialog rather than a field — the register every other consequential act in the portal uses — which says what the tick means (nothing held, nothing to charge damage against) and takes the reason there, by convention naming the booking whose deposit covers the stay; it cannot be confirmed empty, and cancelling leaves the box unticked. Unticking clears the waiver at once. A waived booking quotes zero, which is the path check-in already had; what the waiver adds is the **record**: the reason on the booking, a `deposit.waived` event in its history carrying the figure not taken, and a schema constraint that a booking with a waiver cannot quote a deposit — so an amendment repricing the stay cannot quietly put it back. It is decided at creation only; there is no waiving at the door, for the reason above.
 
 **[A] `booking.security_deposit_cents` stays the quote; the deposit row is what was taken.** The two can differ, because an amendment can reprice a booking after it was quoted, and what is held must not move with it. Every screen that used to read the quoted figure and call it "held" now says which of the two it means.
 
 **[A] An inspection is recorded once per stay, after check-out, with one of two outcomes** — *clean* or *issues found* — and notes are required when something was found. Two outcomes because this section branches exactly once: condition confirmed, or damages to deduct. A finer taxonomy would be categories nobody asked for, and the notes carry the detail in the inspector's own words.
 
 **Requirement 2 is now met: photographs arrived with the documents slice** (7 September 2026, capability B10). An inspection carries any number of them, stored privately, deleted automatically after two years, with every access logged and who attached each one on the record — see §13's as-built block. They are attached under `inspection.record`, the inspection's own permission rather than a second one, and are **not frozen when the release is approved**: a photograph taken to support a charge is evidence, and locking the evidence at the moment of approval was a rule nobody asked for. The delta against scope-of-capabilities.md C2 is closed.
+
+**[A] Recording an inspection and photographing it are one step, not two.** The first build split them — the dialog wrote the inspection, then a notice sent you back to the card to attach — because a photograph hangs off an `inspection_id` and there is nothing to attach to until the inspection exists. That is the schema's order, not the work's: somebody walks the unit once, with the photographs already on the phone they are typing into, and a second errand is how the cheapest evidence in a dispute becomes the step that gets skipped. The dependency is now met by sequencing inside one dialog. Two consequences: the inspection is written first and **has no update path**, so a photograph that fails to upload cannot be retried by resubmitting the form — the dialog freezes the outcome and notes and continues as photographs only; and **photographs stay optional**, including when something was found, because requiring one is a rule nobody has agreed. They can still be added to the inspection at any time afterwards, which is what a dispute months later needs.
 
 **[A] Requirement 4's "charges entered" is satisfied by the approver seeing them.** The inspection is a hard gate — the database refuses a release without one — but a release with no charges against it is the ordinary case, so there is nothing to require. What the approval screen does instead is state the itemised charges and the three resulting figures before the click.
 
@@ -554,7 +569,7 @@ Requirements 1 to 4 are met — the accounting pack arrived a day after the rest
 
 **[A] Existence is not content.** Anyone who may view a booking sees *that* an identity document is on file, what kind it is, how big it is and when it arrived; only opening it is gated. **The filename is not among them**, and that was a correction: an IC arrives named by whoever scanned it, so printing it would hand the guest's name — and often their IC number — to every reader the file itself was withheld from, through the one field nobody had gated. A reader who may not open it is shown the kind of document instead. A guard who can see the IC was collected is being told something useful and shown nothing, and hiding the row entirely would make "did anyone take it?" unanswerable by the people whose job it is to ask. Security and Housekeeping therefore see the row and never the file, which is the principle §4 states.
 
-**[A] Retention is anchored differently per kind.** An identity document is kept twelve months after **checkout**, and its clock follows the stay — extending a booking moves it. A slip and a pack run seven years from when they were taken, because an accounting record dates from the transaction; a photograph two years from the inspection. Periods are configuration, not code, and capability F3 is the screen that edits them.
+**[A] Retention is anchored differently per kind.** An identity document is kept twelve months after **checkout**, and its clock follows the stay — extending a booking moves it. A slip and a pack run seven years from when they were taken, because an accounting record dates from the transaction; a photograph two years from the inspection. Periods are configuration, not code, and capability F3 is the screen that edits them — **so no screen states the number.** An upload dialog that reads "kept for two years" is a second copy of that setting in the one place nothing will think to update, and it would start lying the first time Jason shortens the period himself. The copy says a file is kept privately and deleted when its retention period ends; what the period *is* belongs to F3, and to the document's own row.
 
 **[O] What a cancelled booking's identity document should do is [N22](open-questions.md).** It keeps an anchor on a checkout that never happened. Under the PDPO the client may well want it destroyed sooner, and that is their call rather than an assumption to bury in a default.
 
@@ -571,6 +586,8 @@ Requirements 1 to 4 are met — the accounting pack arrived a day after the rest
 **[A] "Transaction confirmation" is the verification record.** Nothing in the system is called a confirmation. What confirms a transfer is a person checking the bank (§10.4), so the pack prints that act: who verified it and when, the reference and sender they saw, whether it was matched by reference or by hand and why, and why an odd amount was accepted. Cash prints who counted it.
 
 **[A] A pack is assembled the moment a payment is verified, and rebuilt overnight when what it records changes.** architecture.md §8 says "when a booking completes payment"; read literally that pack would usually be missing the IC, which arrives at check-in, and the slip, which arrives whenever the guest sends it. So the first pack exists within seconds of the money being confirmed, and every night any pack older than its newest slip, identity document, verified payment or booking change is assembled again. The earlier pack is kept on the history as replaced, never deleted. An identity document *expiring* on its own clock does not rebuild the pack: the pack states what was on file when it was assembled.
+
+**[A] The desk can also rebuild a pack on demand, and the screen now knows when one is behind.** Two halves of the same fault. The staleness rule lived twice — the nightly job asked the database, and the booking screen decided for itself from verifications alone — so **a slip attached after a pack was built left the job treating the pack as due while the screen showed it as current**, a pack presented as up to date that was missing a file somebody had just added. The rule is now one database function (`accounting_pack_changed_at`, migration 20260909000100) that the job and the screen both read, so the two cannot drift. With the screen telling the truth, waiting until tonight became a choice rather than the only option: a pack that is behind carries a **Rebuild now** control on its title line, which assembles it there and then. It appears only when the pack is actually behind, and the permission is **[A] `payment.verify`** — [N25](open-questions.md).
 
 **[A] The pack prints Latin script only.** It uses the PDF's built-in font, which spares the product a font file and a second library; a name in Chinese or Jawi characters is shown as `?` and the pack says so on the page, with the booking screen carrying the name in full. Whether that is acceptable is [C7](open-questions.md).
 

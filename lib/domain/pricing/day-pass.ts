@@ -15,12 +15,13 @@ import type { Cents } from '../money'
  * commitment, not a preference.
  *
  * ────────────────────────────────────────────────────────────────────────────
- * TODO(client): prd.md §18 N3 and N4 are both open, and they govern this file.
+ * TODO(client): prd.md §18 N4 is open and governs this file. N3's boundary is
+ * settled; only its under-1 half remains.
  *
- *   N3 — the bands "1 to 12" and "12 and above" overlap at 12, and under-1 is
- *        undefined. `config.dayPassAgeBands` holds a provisional non-overlapping
- *        reading; an overlap has no computable meaning, so a choice had to be
- *        made to run at all. It is not the answer.
+ *   N3 — [A] 2026-09-05: 1 to 11 is BND 5, 12 and above is BND 10. The bands in
+ *        `config.dayPassAgeBands` already computed exactly that, so nothing here
+ *        changed. Pricing under age 1 is still unstated and is free by
+ *        inference.
  *
  *   N4 — bundles exist only for 2+1 and 2+2. Any other family shape has no
  *        stated rule. This module resolves that by allowing bundles to be

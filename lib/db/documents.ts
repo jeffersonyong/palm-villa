@@ -71,6 +71,16 @@ export interface Document {
   retainUntil: string
   /** True once `retainUntil` has passed, whether or not the job has run. */
   expired: boolean
+  /**
+   * The instant a pack's facts were read from, and null on every other kind.
+   *
+   * Not `uploadedAt`: assembling a pack takes a second or two, and the
+   * watermark is taken from the clock BEFORE the booking is read (lib/db/packs.ts)
+   * so a slip that lands mid-render is newer than the pack rather than
+   * invisible to it. Comparing staleness against `uploadedAt` would quietly
+   * swallow exactly that slip.
+   */
+  assembledFrom: string | null
 }
 
 interface DocumentRow {
@@ -87,11 +97,12 @@ interface DocumentRow {
   uploaded_by: string | null
   uploaded_at: string
   retain_until: string
+  assembled_from: string | null
   deleted_at: string | null
 }
 
 const DOCUMENT_COLUMNS =
-  'id, kind, booking_id, payment_id, inspection_id, bucket_id, storage_key, original_filename, mime_type, byte_size, uploaded_by, uploaded_at, retain_until, deleted_at'
+  'id, kind, booking_id, payment_id, inspection_id, bucket_id, storage_key, original_filename, mime_type, byte_size, uploaded_by, uploaded_at, retain_until, assembled_from, deleted_at'
 
 function toDocument(row: DocumentRow, now: Date): Document {
   return {
@@ -107,6 +118,7 @@ function toDocument(row: DocumentRow, now: Date): Document {
     uploadedAt: row.uploaded_at,
     retainUntil: row.retain_until,
     expired: isExpired(row.retain_until, now),
+    assembledFrom: row.assembled_from,
   }
 }
 

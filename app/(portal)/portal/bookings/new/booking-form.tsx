@@ -3,6 +3,11 @@
 import { useState } from 'react'
 
 import {
+  DepositWaiverControl,
+  NO_WAIVER,
+  type DepositWaiverValue,
+} from '@/components/portal/deposit-waiver-control'
+import {
   DiscountFields,
   NO_DISCOUNT,
   toDiscountFormValues,
@@ -65,6 +70,8 @@ interface BookingFormProps {
   checkOut: string
   /** Whether this staff member holds `booking.discount`. Decided by the page. */
   mayDiscount: boolean
+  /** Whether this staff member holds `deposit.waive`. Decided by the page. */
+  mayWaiveDeposit: boolean
   /**
    * The create action's state, owned by `NewBookingScreen`. It lives there
    * rather than here because a booking that succeeds stands the whole screen
@@ -82,6 +89,7 @@ export function BookingForm({
   checkIn,
   checkOut,
   mayDiscount,
+  mayWaiveDeposit,
   state,
   formAction,
   isPending,
@@ -106,6 +114,7 @@ export function BookingForm({
   // but not yet seen, so it goes to the verification queue (§10.3).
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [discount, setDiscount] = useState<DiscountValue>(NO_DISCOUNT)
+  const [waiver, setWaiver] = useState<DepositWaiverValue>(NO_WAIVER)
 
   const selectedUnit = units.find((unit) => unit.id === unitId)
   const totalGuests = chargeableGuests + exemptGuests
@@ -276,6 +285,22 @@ export function BookingForm({
             </p>
           </div>
         </FormSection>
+
+        {/* Last, after the money the guest pays: this is the money they do not.
+            A "by the way" the desk needs rarely, so it sits outside the price
+            card rather than on it — but ticking it asks first, in a dialog
+            (B15). Rendered only for a staff member who may waive; the action
+            checks `deposit.waive` again on every submit. */}
+        {mayWaiveDeposit ? (
+          <FormSection title="Security deposit">
+            <DepositWaiverControl
+              value={waiver}
+              onChange={setWaiver}
+              amount={config.securityDeposit}
+              error={state.fieldErrors?.depositWaiverReason}
+            />
+          </FormSection>
+        ) : null}
       </Card>
 
       <QuoteSummary
@@ -294,8 +319,9 @@ export function BookingForm({
             <QuoteLines lines={quote.lines} total={quote.total} />
 
             <Notice className="mt-lg">
-              Plus BND {formatCents(quote.securityDeposit)} refundable security deposit, collected
-              on arrival.
+              {waiver.waived
+                ? 'No security deposit — waived on this booking. Nothing is held against the stay.'
+                : `Plus BND ${formatCents(quote.securityDeposit)} refundable security deposit, collected on arrival.`}
             </Notice>
           </>
         ) : (

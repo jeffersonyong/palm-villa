@@ -5,6 +5,7 @@ import {
   DropdownDemos,
   FormControlDemo,
   OverlayDemos,
+  ActivityBarDemo,
   SkeletonDemo,
   TabsDemo,
 } from '@/app/(public)/tokens/backbone-demos'
@@ -520,6 +521,18 @@ export default function TokensPage() {
             </p>
             <div className="mt-md">
               <SkeletonDemo />
+            </div>
+          </div>
+
+          <div>
+            <h3 className="micro-label text-muted-foreground">Activity bar</h3>
+            <p className="mt-xs max-w-[60ch] text-body-sm text-muted-foreground">
+              Work of unknown length on a record that is already on screen — the half a skeleton
+              does not cover. Full width and static under prefers-reduced-motion, never frozen
+              part-way.
+            </p>
+            <div className="mt-md">
+              <ActivityBarDemo />
             </div>
           </div>
         </div>

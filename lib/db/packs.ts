@@ -167,6 +167,40 @@ async function slipBytes(
   )
 }
 
+/* ── Is the pack behind? ────────────────────────────────────────── */
+
+/**
+ * When this booking last changed in a way its pack records, or null when no
+ * pack is due at all (nothing has been verified, so there is nothing to
+ * assemble).
+ *
+ * **The screen asks the database rather than deciding for itself**, and that
+ * is the whole point of this function existing. The booking screen used to
+ * compare the pack against the newest verification in TypeScript, which meant
+ * a slip attached after the pack was built left the nightly job treating the
+ * pack as due while the screen showed it as current — a pack presented as up
+ * to date that was missing a file somebody had just added. One rule, one
+ * definition: `accounting_pack_changed_at()` (migration 20260909000100), which
+ * `bookings_due_accounting_pack` also calls.
+ *
+ * Compare the answer against the live pack's `assembledFrom`, never its
+ * `uploadedAt` — see the note on `Document.assembledFrom`.
+ */
+export async function accountingPackChangedAt(bookingId: string): Promise<string | null> {
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await dataClient().rpc('accounting_pack_changed_at', {
+    p_property_id: propertyId,
+    p_booking_id: bookingId,
+  })
+
+  if (error) {
+    throw new Error(`Could not read when this booking last changed: ${error.message}`)
+  }
+
+  return (data as string | null) ?? null
+}
+
 /* ── The nightly job ──────────────────────────────────────────────────────── */
 
 /** Bookings whose pack is missing or older than what it records, oldest first. */

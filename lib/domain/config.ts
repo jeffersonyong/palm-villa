@@ -155,11 +155,13 @@ export interface PropertyConfig {
   // --- Day pass pricing (prd.md §8.1) -------------------------------------
 
   /**
-   * TODO(client): prd.md §18 N3 — the client's bands ("1 to 12" and "12 and
-   * above") overlap at 12, and pricing under age 1 is undefined. Bands here are
-   * non-overlapping by construction because an overlap has no computable
-   * meaning; the boundary below is a provisional reading, not the answer.
-   * Under-1 is provisionally free.
+   * [A] The overlap at 12 is settled (2026-09-05, Jeff): 1 to 11 is BND 5, 12
+   * and above is BND 10. That is what the bands below already computed, so this
+   * confirms the provisional reading rather than changing a price.
+   *
+   * TODO(client): pricing under age 1 is still not stated. Under-1 is free
+   * here, inferred from the stays rule that guests aged 3 and below are not
+   * counted — an inference, not an answer. See prd.md §18 N3.
    */
   dayPassAgeBands: readonly DayPassAgeBand[]
 

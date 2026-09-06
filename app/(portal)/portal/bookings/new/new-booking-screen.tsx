@@ -36,6 +36,8 @@ interface NewBookingScreenProps {
   checkOut: string
   /** Whether this staff member holds `booking.discount`. Decided by the page. */
   mayDiscount: boolean
+  /** Whether this staff member holds `deposit.waive`. Decided by the page. */
+  mayWaiveDeposit: boolean
 }
 
 export function NewBookingScreen({ chrome, ...form }: NewBookingScreenProps) {

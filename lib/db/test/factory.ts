@@ -79,6 +79,8 @@ export interface BookingSpec {
   paymentMethod?: PaymentMethod
   /** Defaults to none — a discount is the exception, not the shape. */
   discount?: Discount | null
+  /** Waives the security deposit with this reason. Defaults to none. */
+  depositWaiverReason?: string
 }
 
 /**
@@ -109,6 +111,7 @@ export async function bookingInput(spec: BookingSpec): Promise<CreateWalkInBooki
     total: totalOf(lines),
     securityDeposit: bnd(100),
     discount: spec.discount ?? null,
+    depositWaiverReason: spec.depositWaiverReason ?? null,
     paymentMethod: spec.paymentMethod ?? 'cash',
     // Tests act as no one; the auth slice's own tests cover real actors.
     actorId: null,

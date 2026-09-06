@@ -75,9 +75,16 @@ export function BookingCreated({ created }: { created: CreatedBooking }) {
             label={isTransfer ? 'To transfer' : 'Paid'}
             value={`BND ${formatCents(created.total)}`}
           />
+          {/* "At check-in", not "collected": nothing has been taken yet. A
+              waived booking says so rather than printing 0.00 — a zero on a
+              receipt invites a second look at money that was never due. */}
           <ReceiptRow
-            label="Security deposit collected"
-            value={`BND ${formatCents(created.securityDeposit)}`}
+            label="Security deposit"
+            value={
+              created.depositWaived
+                ? 'Waived'
+                : `BND ${formatCents(created.securityDeposit)} at check-in`
+            }
           />
         </dl>
       </Card>

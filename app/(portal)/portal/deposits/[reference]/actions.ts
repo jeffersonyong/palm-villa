@@ -66,6 +66,15 @@ export interface DepositActionState {
   submitted?: Record<string, string>
   /** The figures an approval produced, so the toast can state them. */
   released?: { releasedAmount: Cents; owed: Cents }
+  /**
+   * The inspection this call just wrote.
+   *
+   * Returned because a photograph hangs off an `inspection_id`, so the dialog
+   * cannot send one until it knows which inspection it is attaching to. This
+   * is what lets recording and photographing be one step for the person doing
+   * them while staying two writes underneath — see record-inspection.tsx.
+   */
+  inspectionId?: string
 }
 
 /* ── Recording an inspection ──────────────────────────────────────────────── */
@@ -130,7 +139,7 @@ export async function recordInspectionAction(
 
   revalidateDepositScreens(reference)
 
-  return { status: 'done' }
+  return { status: 'done', inspectionId: result.inspectionId }
 }
 
 /* ── Charges ──────────────────────────────────────────────────────────────── */

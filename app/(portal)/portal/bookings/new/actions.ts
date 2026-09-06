@@ -7,6 +7,7 @@ import { requirePermission } from '@/lib/auth/require-permission'
 import { createWalkInBooking } from '@/lib/db/bookings'
 import { isStayDate } from '@/lib/domain/dates'
 import { palmVillaConfig } from '@/lib/domain/config'
+import { parseDepositWaiver, MAX_DEPOSIT_WAIVER_REASON_LENGTH } from '@/lib/domain/deposit-waiver'
 import { parseDiscount, MAX_DISCOUNT_REASON_LENGTH } from '@/lib/domain/discount'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { priceStay } from '@/lib/domain/pricing/stay'
@@ -72,6 +73,14 @@ const walkInBookingSchema = z.object({
   discountKind: z.string().default('none'),
   discountValue: z.string().default(''),
   discountReason: z.string().max(MAX_DISCOUNT_REASON_LENGTH).default(''),
+  /**
+   * The waiver control, submitted on every save as `true`/`false` — an
+   * unticked box is a decision, not an absence. Read by `parseDepositWaiver`,
+   * which owns the rule that a waiver has a reason. Defaulted so a form
+   * rendered without the control (no `deposit.waive`) parses cleanly.
+   */
+  waiveDeposit: z.string().default('false'),
+  depositWaiverReason: z.string().max(MAX_DEPOSIT_WAIVER_REASON_LENGTH).default(''),
 })
 
 export interface WalkInBookingState {
@@ -86,6 +95,8 @@ export interface WalkInBookingState {
     checkOut: string
     total: number
     securityDeposit: number
+    /** Nothing is taken at check-in; the receipt says so rather than printing 0.00. */
+    depositWaived: boolean
     /** Decides what the confirmation panel says, and which badge it wears. */
     paymentMethod: PaymentMethod
   }
@@ -163,6 +174,25 @@ export async function createWalkInBookingAction(
     await requirePermission('booking.discount')
   }
 
+  const waiver = parseDepositWaiver({
+    waive: input.waiveDeposit,
+    reason: input.depositWaiverReason,
+  })
+
+  if (!waiver.ok) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: { [waiver.error.field]: waiver.error.message },
+    }
+  }
+
+  // The same construction as the discount above, for the same reason: this is
+  // the other field on the form that decides money is not taken.
+  if (waiver.reason !== null) {
+    await requirePermission('deposit.waive')
+  }
+
   // Re-priced server-side. The client island computes the same total for live
   // display, but no submitted total is ever trusted — the price charged is the
   // one the server derives from the inputs. The discount is an INPUT to that,
@@ -197,7 +227,11 @@ export async function createWalkInBookingAction(
     exemptGuests: input.exemptGuests,
     lines: priced.lines,
     total: priced.total,
+    // The QUOTED figure, even when waived. `create_walk_in_booking()` zeroes
+    // what the booking carries and records this figure on the waiver's own
+    // audit event as what was not taken.
     securityDeposit: priced.securityDeposit,
+    depositWaiverReason: waiver.reason,
     discount: discount.discount,
     paymentMethod: input.paymentMethod,
     actorId: actor.userId,
@@ -228,6 +262,7 @@ export async function createWalkInBookingAction(
       checkOut: result.booking.stay?.range.end ?? input.checkOut,
       total: result.booking.total,
       securityDeposit: result.booking.securityDeposit,
+      depositWaived: result.booking.depositWaiverReason !== null,
       paymentMethod: input.paymentMethod,
     },
   }
