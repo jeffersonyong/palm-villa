@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { bnd, centsFromInput, formatCents, sumCents } from './money'
+import { MAX_CENTS, bnd, centsFromInput, formatCents, sumCents } from './money'
 
 /**
  * Money tests.
@@ -66,6 +66,16 @@ describe('centsFromInput', () => {
     // The form says what it did not understand. Guessing at a mistyped figure
     // is how a payment gets recorded at the wrong amount.
     expect(centsFromInput('1,0O0')).toBeNull()
+  })
+
+  test('refuses an amount larger than the system can store', () => {
+    // Money is `integer` cents, so this is a hard ceiling rather than a
+    // policy — and a figure past it has to be refused at the form, or it
+    // parses cleanly and then fails inside the database as an out-of-range
+    // error the screen can only render as a crash.
+    expect(centsFromInput('21474836.47')).toBe(MAX_CENTS)
+    expect(centsFromInput('21474836.48')).toBeNull()
+    expect(centsFromInput('99999999999.99')).toBeNull()
   })
 })
 

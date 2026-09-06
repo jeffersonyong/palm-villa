@@ -606,6 +606,26 @@ v1 reporting is deliberately minimal:
 - Daily cash-up: recorded versus banked
 - Day pass volume against configured capacity
 
+### As built (capabilities E4–E5, 9 September 2026)
+
+Five of the six are live. Day-pass volume against capacity is not, and cannot be: a day pass is not bookable in the portal, carries no date of its own, and no facility capacity has been agreed ([C2](open-questions.md)). The reports screen states that where the figure will go rather than omitting the row, and it arrives with the day-pass flow. The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
+
+**[A] Occupancy is unit-nights sold or lived in, over the property's whole inventory.** A unit-night counts when an occupancy row covers it in one of four statuses — confirmed, checked in, completed, or leased. A **held** unit does not count: a hold is somebody's intention and expires on its own (§9.3), so counting it would report a building fuller than the money says it was. Nor does a no-show. The denominator is units of the type × nights in the period, and **a unit out of service stays in it** — removing it would make a building that broke down look fuller than one that did not. Nights are half-open, matching every other range in the system. `lib/db/bookings.ts` flagged that this definition had to be agreed rather than inherited from the dashboard's "occupied tonight" figure; this is that agreement, and the screen states it beside the table.
+
+**[A] Revenue is money received, on the day it arrived.** Verified payments only — §10.7 already took this position for the balance, and a report built on booking totals would state income the bank has never held, moving whenever a booking is amended. Cash counts on the day it was collected; a transfer on `observed_on`, the date the verifier read off the bank. **`observed_on` is optional, so a transfer without one falls back to the day it was verified** — named rather than silent, because a run of payments dated by when a clerk was at their desk is worth noticing. The consequence worth stating: this is a **cash-basis** figure. A stay paid for in August and taken in September is August's revenue, which is the basis Finance reconciles on and the one that agrees with the cash-up beside it. Security deposits are excluded in both directions (§11).
+
+**[A] The cash-up's recorded figure is cash booking payments, and deposits sit outside it.** A cash deposit goes into the same drawer, so the day states how much of it is there and the total leaves it out: §11 makes a deposit a refundable liability rather than takings, and banking one as revenue would be counting money the business owes back. The excess a guest settles beyond their deposit is excluded on the reasoning §11 already recorded — it "settles no booking and appears in no cash-up". Whether Finance would rather count the drawer as one figure is **[N27](open-questions.md)**; the answer moves one line.
+
+**[A] A banking is its own record, against a business day, and it is never edited.** Not a third payment status: notes from six payments go to the bank in one envelope, and the same money may be banked across two runs or the next morning. So a banking carries the day the cash was **taken** — chosen by the person banking, defaulted to the day on screen, and never in the future — while when the trip happened is a separate fact on the same row. A correction is a **second entry** rather than a change to the first, because editing one rewrites what somebody says they did; both stay on the day and the difference moves. Amounts are positive: money coming back out of the bank is a refund, and refunds are [N5](open-questions.md).
+
+**[A] Banking is recorded under `payment.verify`, minting no new permission.** §10.5's own [A] reads "verified by Finance" as the cash-up rather than as a per-payment sign-off, so whoever may verify that money arrived is whoever may say it reached the bank. That is the position §10.7 took for recording a transfer and §13 for rebuilding a pack. **[N26](open-questions.md)** puts it to the client, with the consequence that Front Office — who take the cash — hold neither `report.view` nor a way onto the screen.
+
+**[A] Nothing about a day's reconciliation is stored.** Recorded, banked and the difference between them are derived from the payments, the deposits and the bankings on every read — the same argument [architecture.md §5.1](architecture.md) makes for `unit.status` and a deposit's stage. A banking recorded late correctly changes yesterday's answer.
+
+**A day boundary is an instant, not a date.** Every timestamp is `timestamptz`, and a bare date compared against one is cast at the *session's* midnight — UTC on Supabase, which is 08:00 in Brunei. The cash log had that bug and was filing the first eight hours of every day under the day before; the conversion now happens once, at the boundary. Worth recording because it is invisible until somebody counts a drawer.
+
+**`report.view` is now enforced.** It was seeded to Admin and Finance and checked nowhere; the two reporting screens are its first consumers.
+
 ---
 
 ## 15. Non-functional requirements

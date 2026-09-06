@@ -181,6 +181,15 @@ async function clearTransactionalData(): Promise<void> {
     throw new Error(`Could not return units to service between tests: ${serviceError.message}`)
   }
 
+  // Cash bankings hang off nothing that cascades — a banking is about a day,
+  // not about a booking — so they are the one row type here that has to be
+  // named explicitly or a cash-up test would read the previous test's takings.
+  const { error: bankingError } = await db.from('cash_banking').delete().gte('banked_at', EPOCH)
+
+  if (bankingError) {
+    throw new Error(`Could not clear cash bankings between tests: ${bankingError.message}`)
+  }
+
   await emptyDocumentBuckets()
 }
 

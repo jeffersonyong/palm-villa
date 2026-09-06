@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   CalendarDays,
+  Coins,
   DoorOpen,
   Globe,
   Landmark,
@@ -71,6 +72,12 @@ export const navGroups = [
     items: [
       { href: '/portal/deposits', label: 'Deposits', icon: Landmark },
       { href: '/portal/reports', label: 'Reports', icon: BarChart3 },
+      // Its own item rather than a tab inside Reports: the cash-up is worked
+      // daily and the reports are read occasionally, so filing it behind a
+      // screen somebody opens once a month would bury the one Finance uses
+      // most. Every day beneath it (`/portal/reports/cash-up/<date>`) lights
+      // this item, since activeHref matches the longest listed prefix.
+      { href: '/portal/reports/cash-up', label: 'Daily cash-up', icon: Coins },
     ],
   },
   {

@@ -277,16 +277,11 @@ export function planRegistry(
  * lies.
  */
 export function isNoOp(plan: RegistryPlan): boolean {
-  return (
-    plan.renames.length === 0 && plan.additions.length === 0 && plan.removals.length === 0
-  )
+  return plan.renames.length === 0 && plan.additions.length === 0 && plan.removals.length === 0
 }
 
 /** Every reference the plan would leave in place, for a final uniqueness check. */
-export function refsAfter(
-  current: readonly CurrentUnit[],
-  plan: RegistryPlan,
-): readonly string[] {
+export function refsAfter(current: readonly CurrentUnit[], plan: RegistryPlan): readonly string[] {
   const removed = new Set(plan.removals.map((removal) => removal.unitId))
   const renamed = new Map(plan.renames.map((rename) => [rename.unitId, rename.toRef]))
 
@@ -315,9 +310,7 @@ export function checkUnitRegistry(
   desired: readonly DesiredUnitType[],
 ): readonly RefProblem[] {
   const edited = new Set(desired.map((type) => type.unitTypeId))
-  const untouched = current
-    .filter((unit) => !edited.has(unit.unitTypeId))
-    .map((unit) => unit.ref)
+  const untouched = current.filter((unit) => !edited.has(unit.unitTypeId)).map((unit) => unit.ref)
 
   return checkUnitRefs([...untouched, ...desired.flatMap((type) => type.refs)])
 }

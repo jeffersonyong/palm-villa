@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest'
 
 import {
+  bruneiDayBounds,
+  bruneiWindowBounds,
+  dateInBrunei,
   elapsedMinutes,
   formatElapsed,
   formatInstantAsDate,
@@ -138,5 +141,67 @@ describe('formatInstantAsDate', () => {
 
   test('formats an ordinary instant as the day it falls on', () => {
     expect(formatInstantAsDate('2026-09-15T03:30:00Z')).toBe('15 Sept 2026')
+  })
+})
+
+/**
+ * The eight hours that separate a Brunei day from a UTC one.
+ *
+ * Every timestamp in the schema is `timestamptz`, so a day boundary is an
+ * instant rather than a string comparison — and getting it wrong moves money
+ * between days on the cash-up, which is the one screen whose whole job is to
+ * say a day's takings are right.
+ */
+describe('dateInBrunei', () => {
+  test('an instant late in the UTC evening is already the next day in Brunei', () => {
+    expect(dateInBrunei('2026-09-14T23:30:00Z')).toBe('2026-09-15')
+  })
+
+  test('16:00 UTC is the moment the Brunei day turns over', () => {
+    expect(dateInBrunei('2026-09-14T15:59:59Z')).toBe('2026-09-14')
+    expect(dateInBrunei('2026-09-14T16:00:00Z')).toBe('2026-09-15')
+  })
+})
+
+describe('bruneiDayBounds', () => {
+  test('a day runs from 16:00 UTC the day before to 16:00 UTC on the day', () => {
+    expect(bruneiDayBounds('2026-09-06')).toEqual({
+      start: '2026-09-05T16:00:00.000Z',
+      end: '2026-09-06T16:00:00.000Z',
+    })
+  })
+
+  test('the bounds round-trip: every instant inside one reads as that day', () => {
+    const { start, end } = bruneiDayBounds('2026-09-06')
+
+    expect(dateInBrunei(start)).toBe('2026-09-06')
+    // Half-open: the end instant belongs to the next day, not this one.
+    expect(dateInBrunei(end)).toBe('2026-09-07')
+  })
+
+  test('crosses a month end without arithmetic of its own', () => {
+    expect(bruneiDayBounds('2026-09-30').end).toBe('2026-09-30T16:00:00.000Z')
+    expect(bruneiDayBounds('2026-10-01').start).toBe('2026-09-30T16:00:00.000Z')
+  })
+})
+
+describe('bruneiWindowBounds', () => {
+  test('both ends are inclusive, so the end instant is the day after `to`', () => {
+    expect(bruneiWindowBounds({ from: '2026-09-01', to: '2026-09-07' })).toEqual({
+      start: '2026-08-31T16:00:00.000Z',
+      end: '2026-09-07T16:00:00.000Z',
+    })
+  })
+
+  test('a single-day window is that day', () => {
+    expect(bruneiWindowBounds({ from: '2026-09-06', to: '2026-09-06' })).toEqual(
+      bruneiDayBounds('2026-09-06'),
+    )
+  })
+
+  test('refuses a range that ends before it starts', () => {
+    expect(() => bruneiWindowBounds({ from: '2026-09-07', to: '2026-09-01' })).toThrow(
+      /ends before it starts/,
+    )
   })
 })

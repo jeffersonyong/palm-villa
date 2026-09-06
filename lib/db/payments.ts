@@ -1,7 +1,8 @@
 import { transition, type BookingStatus, isTerminal } from '@/lib/domain/booking-state'
-import type { StayDate } from '@/lib/domain/dates'
+import type { DayBounds, StayDate } from '@/lib/domain/dates'
 import type { Cents } from '@/lib/domain/money'
 import type { PaymentMatchKind, PaymentMethod, PaymentStatus } from '@/lib/domain/payment'
+import type { BookingStream } from '@/lib/domain/stream'
 import { dataClient } from '@/lib/supabase/data'
 
 import { currentPropertyId } from './property'
@@ -81,6 +82,11 @@ export interface Payment {
   slipDocumentId: string | null
   checkIn: StayDate | null
   unitRef: string | null
+  /**
+   * What the booking sold — read for revenue by stream (capability E5), which
+   * groups money received by the product it was received for.
+   */
+  bookingStream: BookingStream
 }
 
 interface PaymentSummaryRow {
@@ -109,6 +115,7 @@ interface PaymentSummaryRow {
   slip_document_id: string | null
   check_in: StayDate | null
   unit_ref: string | null
+  booking_stream: BookingStream
 }
 
 const SUMMARY_COLUMNS =
@@ -116,7 +123,8 @@ const SUMMARY_COLUMNS =
   'method, status, due_amount_cents, expected_amount_cents, amount_cents, ' +
   'observed_reference, observed_sender, observed_on, match_kind, ' +
   'amount_override_reason, match_reason, collected_by, collected_at, ' +
-  'verified_by, verified_at, created_at, slip_document_id, check_in, unit_ref'
+  'verified_by, verified_at, created_at, slip_document_id, check_in, unit_ref, ' +
+  'booking_stream'
 
 function toPayment(row: PaymentSummaryRow): Payment {
   return {
@@ -145,6 +153,7 @@ function toPayment(row: PaymentSummaryRow): Payment {
     slipDocumentId: row.slip_document_id,
     checkIn: row.check_in,
     unitRef: row.unit_ref,
+    bookingStream: row.booking_stream,
   }
 }
 
@@ -159,6 +168,29 @@ export interface PaymentListFilter {
    */
   collectedFrom?: string
   collectedBefore?: string
+  /**
+   * Money that may have landed inside a window, however it arrived — the
+   * revenue report's filter (capability E5).
+   *
+   * A coarse superset of three columns, because which day a payment counts on
+   * is a rule with branches (`revenueDateOf` in lib/domain/reports/revenue):
+   * cash by the day it was collected, a transfer by the date read off the bank
+   * or, failing that, the day it was verified. Expressing that here would put
+   * half the rule in a query string; the domain applies the exact one to what
+   * comes back.
+   *
+   * **Not combined with `search` today, and untested if it ever is.** Both
+   * write an `or=` on the same query, which PostgREST ANDs together — probably
+   * what a caller would want, but nothing here proves it. A revenue report
+   * that grows a search box should add the test before it adds the field.
+   */
+  collectedOrObserved?: {
+    /** The window as instants, for the two `timestamptz` columns. */
+    bounds: DayBounds
+    /** The window as calendar dates, for `observed_on`, which is a `date`. */
+    from: StayDate
+    to: StayDate
+  }
   /**
    * A log reads newest first; a queue reads oldest first. Both are this same
    * query, so which end is "the top" is the caller's to say.
@@ -199,6 +231,18 @@ export async function listPayments(filter: PaymentListFilter = {}): Promise<read
 
   if (filter.collectedBefore) {
     query = query.lt('collected_at', filter.collectedBefore)
+  }
+
+  if (filter.collectedOrObserved) {
+    const { bounds, from, to } = filter.collectedOrObserved
+
+    query = query.or(
+      [
+        `and(collected_at.gte.${bounds.start},collected_at.lt.${bounds.end})`,
+        `and(observed_on.gte.${from},observed_on.lte.${to})`,
+        `and(verified_at.gte.${bounds.start},verified_at.lt.${bounds.end})`,
+      ].join(','),
+    )
   }
 
   if (filter.search) {

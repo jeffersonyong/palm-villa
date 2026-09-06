@@ -272,3 +272,88 @@ function formatDayAndMonth(date: StayDate): string {
 function formatRangeEnd(date: StayDate): string {
   return formatWith(date, { day: 'numeric', month: 'short', year: 'numeric' })
 }
+
+/**
+ * The property's UTC offset, as the suffix an ISO instant carries.
+ *
+ * Brunei is UTC+8 with no daylight saving (see the header), which is what lets
+ * a day's boundaries be constructed by string rather than by asking a timezone
+ * database where midnight fell.
+ */
+const PROPERTY_UTC_OFFSET = '+08:00'
+
+/**
+ * A window of days, **both ends inclusive** — the first and last day a filter
+ * row's calendar shows as selected, because that is what the person clicking
+ * them meant.
+ *
+ * It lives here rather than beside the URL reader that produces it
+ * (components/portal/list-params.ts, which re-exports it) because a span of
+ * days is a fact about the property's calendar, and the reporting modules that
+ * take one must not import from components — lib/db is not reachable from a
+ * client component and the dependency would run the wrong way.
+ */
+export interface StayWindow {
+  from: StayDate
+  to: StayDate
+}
+
+/** An instant's calendar date in the property timezone. */
+export function dateInBrunei(instant: string): StayDate {
+  return todayInBrunei(new Date(instant))
+}
+
+/** The half-open pair of instants a Brunei calendar day spans. */
+export interface DayBounds {
+  /** The first instant of the day, inclusive. */
+  start: string
+  /** The first instant of the following day, exclusive. */
+  end: string
+}
+
+/**
+ * A Brunei calendar day as the pair of instants it covers.
+ *
+ * Every timestamp in this schema is `timestamptz` (architecture.md §5.1), and
+ * a `date` compared against one is cast at the *session's* midnight — UTC on
+ * Supabase, which is 08:00 in Brunei. So filtering "cash taken on the 6th" by
+ * passing `2026-09-06` silently means 08:00 on the 6th to 08:00 on the 7th,
+ * and a payment counted at 02:00 falls out of its own day. The cash log did
+ * exactly that until capability E4 needed the figure to be right.
+ *
+ * The conversion therefore happens here, at the boundary, and the database is
+ * only ever handed instants.
+ *
+ * Emitted in `Z` form rather than `+08:00`: these strings go into PostgREST
+ * filter values, where a `+` is a space unless it is encoded, and a query
+ * string is the last place to rely on that being got right.
+ */
+export function bruneiDayBounds(date: StayDate): DayBounds {
+  return {
+    start: startOfBruneiDay(parseStayDate(date)),
+    end: startOfBruneiDay(addDays(date, 1)),
+  }
+}
+
+/**
+ * An inclusive span of Brunei days as the instants it covers.
+ *
+ * Both ends inclusive, matching `formatStayRange` and every date filter a
+ * staff member picks off a calendar: the range they pointed at is the days
+ * they meant. The returned `end` is the instant the day *after* `to` begins,
+ * because the query it feeds is half-open.
+ */
+export function bruneiWindowBounds(window: { from: StayDate; to: StayDate }): DayBounds {
+  const from = parseStayDate(window.from)
+  const to = parseStayDate(window.to)
+
+  if (from > to) {
+    throw new Error(`Range ends before it starts: ${from} to ${to}.`)
+  }
+
+  return { start: startOfBruneiDay(from), end: startOfBruneiDay(addDays(to, 1)) }
+}
+
+function startOfBruneiDay(date: StayDate): string {
+  return new Date(`${date}T00:00:00${PROPERTY_UTC_OFFSET}`).toISOString()
+}

@@ -30,12 +30,7 @@ import type { StayDate } from './dates'
  */
 
 export type UnitStatus =
-  | 'available'
-  | 'held'
-  | 'booked'
-  | 'occupied'
-  | 'leased_long_term'
-  | 'out_of_service'
+  'available' | 'held' | 'booked' | 'occupied' | 'leased_long_term' | 'out_of_service'
 
 /**
  * The statuses in reading order: the lifecycle first, then the two facts a

@@ -60,6 +60,7 @@ declare
   v_result jsonb;
   v_booking_id uuid;
   v_deposit_id uuid;
+  v_banked_cents integer;
   v_check_in date;
   spec record;
 begin
@@ -95,7 +96,8 @@ begin
       ('DEMO — Awaiting transfer (4-bed)',    '+673 000 0003', '4B-01',  7, 3, 6, array['BAB 5678', 'BAD 3456'], false, 'bank_transfer', 'awaiting_payment_verification'),
       ('DEMO — In residence',                 '+673 000 0004', 'SD-01', -1, 3, 8, array['BAC 9012'],            false, 'cash',          'checked_in'),
       ('DEMO — Departed last week',           '+673 000 0005', '3B-03', -5, 3, 2, array['BAE 7788'],            false, 'cash',          'completed'),
-      ('DEMO — Left today, not inspected',    '+673 000 0006', '3B-04', -2, 2, 3, array['BAF 2244'],            false, 'cash',          'completed')
+      ('DEMO — Left today, not inspected',    '+673 000 0006', '3B-04', -2, 2, 3, array['BAF 2244'],            false, 'cash',          'completed'),
+      ('DEMO — Paid by transfer, verified',   '+673 000 0007', '3B-05', -3, 2, 2, array['BAG 4455'],            false, 'bank_transfer', 'confirmed')
     ) as t (
       guest_name, phone, unit_ref, start_offset, nights,
       chargeable_guests, vehicles, no_vehicle, payment_method, settles_at
@@ -157,6 +159,26 @@ begin
     end if;
 
     v_booking_id := (v_result ->> 'booking_id')::uuid;
+
+    -- One transfer is confirmed rather than left waiting, so revenue by stream
+    -- (capability E5) has a bank column that is not zero on a fresh stack —
+    -- and so the verification queue shows a worked item beside its two open
+    -- ones. Through verify_payment(), like a clerk would: the full amount
+    -- matched on reference, so no override reason is needed, and `observed_on`
+    -- is the day the money would have shown in the bank.
+    if spec.payment_method = 'bank_transfer' and spec.settles_at = 'confirmed' then
+      perform verify_payment(
+        v_property_id,
+        (v_result ->> 'payment_id')::uuid,
+        'awaiting_payment_verification',
+        'confirmed',
+        v_total_cents,
+        'reference',
+        p_observed_reference => v_result ->> 'reference',
+        p_observed_on => v_check_in,
+        p_actor_id => null
+      );
+    end if;
 
     -- Walk the rest of the machine. Each step is a real transition with its
     -- own audit event, so the trail reads as it would for a booking that
@@ -231,5 +253,28 @@ begin
       );
     end if;
   end loop;
+
+  -- ── The cash-up (capability E4) ────────────────────────────────────────
+  --
+  -- Every cash payment above is stamped `collected_at = now()` by the real
+  -- functions, and rule 2 forbids updating a row this file did not write
+  -- through the product — so all demo cash lands on TODAY however the stays
+  -- are dated. That is the shape the seed can honestly produce, and it is
+  -- enough: today reads as banked-but-short, and yesterday as banked with
+  -- nothing recorded, which is the pair that shows a variance in both
+  -- directions.
+  select coalesce(sum(amount_cents), 0) into v_banked_cents
+  from payment
+  where property_id = v_property_id and method = 'cash' and status = 'verified';
+
+  perform record_cash_banking(
+    v_property_id, v_today, greatest(v_banked_cents - 25000, 5000),
+    'DEMO — Morning run to BIBD, the rest goes tomorrow.', null
+  );
+
+  perform record_cash_banking(
+    v_property_id, v_today - 1, 20000,
+    'DEMO — Banked yesterday; the takings it covers predate this seed.', null
+  );
 end;
 $demo$;

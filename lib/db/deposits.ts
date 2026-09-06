@@ -7,7 +7,7 @@ import {
 } from '@/lib/domain/deposit'
 import { transition, type BookingStatus } from '@/lib/domain/booking-state'
 import type { DateRange } from '@/lib/domain/availability'
-import type { StayDate } from '@/lib/domain/dates'
+import type { DayBounds, StayDate } from '@/lib/domain/dates'
 import type { Cents } from '@/lib/domain/money'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { dataClient } from '@/lib/supabase/data'
@@ -263,6 +263,42 @@ export async function listHeldDeposits(): Promise<readonly Deposit[]> {
 
   if (error) {
     throw new Error(`Could not read the deposits held: ${error.message}`)
+  }
+
+  return (data as unknown as DepositSummaryRow[]).map(toDeposit)
+}
+
+/**
+ * The deposits collected inside a half-open span of instants.
+ *
+ * The cash-up's informational line (capability E4): cash security deposits go
+ * into the same drawer as the takings, so a clerk counting it has to be told
+ * they are there — while prd.md §11 keeps them out of the total, because a
+ * deposit is money the business owes back rather than money it earned.
+ *
+ * Instants, not dates: `collected_at` is a `timestamptz` and a bare date is
+ * cast at the session's midnight, which is 08:00 in Brunei. The caller builds
+ * the bounds with `bruneiDayBounds`/`bruneiWindowBounds` (lib/domain/dates).
+ */
+export async function listDepositsCollectedBetween(
+  bounds: DayBounds,
+  method?: PaymentMethod,
+): Promise<readonly Deposit[]> {
+  const propertyId = await currentPropertyId()
+
+  const query = summaryQuery(propertyId)
+    .gte('collected_at', bounds.start)
+    .lt('collected_at', bounds.end)
+    .order('collected_at', { ascending: true })
+
+  if (method) {
+    query.eq('method', method)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(`Could not read the deposits collected: ${error.message}`)
   }
 
   return (data as unknown as DepositSummaryRow[]).map(toDeposit)

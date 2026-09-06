@@ -100,6 +100,17 @@ A forwarded or leaked QR code grants nothing by itself — check-in authority co
 | E4 | Run a daily cash-up view: cash recorded in the system versus cash banked |
 | E5 | View reports: occupancy by unit and type, revenue by stream, outstanding deposits, outstanding charges, and day-pass volume against capacity |
 
+**E4–E5 delivered 9 September 2026.** The reports screen answers occupancy by unit and by type over any period, revenue by stream, and what is held and owed right now; the daily cash-up is its own screen, comparing the cash the desk recorded against the cash somebody took to the bank, day by day.
+
+Four things worth saying plainly, because they are the decisions behind the figures:
+
+- **The cash-up counts booking payments, not deposits.** A cash security deposit goes into the same drawer, so the day states how much of it is there — but it is money you owe back rather than money you earned, and adding it to the takings would bank a liability as revenue. Whether Finance would rather count the drawer as one figure is a question in the register.
+- **Banking is recorded, never edited.** A trip to the bank is a physical act with a witness, so a correction is a second entry and the day's difference moves. Both entries stay on the day, with who recorded each.
+- **Revenue is money received, not money quoted.** A payment counts on the day it actually arrived — cash on the day it was taken, a transfer on the date read off the bank — and a payment nobody has confirmed counts for nothing. So the revenue figure agrees with what the bank holds rather than with what bookings were worth.
+- **A tenancy shows no revenue, and says so.** A long lease is recorded as occupancy with no money attached until the tenancy module arrives, so it appears in occupancy and at zero in revenue.
+
+**One item of E5 is not delivered: day-pass volume against capacity.** Day passes are not bookable in the portal yet, carry no date of their own, and no facility capacity has been agreed (see the register, C2) — so neither the volume nor the number to compare it against exists. The screen says so where the figure will go, and it arrives with the day-pass booking flow in phase two.
+
 **E1–E3 delivered 6 September 2026.** The ledger answers what is held right now, a deposit has its own screen carrying the inspection, its itemised charges and the release approval, and a released deposit prints a statement to send on.
 
 - **Photographs on an inspection arrived on 7 September 2026** with document storage, closing the gap this entry flagged. C2's evidence is now real: any number of photographs per inspection, stored privately, deleted automatically after two years.
