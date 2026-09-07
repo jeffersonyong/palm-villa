@@ -147,6 +147,10 @@ All three surfaces are one codebase, one database, one deployment. What a user s
 ### 5.1 Public booking site
 Availability, pricing, booking, payment instructions, slip upload, booking lookup, FAQ.
 
+**[O] Its photographs are staff-managed, or they are stale within a year** (proposed 10 September 2026, capability F7, unagreed with the client). A unit type gets repainted, a facility reopens, somebody commissions a better photo shoot — and under any arrangement where the images ship with the code, each of those is a developer deploy. That is the same argument §7.2 already accepted for facility inclusion and §7.1 for unit naming, applied to the one part of the product a customer actually looks at first.
+
+**No image is real yet.** Every unit type and facility on the public site renders a labelled placeholder, so this is not a control over something that exists — it is the images and the way to manage them, together. What that costs architecturally is §8's one departure: a **public** bucket, which is the opposite of every rule [architecture.md §8](architecture.md) states for the private ones.
+
 ### 5.2 Operations portal (desktop)
 Booking calendar and list, manual booking creation, payment verification queue, unit management, inspection and deposit workflow, document access, reporting, configuration.
 
@@ -338,13 +342,21 @@ The PRD has never described a discount, and staff asked for one: a guest at the 
 ### 9.1 Constraints
 
 **[C]** Maximum advance booking period is two months.
-**[C]** Full payment is required to secure a unit. Unpaid bookings do not hold inventory.
+**[C]** ~~Full payment is required to secure a unit. Unpaid bookings do not hold inventory.~~ **Superseded 10 September 2026 by the client** — the security deposit is what secures a unit; see below. The rest of the sentence survives in substance: a unit is never held against nothing.
 
 **[A] One qualification, added when the payment layer was built.** A booking taken at the desk and paid by bank transfer holds its unit from the moment it is created — its occupancy row counts against the exclusion constraint — and stays held until someone confirms the money landed. That is §9.3's checkout timer in substance, but **nothing expires it**, and as of 10 September 2026 nothing should: [N7](open-questions.md) is answered *indefinitely*, which is exactly what is built. The expiry job sketched in architecture.md §6.3 is not needed. An abandoned transfer blocks a unit until a staff member cancels it — by decision now, rather than by omission — and the verification queue sorts oldest-first and shows the wait so it stays visible rather than silent.
 
-**[O] The same answers contradict the [C] above, and this is the largest open item in the document.** Asked how long to hold a unit, Jason added that *"right now it's the norm for people to make full payment only on the day itself, 90% of the time"*; asked what a guest transfers when booking, he named two cases — the deposit only, or the full amount with the deposit. Read together they describe **a booking secured by the BND 100 security deposit, with the stay paid on arrival**: the pay-on-arrival booking §9.4 excludes from v1 in as many words, and the part payment [N16](open-questions.md) was deferred over. Nine bookings in ten are the case v1 is built to refuse.
+**[C] Answered 10 September 2026, and it reverses the line above.** Asked how long to hold a unit, Jason added that *"right now it's the norm for people to make full payment only on the day itself, 90% of the time"*; asked what a guest transfers when booking, he named two cases — the deposit only, or the full amount with the deposit. Put to him directly, he confirmed it: **a booking is secured by the BND 100 security deposit, and the unit is held until someone verifies that payment.** The stay is settled on arrival.
 
-Nothing has been changed on the strength of it. It reverses two of his own confirmations, and one of them — *full payment is required to secure a unit* — is stated policy rather than an inference, so it is his to reverse and not ours to read into an answer about something else. It is [N29](open-questions.md), and it is the question to put to him before the next slice: it decides what holds inventory, which booking states exist, what the public flow asks a customer for, and when the deposit is collected (§11).
+**[C] The BND 100 is the security deposit, collected early — not a part payment of the stay.** This is the half that decides the shape of everything downstream, and it was confirmed separately (10 September 2026) because his wording admitted both readings. It is the same deposit §11 already models, taken at booking rather than at the door: the booking's own balance is untouched by it, so a BND 400 stay still owes BND 400 on arrival. **[N16](open-questions.md) is therefore not reopened** — nothing lets a guest pay half the *stay* up front, and the stated policy that a stay is paid in full stands, only later than it used to.
+
+**What that changes, none of it built:**
+
+- **A booking can exist with the stay unpaid.** The deposit is what holds the unit. `check_in_booking` is the only path that writes a deposit row today, inside the check-in transaction and with a backstop refusing a second, so collecting one at booking is the first piece of work.
+- **Check-in stops asking for a deposit that is already held**, and §11's one-deposit-per-booking rule becomes the thing that guarantees it rather than a race nobody can reach.
+- **A deposit payment must not read as a short booking payment.** §10.4's match rule compares what arrived against what the booking owes, and BND 100 against a BND 400 stay is short by BND 300 — an override reason demanded on the ordinary case, which is the failure §10.7 already fixed once and must not reintroduce. The deposit is not a booking payment and must not be recorded as one.
+- **`confirmed` stops meaning `paid`.** A deposit-secured booking is confirmed with the whole stay outstanding. That is §10.7's position held consistently — owing money is a balance, not a state — and it means every screen that reads `confirmed` as settled has to be checked.
+- **Settling on arrival is already built.** §10.7's outstanding balance, cash or transfer from the booking itself, is exactly this transaction. It arrived for amendments and turns out to be the ordinary path.
 
 ### 9.2 Booking states
 
@@ -358,7 +370,7 @@ draft → held → awaiting_payment_verification → confirmed → checked_in
 
 ### 9.3 The hold
 
-**[A]** A short hold is required despite the "full payment secures" policy. Between a customer submitting a booking and their transfer landing, the unit must be reserved or two customers will pay for the same night and one requires a manual refund. Refunding a bank transfer by hand is materially worse than a short hold.
+**[A]** A short hold is required even when a payment is expected immediately. Between a customer submitting a booking and their transfer landing, the unit must be reserved or two customers will pay for the same night and one requires a manual refund. Refunding a bank transfer by hand is materially worse than a short hold. **This was written against the full-payment policy §9.1 has since struck through**, and it survives the reversal unchanged: what is now awaited is the deposit rather than the whole stay, and the reason for holding the unit while it lands is identical.
 
 Framed to the client as a **checkout timer**, not a reservation: the unit is held while payment completes, then released automatically.
 
@@ -372,13 +384,13 @@ Framed to the client as a **checkout timer**, not a reservation: the unit is hel
 
 **[C]** Staff can check availability and create a booking on the spot, using the same availability check, pricing engine, and document capture as the public flow.
 
-**[C] v1 supports walk-ins only.** The guest is present and pays immediately. The booking is created and paid in a single action, and no unit is ever held against an unpaid promise.
+**[C] v1 supports walk-ins only.** ~~The guest is present and pays immediately. The booking is created and paid in a single action, and no unit is ever held against an unpaid promise.~~ **Superseded 10 September 2026** — see §9.1. An advance booking secured by the deposit is now in scope, so this is no longer the only shape a staff-created booking takes. The walk-in path itself is unchanged: a guest at the desk still pays in full in a single action.
 
-**[A] "Pays immediately" covers both methods in §10.1.** Cash is counted at the desk and the booking is confirmed outright. A bank transfer is sent from the guest's phone while they stand there — payment made, but not yet payment seen — so the booking goes to the verification queue and someone checks the bank (§10.3). Neither is the booked-ahead, pay-on-arrival case excluded below: in both, the guest has actually paid. This is what gives the queue something to work on before the public flow (phase two) exists. The qualification in §9.1 applies to the transfer path.
+**[A] The two paths differ only in what has been paid.** Same availability check, same pricing engine, same document capture, same unit held by the same occupancy row. A walk-in settles the stay at the desk; an advance booking settles it at check-in through the path §10.7 already built for a booking that owes money. Nothing new is minted to express the difference — the balance says it.
 
-**[C] Booked-ahead, pay-on-arrival is explicitly excluded from v1.** Staff cannot reserve a unit for a customer who intends to pay cash on the day. Advance bookings require payment, in line with stated policy.
+**[C] Booked-ahead, pay-on-arrival is explicitly excluded from v1.** ~~Staff cannot reserve a unit for a customer who intends to pay cash on the day. Advance bookings require payment, in line with stated policy.~~ **Reversed 10 September 2026 by the client** ([N29](open-questions.md)). It was excluded on the strength of §9.1's full-payment rule, which he has now reversed. What replaces it is not "reserve a unit for nothing": the deposit is real money taken before the unit is held, and a guest who does not turn up loses it (§9.5).
 
-**Adoption risk to manage, not a build risk.** If staff currently hold units informally for regular cash customers, v1 removes that ability. This should be raised with the client before go-live rather than discovered by a front office staff member turning a regular away. If it later proves necessary, it is an **additive** change: the state machine already carries a `held` state with an expiry, so adding a `confirmed_payment_due` state with the authorising staff member recorded against it is a small extension, not a rework.
+**The adoption risk this section flagged is answered, and it was the right risk to flag.** It read: *if staff currently hold units informally for regular cash customers, v1 removes that ability, and this should be raised with the client before go-live rather than discovered by a front office staff member turning a regular away.* They do, it would have, and the owner said so himself before any staff member had to. The change is the additive one this paragraph predicted — no rework, and no `confirmed_payment_due` state either, because §10.7 made owing money a balance rather than a status.
 
 ### 9.5 Cancellation and no-show
 
@@ -392,7 +404,7 @@ Framed to the client as a **checkout timer**, not a reservation: the unit is hel
 
 - The deposit gains an outcome the ledger does not have: **forfeited**, beside held and released. §11's stages are derived rather than stored, so this is a rule and not a column.
 - A forfeited deposit **stops being a liability and becomes revenue**, on the day it was forfeited. §14's revenue figure excludes deposits in both directions today — **[O] [N32](open-questions.md)**.
-- The cancel screen should **state the forfeiture** instead of disclaiming any calculation, and say so plainly when no deposit was ever taken — which, until §9.1's policy question is settled, is every booking cancelled before check-in.
+- The cancel screen should **state the forfeiture** instead of disclaiming any calculation, and say so plainly when no deposit was ever taken. That was the bullet waiting on §9.1's policy question, and it is no longer waiting: a booking is secured by the deposit ([N29](open-questions.md)), so the ordinary cancellation now has money against it to forfeit.
 
 ### 9.6 Amendment
 
@@ -496,7 +508,7 @@ Added when the amendment path made the gap real. Nothing in §10 described what 
 
 **[A] Owing money is not a status.** A booking with a balance outstanding stays `confirmed`; the amount is stated beside it rather than encoded in the state machine. §9.2's states describe the *stay* — where the guest is in their journey — and a second axis running through them would have to be answered by every screen that filters on status.
 
-**This is not part payments.** §9.1's **[C]** stands: full payment secures a unit, and nothing offers a guest the choice of paying half up front. What is now expressible is a shortfall the *system itself* created by repricing a booking somebody had already paid for. The balance being computable does make instalments mechanically possible — worth stating plainly, because it means the policy is now enforced by the product declining to offer them rather than by the schema being unable to represent one. **[N16](open-questions.md) is unchanged and still the client's to answer.**
+**This is not part payments**, and it did not become part payments when §9.1 changed. The **[C]** that stands after 10 September 2026 is that the deposit secures the unit and **the stay is paid in full** — on arrival rather than at booking, but in full, and nothing offers a guest the choice of paying half of it. What is now expressible is a shortfall the *system itself* created by repricing a booking somebody had already paid for. The balance being computable does make instalments mechanically possible — worth stating plainly, because it means the policy is now enforced by the product declining to offer them rather than by the schema being unable to represent one. **[N16](open-questions.md) is unchanged and still the client's to answer** — the deposit-secured booking he did agree to leaves the stay whole, so it settles nothing here.
 
 ### 10.6 Later (out of scope for v1)
 
@@ -510,7 +522,7 @@ Added when the amendment path made the gap real. Nothing in §10 described what 
 **[C]** Process: Housekeeping inspects the unit after check-out. Once condition is confirmed, deposit release is authorised by the approving role. Damages or charges are deducted before the balance is released.
 **[C]** Additional charges apply if costs exceed the deposit. **The deposit is not a cap on liability.**
 
-**[C] "Refundable" means refundable after a stay that happens.** §9.5's answer of 10 September 2026 makes this same BND 100 the amount kept when a guest cancels or does not turn up, so the deposit carries a second job this section never described: it is the commitment that secures a booking as well as the security against damage. What that changes here is **when it is taken** — see the note in the as-built block below.
+**[C] "Refundable" means refundable after a stay that happens.** §9.5's answer of 10 September 2026 makes this same BND 100 the amount kept when a guest cancels or does not turn up, so the deposit carries a second job this section never described: it is the commitment that secures a booking as well as the security against damage. §9.1's answer of the same date says where it is taken — **at booking, or at the door, and one or the other every time** — which is the change this section absorbs; see the as-built block below.
 
 ### Requirements
 
@@ -529,7 +541,13 @@ Six requirements above; five are met as written and one is not. The following ar
 
 **[A] The deposit is collected at check-in, as part of checking the guest in.** One action, one transaction: the booking moves to `checked_in` and the deposit row is written together, because a guest checked in with no deposit recorded is precisely the gap in the spreadsheet this replaces. It is taken in cash or by bank transfer, for the amount the booking quoted, and it cannot be skipped at the door. A booking quoting no deposit checks in without one, and the screen says so rather than implying money changed hands.
 
-**[O] The client has since contradicted that, and it is [N29](open-questions.md) seen from the deposit's side.** Asked on 10 September 2026 what a guest transfers when they book, Jason named two cases — *the deposit only*, or *the full amount with the deposit* — and both are money sent **when the booking is made**. §9.5 says the same thing from the other end: a deposit can only be forfeited by a no-show if it was taken before they failed to show. So the door is one of the places a deposit is collected, not the only one, and check-in would have to recognise a deposit already held rather than demand a second. Nothing has been changed on the strength of it, because it is the same single decision as §9.1's and building the early-collection path before the payment policy is settled would be guessing at the shape of the thing that pays for it.
+**[C] The client has since answered that, and the deposit is now collected at booking too** (10 September 2026, [N29](open-questions.md)). A booking is secured by the BND 100, so the money arrives before the guest does — and the same BND 100, taken early, is what §9.5 forfeits when they never turn up. The door stays one of the places a deposit is collected; it is no longer the only one.
+
+**What that asks of this section, none of it built.** `check_in_booking` writes the only deposit row there is, inside the check-in transaction, and refuses a second — which is exactly the right guarantee once a deposit can arrive earlier, and exactly the wrong place for it to be the only writer. Three things follow:
+
+- **A deposit is collected when a booking is created**, by whoever takes the booking, in cash or by bank transfer. A transfer is not verified money until somebody checks the bank, so the unit is held on a deposit that is *promised* until then — which is precisely the hold §9.1 already describes, now carrying the deposit rather than the stay.
+- **Check-in recognises a deposit already held** and takes nothing. It is not a new state: the check-in screen already says so for a booking quoting no deposit (B15's waiver), and this is the same sentence with a different reason behind it.
+- **A deposit is still never a booking payment.** It settles no booking, appears in no cash-up total (§14, [N27](open-questions.md)) and leaves the stay fully owed. Recording it as a payment would make every deposit-secured booking read as short against its own total, which is the flag §10.7 spent a slice making meaningful.
 
 **[A] The deposit can be waived — at creation, with a reason, under its own permission** (5 September 2026, capability B15). The first build held that "a deposit somebody decided not to take is a conversation, not a field", and the conversation turned out to be a real one: a guest who extends after checking in gets a second booking (§9.6), and a second booking takes a second BND 100. The waiver is a checkbox in a *Security deposit* section at the foot of the walk-in form, shown only to a holder of `deposit.waive`. Ticking it opens a dialog rather than a field — the register every other consequential act in the portal uses — which says what the tick means (nothing held, nothing to charge damage against) and takes the reason there, by convention naming the booking whose deposit covers the stay; it cannot be confirmed empty, and cancelling leaves the box unticked. Unticking clears the waiver at once. A waived booking quotes zero, which is the path check-in already had; what the waiver adds is the **record**: the reason on the booking, a `deposit.waived` event in its history carrying the figure not taken, and a schema constraint that a booking with a waiver cannot quote a deposit — so an amendment repricing the stay cannot quietly put it back. It is decided at creation only; there is no waiving at the door, for the reason above.
 
