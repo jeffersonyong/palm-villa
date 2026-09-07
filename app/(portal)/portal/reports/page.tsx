@@ -162,18 +162,18 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         <Card className="h-full">
           <Stat
             size="sm"
-            label="Occupancy"
-            value={formatOccupancyRate(totals.rate)}
-            hint={`${totals.occupiedNights} of ${totals.availableNights} unit-nights`}
+            label="Revenue received"
+            value={`BND ${formatCents(revenue.total)}`}
+            hint={`${revenue.count} ${revenue.count === 1 ? 'payment' : 'payments'} in the period`}
           />
         </Card>
 
         <Card className="h-full">
           <Stat
             size="sm"
-            label="Revenue received"
-            value={`BND ${formatCents(revenue.total)}`}
-            hint={`${revenue.count} ${revenue.count === 1 ? 'payment' : 'payments'} in the period`}
+            label="Occupancy"
+            value={formatOccupancyRate(totals.rate)}
+            hint={`${totals.occupiedNights} of ${totals.availableNights} unit-nights`}
           />
         </Card>
 
@@ -204,12 +204,61 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         />
       </div>
 
+      <section aria-labelledby="revenue-by-stream" className="mt-2xl">
+        <SectionHeading id="revenue-by-stream" title="Revenue by stream">
+          Money received, not money quoted — verified payments only, dated by the day it arrived.
+          Security deposits are excluded: they are held, not earned.
+        </SectionHeading>
+
+        <Table containerClassName="mt-md">
+          <TableHeader>
+            <TableHeaderRow>
+              <TableHead>Type</TableHead>
+              <TableHead className="text-right">Cash</TableHead>
+              <TableHead className="text-right">Bank transfer</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Payments</TableHead>
+            </TableHeaderRow>
+          </TableHeader>
+          <TableBody>
+            {revenue.byStream.map((stream) => (
+              <TableRow key={stream.stream}>
+                <TableRowHead>
+                  <span className="flex items-center gap-sm">
+                    <StreamDot stream={stream.stream} />
+                    {BOOKING_STREAM_LABELS[stream.stream]}
+                  </span>
+                </TableRowHead>
+                <Money amount={stream.byMethod.cash} />
+                <Money amount={stream.byMethod.bank_transfer} />
+                <TableCell className="text-right text-foreground tabular-nums">
+                  BND {formatCents(stream.total)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{stream.count}</TableCell>
+              </TableRow>
+            ))}
+            <TotalRow
+              label="All streams"
+              cells={[
+                `BND ${formatCents(revenue.byMethod.cash)}`,
+                `BND ${formatCents(revenue.byMethod.bank_transfer)}`,
+                `BND ${formatCents(revenue.total)}`,
+                revenue.count,
+              ]}
+            />
+          </TableBody>
+        </Table>
+
+        <p className="mt-md text-caption text-muted-foreground">
+          A tenancy records no money until the tenancy module lands: a long lease is an occupancy
+          with no booking and no payments, so it appears in occupancy above and at zero here.
+        </p>
+      </section>
+
       <section aria-labelledby="occupancy-by-type" className="mt-2xl">
         <SectionHeading id="occupancy-by-type" title="Occupancy by type">
-          Nights a unit was confirmed, occupied, completed or leased, against the nights it could
-          have been. Nights are half-open, so a guest arriving on the 12th and leaving on the 14th
-          occupies two. A unit out of service still counts in what was available — a building that
-          broke down should not read as fuller than one that did not.
+          Nights a unit was booked, stayed in or leased, against the nights it could have been.
+          Units out of service still count as available.
         </SectionHeading>
 
         <Table containerClassName="mt-md">
@@ -296,59 +345,6 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             ))}
           </TableBody>
         </Table>
-      </section>
-
-      <section aria-labelledby="revenue-by-stream" className="mt-2xl">
-        <SectionHeading id="revenue-by-stream" title="Revenue by stream">
-          Money actually received in the period, not what was quoted. Cash counts on the day it was
-          collected; a transfer on the date read off the bank, or failing that the day it was
-          verified. A payment nobody has confirmed is a promise and is not counted. Security
-          deposits are excluded — they are held, not earned.
-        </SectionHeading>
-
-        <Table containerClassName="mt-md">
-          <TableHeader>
-            <TableHeaderRow>
-              <TableHead>Type</TableHead>
-              <TableHead className="text-right">Cash</TableHead>
-              <TableHead className="text-right">Bank transfer</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Payments</TableHead>
-            </TableHeaderRow>
-          </TableHeader>
-          <TableBody>
-            {revenue.byStream.map((stream) => (
-              <TableRow key={stream.stream}>
-                <TableRowHead>
-                  <span className="flex items-center gap-sm">
-                    <StreamDot stream={stream.stream} />
-                    {BOOKING_STREAM_LABELS[stream.stream]}
-                  </span>
-                </TableRowHead>
-                <Money amount={stream.byMethod.cash} />
-                <Money amount={stream.byMethod.bank_transfer} />
-                <TableCell className="text-right text-foreground tabular-nums">
-                  BND {formatCents(stream.total)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">{stream.count}</TableCell>
-              </TableRow>
-            ))}
-            <TotalRow
-              label="All streams"
-              cells={[
-                `BND ${formatCents(revenue.byMethod.cash)}`,
-                `BND ${formatCents(revenue.byMethod.bank_transfer)}`,
-                `BND ${formatCents(revenue.total)}`,
-                revenue.count,
-              ]}
-            />
-          </TableBody>
-        </Table>
-
-        <p className="mt-md text-caption text-muted-foreground">
-          A tenancy records no money until the tenancy module lands: a long lease is an occupancy
-          with no booking and no payments, so it appears in occupancy above and at zero here.
-        </p>
       </section>
 
       <section aria-labelledby="day-passes" className="mt-2xl">

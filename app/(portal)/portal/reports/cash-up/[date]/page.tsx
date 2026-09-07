@@ -191,7 +191,7 @@ export default async function CashUpDayPage({ params }: PageProps) {
         <Card className="h-full">
           <Stat
             size="sm"
-            label="In the safe"
+            label="Cash on hand"
             value={<Balance amount={closing} />}
             hint={
               opening === 0

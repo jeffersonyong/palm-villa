@@ -22,9 +22,12 @@
  *
  * ── What is banked ────────────────────────────────────────────────────────
  *
- * The `cash_banking` rows filed against that business day. A day's cash may go
- * to the bank in two runs, or the next morning; what ties them to the day is
- * the business date on the record, not when the trip happened.
+ * The `cash_banking` rows dated that day — the day the money actually went to
+ * the bank. A day's takings may go in two runs, or next week with three other
+ * days' behind them; the date says when the bank received it, and the running
+ * balance below does the rest. Nothing has to be attributed to the day the
+ * notes were taken, which is the question one trip covering two months cannot
+ * answer.
  *
  * ── The running balance, and why it is not a per-day variance [A] ─────────
  *
@@ -65,7 +68,7 @@ import type { Cents } from '../money'
  * carried forward, not about that day's own two figures.
  *
  * `holding` is the ordinary state of a business that banks twice a week, so it
- * is deliberately unremarkable: cash in the safe is not a problem to be
+ * is deliberately unremarkable: cash on hand is not a problem to be
  * flagged. `over_banked` is the one that is wrong in a way arithmetic can
  * prove — more has gone to the bank than was ever recorded as taken, which
  * means a payment went unrecorded or a banking was entered twice.
@@ -76,8 +79,19 @@ export type CashUpState = (typeof CASH_UP_STATES)[number]
 
 export const CASH_UP_STATE_LABELS: Record<CashUpState, string> = {
   clear: 'Clear',
-  holding: 'In safe',
+  holding: 'On hand',
   over_banked: 'Over-banked',
+}
+
+/**
+ * One line each, for the column's legend. What the state means, never why —
+ * the reasoning is above and in prd.md §14.
+ */
+export const CASH_UP_STATE_DESCRIPTIONS: Record<CashUpState, string> = {
+  clear: 'Everything taken has reached the bank.',
+  holding: 'Cash taken and not yet banked. The ordinary state between bank runs.',
+  over_banked:
+    'More banked than was ever recorded as taken — a payment is missing, or a banking was entered twice.',
 }
 
 /** A cash payment, reduced to what the day's arithmetic needs. */
@@ -86,7 +100,7 @@ export interface CashCollection {
   amount: Cents
 }
 
-/** A banking, filed against the day the cash was taken. */
+/** A banking, dated the day the money reached the bank. */
 export interface Banking {
   businessDate: StayDate
   amount: Cents
@@ -120,6 +134,11 @@ export interface CashUpTotals {
   closing: Cents
 }
 
+/** Whether a string is one of the states, for reading a filter off the URL. */
+export function isCashUpState(candidate: string): candidate is CashUpState {
+  return (CASH_UP_STATES as readonly string[]).includes(candidate)
+}
+
 /** What a carried balance says about where the money is. */
 export function cashUpStateOf(balance: Cents): CashUpState {
   if (balance === 0) {
@@ -147,7 +166,7 @@ export interface CashUpInput {
  *
  * `opening` is what was unbanked before the window began. It has to be passed
  * in rather than assumed to be zero: a window starting on the 1st inherits
- * whatever the last week of the previous month left in the safe, and starting
+ * whatever the last week of the previous month left on hand, and starting
  * every period from zero would report the balance as low by exactly the amount
  * nobody had banked yet.
  *

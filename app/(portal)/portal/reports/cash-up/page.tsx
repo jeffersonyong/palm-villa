@@ -6,6 +6,7 @@ import { CashUpStateBadge } from '@/components/portal/cash-up-state-badge'
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionHint } from '@/components/portal/section-hint'
+import { StatusLegend } from '@/components/portal/status-legend'
 import { Stat } from '@/components/portal/stat'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -19,6 +20,7 @@ import {
   TableRow,
   TableRowLink,
 } from '@/components/ui/table'
+import { readChoices } from '@/components/portal/list-params'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { cashOnHandBefore, listCashBankings } from '@/lib/db/cash-banking'
@@ -33,13 +35,20 @@ import {
 } from '@/lib/domain/dates'
 import { formatCents, type Cents } from '@/lib/domain/money'
 import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
-import { cashUpDays, cashUpTotals, clampWindowToToday } from '@/lib/domain/reports/cash-up'
+import {
+  CASH_UP_STATES,
+  CASH_UP_STATE_DESCRIPTIONS,
+  cashUpDays,
+  cashUpTotals,
+  clampWindowToToday,
+  isCashUpState,
+} from '@/lib/domain/reports/cash-up'
 
 import { readPage, readPageSize } from '../page-size'
 import { ReportsPagination } from '../reports-pagination'
 
 import { readReportWindow } from '../report-window'
-import { ReportsFilters } from '../reports-filters'
+import { CashUpFilters } from './cash-up-filters'
 import { RecordBanking } from './record-banking'
 
 export const metadata: Metadata = {
@@ -63,8 +72,20 @@ export const dynamic = 'force-dynamic'
  */
 
 interface PageProps {
-  searchParams: Promise<{ from?: string; to?: string; page?: string; size?: string }>
+  searchParams: Promise<{
+    from?: string
+    to?: string
+    state?: string | string[]
+    page?: string
+    size?: string
+  }>
 }
+
+/** The column's key. Every state, in the order the domain defines them. */
+const STATE_LEGEND = CASH_UP_STATES.map((state) => ({
+  badge: <CashUpStateBadge state={state} />,
+  description: CASH_UP_STATE_DESCRIPTIONS[state],
+}))
 
 export default async function CashUpPage({ searchParams }: PageProps) {
   const params = await searchParams
@@ -94,11 +115,11 @@ export default async function CashUpPage({ searchParams }: PageProps) {
       <>
         <CashUpHeader window={requested} />
         <div className="mt-xl">
-          <ReportsFilters
-            route="/portal/reports/cash-up"
+          <CashUpFilters
             from={requested.from}
             to={requested.to}
             isExplicit={isExplicit}
+            states={[]}
           />
         </div>
         <EmptyState
@@ -155,18 +176,27 @@ export default async function CashUpPage({ searchParams }: PageProps) {
   const totals = cashUpTotals(days, opening)
   const mayBank = hasPermission(actor.permissions, 'payment.verify')
 
-  // Paged after the balance is accumulated, never before: every row already
-  // carries its own closing figure, so page 2 continues the running total
-  // rather than restarting it.
+  // Filtered and paged after the balance is accumulated, never before: every
+  // row already carries the figure it actually closed on, so a hidden day does
+  // not change a shown one and page 2 continues the running total rather than
+  // restarting it.
+  const chosenStates = readChoices(params.state, CASH_UP_STATES, isCashUpState)
+  const visibleDays =
+    chosenStates.length > 0 ? days.filter((day) => chosenStates.includes(day.state)) : days
+
   const pageSize = readPageSize(params.size)
-  const currentPage = clampPage(readPage(params.page), pageCountFor(days.length, pageSize))
-  const pagedDays = days.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const currentPage = clampPage(readPage(params.page), pageCountFor(visibleDays.length, pageSize))
+  const pagedDays = visibleDays.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const pageParams = new URLSearchParams()
 
   if (isExplicit) {
     pageParams.set('from', window.from)
     pageParams.set('to', window.to)
+  }
+
+  for (const state of chosenStates) {
+    pageParams.append('state', state)
   }
 
   return (
@@ -195,7 +225,7 @@ export default async function CashUpPage({ searchParams }: PageProps) {
         <Card className="h-full">
           <Stat
             size="sm"
-            label="In the safe"
+            label="Cash on hand"
             value={<Balance amount={totals.closing} />}
             hint={
               totals.opening === 0
@@ -225,20 +255,18 @@ export default async function CashUpPage({ searchParams }: PageProps) {
         <h2 id="cash-up-days" className="flex items-center gap-sm text-display-xs text-foreground">
           Day by day
           <SectionHint label="How a day is counted">
-            Cash recorded is the cash payments taken against bookings that day, in Brunei time.
-            Security deposits are counted separately: the notes are in the same drawer, but a
-            deposit is money held rather than earned. In the safe is a running figure — everything
-            taken, less everything banked — so a single trip to the bank clears whatever has built
-            up, whichever days it came from. Days do not have to be banked one by one.
+            Cash payments taken against bookings that day. Cash on hand runs forward — everything
+            taken, less everything banked — so one trip clears several days at once. Deposits are
+            counted separately: held, not earned.
           </SectionHint>
         </h2>
 
         <div className="mt-lg flex flex-wrap items-center gap-md">
-          <ReportsFilters
-            route="/portal/reports/cash-up"
+          <CashUpFilters
             from={window.from}
             to={window.to}
             isExplicit={isExplicit}
+            states={chosenStates}
           />
 
           {mayBank ? (
@@ -260,7 +288,7 @@ export default async function CashUpPage({ searchParams }: PageProps) {
               route="/portal/reports/cash-up"
               page={currentPage}
               pageSize={pageSize}
-              total={days.length}
+              total={visibleDays.length}
               itemLabel="days"
               params={pageParams.toString()}
             />
@@ -272,8 +300,13 @@ export default async function CashUpPage({ searchParams }: PageProps) {
               <TableHead className="text-right">Cash recorded</TableHead>
               <TableHead className="text-right">Deposits taken</TableHead>
               <TableHead className="text-right">Banked</TableHead>
-              <TableHead className="text-right">In the safe</TableHead>
-              <TableHead>State</TableHead>
+              <TableHead className="text-right">Cash on hand</TableHead>
+              <TableHead>
+                <span className="inline-flex items-center gap-sm">
+                  State
+                  <StatusLegend label="What the states mean" items={STATE_LEGEND} />
+                </span>
+              </TableHead>
               <TableHead className="w-0">
                 <span className="sr-only">Open</span>
               </TableHead>

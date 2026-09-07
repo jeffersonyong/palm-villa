@@ -33,12 +33,17 @@ import { recordBankingAction, type RecordBankingState } from './actions'
  * cannot be edited afterwards, and the copy has to be able to say so before
  * the click rather than after it.
  *
- * **The business day is a field, and it defaults to the day being read.** An
- * evening's cash goes to the bank the next morning; filing it under the
- * morning would leave every day short and the next day over. The field cannot
- * reach past today — the database refuses a future business date, and offering
- * a day the server will reject is a worse control than one that does not
- * offer it.
+ * **The date is the day the money went to the bank**, defaulting to the day
+ * being read. It was "the day the cash was taken" while each day reconciled on
+ * its own, and that question stopped having an answer when the reconciliation
+ * became a running balance: one trip can clear two months of takings, and there
+ * is no single day those notes were taken on. What the date does now is place
+ * the banking on the timeline — the balance drops from that day — which is a
+ * fact the person banking actually knows.
+ *
+ * The field cannot reach past today: the database refuses a future date, and
+ * offering a day the server will reject is a worse control than one that does
+ * not offer it.
  */
 
 const initialState: RecordBankingState = { status: 'idle' }
@@ -46,9 +51,9 @@ const initialState: RecordBankingState = { status: 'idle' }
 interface RecordBankingProps {
   /** The day the dialog opens on — the one being looked at. */
   defaultDate: StayDate
-  /** Today in Brunei, the latest day cash can be banked against. */
+  /** Today in Brunei, the latest day a banking can have happened. */
   today: StayDate
-  /** The screen's own day, revalidated alongside the day being banked. */
+  /** The screen's own day, revalidated alongside the banking's own date. */
   viewing?: StayDate
 }
 
@@ -89,7 +94,7 @@ function RecordBankingDialog({
       toast({
         tone: 'positive',
         title: `BND ${formatCents(state.recorded.amount)} banked`,
-        description: `Against ${formatStayRange(state.recorded.businessDate, state.recorded.businessDate)}`,
+        description: `Banked ${formatStayRange(state.recorded.businessDate, state.recorded.businessDate)}`,
       })
       onClose()
       router.refresh()
@@ -112,7 +117,7 @@ function RecordBankingDialog({
           {viewing ? <input type="hidden" name="viewing" value={viewing} /> : null}
 
           <div className="grid gap-sm">
-            <Label htmlFor="businessDate">Cash taken on</Label>
+            <Label htmlFor="businessDate">Date banked</Label>
             <DateField
               id="businessDate"
               name="businessDate"
@@ -126,8 +131,7 @@ function RecordBankingDialog({
               <FieldError id="businessDate-hint" message={state.fieldErrors.businessDate} />
             ) : (
               <p id="businessDate-hint" className="text-caption text-muted-foreground">
-                The day the notes were taken at the desk. Yesterday&apos;s cash banked this morning
-                belongs to yesterday.
+                The day the money went to the bank. It comes off the running balance from this day.
               </p>
             )}
           </div>
@@ -165,14 +169,15 @@ function RecordBankingDialog({
               id="banking-note"
               name="note"
               maxLength={280}
-              placeholder="Morning run to BIBD; the rest goes tomorrow."
+              placeholder="Morning run to BIBD."
               defaultValue={submitted?.note ?? ''}
             />
           </div>
 
           <Notice>
-            Recorded as banked by you, now, against the day you choose. It cannot be edited
-            afterwards — a correction is a second entry, and both stay on the day.
+            Recorded as banked by you. One entry covers however many days the cash built up over —
+            there is nothing to match day by day. It cannot be edited afterwards; a correction is a
+            second entry.
           </Notice>
 
           {state.status === 'error' && !state.fieldErrors ? (

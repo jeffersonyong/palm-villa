@@ -263,7 +263,7 @@ begin
   --
   -- Both bankings therefore go against today, in two runs, which is worth more
   -- than one: it shows that a day is not a single trip to the bank, and it
-  -- leaves a balance still in the safe so the running figure is not zero on
+  -- leaves cash still on hand so the running figure is not zero on
   -- first sight. Nothing is banked against an earlier day, deliberately —
   -- money filed against a day that recorded none reads as `over_banked`, and
   -- seeding an error state would open the screen on a red chip describing a
