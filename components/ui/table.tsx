@@ -161,6 +161,46 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
   )
 }
 
+/**
+ * The body's stand-in when a table has no rows to show.
+ *
+ * A header with nothing under it is the one state a table cannot explain: the
+ * columns are drawn, so the screen looks like it is working, and the reader is
+ * left to guess whether nothing matched, nothing exists yet, or something
+ * failed. A filtered table is the common way in — narrow to a unit type that
+ * has none configured and the rows simply vanish.
+ *
+ * The header **stays**, deliberately, rather than the table being swapped for
+ * a page-level `EmptyState`. Emptiness here is usually the answer to a filter
+ * sitting directly above, and keeping the columns keeps the question visible
+ * beside the answer. Where a whole *screen* has nothing on it — a period with
+ * no bookings at all — that is still `EmptyState`'s job, and the record screens
+ * go on using it.
+ *
+ * Say which of the two it is: "nothing matched" names the filter and offers to
+ * clear it; "nothing here yet" names where rows come from. The caller writes
+ * the sentence because only it knows which.
+ */
+function TableEmpty({
+  colSpan,
+  className,
+  children,
+  ...props
+}: React.ComponentProps<'td'> & { colSpan: number }) {
+  return (
+    <TableRow>
+      <TableCell
+        colSpan={colSpan}
+        data-slot="table-empty"
+        className={cn('px-lg py-2xl text-center text-body-sm text-muted-foreground', className)}
+        {...props}
+      >
+        {children}
+      </TableCell>
+    </TableRow>
+  )
+}
+
 export {
   Table,
   TableHeader,
@@ -171,4 +211,5 @@ export {
   TableRowHead,
   TableRowLink,
   TableCell,
+  TableEmpty,
 }

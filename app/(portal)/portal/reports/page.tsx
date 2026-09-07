@@ -7,14 +7,15 @@ import { PageHeader } from '@/components/portal/page-header'
 import { readChoices } from '@/components/portal/list-params'
 import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
 import { SectionHint } from '@/components/portal/section-hint'
-import { TextActionLink } from '@/components/ui/text-action'
 import { Stat } from '@/components/portal/stat'
 import { StreamDot } from '@/components/portal/stream-dot'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   Table,
   TableBody,
   TableCell,
+  TableEmpty,
   TableHead,
   TableHeader,
   TableHeaderRow,
@@ -294,6 +295,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </TableHeaderRow>
           </TableHeader>
           <TableBody>
+            {byType.length === 0 ? (
+              <TableEmpty colSpan={5}>
+                No unit types are configured, so there is nothing to measure occupancy against.
+              </TableEmpty>
+            ) : null}
             {byType.map((type) => (
               <TableRow key={type.typeId}>
                 <TableRowHead>{type.name}</TableRowHead>
@@ -319,18 +325,21 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       </section>
 
       <section aria-labelledby="occupancy-by-unit" className="mt-2xl">
-        <SectionHeading
-          id="occupancy-by-unit"
-          title="Occupancy by unit"
-          href={exportHref('occupancy-by-unit', unitParams)}
-        />
+        <SectionHeading id="occupancy-by-unit" title="Occupancy by unit" />
 
-        <div className="mt-lg">
+        {/* This section has controls of its own, so the export sits with them
+            rather than on the title line: it carries the types selected here,
+            and an export that answers to a control should stand next to it. */}
+        <div className="mt-lg flex flex-wrap items-center gap-md">
           <OccupancyFilter
             options={typeOptions}
             selected={chosenTypes}
             period={isExplicit ? { from: window.from, to: window.to } : null}
           />
+
+          <div className="ml-auto">
+            <DownloadCsvButton href={exportHref('occupancy-by-unit', unitParams)} />
+          </div>
         </div>
 
         <Table
@@ -355,6 +364,13 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </TableHeaderRow>
           </TableHeader>
           <TableBody>
+            {pagedUnits.length === 0 ? (
+              <TableEmpty colSpan={4}>
+                {chosenTypes.length > 0
+                  ? 'No units of that type. The 2-bedroom exists as a type and has no units configured yet.'
+                  : 'No units are configured. The unit registry is where the building is described.'}
+              </TableEmpty>
+            ) : null}
             {pagedUnits.map((row) => (
               <TableRow key={row.unit.id} interactive className="group">
                 <TableCell className="font-mono text-foreground tabular-nums">
@@ -391,11 +407,21 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 /**
  * A section's title line: the heading, its hint, and the download opposite.
  *
- * The download sits on the title line as the one action that acts on the
- * section as a whole (design.md §Components), in the text-action register
- * rather than as a button — four bordered rectangles down a page of tables
- * would read as chrome the page grew rather than as an offer. A real link, so
- * it can be middle-clicked and opens with a filename.
+ * The download is a `tertiary` button rather than a text action. It is the one
+ * action that acts on the section as a whole (design.md §Components), and on a
+ * screen where every other control is a bordered rectangle — the period chip,
+ * the type filter — the export was the only one that wasn't, which read as a
+ * footnote about the table rather than as something to click. Tertiary keeps
+ * it quiet: no fill, and the screen's primary stays unspent.
+ *
+ * **The title line is where a section with no controls of its own puts it** —
+ * the top-right corner of that table. A section that *has* a control row puts
+ * it there instead, beside the other controls, because the export carries
+ * whatever those controls have selected (see occupancy by unit).
+ *
+ * Still an anchor under the button, so it survives a middle-click, a
+ * right-click and a browser that has not run the page's JavaScript yet, and
+ * arrives with a filename on it.
  */
 function SectionHeading({
   id,
@@ -418,12 +444,21 @@ function SectionHeading({
         ) : null}
       </h2>
 
-      {href ? (
-        <TextActionLink href={href} className="shrink-0">
-          Download CSV
-        </TextActionLink>
-      ) : null}
+      {href ? <DownloadCsvButton href={href} /> : null}
     </div>
+  )
+}
+
+/**
+ * The export, wherever a section chooses to put it. One component so the two
+ * placements — a section's title line, a section's control row — cannot drift
+ * into two different-looking buttons on one screen.
+ */
+function DownloadCsvButton({ href }: { href: string }) {
+  return (
+    <Button asChild variant="tertiary" className="shrink-0">
+      <a href={href}>Download CSV</a>
+    </Button>
   )
 }
 
@@ -440,10 +475,17 @@ function Money({ amount }: { amount: Cents }) {
  * Set in 600 throughout, label and figures alike. The tone alone was doing the
  * work of saying "this line is different in kind", and a reader scanning a
  * column of numbers reads weight before they read a background.
+ *
+ * **`bg-muted`, not `bg-canvas-soft`.** The container tone is a *role*, and the
+ * token that carries it through both themes is `--muted`; `--color-canvas-soft`
+ * is the raw palette entry behind its light half and is a fixed `#f7f7f7`
+ * whatever the theme. Reaching for the palette value put a white bar with white
+ * text on it in dark mode — the same fill the table header uses is `bg-muted`,
+ * and the totals row is the same role at the other end of the table.
  */
 function TotalRow({ label, cells }: { label: string; cells: readonly (string | number)[] }) {
   return (
-    <TableRow className="bg-canvas-soft">
+    <TableRow className="bg-muted">
       <TableRowHead className="font-semibold text-foreground">{label}</TableRowHead>
       {cells.map((cell, index) => (
         <TableCell key={index} className="text-right font-semibold text-foreground tabular-nums">

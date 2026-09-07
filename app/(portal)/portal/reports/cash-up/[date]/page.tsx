@@ -34,6 +34,7 @@ import {
   formatTimestamp,
   isStayDate,
   todayInBrunei,
+  type StayDate,
 } from '@/lib/domain/dates'
 import { formatCents, sumCents, type Cents } from '@/lib/domain/money'
 import { cashUpStateOf } from '@/lib/domain/reports/cash-up'
@@ -144,28 +145,10 @@ export default async function CashUpDayPage({ params }: PageProps) {
     <>
       <PageHeader
         title="Cash-up"
-        meta={
-          <>
-            <span className="tabular-nums">{formatStayRange(date, date)}</span>
-            <CashUpStateBadge state={state} />
-          </>
-        }
+        meta={<CashUpStateBadge state={state} />}
         actions={
           <>
-            <Button asChild variant="tertiary">
-              <Link href={`/portal/reports/cash-up/${addDays(date, -1)}`}>
-                <ChevronLeft aria-hidden />
-                Previous day
-              </Link>
-            </Button>
-            {date < today ? (
-              <Button asChild variant="tertiary">
-                <Link href={`/portal/reports/cash-up/${addDays(date, 1)}`}>
-                  Next day
-                  <ChevronRight aria-hidden />
-                </Link>
-              </Button>
-            ) : null}
+            <DayStepper date={date} today={today} />
             {mayBank ? <RecordBanking defaultDate={date} today={today} viewing={date} /> : null}
           </>
         }
@@ -247,7 +230,7 @@ export default async function CashUpDayPage({ params }: PageProps) {
                   </TableCell>
                 </TableRow>
               ))}
-              <TableRow className="bg-canvas-soft">
+              <TableRow className="bg-muted">
                 <TableCell className="font-semibold text-foreground">Recorded</TableCell>
                 <TableCell colSpan={3} />
                 <TableCell className="text-right font-semibold text-foreground tabular-nums">
@@ -323,7 +306,7 @@ export default async function CashUpDayPage({ params }: PageProps) {
                   </TableCell>
                 </TableRow>
               ))}
-              <TableRow className="bg-canvas-soft">
+              <TableRow className="bg-muted">
                 <TableCell className="font-semibold text-foreground">
                   <span className="flex items-center gap-sm">
                     <Landmark aria-hidden className="size-4 text-muted-foreground" />
@@ -364,6 +347,59 @@ function PersonCell({ id, name }: { id: string | null; name: string | undefined 
       </Avatar>
       <span className="min-w-0 truncate">{name}</span>
     </span>
+  )
+}
+
+/**
+ * Stepping between days, with the day itself in the middle.
+ *
+ * The two arrows used to sit on their own with the date up beside the title,
+ * which made paging feel like it moved something invisible: you pressed
+ * "Previous day" and then looked somewhere else to find out where you had
+ * landed. Putting the date *between* the controls makes the three one object —
+ * the thing being changed, with the way to change it on either side — so the
+ * answer is where the action was.
+ *
+ * **Next day is disabled rather than hidden on today.** Hiding it would shift
+ * the date under the pointer the moment somebody reached the most recent day,
+ * which is the day they are on most of the time; a control that moves as you
+ * approach it is worse than one that is plainly unavailable. It is a `span`
+ * when disabled rather than a link, because there is no address to go to — a
+ * disabled anchor is still followable by keyboard.
+ *
+ * The state badge stays up on the title line: it describes the whole day, not
+ * the navigation, and this control has enough in it already.
+ */
+function DayStepper({ date, today }: { date: StayDate; today: StayDate }) {
+  const isToday = date >= today
+
+  return (
+    <div className="flex items-center gap-xs">
+      <Button asChild variant="tertiary" aria-label="Previous day">
+        <Link href={`/portal/reports/cash-up/${addDays(date, -1)}`}>
+          <ChevronLeft aria-hidden />
+          Previous day
+        </Link>
+      </Button>
+
+      <span className="px-sm text-body-sm-strong text-foreground tabular-nums">
+        {formatStayRange(date, date)}
+      </span>
+
+      {isToday ? (
+        <Button variant="tertiary" disabled aria-label="Next day — today is the latest">
+          Next day
+          <ChevronRight aria-hidden />
+        </Button>
+      ) : (
+        <Button asChild variant="tertiary" aria-label="Next day">
+          <Link href={`/portal/reports/cash-up/${addDays(date, 1)}`}>
+            Next day
+            <ChevronRight aria-hidden />
+          </Link>
+        </Button>
+      )}
+    </div>
   )
 }
 

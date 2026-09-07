@@ -7,7 +7,6 @@ import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionHint } from '@/components/portal/section-hint'
 import { StatusLegend } from '@/components/portal/status-legend'
-import { TextActionLink } from '@/components/ui/text-action'
 import { Stat } from '@/components/portal/stat'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -15,6 +14,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableEmpty,
   TableHead,
   TableHeader,
   TableHeaderRow,
@@ -39,6 +39,7 @@ import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
 import {
   CASH_UP_STATES,
   CASH_UP_STATE_DESCRIPTIONS,
+  CASH_UP_STATE_LABELS,
   cashUpDays,
   cashUpTotals,
   clampWindowToToday,
@@ -266,23 +267,14 @@ export default async function CashUpPage({ searchParams }: PageProps) {
           section they belong to, reading as page furniture rather than as this
           table's controls. */}
       <section aria-labelledby="cash-up-days" className="mt-2xl">
-        <div className="flex items-center justify-between gap-md">
-          <h2
-            id="cash-up-days"
-            className="flex items-center gap-sm text-display-xs text-foreground"
-          >
-            Day by day
-            <SectionHint label="How a day is counted">
-              Cash payments taken against bookings that day. Cash on hand runs forward — everything
-              taken, less everything banked — so one trip clears several days at once. Deposits are
-              counted separately: held, not earned.
-            </SectionHint>
-          </h2>
-
-          <TextActionLink href={exportHref} className="shrink-0">
-            Download CSV
-          </TextActionLink>
-        </div>
+        <h2 id="cash-up-days" className="flex items-center gap-sm text-display-xs text-foreground">
+          Day by day
+          <SectionHint label="How a day is counted">
+            Cash payments taken against bookings that day. Cash on hand runs forward — everything
+            taken, less everything banked — so one trip clears several days at once. Deposits are
+            counted separately: held, not earned.
+          </SectionHint>
+        </h2>
 
         <div className="mt-lg flex flex-wrap items-center gap-md">
           <CashUpFilters
@@ -292,16 +284,23 @@ export default async function CashUpPage({ searchParams }: PageProps) {
             states={chosenStates}
           />
 
-          {mayBank ? (
-            <div className="ml-auto">
-              {/* Defaulted to the last day of the period rather than to today:
-                  the window is already clamped to today, so on the ordinary
-                  view the two are the same day — and on a past period it opens
-                  on a day the reader can actually see, instead of filing cash
-                  against a row that is not on the screen. */}
-              <RecordBanking defaultDate={window.to} today={today} />
-            </div>
-          ) : null}
+          {/* The actions end of the control line. The export belongs here rather
+              than on the title line above: it acts on exactly what the filters
+              opposite it have selected, so it reads as the last control in the
+              row that produced the rows — and a download that has to survive a
+              middle-click stays an anchor, wearing the button. */}
+          <div className="ml-auto flex items-center gap-sm">
+            <Button asChild variant="tertiary">
+              <a href={exportHref}>Download CSV</a>
+            </Button>
+
+            {/* Defaulted to the last day of the period rather than to today:
+                the window is already clamped to today, so on the ordinary view
+                the two are the same day — and on a past period it opens on a
+                day the reader can actually see, instead of filing cash against
+                a row that is not on the screen. */}
+            {mayBank ? <RecordBanking defaultDate={window.to} today={today} /> : null}
+          </div>
         </div>
 
         <Table
@@ -336,6 +335,12 @@ export default async function CashUpPage({ searchParams }: PageProps) {
             </TableHeaderRow>
           </TableHeader>
           <TableBody>
+            {pagedDays.length === 0 ? (
+              <TableEmpty colSpan={7}>
+                No days in this period are{' '}
+                {chosenStates.map((s) => CASH_UP_STATE_LABELS[s]).join(' or ')}.
+              </TableEmpty>
+            ) : null}
             {pagedDays.map((day) => (
               <TableRow key={day.date} interactive className="group">
                 <TableCell className="text-foreground tabular-nums">
