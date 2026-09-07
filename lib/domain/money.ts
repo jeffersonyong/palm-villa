@@ -85,6 +85,25 @@ export function sumCents(amounts: readonly Cents[]): Cents {
 }
 
 /**
+ * An amount as a bare decimal, e.g. `2360.00` — no grouping separator.
+ *
+ * For a machine rather than a reader: a CSV cell, where `formatCents`'s
+ * thousands comma is actively wrong twice over. It has to be quoted to survive
+ * the delimiter, and a quoted `"2,360.00"` is then read by Excel as **text** —
+ * so the column the accountant downloaded the file to sum will not sum. The
+ * grouping is a courtesy to a human eye and there is no eye here.
+ *
+ * Always two decimal places, and a negative keeps its sign so an over-banked
+ * balance stays negative arithmetic rather than becoming a string.
+ */
+export function centsToDecimal(amount: Cents): string {
+  const isNegative = amount < 0
+  const absolute = Math.abs(amount)
+
+  return `${isNegative ? '-' : ''}${Math.floor(absolute / CENTS_PER_BND)}.${String(absolute % CENTS_PER_BND).padStart(2, '0')}`
+}
+
+/**
  * Formats an amount for display, e.g. `442.00`.
  *
  * Deliberately excludes the currency word or symbol. The client writes prices

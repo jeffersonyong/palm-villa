@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/portal/page-header'
 import { readChoices } from '@/components/portal/list-params'
 import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
 import { SectionHint } from '@/components/portal/section-hint'
+import { TextActionLink } from '@/components/ui/text-action'
 import { Stat } from '@/components/portal/stat'
 import { StreamDot } from '@/components/portal/stream-dot'
 import { Card } from '@/components/ui/card'
@@ -136,6 +137,19 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const currentPage = clampPage(readPage(params.page), pageCountFor(visibleUnits.length, pageSize))
   const pagedUnits = visibleUnits.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
+  // The export links carry exactly what is on screen: same period, same type
+  // filter. Built from the same values the tables render from, so a download
+  // cannot disagree with what somebody was looking at.
+  const periodParams = new URLSearchParams({ from: window.from, to: window.to })
+  const exportHref = (table: string, extra?: URLSearchParams) => {
+    const query = new URLSearchParams(periodParams)
+    query.set('table', table)
+    for (const [key, value] of extra ?? []) {
+      if (key === 'type') query.append(key, value)
+    }
+    return `/portal/reports/export?${query.toString()}`
+  }
+
   const unitParams = new URLSearchParams()
 
   if (isExplicit) {
@@ -205,7 +219,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       </div>
 
       <section aria-labelledby="revenue-by-stream" className="mt-2xl">
-        <SectionHeading id="revenue-by-stream" title="Revenue by stream">
+        <SectionHeading
+          id="revenue-by-stream"
+          title="Revenue by stream"
+          href={exportHref('revenue')}
+        >
           Money received, not money quoted — verified payments only, dated by the day it arrived.
           Security deposits are excluded: they are held, not earned.
         </SectionHeading>
@@ -256,7 +274,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       </section>
 
       <section aria-labelledby="occupancy-by-type" className="mt-2xl">
-        <SectionHeading id="occupancy-by-type" title="Occupancy by type">
+        <SectionHeading
+          id="occupancy-by-type"
+          title="Occupancy by type"
+          href={exportHref('occupancy-by-type')}
+        >
           Nights a unit was booked, stayed in or leased, against the nights it could have been.
           Units out of service still count as available.
         </SectionHeading>
@@ -297,7 +319,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       </section>
 
       <section aria-labelledby="occupancy-by-unit" className="mt-2xl">
-        <SectionHeading id="occupancy-by-unit" title="Occupancy by unit" />
+        <SectionHeading
+          id="occupancy-by-unit"
+          title="Occupancy by unit"
+          href={exportHref('occupancy-by-unit', unitParams)}
+        />
 
         <div className="mt-lg">
           <OccupancyFilter
@@ -362,22 +388,42 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   )
 }
 
+/**
+ * A section's title line: the heading, its hint, and the download opposite.
+ *
+ * The download sits on the title line as the one action that acts on the
+ * section as a whole (design.md §Components), in the text-action register
+ * rather than as a button — four bordered rectangles down a page of tables
+ * would read as chrome the page grew rather than as an offer. A real link, so
+ * it can be middle-clicked and opens with a filename.
+ */
 function SectionHeading({
   id,
   title,
+  href,
   children,
 }: {
   id: string
   title: string
+  /** The export for this section, carrying the period and filters on screen. */
+  href?: string
   children?: React.ReactNode
 }) {
   return (
-    <h2 id={id} className="flex items-center gap-sm text-display-xs text-foreground">
-      {title}
-      {children ? (
-        <SectionHint label={`How ${title.toLowerCase()} is counted`}>{children}</SectionHint>
+    <div className="flex items-center justify-between gap-md">
+      <h2 id={id} className="flex items-center gap-sm text-display-xs text-foreground">
+        {title}
+        {children ? (
+          <SectionHint label={`How ${title.toLowerCase()} is counted`}>{children}</SectionHint>
+        ) : null}
+      </h2>
+
+      {href ? (
+        <TextActionLink href={href} className="shrink-0">
+          Download CSV
+        </TextActionLink>
       ) : null}
-    </h2>
+    </div>
   )
 }
 

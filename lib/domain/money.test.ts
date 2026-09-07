@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { MAX_CENTS, bnd, centsFromInput, formatCents, sumCents } from './money'
+import { MAX_CENTS, bnd, centsFromInput, centsToDecimal, formatCents, sumCents } from './money'
 
 /**
  * Money tests.
@@ -105,5 +105,26 @@ describe('formatCents', () => {
 
   test('round-trips a parsed amount', () => {
     expect(formatCents(centsFromInput('442.05')!)).toBe('442.05')
+  })
+})
+
+describe('centsToDecimal', () => {
+  test('omits the grouping separator formatCents adds', () => {
+    // A CSV cell is read by a machine. `formatCents` gives `2,360.00`, which
+    // has to be quoted to survive the delimiter and is then text to Excel —
+    // the column would not sum, which is the whole point of the download.
+    expect(formatCents(bnd(2360))).toBe('2,360.00')
+    expect(centsToDecimal(bnd(2360))).toBe('2360.00')
+  })
+
+  test('always carries two decimal places', () => {
+    expect(centsToDecimal(bnd(50))).toBe('50.00')
+    expect(centsToDecimal(5)).toBe('0.05')
+    expect(centsToDecimal(0)).toBe('0.00')
+  })
+
+  test('keeps a negative negative, so an over-banked balance stays arithmetic', () => {
+    expect(centsToDecimal(bnd(-50))).toBe('-50.00')
+    expect(centsToDecimal(-5)).toBe('-0.05')
   })
 })

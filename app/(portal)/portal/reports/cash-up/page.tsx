@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionHint } from '@/components/portal/section-hint'
 import { StatusLegend } from '@/components/portal/status-legend'
+import { TextActionLink } from '@/components/ui/text-action'
 import { Stat } from '@/components/portal/stat'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -199,6 +200,19 @@ export default async function CashUpPage({ searchParams }: PageProps) {
     pageParams.append('state', state)
   }
 
+  // The file is the screen: same period, same states.
+  const exportParams = new URLSearchParams({
+    table: 'cash-up',
+    from: window.from,
+    to: window.to,
+  })
+
+  for (const state of chosenStates) {
+    exportParams.append('state', state)
+  }
+
+  const exportHref = `/portal/reports/export?${exportParams.toString()}`
+
   return (
     <>
       <CashUpHeader window={window} />
@@ -252,14 +266,23 @@ export default async function CashUpPage({ searchParams }: PageProps) {
           section they belong to, reading as page furniture rather than as this
           table's controls. */}
       <section aria-labelledby="cash-up-days" className="mt-2xl">
-        <h2 id="cash-up-days" className="flex items-center gap-sm text-display-xs text-foreground">
-          Day by day
-          <SectionHint label="How a day is counted">
-            Cash payments taken against bookings that day. Cash on hand runs forward — everything
-            taken, less everything banked — so one trip clears several days at once. Deposits are
-            counted separately: held, not earned.
-          </SectionHint>
-        </h2>
+        <div className="flex items-center justify-between gap-md">
+          <h2
+            id="cash-up-days"
+            className="flex items-center gap-sm text-display-xs text-foreground"
+          >
+            Day by day
+            <SectionHint label="How a day is counted">
+              Cash payments taken against bookings that day. Cash on hand runs forward — everything
+              taken, less everything banked — so one trip clears several days at once. Deposits are
+              counted separately: held, not earned.
+            </SectionHint>
+          </h2>
+
+          <TextActionLink href={exportHref} className="shrink-0">
+            Download CSV
+          </TextActionLink>
+        </div>
 
         <div className="mt-lg flex flex-wrap items-center gap-md">
           <CashUpFilters

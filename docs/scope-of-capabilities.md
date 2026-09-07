@@ -98,7 +98,7 @@ A forwarded or leaked QR code grants nothing by itself — check-in authority co
 | E2 | Approve deposit releases — the approval is only available once the inspection is recorded, and is logged as a formal event (who approved, when, how much) |
 | E3 | Record itemised charges against a deposit, each with a reason and author; where charges exceed the deposit, the balance is tracked as an amount owed with a shareable statement |
 | E4 | Run a daily cash-up view: cash recorded in the system versus cash banked |
-| E5 | View reports: occupancy by unit and type, revenue by stream, outstanding deposits, outstanding charges, and day-pass volume against capacity |
+| E5 | View reports: occupancy by unit and type, revenue by stream, outstanding deposits, outstanding charges, and day-pass volume against capacity — **each table downloadable as a CSV** for the period and filters on screen |
 
 **E4–E5 delivered 9 September 2026.** The reports screen answers occupancy by unit and by type over any period, revenue by stream, and what is held and owed right now; the daily cash-up is its own screen, comparing the cash the desk recorded against the cash somebody took to the bank, day by day.
 
