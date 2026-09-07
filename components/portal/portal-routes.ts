@@ -83,7 +83,7 @@ export const navGroups = [
   {
     label: 'Admin',
     items: [
-      { href: '/portal/settings/pricing', label: 'Pricing', icon: Tag },
+      { href: '/portal/settings/property', label: 'Property settings', icon: Tag },
       // Under Admin rather than beside Units in Property, deliberately. The
       // Units board is a daily operations screen; naming the building is
       // configuration and is gated on `config.manage` like everything else

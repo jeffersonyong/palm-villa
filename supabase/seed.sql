@@ -21,16 +21,51 @@
 -- could have produced. Drop it from config.toml's `sql_paths` to work against
 -- the empty states instead.
 --
--- No facilities. architecture.md §10 lists them, but prd.md §7.2 has three of
--- the seven pending a Ladyboss decision (C1) and every capacity unknown (C2),
--- and nothing built reads them. They land with the day-pass flow in phase two,
--- which is the first thing that needs facility headroom to mean something.
---
 -- Nothing invented. Every number below is a [C] value from prd.md, except the
 -- unit references, which are flagged where they appear.
+--
+-- ── What moved out of this file (capability F3, 20260912000100) ────────────
+--
+-- The day-pass bands and bundles, the facilities, the bank accounts and the
+-- document retention periods are all seeded by seed_property_settings() at the
+-- foot of this file rather than written out here. One copy, called from two
+-- places: this seed, and the migration that backfills a database which already
+-- has a property. The retention rows are why — they lived only here, so every
+-- deployed database had none and attach_document() refused every upload.
 
-insert into property (name)
-values ('Palm Villa');
+insert into property (
+  name,
+  pax_policy,
+  extra_person_per_night_cents,
+  pax_exempt_age_max,
+  sofa_bed_fee_cents,
+  sofa_bed_stock,
+  early_check_in_per_hour_cents,
+  late_check_out_per_hour_cents,
+  check_in_time,
+  check_out_time,
+  security_deposit_cents,
+  max_advance_booking_days
+)
+values (
+  'Palm Villa',
+  -- [A] prd.md §18 N2: stated max pax is read as the threshold above which the
+  -- BND 7 extra-person charge applies, not as a refusal. The only reading under
+  -- which the confirmed charge is ever chargeable; one value flips it.
+  'surcharge_threshold',
+  700,
+  3,
+  2800,
+  -- [O] prd.md §18 N8: total sofa beds is unknown, so nothing is constrained.
+  null,
+  1000,
+  1500,
+  -- [C] 14:00 / 12:00, answering N6 on 10 September 2026.
+  '14:00',
+  '12:00',
+  10000,
+  62
+);
 
 -- Unit types (prd.md §7.1, all rates [C]).
 --
@@ -178,28 +213,11 @@ where r.slug = 'finance';
 -- No user_role rows: there are no staff accounts yet. Supabase Auth users and
 -- their role grants arrive with the auth slice.
 
--- ── Document retention (capability G4, architecture.md §8) ─────────────────
+-- ── Everything else the property is configured with (capability F3) ───────
 --
--- The defaults architecture.md §8 states, as rows rather than constants: §11
--- makes every policy figure per-property configuration, and G4 promises the
--- client a retention policy they can change. Capability F3 is the screen that
--- edits them; until it exists these are what the system ships with.
---
--- Seeded rather than defaulted in code on purpose. attach_document() REFUSES a
--- kind with no row here, so a missing period is a visible error at a desk
--- rather than a number nobody agreed applied to somebody's identity document.
---
---   identity          12 months after checkout
---   payment_slip      84 months (7 years, accounting records)
---   accounting_pack   84 months (7 years, same)
---   inspection_photo  24 months
-insert into document_retention (property_id, kind, months)
-select p.id, spec.kind, spec.months
-from property p
-cross join (
-  values
-    ('identity', 12),
-    ('payment_slip', 84),
-    ('inspection_photo', 24),
-    ('accounting_pack', 84)
-) as spec (kind, months);
+-- Day-pass age bands and family bundles, the facilities and whether each is in
+-- the day pass, the bank accounts, and the document retention periods. Defined
+-- once in seed_property_settings() (20260912000100) so this seed and the
+-- migration that fills an existing database cannot disagree about them.
+
+select seed_property_settings(id) from property;

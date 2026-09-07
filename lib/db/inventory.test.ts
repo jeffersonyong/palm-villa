@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'vitest'
 
 import { countAvailableByType, findAvailableUnits } from './bookings'
-import { palmVillaConfig } from '@/lib/domain/config'
 
-import { getUnitCounts, getUnitTypes, getUnits } from './inventory'
+import { getUnitCounts, getUnits } from './inventory'
 import { givenBooking } from './test/factory'
 
 /**
@@ -49,34 +48,12 @@ describe('the seeded inventory', () => {
   })
 })
 
-describe('unit type rates', () => {
-  test('match lib/domain/config.ts exactly', async () => {
-    const seeded = await getUnitTypes()
-
-    // These figures live in two places while PropertyConfig still holds values
-    // with no database home — the prd.md §18 TODO(client) fields. Both copies
-    // come from the same [C] rows in prd.md §7.1, and this is what stops them
-    // drifting apart until the config slice removes the duplication.
-    const asConfigured = palmVillaConfig.unitTypes.map((type) => ({
-      id: type.id,
-      name: type.name,
-      baseRatePerNight: type.baseRatePerNight,
-      maxPax: type.maxPax,
-      carParks: type.carParks,
-    }))
-
-    const asSeeded = seeded.map((type) => ({
-      id: type.id,
-      name: type.name,
-      baseRatePerNight: type.baseRatePerNight,
-      maxPax: type.maxPax,
-      carParks: type.carParks,
-    }))
-
-    expect(asSeeded).toEqual(expect.arrayContaining(asConfigured))
-    expect(asSeeded).toHaveLength(asConfigured.length)
-  })
-})
+/**
+ * The rates the seed carries are asserted in property-config.test.ts, which
+ * compares the WHOLE of the live configuration against `palmVillaConfig`
+ * rather than the four rates this file used to check. Moved there with
+ * capability F3, when the figures stopped living in TypeScript.
+ */
 
 describe('availability', () => {
   const RANGE = { start: '2026-10-05', end: '2026-10-08' }

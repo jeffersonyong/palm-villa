@@ -6,8 +6,8 @@ import { z } from 'zod'
 import { hasPermission } from '@/lib/auth/permissions'
 import { requirePermission } from '@/lib/auth/require-permission'
 import { amendBooking, getBookingById } from '@/lib/db/bookings'
+import { getPropertyConfig } from '@/lib/db/property-config'
 import { canAmend } from '@/lib/domain/booking-state'
-import { palmVillaConfig } from '@/lib/domain/config'
 import { isStayDate } from '@/lib/domain/dates'
 import { parseDiscount, MAX_DISCOUNT_REASON_LENGTH } from '@/lib/domain/discount'
 import { priceStay } from '@/lib/domain/pricing/stay'
@@ -182,7 +182,7 @@ export async function amendBookingAction(
       // ten percent of the longer stay, which is what was actually agreed.
       discount,
     },
-    palmVillaConfig,
+    await getPropertyConfig(),
   )
 
   if (!priced.ok) {

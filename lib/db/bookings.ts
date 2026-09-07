@@ -1,7 +1,6 @@
 import type { DateRange } from '@/lib/domain/availability'
 import { transition, type BookingEvent, type BookingStatus } from '@/lib/domain/booking-state'
 import type { PaymentMethod } from '@/lib/domain/payment'
-import { palmVillaConfig, type PropertyConfig } from '@/lib/domain/config'
 import { addDays, type StayDate } from '@/lib/domain/dates'
 import type { Discount, DiscountKind } from '@/lib/domain/discount'
 import { BOOKING_STREAMS, type BookingStream } from '@/lib/domain/stream'
@@ -731,7 +730,6 @@ export type CreateBookingResult =
  */
 export async function createWalkInBooking(
   input: CreateWalkInBookingInput,
-  config: PropertyConfig = palmVillaConfig,
 ): Promise<CreateBookingResult> {
   const propertyId = await currentPropertyId()
 
@@ -759,7 +757,7 @@ export async function createWalkInBooking(
     p_chargeable_guests: input.chargeableGuests,
     p_exempt_guests: input.exemptGuests,
     p_total_cents: input.total,
-    p_security_deposit_cents: input.securityDeposit ?? config.securityDeposit,
+    p_security_deposit_cents: input.securityDeposit,
     p_lines: input.lines,
     p_payment_method: input.paymentMethod,
     p_discount_kind: input.discount?.kind ?? null,

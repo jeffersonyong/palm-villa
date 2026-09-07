@@ -38,8 +38,15 @@ import { cn } from '@/lib/utils'
  * Monochrome, like everything else on the operations surfaces: no teal here,
  * ever (design.md — two accents, one system).
  */
+/**
+ * `inline-flex` so an action may carry a leading glyph — "Add a band" under a
+ * table it appends to — and have it sit beside the word rather than above it.
+ * A bare button is `inline-block`, which wraps an icon and its label onto two
+ * lines the moment the button is narrower than the two together. Harmless for
+ * the text-only case, which is every other caller.
+ */
 const textActionClass =
-  'cursor-pointer rounded-sm text-body-sm text-copy underline decoration-muted-foreground underline-offset-2 transition-colors outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50'
+  'inline-flex cursor-pointer items-center gap-xs rounded-sm text-body-sm text-copy underline decoration-muted-foreground underline-offset-2 transition-colors outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50'
 
 export function TextAction({ className, type, ...props }: React.ComponentProps<'button'>) {
   return (

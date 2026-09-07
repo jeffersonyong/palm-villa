@@ -1,21 +1,30 @@
 import { bnd, type Cents } from './money'
 
 /**
- * Property configuration.
+ * Property configuration — the shape, and the values the property ships with.
  *
- * Every number the pricing engine uses lives here rather than inline, for two
- * reasons. Rates, fees and policies are per-property configuration and never
- * constants (architecture.md §11), and — more immediately — several of them are
- * still open questions with the client. prd.md §7.2 sanctions exactly this
- * handling: a pending decision becomes "a settings change rather than a code
- * change".
+ * Every number the pricing engine uses is on this type rather than inline,
+ * because rates, fees and policies are per-property configuration and never
+ * constants (architecture.md §11).
  *
- * Values carrying a `TODO(client)` are provisional. They are placeholders that
- * let the engine run, NOT decisions. CLAUDE.md is explicit that a gap in the
- * PRD is a question for the client, not a design decision to make silently, so
- * each one names the prd.md §18 item that answers it.
+ * ── Where the live values come from ────────────────────────────────────────
  *
- * Grep `TODO(client)` in this file for the list to put in front of Jason.
+ * **Not from here.** Since 20260912000100 the figures are rows, and the engine
+ * reads them through `getPropertyConfig()` in lib/db/property-config.ts. That
+ * is what makes prd.md §7.2's promise true — a pending decision "becomes a
+ * settings change rather than a code change" — and capability F3 is the screen
+ * that changes them.
+ *
+ * `palmVillaConfig` below is what the property was seeded WITH, kept for two
+ * jobs: it is the fixture the pure pricing tests price against, and it is the
+ * documented statement of the shipped defaults, which lib/db/property-config
+ * .test.ts asserts the database still agrees with. It is not read by anything
+ * that quotes a real booking.
+ *
+ * Values carrying a `TODO(client)` are provisional — placeholders that let the
+ * engine run, NOT decisions — and each names the prd.md §18 item that answers
+ * it. They are now provisional *settings* rather than provisional code: the
+ * client can change them himself, which is the whole point of the slice.
  */
 
 /**
@@ -155,18 +164,14 @@ export interface PropertyConfig {
   /** [C] Maximum advance booking period is two months (prd.md §9.1). */
   maxAdvanceBookingDays: number
 
-  /**
-   * Inert, and now deliberately so. open-questions.md N7 is answered
-   * (10 September 2026): a unit is held **indefinitely**, until a person checks
-   * — which is what the product does, since nothing expires a hold. No expiry
-   * job reads these.
-   *
-   * They survive rather than being deleted because the public flow (phase two)
-   * may still want to state an expectation to a customer even when nothing
-   * enforces one. Anything that starts *enforcing* them contradicts N7.
-   */
-  holdMinutesStay: number
-  holdMinutesDayPass: number
+  // There are no hold durations, and that is open-questions.md N7 answered
+  // (10 September 2026): a unit is held **indefinitely**, until a person
+  // checks. Nothing expires a hold and nothing should, so the two fields that
+  // used to sit here were deleted with capability F3 rather than given a
+  // settings row — a number the client can change that changes nothing invites
+  // him to shorten a timer that does not exist. If the public flow (phase two)
+  // wants to state an expectation to a customer, that is a screen decision
+  // with nothing behind it.
 
   // --- Day pass pricing (prd.md §8.1) -------------------------------------
 
@@ -190,11 +195,19 @@ export interface PropertyConfig {
 }
 
 /**
- * The Palm Villa configuration.
+ * The values Palm Villa was seeded with (supabase/seed.sql and
+ * `seed_property_settings()` in 20260912000100).
  *
- * Confirmed values come from prd.md §7.1, §8 and §11. Provisional values carry
- * a `TODO(client)` on their field above. When these move into the database
- * (schema slice), this object becomes the seed.
+ * Confirmed values come from prd.md §7.1, §8 and §11; provisional ones carry a
+ * `TODO(client)` on their field above. This is a **fixture and a statement of
+ * the defaults**, not the live configuration — see the module header. Changing
+ * a number here changes what a fresh database is seeded with and what the pure
+ * pricing tests price against, and changes nothing about a booking taken
+ * tomorrow.
+ *
+ * `propertyId` is the slug rather than the database uuid the live config
+ * carries. Nothing reads the field; it is here because a config that could not
+ * name its property would be an odd shape to hand to a second one.
  */
 export const palmVillaConfig: PropertyConfig = {
   propertyId: 'palm-villa',
@@ -252,9 +265,6 @@ export const palmVillaConfig: PropertyConfig = {
   securityDeposit: bnd(100),
 
   maxAdvanceBookingDays: 62,
-
-  holdMinutesStay: 60,
-  holdMinutesDayPass: 30,
 
   dayPassAgeBands: [
     {
