@@ -1,5 +1,6 @@
 import { EventHistory } from '@/components/portal/event-history'
-import type { AuditEvent, AuditEventPage } from '@/lib/db/audit'
+import type { AuditEventPage } from '@/lib/db/audit'
+import { describeAuditEvent } from '@/lib/domain/audit-label'
 
 /**
  * Everything recorded against this unit, newest first.
@@ -15,57 +16,14 @@ import type { AuditEvent, AuditEventPage } from '@/lib/db/audit'
  *
  * And every edit to the unit's note, which is what lets the note itself be a
  * single editable block rather than an append-only thread: the thread is here,
- * and the block at the top of the screen says what is true now.
+ * and the block at the top of the screen says what is true now. The note's own
+ * text is deliberately not quoted in the trail — `EventHistory` quotes a
+ * `reason`, a sentence written *about* an action, where a note is the thing
+ * itself and often several lines of it.
  *
- * It was the first history to be paged, because a unit is never finished: a
- * note corrected twice a month is two events a month for the life of the
- * building. Every trail pages the same way now — see `history-page.ts` — and
- * what stays here is the vocabulary.
+ * The verbs are `describeAuditEvent`, shared with every other trail since the
+ * audit log (F4) became a reader of all of them at once.
  */
-
-const ACTION_LABELS: Record<string, string> = {
-  'unit.marked_out_of_service': 'Taken out of service',
-  'unit.returned_to_service': 'Returned to service',
-  'unit.leased': 'Let long-term',
-  'unit.lease_ended': 'Lease end date changed',
-  'unit.lease_cancelled': 'Lease removed',
-  'unit.added': 'Added to the building',
-  'unit.note_added': 'Note added',
-  'unit.note_changed': 'Note changed',
-  'unit.note_cleared': 'Note cleared',
-}
-
-/**
- * A rename names both sides, because the trail's whole job here is to answer
- * "what was this door called before".
- */
-function renameLabel(event: AuditEvent): string {
-  const from = typeof event.before?.ref === 'string' ? event.before.ref : null
-  const to = typeof event.after?.ref === 'string' ? event.after.ref : null
-
-  return from && to ? `Renamed from ${from} to ${to}` : 'Renamed'
-}
-
-/**
- * The reason a unit went out of service is a fact about the unit, not a note on
- * the event — so it is stored under `reason` in the payload and read back here
- * the same way `EventHistory` reads a cancellation's.
- */
-function actionLabel(event: AuditEvent): string {
-  if (event.action === 'unit.renamed') {
-    return renameLabel(event)
-  }
-
-  // The note's own text is not quoted in the trail. `EventHistory` quotes an
-  // event's `reason` — a sentence written *about* an action — and a note is
-  // the thing itself, often several lines of it. Six entries each carrying a
-  // paragraph would bury the history in copies of a field the reader can see
-  // in full at the top of the screen.
-
-  // An unmapped action still renders as its raw verb. Hiding it would make the
-  // trail lie by omission about something that happened to this unit.
-  return ACTION_LABELS[event.action] ?? event.action.replace(/^unit\./, '').replace(/_/g, ' ')
-}
 
 interface UnitHistoryProps {
   history: AuditEventPage
@@ -80,8 +38,8 @@ export function UnitHistory({ history, path, actorNames }: UnitHistoryProps) {
       history={history}
       path={path}
       actorNames={actorNames}
-      label={actionLabel}
-      emptyMessage="Nothing has happened to this unit yet."
+      label={describeAuditEvent}
+      emptyMessage="Nothing recorded against this unit yet."
     />
   )
 }
