@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { csvCell, csvFilename, toCsv } from './csv'
+import { csvCell, csvFilename, exportFilename, toCsv } from './csv'
 
 describe('csvCell', () => {
   test('writes a plain value unquoted', () => {
@@ -77,5 +77,11 @@ describe('csvFilename', () => {
     expect(csvFilename('revenue', '2026-09-01', '2026-09-08')).toBe(
       'palm-villa-revenue-2026-09-01-to-2026-09-08.csv',
     )
+  })
+})
+
+describe('exportFilename', () => {
+  test('names the table and the day it was taken', () => {
+    expect(exportFilename('bookings', '2026-09-12')).toBe('palm-villa-bookings-2026-09-12.csv')
   })
 })

@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Coins,
   DoorOpen,
+  Download,
   Globe,
   LayoutDashboard,
   List,
@@ -92,6 +93,7 @@ export const navGroups = [
       { href: '/portal/settings/units', label: 'Unit registry', icon: Building2 },
       { href: '/portal/settings/roles', label: 'Roles & staff', icon: Users },
       { href: '/portal/settings/audit', label: 'Audit log', icon: ScrollText },
+      { href: '/portal/settings/export', label: 'Export data', icon: Download },
     ],
   },
   /**
