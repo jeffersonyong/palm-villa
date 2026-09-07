@@ -143,9 +143,7 @@ describe('checkUnitRefs', () => {
 describe('planRegistry', () => {
   test('identical input is an empty plan, and reads as a no-op', () => {
     const current = [unit('3B-01'), unit('3B-02')]
-    const plan = planRegistry(current, [
-      { unitTypeId: 'three-bedroom', refs: ['3B-01', '3B-02'] },
-    ])
+    const plan = planRegistry(current, [{ unitTypeId: 'three-bedroom', refs: ['3B-01', '3B-02'] }])
 
     expect(plan).toEqual({ renames: [], additions: [], removals: [], blocked: [] })
     expect(isNoOp(plan)).toBe(true)
@@ -170,9 +168,7 @@ describe('planRegistry', () => {
 
   test('a swap is two renames — the case the deferrable constraint exists for', () => {
     const current = [unit('3B-01'), unit('3B-02')]
-    const plan = planRegistry(current, [
-      { unitTypeId: 'three-bedroom', refs: ['3B-02', '3B-01'] },
-    ])
+    const plan = planRegistry(current, [{ unitTypeId: 'three-bedroom', refs: ['3B-02', '3B-01'] }])
 
     expect(plan.renames).toEqual([
       { unitId: 'id-3B-01', fromRef: '3B-01', toRef: '3B-02' },
@@ -183,9 +179,7 @@ describe('planRegistry', () => {
   test('pairs in natural order, so the ninth door is not renamed to the tenth name', () => {
     // Plain string sorting puts 3B-10 before 3B-9 and shifts half a floor.
     const current = [unit('3B-10'), unit('3B-9')]
-    const plan = planRegistry(current, [
-      { unitTypeId: 'three-bedroom', refs: ['A-09', 'A-10'] },
-    ])
+    const plan = planRegistry(current, [{ unitTypeId: 'three-bedroom', refs: ['A-09', 'A-10'] }])
 
     expect(plan.renames).toEqual([
       { unitId: 'id-3B-9', fromRef: '3B-9', toRef: 'A-09' },
@@ -219,9 +213,7 @@ describe('planRegistry', () => {
     const plan = planRegistry(current, [{ unitTypeId: 'three-bedroom', refs: ['3B-01'] }])
 
     expect(plan.removals).toEqual([])
-    expect(plan.blocked).toEqual([
-      { unitId: 'id-3B-02', ref: '3B-02', reason: 'has_history' },
-    ])
+    expect(plan.blocked).toEqual([{ unitId: 'id-3B-02', ref: '3B-02', reason: 'has_history' }])
   })
 
   test('a plan whose only content is a refusal is still a no-op, so Save stays disabled', () => {
@@ -235,9 +227,7 @@ describe('planRegistry', () => {
   test('a type absent from the desired set is left entirely alone', () => {
     // "No instruction" must never read as "delete everything".
     const current = [unit('3B-01'), unit('SD-01', { unitTypeId: 'semi-detached' })]
-    const plan = planRegistry(current, [
-      { unitTypeId: 'three-bedroom', refs: ['3B-01'] },
-    ])
+    const plan = planRegistry(current, [{ unitTypeId: 'three-bedroom', refs: ['3B-01'] }])
 
     expect(plan.removals).toEqual([])
     expect(plan.blocked).toEqual([])
@@ -250,16 +240,11 @@ describe('planRegistry', () => {
       { unitTypeId: 'semi-detached', refs: ['SD-01'] },
     ])
 
-    expect(plan.renames).toEqual([
-      { unitId: 'id-3B-01', fromRef: '3B-01', toRef: 'A-101' },
-    ])
+    expect(plan.renames).toEqual([{ unitId: 'id-3B-01', fromRef: '3B-01', toRef: 'A-101' }])
   })
 
   test('trims what the form gave it, so a stray space is not a rename', () => {
-    const plan = planRegistry(
-      [unit('3B-01')],
-      [{ unitTypeId: 'three-bedroom', refs: ['3B-01 '] }],
-    )
+    const plan = planRegistry([unit('3B-01')], [{ unitTypeId: 'three-bedroom', refs: ['3B-01 '] }])
 
     expect(plan.renames).toEqual([])
   })
@@ -278,9 +263,7 @@ describe('planRegistry', () => {
 describe('refsAfter', () => {
   test('describes the building the plan would leave behind', () => {
     const current = [unit('3B-01'), unit('3B-02'), unit('3B-03')]
-    const plan = planRegistry(current, [
-      { unitTypeId: 'three-bedroom', refs: ['A-101', 'A-102'] },
-    ])
+    const plan = planRegistry(current, [{ unitTypeId: 'three-bedroom', refs: ['A-101', 'A-102'] }])
 
     expect([...refsAfter(current, plan)].sort()).toEqual(['A-101', 'A-102'])
   })
@@ -289,41 +272,32 @@ describe('refsAfter', () => {
     // The editor renumbers one type into references another type already
     // holds. Caught before the save rather than by the database after it.
     const current = [unit('3B-01'), unit('SD-01', { unitTypeId: 'semi-detached' })]
-    const plan = planRegistry(current, [
-      { unitTypeId: 'three-bedroom', refs: ['SD-01'] },
-    ])
+    const plan = planRegistry(current, [{ unitTypeId: 'three-bedroom', refs: ['SD-01'] }])
 
-    expect(checkUnitRefs(refsAfter(current, plan))).toEqual([
-      { ref: 'SD-01', reason: 'duplicate' },
-    ])
+    expect(checkUnitRefs(refsAfter(current, plan))).toEqual([{ ref: 'SD-01', reason: 'duplicate' }])
   })
 })
 
 describe('checkUnitRegistry', () => {
-  const building: CurrentUnit[] = [
-    unit('3B-01'),
-    unit('SD-01', { unitTypeId: 'semi-detached' }),
-  ]
+  const building: CurrentUnit[] = [unit('3B-01'), unit('SD-01', { unitTypeId: 'semi-detached' })]
 
   test('a clean edit has nothing wrong with it', () => {
-    expect(
-      checkUnitRegistry(building, [{ unitTypeId: 'three-bedroom', refs: ['A-101'] }]),
-    ).toEqual([])
+    expect(checkUnitRegistry(building, [{ unitTypeId: 'three-bedroom', refs: ['A-101'] }])).toEqual(
+      [],
+    )
   })
 
   test('catches a collision with a type the form is not even showing', () => {
     // The database would refuse this after the form was filled in. Catching it
     // here is the difference between a marked field and a lost edit.
-    expect(
-      checkUnitRegistry(building, [{ unitTypeId: 'three-bedroom', refs: ['SD-01'] }]),
-    ).toEqual([{ ref: 'SD-01', reason: 'duplicate' }])
+    expect(checkUnitRegistry(building, [{ unitTypeId: 'three-bedroom', refs: ['SD-01'] }])).toEqual(
+      [{ ref: 'SD-01', reason: 'duplicate' }],
+    )
   })
 
   test('reports the problem against the name being edited, not the one being kept', () => {
     // Both are 'SD-01'; only one of them is in a field the clerk can change.
-    const problems = checkUnitRegistry(building, [
-      { unitTypeId: 'three-bedroom', refs: ['SD-01'] },
-    ])
+    const problems = checkUnitRegistry(building, [{ unitTypeId: 'three-bedroom', refs: ['SD-01'] }])
 
     expect(problems).toHaveLength(1)
   })

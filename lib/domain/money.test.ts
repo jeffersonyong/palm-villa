@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { bnd, centsFromInput, formatCents, sumCents } from './money'
+import { MAX_CENTS, bnd, centsFromInput, centsToDecimal, formatCents, sumCents } from './money'
 
 /**
  * Money tests.
@@ -67,6 +67,16 @@ describe('centsFromInput', () => {
     // is how a payment gets recorded at the wrong amount.
     expect(centsFromInput('1,0O0')).toBeNull()
   })
+
+  test('refuses an amount larger than the system can store', () => {
+    // Money is `integer` cents, so this is a hard ceiling rather than a
+    // policy — and a figure past it has to be refused at the form, or it
+    // parses cleanly and then fails inside the database as an out-of-range
+    // error the screen can only render as a crash.
+    expect(centsFromInput('21474836.47')).toBe(MAX_CENTS)
+    expect(centsFromInput('21474836.48')).toBeNull()
+    expect(centsFromInput('99999999999.99')).toBeNull()
+  })
 })
 
 describe('formatCents', () => {
@@ -95,5 +105,26 @@ describe('formatCents', () => {
 
   test('round-trips a parsed amount', () => {
     expect(formatCents(centsFromInput('442.05')!)).toBe('442.05')
+  })
+})
+
+describe('centsToDecimal', () => {
+  test('omits the grouping separator formatCents adds', () => {
+    // A CSV cell is read by a machine. `formatCents` gives `2,360.00`, which
+    // has to be quoted to survive the delimiter and is then text to Excel —
+    // the column would not sum, which is the whole point of the download.
+    expect(formatCents(bnd(2360))).toBe('2,360.00')
+    expect(centsToDecimal(bnd(2360))).toBe('2360.00')
+  })
+
+  test('always carries two decimal places', () => {
+    expect(centsToDecimal(bnd(50))).toBe('50.00')
+    expect(centsToDecimal(5)).toBe('0.05')
+    expect(centsToDecimal(0)).toBe('0.00')
+  })
+
+  test('keeps a negative negative, so an over-banked balance stays arithmetic', () => {
+    expect(centsToDecimal(bnd(-50))).toBe('-50.00')
+    expect(centsToDecimal(-5)).toBe('-0.05')
   })
 })

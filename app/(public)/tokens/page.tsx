@@ -157,6 +157,12 @@ const roles: { role: string; swatch: string; light: string; dark: string }[] = [
   { role: 'divider', swatch: 'bg-divider', light: 'hairline', dark: 'white 7%' },
   { role: 'accent', swatch: 'bg-accent', light: 'brand-pale', dark: 'brand 20% on ink-deep' },
   { role: 'invert-surface', swatch: 'bg-invert-surface', light: 'ink', dark: 'canvas-soft' },
+  {
+    role: 'tooltip-surface',
+    swatch: 'bg-tooltip-surface',
+    light: 'canvas',
+    dark: 'card lifted 6%',
+  },
   { role: 'footer-surface', swatch: 'bg-footer-surface', light: 'ink', dark: 'raised ink' },
 ]
 

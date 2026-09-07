@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, ArrowUpLeft, FileText, Landmark } from 'lucide-react'
+import { ArrowLeft, ArrowUpLeft, FileText, LockKeyhole } from 'lucide-react'
 
 import { DepositFigureTable } from '@/components/portal/deposit-figures'
 import { DepositStageBadge } from '@/components/portal/deposit-stage-badge'
@@ -281,7 +281,7 @@ function DepositFigures({
       title="Security deposit"
       // The deposit's mark (`deposit-figures.tsx`): the glyph the ledger wears
       // in the nav, over the table the booking screen shows under the same words.
-      icon={Landmark}
+      icon={LockKeyhole}
       // The sentence that keeps this honest — every money-out path in this
       // product records rather than moves (architecture.md §6.4) — as the
       // section's hint rather than a paragraph under its figures.

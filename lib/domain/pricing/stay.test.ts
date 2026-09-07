@@ -188,9 +188,10 @@ describe('priceStay — extras', () => {
   })
 })
 
-describe('priceStay — prd.md §18 N6, early check-in is undefined', () => {
+describe('priceStay — early check-in needs a check-in time to be early of', () => {
   test('is refused while the standard check-in time is unknown', () => {
-    const result = priceStay(input({ earlyCheckInHours: 2 }), palmVillaConfig, TODAY)
+    const config = withConfig({ standardCheckInTime: null })
+    const result = priceStay(input({ earlyCheckInHours: 2 }), config, TODAY)
 
     expect(result.ok).toBe(false)
     if (result.ok) return
@@ -198,9 +199,12 @@ describe('priceStay — prd.md §18 N6, early check-in is undefined', () => {
     expect(result.error.code).toBe('early_check_in_undefined')
   })
 
-  test('prices at BND 10 per hour once a check-in time is configured', () => {
-    const config = withConfig({ standardCheckInTime: '14:00' })
-    const result = priceStay(input({ earlyCheckInHours: 2 }), config, TODAY)
+  // open-questions.md N6 answered 10 September 2026: check-in is 14:00, so the
+  // live config prices early hours rather than refusing them. Whether the desk
+  // may sell them at all is N31, and is a question about the form, not the
+  // engine — nothing here asks for early hours today.
+  test('prices at BND 10 per hour under the configured 14:00 check-in', () => {
+    const result = priceStay(input({ earlyCheckInHours: 2 }), palmVillaConfig, TODAY)
 
     expect(result.ok).toBe(true)
     if (!result.ok) return

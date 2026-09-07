@@ -442,6 +442,42 @@
     color-mix(in oklab, var(--color-canvas) 4%, var(--color-ink-raised))
   );
 
+  /* The tooltip's fill (recut 2026-09-07).
+
+     **Light stays at the card white; dark lifts off it.** A tooltip is the
+     quietest thing on the page that floats — a hint, a key, a label on a glyph
+     — so the instinct is to mute it, and in light there is nowhere to mute
+     *to*. Every step down the neutral ladder is occupied: `canvas-soft` is the
+     neutral badge's own fill, and a status legend shows the real badges, so a
+     tooltip in it made every neutral chip vanish into its own ground. Stepping
+     further (ink 6% into the container tone) cleared the chips and read as a
+     flat gray slab — the tone the system uses for *disabled*, on the one
+     overlay that is pure information. White plus an edge is what the elevation
+     ladder says anyway, and it is the ground the badge tints were mixed
+     against.
+
+     Dark has the opposite problem and the room to solve it: it cannot mute
+     downward at all, because `muted` there is `ink-deep`, which sits *under*
+     both grounds a tooltip opens over — the content panel and the card — so a
+     chip in it reads as a hole punched in the page. It mutes by lifting, a
+     half-step above the card ceiling: the move `--tab-chip` already makes, one
+     notch further because a tooltip has to clear `ink-raised` as well as
+     `ink-panel`. */
+  --tooltip-surface: light-dark(
+    var(--color-canvas),
+    color-mix(in oklab, var(--color-canvas) 6%, var(--color-ink-raised))
+  );
+
+  /* And its seam, a step stronger than the card's. A tooltip is small, has no
+     scrim behind it and often opens over the very card it has to be told apart
+     from, so `hairline` — cut for an edge the eye can rest against — is not
+     quite enough to bound one. Dark keeps the standard 9%: its fill went up,
+     so the tone step is already doing the work. */
+  --tooltip-border: light-dark(
+    color-mix(in oklab, var(--color-ink) 12%, transparent),
+    color-mix(in oklab, var(--color-canvas) 9%, transparent)
+  );
+
   /* Text — two steps, and deliberately nothing between them (recut
      2026-08-31).
 
@@ -843,6 +879,8 @@
   --color-surface-panel: var(--surface-panel);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-tooltip-surface: var(--tooltip-surface);
+  --color-tooltip-border: var(--tooltip-border);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);

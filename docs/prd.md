@@ -249,14 +249,16 @@ any → out_of_service → available
 | Facility | Included in day pass |
 |---|---|
 | Swimming pool | **[C]** Yes |
-| Water park | **[C]** Yes |
-| Indoor children's playground | **[C]** Yes |
+| Water park | **[C]** Yes — *not named in the client's list of 10 September 2026; see below* |
+| Indoor children's playground (the "playroom") | **[C]** Yes |
 | BBQ area | **[C]** No |
-| Gym | **[O]** Pending Ladyboss decision |
-| Snooker table | **[O]** Pending Ladyboss decision |
-| Sauna room | **[O]** Pending Ladyboss decision |
+| Gym | **[C]** No (10 September 2026) |
+| Billiard / snooker room | **[C]** No (10 September 2026) |
+| Sauna room | **[O]** Not named either way — see below |
 
-**[A]** Facility inclusion is a per-facility toggle in configuration, so pending decisions become a settings change rather than a code change.
+**Answered 10 September 2026 — and one thing it did not settle.** Jason listed the day pass as pool and playroom in, billiard room, gym and BBQ out. That closes the gym and the snooker table, which had been waiting on a Ladyboss decision since this document was written. **The water park and the sauna are in neither half of his list.** The water park has been **[C]** included since §2 and is the most prominent thing on the public landing page, so the likeliest reading is that "swimming pool" covers the whole wet area — and a likeliest reading is not a confirmation for the one facility a customer is most likely to arrive expecting. Both go back to him in [C1](open-questions.md).
+
+**[A] confirmed as the right shape.** Jason's own framing was *"I will list out all the options so your team can enable or disable whenever you want"* — which is the per-facility toggle this document already assumed, now his expectation too. Inclusion is configuration (capability F3), so every line above is a switch rather than a code change, and the two unresolved facilities cost nothing to leave off until he says.
 
 **[A]** Facility capacity is configurable per facility. The configured number represents headroom available to day-pass visitors, not raw physical capacity, because long-term tenants have facility access at no service charge and form a permanent baseline load.
 
@@ -297,9 +299,15 @@ total = (base_rate × nights)
 **[C]** Sofa bed: 28, includes one pillow and one blanket, subject to availability.
 **[O]** Total number of sofa beds available across the property is unknown. Model as property-level add-on stock, not per unit.
 
-**[A] Early check-in requires an availability check, not just a charge.** Check-out is 12:00 and units target readiness by 14:00. Early check-in is only sellable when the unit was vacant the previous night or has passed inspection. Selling it as a simple paid extra will place guests in units still being cleaned.
+**[C] Standard check-in is 14:00 and standard check-out is 12:00** (10 September 2026, answering [N6](open-questions.md)). "Early" and "late" now have a baseline, and the pricing engine no longer refuses to count early check-in hours against an undefined one. `config.standardCheckInTime` carries the time.
 
-**[O]** Standard check-in time is not stated, so "early" is currently undefined.
+**[C] Late check-out is BND 15 per hour**, confirmed on the same date — unchanged from the formula above.
+
+**[O] The client's own example does not agree with the rate he gave.** *"There is a late fee of 15/hour. For example, they want to check out at 3pm instead, that's another 15."* Three hours past 12:00 at BND 15 an hour is 45, not 15. Either the rate is per hour and the example is loose, or a late check-out is a flat BND 15 however long it runs. The engine prices it per hour, which is what the words say and what the price list has always said; the arithmetic is [N30](open-questions.md) and one line settles it.
+
+**[A] Early check-in requires an availability check, not just a charge.** Check-out is 12:00 and units target readiness by 14:00. Early check-in is only sellable when the unit was vacant the previous night or has passed inspection. Selling it as a simple paid extra will place guests in units still being cleaned. Jason's answer is that same position from the other side — *"usually it's up for discussion as we may or may not have room ready"* — so it is a desk judgement, not a checkbox on a form.
+
+**[O] The booking form still does not sell it**, now for a stated reason rather than for want of a check-in time. What is undecided is the rule the desk applies and whether the BND 10 an hour on the price list is what it charges when it is granted: [N31](open-questions.md).
 
 ### 8.3 Long-term
 
@@ -332,7 +340,11 @@ The PRD has never described a discount, and staff asked for one: a guest at the 
 **[C]** Maximum advance booking period is two months.
 **[C]** Full payment is required to secure a unit. Unpaid bookings do not hold inventory.
 
-**[A] One qualification, added when the payment layer was built.** A booking taken at the desk and paid by bank transfer holds its unit from the moment it is created — its occupancy row counts against the exclusion constraint — and stays held until someone confirms the money landed. That is §9.3's checkout timer in substance, but **nothing expires it**: the duration is [N7](open-questions.md), still open, and the expiry job in architecture.md §6.3 is unbuilt. Until N7 is answered, an abandoned transfer blocks a unit until a staff member cancels it. The verification queue sorts oldest-first and shows the wait so this is visible rather than silent.
+**[A] One qualification, added when the payment layer was built.** A booking taken at the desk and paid by bank transfer holds its unit from the moment it is created — its occupancy row counts against the exclusion constraint — and stays held until someone confirms the money landed. That is §9.3's checkout timer in substance, but **nothing expires it**, and as of 10 September 2026 nothing should: [N7](open-questions.md) is answered *indefinitely*, which is exactly what is built. The expiry job sketched in architecture.md §6.3 is not needed. An abandoned transfer blocks a unit until a staff member cancels it — by decision now, rather than by omission — and the verification queue sorts oldest-first and shows the wait so it stays visible rather than silent.
+
+**[O] The same answers contradict the [C] above, and this is the largest open item in the document.** Asked how long to hold a unit, Jason added that *"right now it's the norm for people to make full payment only on the day itself, 90% of the time"*; asked what a guest transfers when booking, he named two cases — the deposit only, or the full amount with the deposit. Read together they describe **a booking secured by the BND 100 security deposit, with the stay paid on arrival**: the pay-on-arrival booking §9.4 excludes from v1 in as many words, and the part payment [N16](open-questions.md) was deferred over. Nine bookings in ten are the case v1 is built to refuse.
+
+Nothing has been changed on the strength of it. It reverses two of his own confirmations, and one of them — *full payment is required to secure a unit* — is stated policy rather than an inference, so it is his to reverse and not ours to read into an answer about something else. It is [N29](open-questions.md), and it is the question to put to him before the next slice: it decides what holds inventory, which booking states exist, what the public flow asks a customer for, and when the deposit is collected (§11).
 
 ### 9.2 Booking states
 
@@ -350,7 +362,11 @@ draft → held → awaiting_payment_verification → confirmed → checked_in
 
 Framed to the client as a **checkout timer**, not a reservation: the unit is held while payment completes, then released automatically.
 
-**[O]** Hold duration to be agreed. Suggested default: 60 minutes for stays, 30 minutes for day passes.
+**[C] There is no timer** (10 September 2026, answering [N7](open-questions.md)). Asked how long a unit should be held for someone promising a transfer, Jason said indefinitely, until somebody checks. The automatic release above is therefore **not built and not wanted**: a hold ends when a staff member confirms the payment or cancels the booking, and nothing else ends it. `holdMinutesStay` and `holdMinutesDayPass` stay in configuration as inert values rather than being deleted, because the public flow may still want a *displayed* expectation even when nothing enforces one — and that is a decision about a screen, not about the schema.
+
+**The consequence for phase two:** §10.3's transfer flow shows the customer "a countdown". With no expiry behind it that is a promise the system does not keep, so the public flow states the reference and the amount and says the unit is held until payment is confirmed. Capability A4 in scope-of-capabilities.md is worded as a checkout timer and needs the same correction.
+
+**And the consequence to raise rather than absorb:** an indefinite hold is only safe because a person is watching the queue. [N29](open-questions.md) is this same answer from the other end — if most guests really do pay on the day, "held indefinitely" is not a fallback, it is the product.
 
 ### 9.4 Manual booking (staff)
 
@@ -367,9 +383,16 @@ Framed to the client as a **checkout timer**, not a reservation: the unit is hel
 ### 9.5 Cancellation and no-show
 
 **[C]** The deposit paid is forfeited on cancellation or no-show.
-**[O]** Ambiguous which deposit this refers to. The BND 100 security deposit is collected on arrival, so a no-show never pays it. This most likely means the prepayment. **The two must be named distinctly in the product** (for example "booking payment" and "security deposit") before the ambiguity propagates into the schema.
 
-**Partly addressed.** The naming demand is met: the schema names the refundable BND 100 `security_deposit_cents` and never a bare `deposit`, and the booking payment is a separate concept per the §6.2 entity list. **N5 itself remains open** — which of the two is forfeited is still unanswered. Cancellation is now built (capability B3) and deliberately moves no money: it releases the unit, records who cancelled it, when and why, and states on screen that settlement happens outside the system. Nothing in the schema or the code depends on the answer, so N5 can still be answered either way — but it is now the one thing standing between the cancel screen and being complete.
+**[C] It is the security deposit that is kept, and the booking payment is refunded** (10 September 2026, answering [N5](open-questions.md)). Jason: *"We keep the deposit, booking payment is refunded if that is paid during booking."* The BND 100 therefore does two jobs — it secures the booking against a cancellation and the unit against damage — and *"if that is paid during booking"* carries the fact §11 now has to absorb: the deposit is taken **when the booking is made**, not only at the door.
+
+**The naming demand this section made was worth making.** The schema names the refundable BND 100 `security_deposit_cents` and never a bare `deposit`, and the booking payment is a separate concept per the §6.2 entity list — so the answer lands on two amounts that were already distinct, rather than on one word that meant either.
+
+**What is built, and what the answer now asks for.** Cancellation (capability B3) deliberately moves no money: it releases the unit, records who cancelled it, when and why, and states on screen that settlement happens outside the system. That stays right for the **refund** — architecture.md §6.4 keeps a v1 refund an instruction a person executes in a banking app. It is no longer complete for the **forfeiture**, because a deposit that is kept is money the business now owns. Three things follow, none of them built:
+
+- The deposit gains an outcome the ledger does not have: **forfeited**, beside held and released. §11's stages are derived rather than stored, so this is a rule and not a column.
+- A forfeited deposit **stops being a liability and becomes revenue**, on the day it was forfeited. §14's revenue figure excludes deposits in both directions today — **[O] [N32](open-questions.md)**.
+- The cancel screen should **state the forfeiture** instead of disclaiming any calculation, and say so plainly when no deposit was ever taken — which, until §9.1's policy question is settled, is every booking cancelled before check-in.
 
 ### 9.6 Amendment
 
@@ -409,6 +432,17 @@ Nothing in the PRD gives staff anywhere to write down what they know about a sta
 
 **[C]** Bank transfer to BIBD or Baiduri. Cash on site.
 **[C]** No card payment in v1. Deferred to a later phase pending merchant onboarding.
+
+**[C] The accounts, given 10 September 2026:**
+
+| Bank | Account number |
+|---|---|
+| BIBD | `0018-02-0010611` |
+| Baiduri | `03-0110-455273` |
+
+**[C] The number alone is what a customer is shown — no account name.** Two accounts exist for one reason: a Bruneian customer already banks with one or the other and transfers within their own bank without a fee or a delay. It is a choice of convenience, not two products, and nothing in the system routes on which one they pick or reconciles them differently.
+
+**[A] These are property configuration, not copy.** They belong beside the rates in the property's settings (capability F3), because the day a number changes is the day every transfer instruction and every accounting pack has to change with it — and a number pasted into a marketing page is the copy nobody remembers to update. Neither is in the product yet: the customer-facing transfer instructions are phase two (capability A5), and the desk reads them off a phone today.
 
 ### 10.2 Payment reference
 
@@ -476,6 +510,8 @@ Added when the amendment path made the gap real. Nothing in §10 described what 
 **[C]** Process: Housekeeping inspects the unit after check-out. Once condition is confirmed, deposit release is authorised by the approving role. Damages or charges are deducted before the balance is released.
 **[C]** Additional charges apply if costs exceed the deposit. **The deposit is not a cap on liability.**
 
+**[C] "Refundable" means refundable after a stay that happens.** §9.5's answer of 10 September 2026 makes this same BND 100 the amount kept when a guest cancels or does not turn up, so the deposit carries a second job this section never described: it is the commitment that secures a booking as well as the security against damage. What that changes here is **when it is taken** — see the note in the as-built block below.
+
 ### Requirements
 
 1. Deposit tracked as a liability from collection to release. An "outstanding deposits" view must exist.
@@ -492,6 +528,8 @@ Added when the amendment path made the gap real. Nothing in §10 described what 
 Six requirements above; five are met as written and one is not. The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
 
 **[A] The deposit is collected at check-in, as part of checking the guest in.** One action, one transaction: the booking moves to `checked_in` and the deposit row is written together, because a guest checked in with no deposit recorded is precisely the gap in the spreadsheet this replaces. It is taken in cash or by bank transfer, for the amount the booking quoted, and it cannot be skipped at the door. A booking quoting no deposit checks in without one, and the screen says so rather than implying money changed hands.
+
+**[O] The client has since contradicted that, and it is [N29](open-questions.md) seen from the deposit's side.** Asked on 10 September 2026 what a guest transfers when they book, Jason named two cases — *the deposit only*, or *the full amount with the deposit* — and both are money sent **when the booking is made**. §9.5 says the same thing from the other end: a deposit can only be forfeited by a no-show if it was taken before they failed to show. So the door is one of the places a deposit is collected, not the only one, and check-in would have to recognise a deposit already held rather than demand a second. Nothing has been changed on the strength of it, because it is the same single decision as §9.1's and building the early-collection path before the payment policy is settled would be guessing at the shape of the thing that pays for it.
 
 **[A] The deposit can be waived — at creation, with a reason, under its own permission** (5 September 2026, capability B15). The first build held that "a deposit somebody decided not to take is a conversation, not a field", and the conversation turned out to be a real one: a guest who extends after checking in gets a second booking (§9.6), and a second booking takes a second BND 100. The waiver is a checkbox in a *Security deposit* section at the foot of the walk-in form, shown only to a holder of `deposit.waive`. Ticking it opens a dialog rather than a field — the register every other consequential act in the portal uses — which says what the tick means (nothing held, nothing to charge damage against) and takes the reason there, by convention naming the booking whose deposit covers the stay; it cannot be confirmed empty, and cancelling leaves the box unticked. Unticking clears the waiver at once. A waived booking quotes zero, which is the path check-in already had; what the waiver adds is the **record**: the reason on the booking, a `deposit.waived` event in its history carrying the figure not taken, and a schema constraint that a booking with a waiver cannot quote a deposit — so an amendment repricing the stay cannot quietly put it back. It is decided at creation only; there is no waiving at the door, for the reason above.
 
@@ -581,7 +619,7 @@ Requirements 1 to 4 are met — the accounting pack arrived a day after the rest
 
 **The accounting pack (requirement 4, capability G5).** Assembled by the system, never by hand: the itemised booking, each payment's verification record, each transfer slip copied in, and the identity document referenced. It sits on the booking as a document like any other — opened by anyone who may view the booking, kept seven years, every opening logged. The following are **[A]**.
 
-**[A] The IC is referenced in the pack, not copied into it.** Requirement 4 says "IC" and the pack says *when it was collected, by whom, and which record it is* — never the image, never the filename. The reason is the two clocks above: a pack is kept seven years and opened by every role that can view a booking, an identity document twelve months and by Admin and Front Office only. A copy inside the pack would outlive the original by six years and reach Security and Housekeeping, which G2 promises never happens. **[O] [N24](open-questions.md)** asks whether that is what the accountant needs; the answer either way is a permission and a retention decision, not a rebuild.
+**[A] The IC is referenced in the pack, not copied into it.** Requirement 4 says "IC" and the pack says *when it was collected, by whom, and which record it is* — never the image, never the filename. The reason is the two clocks above: a pack is kept seven years and opened by every role that can view a booking, an identity document twelve months and by Admin and Front Office only. A copy inside the pack would outlive the original by six years and reach Security and Housekeeping, which G2 promises never happens. **[C] That is what the accountant needs** (10 September 2026): asked outright whether the IC belongs inside the pack, Jason said no. [N24](open-questions.md) is answered, the pack keeps its own seven-year clock and its own audience, and the permission and retention decision the other answer would have forced does not arise. The scope wording that lists the IC among the pack contents is met by the reference.
 
 **[A] "Transaction confirmation" is the verification record.** Nothing in the system is called a confirmation. What confirms a transfer is a person checking the bank (§10.4), so the pack prints that act: who verified it and when, the reference and sender they saw, whether it was matched by reference or by hand and why, and why an odd amount was accepted. Cash prints who counted it.
 
@@ -605,6 +643,30 @@ v1 reporting is deliberately minimal:
 - Outstanding charges owed
 - Daily cash-up: recorded versus banked
 - Day pass volume against configured capacity
+
+### As built (capabilities E4–E5, 9 September 2026)
+
+Five of the six are live. Day-pass volume against capacity is not, and cannot be: a day pass is not bookable in the portal, carries no date of its own, and no facility capacity has been agreed ([C2](open-questions.md)). The reports screen states that where the figure will go rather than omitting the row, and it arrives with the day-pass flow. The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
+
+**[A] Occupancy is unit-nights sold or lived in, over the property's whole inventory.** A unit-night counts when an occupancy row covers it in one of four statuses — confirmed, checked in, completed, or leased. A **held** unit does not count: a hold is somebody's intention and expires on its own (§9.3), so counting it would report a building fuller than the money says it was. Nor does a no-show. The denominator is units of the type × nights in the period, and **a unit out of service stays in it** — removing it would make a building that broke down look fuller than one that did not. Nights are half-open, matching every other range in the system. `lib/db/bookings.ts` flagged that this definition had to be agreed rather than inherited from the dashboard's "occupied tonight" figure; this is that agreement, and the screen states it beside the table.
+
+**[A] Revenue is money received, on the day it arrived.** Verified payments only — §10.7 already took this position for the balance, and a report built on booking totals would state income the bank has never held, moving whenever a booking is amended. Cash counts on the day it was collected; a transfer on `observed_on`, the date the verifier read off the bank. **`observed_on` is optional, so a transfer without one falls back to the day it was verified** — named rather than silent, because a run of payments dated by when a clerk was at their desk is worth noticing. The consequence worth stating: this is a **cash-basis** figure. A stay paid for in August and taken in September is August's revenue, which is the basis Finance reconciles on and the one that agrees with the cash-up beside it. Security deposits are excluded in both directions (§11) — with one exception nobody has priced yet. §9.5's answer of 10 September 2026 makes a forfeited deposit money the business keeps, and money kept is revenue on the day it is kept. Nothing forfeits a deposit today, so no figure here is wrong; the rule arrives with the forfeiture, and whether the accountant wants it counted that way is [N32](open-questions.md).
+
+**[A] The cash-up's recorded figure is cash booking payments, and deposits sit outside it.** A cash deposit goes into the same drawer, so the day states how much of it is there and the total leaves it out: §11 makes a deposit a refundable liability rather than takings, and banking one as revenue would be counting money the business owes back. The excess a guest settles beyond their deposit is excluded on the reasoning §11 already recorded — it "settles no booking and appears in no cash-up". Whether Finance would rather count the drawer as one figure is **[N27](open-questions.md)**; the answer moves one line.
+
+**[A] A banking is its own record, against a business day, and it is never edited.** Not a third payment status: notes from six payments go to the bank in one envelope, and the same money may be banked across two runs or the next morning. So a banking carries the day the cash was **taken** — chosen by the person banking, defaulted to the day on screen, and never in the future — while when the trip happened is a separate fact on the same row. A correction is a **second entry** rather than a change to the first, because editing one rewrites what somebody says they did; both stay on the day and the difference moves. Amounts are positive: money coming back out of the bank is a refund, and refunds are [N5](open-questions.md).
+
+**[A] Banking is recorded under `payment.verify`, minting no new permission.** §10.5's own [A] reads "verified by Finance" as the cash-up rather than as a per-payment sign-off, so whoever may verify that money arrived is whoever may say it reached the bank. That is the position §10.7 took for recording a transfer and §13 for rebuilding a pack. **[N26](open-questions.md)** puts it to the client, with the consequence that Front Office — who take the cash — hold neither `report.view` nor a way onto the screen.
+
+**[A] The reconciliation is a running balance, not a per-day variance.** The first build compared each day's cash against each day's banking and reported the difference per row. That is only correct for a desk that banks every day it takes cash, and this one does not: an evening's notes go in the next morning, and a quiet week goes in on one trip. Under a per-day rule that trip left four days reading "not banked" and the fifth "over" by four days' takings, and squaring it would have meant splitting one deposit slip across five rows by hand — a reconciliation that makes the ordinary week look broken is one nobody keeps up. So a day now carries a **balance brought forward**: everything taken, less everything banked, since the building opened. One lump sum clears whatever has built up, whichever days it came from, and no row is matched to another. The screen leads with **cash on hand** — what should be in the drawer right now — which is the one figure here a person can verify directly by counting it. A window's own recorded and banked totals still answer §10.5's "recorded cash against banked amounts" for the period; what changed is that the *day* is no longer the unit of reconciliation. A negative balance is the one state arithmetic can call wrong — more has reached the bank than was ever recorded — and it is named **over-banked** rather than dressed as a shortfall.
+
+**Every report table downloads as CSV.** A report nobody can get out of the browser is half a tool: the accountant works in a spreadsheet and a screenshot cannot be summed. Each table carries a *Download CSV* on its title line, exporting the rows behind it **for the period and filters on screen** — the file is the screen, read through the same functions the page uses, so the two cannot disagree. Deliberately unpaged: a page boundary is a reading convenience and a spreadsheet has no use for one. Amounts go out as bare decimals with the currency named in the column header, because a cell reading `BND 2,360.00` is text a spreadsheet cannot add up. **This is not F5**, which is the whole-business data export and is still unbuilt; this is the reports screen answering for itself.
+
+**[A] Nothing about a day's reconciliation is stored.** Recorded, banked and the difference between them are derived from the payments, the deposits and the bankings on every read — the same argument [architecture.md §5.1](architecture.md) makes for `unit.status` and a deposit's stage. A banking recorded late correctly changes yesterday's answer.
+
+**A day boundary is an instant, not a date.** Every timestamp is `timestamptz`, and a bare date compared against one is cast at the *session's* midnight — UTC on Supabase, which is 08:00 in Brunei. The cash log had that bug and was filing the first eight hours of every day under the day before; the conversion now happens once, at the boundary. Worth recording because it is invisible until somebody counts a drawer.
+
+**`report.view` is now enforced.** It was seeded to Admin and Finance and checked nowhere; the two reporting screens are its first consumers.
 
 ---
 

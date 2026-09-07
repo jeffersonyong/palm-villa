@@ -13,10 +13,14 @@ describe('activeHref', () => {
     // The Admin landing page is itself a route, so its children must still win.
     expect(activeHref('/portal/settings')).toBe('/portal/settings')
     expect(activeHref('/portal/settings/pricing')).toBe('/portal/settings/pricing')
+    // Reports and the cash-up are siblings in the nav and nested in the URL.
+    expect(activeHref('/portal/reports/cash-up')).toBe('/portal/reports/cash-up')
   })
 
   test('keeps a deeper unlisted route on its nearest listed ancestor', () => {
     expect(activeHref('/portal/bookings/abc123')).toBe('/portal/bookings')
+    // One day of the cash-up lights the cash-up, not Reports above it.
+    expect(activeHref('/portal/reports/cash-up/2026-09-06')).toBe('/portal/reports/cash-up')
   })
 
   test('matches whole segments, so a sibling sharing a prefix does not match', () => {
@@ -45,6 +49,14 @@ describe('breadcrumbTrail', () => {
       { label: 'Portal', href: '/portal' },
       { label: 'Admin' },
       { label: 'Audit log' },
+    ])
+  })
+
+  test('a day of the cash-up is crumbed under the screen it belongs to', () => {
+    expect(breadcrumbTrail('/portal/reports/cash-up/2026-09-06')).toEqual([
+      { label: 'Portal', href: '/portal' },
+      { label: 'Finance' },
+      { label: 'Daily cash-up' },
     ])
   })
 

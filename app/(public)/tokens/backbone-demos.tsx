@@ -180,7 +180,7 @@ export function OverlayDemos() {
 
       <Row
         title="Tooltip"
-        note="The small-overlay exception: control radius on the invert surface, because a 16px corner on a caption chip reads as a pill. One TooltipProvider wraps the surface — never one per tooltip."
+        note="The overlay shell at label scale: card fill, hairline and shadow like every overlay, but the control radius — a 16px corner on a caption chip reads as a pill. One TooltipProvider wraps the surface — never one per tooltip."
       >
         <TooltipProvider>
           <Tooltip>

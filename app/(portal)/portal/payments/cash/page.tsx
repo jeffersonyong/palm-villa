@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react'
 
 import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { EmptyState } from '@/components/portal/empty-state'
-import { overlapRangeOf, readSearch, readStayWindow } from '@/components/portal/list-params'
+import { readSearch, readStayWindow } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { initials } from '@/components/ui/avatar-identity'
@@ -23,7 +23,7 @@ import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listPayments } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
-import { formatTimestamp } from '@/lib/domain/dates'
+import { bruneiWindowBounds, formatTimestamp } from '@/lib/domain/dates'
 import { formatCents, sumCents } from '@/lib/domain/money'
 
 import { CashFilters } from './cash-filters'
@@ -75,16 +75,21 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
   }
 
   // Both ends inclusive — the days the calendar shows as selected — converted
-  // to a half-open range at this boundary and nowhere else.
+  // at this boundary and nowhere else. **Instants, not dates**: `collected_at`
+  // is a `timestamptz`, and a bare date compared against one is cast at the
+  // session's midnight, which is 08:00 in Brunei — so this screen used to file
+  // the first eight hours of every day under the day before. The cash-up
+  // needed the figure to be right and found it (capability E4).
   const window = readStayWindow(params.from, params.to)
   const search = readSearch(params.q)
   const isFiltered = window !== null || search !== null
+  const bounds = window ? bruneiWindowBounds(window) : null
 
   const [payments, staff] = await Promise.all([
     listPayments({
       methods: ['cash'],
-      collectedFrom: window?.from,
-      collectedBefore: window ? overlapRangeOf(window).end : undefined,
+      collectedFrom: bounds?.start,
+      collectedBefore: bounds?.end,
       search: search ?? undefined,
       newestFirst: true,
     }),

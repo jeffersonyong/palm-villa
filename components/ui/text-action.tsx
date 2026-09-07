@@ -38,16 +38,27 @@ import { cn } from '@/lib/utils'
  * Monochrome, like everything else on the operations surfaces: no teal here,
  * ever (design.md — two accents, one system).
  */
+const textActionClass =
+  'cursor-pointer rounded-sm text-body-sm text-copy underline decoration-muted-foreground underline-offset-2 transition-colors outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50'
+
 export function TextAction({ className, type, ...props }: React.ComponentProps<'button'>) {
   return (
     <button
       data-slot="text-action"
       type={type ?? 'button'}
-      className={cn(
-        'cursor-pointer rounded-sm text-body-sm text-copy underline decoration-muted-foreground underline-offset-2 transition-colors outline-none hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
-        className,
-      )}
+      className={cn(textActionClass, className)}
       {...props}
     />
   )
+}
+
+/**
+ * The same action worded as a link, for the case where it *is* one — a
+ * download, which is a URL with a filename on the end of it and has to survive
+ * a middle-click, a right-click and a browser with no JavaScript yet. A button
+ * that fetched the file itself would take all three away, and the styling is
+ * shared rather than re-typed so the two cannot drift apart.
+ */
+export function TextActionLink({ className, ...props }: React.ComponentProps<'a'>) {
+  return <a data-slot="text-action" className={cn(textActionClass, className)} {...props} />
 }

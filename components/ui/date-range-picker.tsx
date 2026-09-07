@@ -4,7 +4,11 @@ import { X } from 'lucide-react'
 import { useState } from 'react'
 
 import { RangeCalendar, type StayDateRange } from '@/components/ui/calendar'
-import { DATE_RANGE_PRESETS, matchingPreset } from '@/components/ui/date-range-presets'
+import {
+  DATE_RANGE_PRESETS,
+  matchingPreset,
+  type DateRangePreset,
+} from '@/components/ui/date-range-presets'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { formatStayRange, todayInBrunei, type StayDate } from '@/lib/domain/dates'
@@ -43,6 +47,11 @@ interface DateRangePickerProps {
   onChange: (range: StayDateRange | null) => void
   /** How many months to show. Defaults to two. */
   months?: number
+  /**
+   * The rail's named spans. Defaults to the forward-weighted set; the reports
+   * screens pass `REPORT_DATE_RANGE_PRESETS`, which looks backwards.
+   */
+  presets?: readonly DateRangePreset[]
   className?: string
 }
 
@@ -51,6 +60,7 @@ export function DateRangePicker({
   value,
   onChange,
   months = 2,
+  presets = DATE_RANGE_PRESETS,
   className,
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -58,7 +68,7 @@ export function DateRangePicker({
   const [draftStart, setDraftStart] = useState<StayDate | null>(null)
   const [today] = useState(() => todayInBrunei())
 
-  const selectedPreset = matchingPreset(value, today)
+  const selectedPreset = matchingPreset(value, today, presets)
 
   function commit(range: StayDateRange) {
     onChange(range)
@@ -90,7 +100,7 @@ export function DateRangePicker({
               system, and it scrolls rather than stretching the panel if the
               set ever grows. */}
           <div className="w-[128px] shrink-0 border-r border-divider p-sm">
-            {DATE_RANGE_PRESETS.map((preset) => {
+            {presets.map((preset) => {
               const isSelected = preset.id === selectedPreset?.id
 
               return (

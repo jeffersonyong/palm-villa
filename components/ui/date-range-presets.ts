@@ -61,6 +61,55 @@ export const DATE_RANGE_PRESETS: readonly DateRangePreset[] = [
   },
 ]
 
+/**
+ * The rail the reports screen carries instead, weighted backwards.
+ *
+ * The set above serves a bookings list, which is read to answer "who is
+ * coming". A report answers "what happened", and every span it offers is
+ * therefore behind today — a forward-looking preset on a screen about the past
+ * would resolve to a period with nothing in it.
+ *
+ * `Today` stays first for the same reason it leads the other rail, and it also
+ * settles an ambiguity: on the 1st of a month, `Today` and `Month to date` are
+ * the same range, and `matchingPreset` returns the first one that matches.
+ */
+export const REPORT_DATE_RANGE_PRESETS: readonly DateRangePreset[] = [
+  {
+    id: 'today',
+    label: 'Today',
+    resolve: (today) => ({ start: today, end: today }),
+  },
+  {
+    id: 'yesterday',
+    label: 'Yesterday',
+    resolve: (today) => ({ start: addDays(today, -1), end: addDays(today, -1) }),
+  },
+  {
+    id: 'last-7',
+    label: 'Last 7 days',
+    // Inclusive of today, so seven days means today and the six before it.
+    resolve: (today) => ({ start: addDays(today, -6), end: today }),
+  },
+  {
+    id: 'month-to-date',
+    label: 'Month to date',
+    // To today, not to the end of the month: a report that padded the period
+    // with days that have not happened would divide its occupancy by nights
+    // nobody could have slept.
+    resolve: (today) => ({ start: firstDayOfMonth(monthOf(today)), end: today }),
+  },
+  {
+    id: 'last-month',
+    label: 'Last month',
+    resolve: (today) => monthSpan(shiftMonth(monthOf(today), -1)),
+  },
+  {
+    id: 'year-to-date',
+    label: 'Year to date',
+    resolve: (today) => ({ start: `${today.slice(0, 4)}-01-01`, end: today }),
+  },
+]
+
 function monthSpan(month: string): StayDateRange {
   return { start: firstDayOfMonth(month), end: lastDayOfMonth(month) }
 }
@@ -75,12 +124,13 @@ function monthSpan(month: string): StayDateRange {
 export function matchingPreset(
   range: StayDateRange | null,
   today: StayDate = todayInBrunei(),
+  presets: readonly DateRangePreset[] = DATE_RANGE_PRESETS,
 ): DateRangePreset | undefined {
   if (!range) {
     return undefined
   }
 
-  return DATE_RANGE_PRESETS.find((preset) => {
+  return presets.find((preset) => {
     const resolved = preset.resolve(today)
 
     return resolved.start === range.start && resolved.end === range.end

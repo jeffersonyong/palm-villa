@@ -129,7 +129,8 @@ export default async function StatementPage({ params }: PageProps) {
         {deposit.inspection ? (
           <>
             <p className="mt-sm text-foreground">
-              {outcome ?? deposit.inspection.outcome} — {formatTimestamp(deposit.inspection.inspectedAt)}
+              {outcome ?? deposit.inspection.outcome} —{' '}
+              {formatTimestamp(deposit.inspection.inspectedAt)}
             </p>
             {deposit.inspection.notes ? (
               <p className="mt-xs whitespace-pre-line">{deposit.inspection.notes}</p>
@@ -163,7 +164,7 @@ export default async function StatementPage({ params }: PageProps) {
               {standing.map((charge) => (
                 <tr key={charge.id} className="border-b border-divider last:border-0">
                   <td className="py-sm pr-lg align-top text-foreground">{charge.reason}</td>
-                  <td className="py-sm text-right align-top tabular-nums text-foreground">
+                  <td className="py-sm text-right align-top text-foreground tabular-nums">
                     {formatCents(charge.amount)}
                   </td>
                 </tr>
@@ -230,9 +231,7 @@ function Total({ label, value, strong }: { label: string; value: number; strong?
       <span className={strong ? 'text-body-md text-foreground' : undefined}>{label}</span>
       <span
         className={
-          strong
-            ? 'text-body-md text-foreground tabular-nums'
-            : 'text-foreground tabular-nums'
+          strong ? 'text-body-md text-foreground tabular-nums' : 'text-foreground tabular-nums'
         }
       >
         BND {formatCents(value)}

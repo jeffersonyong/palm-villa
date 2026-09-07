@@ -56,9 +56,9 @@ The `docs/` folder is the source of truth. Each doc is **normative for its domai
 
 Docs are living documents and must evolve with the project:
 
-- **[changelog.md](changelog.md) is updated only when a slice of work is complete — not per commit.** A dated entry (newest first) with what was added/changed/decided and why. Link the doc or PR; don't restate detail. This is the running narrative of how the project evolved, not a commit log.
+- **There is no changelog file — the git log is the project's history.** Every commit body explains *why* as well as what, and every PR summary ties the slice to its PRD/scope refs (see Repo etiquette). Don't add a changelog or dated release-notes file: it would be a third copy of what commit bodies, PR descriptions and the normative docs already hold.
 - **Update `docs/` after every major milestone or significant addition** — a phase completing, a schema-shaping decision, a scope change, or an [O]/[A] item being resolved with the client. The change belongs in the same PR as the work, in whichever doc is normative for it.
 - When the client answers an open question, move it to the Answered section of [open-questions.md](docs/open-questions.md), update its [O]/[A] tag to [C] where it arises in the PRD, and propagate the decision to the relevant section — don't leave the answer only in a chat thread, or only in the register.
 - If implementation is forced to diverge from architecture.md, update architecture.md in the same PR with the reasoning — the doc stays normative only if it stays true.
 - Scope changes agreed with the client get a capability ref added to (or struck from) scope-of-capabilities.md, so the scope baseline stays honest.
-- Keep docs concise: record decisions and rationale, not narration. Prefer editing the existing section over appending changelogs.
+- Keep docs concise: record decisions and rationale, not narration. Prefer editing the existing section over appending dated notes.

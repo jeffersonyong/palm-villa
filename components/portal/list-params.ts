@@ -1,4 +1,4 @@
-import { addDays, isStayDate, type StayDate } from '@/lib/domain/dates'
+import { addDays, isStayDate, type StayDate, type StayWindow } from '@/lib/domain/dates'
 
 /**
  * How a list screen reads its filters out of the URL.
@@ -37,14 +37,10 @@ export function readChoices<T extends string>(
 }
 
 /**
- * A window of days, **both ends inclusive** — the first and last day the filter
- * row's calendar shows as selected, because that is what the person clicking
- * them meant.
+ * A window of days, both ends inclusive. Defined in lib/domain/dates and
+ * re-exported here, where every list screen already reaches for it.
  */
-export interface StayWindow {
-  from: StayDate
-  to: StayDate
-}
+export type { StayWindow } from '@/lib/domain/dates'
 
 /** The `from`/`to` pair, or null unless both are real dates in order. */
 export function readStayWindow(

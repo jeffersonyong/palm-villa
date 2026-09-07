@@ -36,6 +36,19 @@ export function bnd(amount: number): Cents {
 const TYPED_AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/
 
 /**
+ * The largest amount this system can hold: Postgres `integer`, in cents.
+ *
+ * Money is stored as `integer` cents (architecture.md §5.1), so BND
+ * 21,474,836.47 is a hard ceiling rather than a policy. A figure above it is
+ * refused **here**, at the boundary, because the alternative is a value that
+ * parses cleanly, passes every check a form makes, and then fails inside the
+ * database as an out-of-range error the screen can only render as a crash.
+ * Nothing at Palm Villa is legitimately this large — the point is that a
+ * mistyped one is answered with a sentence rather than an error page.
+ */
+export const MAX_CENTS: Cents = 2_147_483_647
+
+/**
  * Parses an amount a staff member typed, in BND, to cents.
  *
  * `bnd()` refuses anything that is not whole dollars, which is right for the
@@ -47,6 +60,11 @@ const TYPED_AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/
  * grouping comma, a currency symbol, a minus sign or a third decimal place all
  * come back as null so the form can say what it did not understand. Guessing
  * at "1,0O0" is how a payment gets recorded at the wrong amount.
+ *
+ * An amount past `MAX_CENTS` is refused for the same reason and not a
+ * different one: it is a figure this system cannot store, and letting it
+ * through moves the refusal from a message beside the field to an
+ * out-of-range error inside the database.
  */
 export function centsFromInput(value: string): Cents | null {
   const trimmed = value.trim()
@@ -56,13 +74,33 @@ export function centsFromInput(value: string): Cents | null {
   }
 
   const [major, minor = ''] = trimmed.split('.')
+  const cents = Number(major) * CENTS_PER_BND + Number(minor.padEnd(2, '0'))
 
-  return Number(major) * CENTS_PER_BND + Number(minor.padEnd(2, '0'))
+  return cents > MAX_CENTS ? null : cents
 }
 
 /** Sums a list of amounts. */
 export function sumCents(amounts: readonly Cents[]): Cents {
   return amounts.reduce((total, amount) => total + amount, 0)
+}
+
+/**
+ * An amount as a bare decimal, e.g. `2360.00` — no grouping separator.
+ *
+ * For a machine rather than a reader: a CSV cell, where `formatCents`'s
+ * thousands comma is actively wrong twice over. It has to be quoted to survive
+ * the delimiter, and a quoted `"2,360.00"` is then read by Excel as **text** —
+ * so the column the accountant downloaded the file to sum will not sum. The
+ * grouping is a courtesy to a human eye and there is no eye here.
+ *
+ * Always two decimal places, and a negative keeps its sign so an over-banked
+ * balance stays negative arithmetic rather than becoming a string.
+ */
+export function centsToDecimal(amount: Cents): string {
+  const isNegative = amount < 0
+  const absolute = Math.abs(amount)
+
+  return `${isNegative ? '-' : ''}${Math.floor(absolute / CENTS_PER_BND)}.${String(absolute % CENTS_PER_BND).padStart(2, '0')}`
 }
 
 /**
