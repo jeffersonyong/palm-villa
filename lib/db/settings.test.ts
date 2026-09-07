@@ -206,9 +206,7 @@ describe('savePricingSettings', () => {
       pricing: {
         ...pricing,
         unitTypes: pricing.unitTypes.map((unitType) =>
-          unitType.slug === 'three-bedroom'
-            ? { ...unitType, base_rate_cents: bnd(220) }
-            : unitType,
+          unitType.slug === 'three-bedroom' ? { ...unitType, base_rate_cents: bnd(220) } : unitType,
         ),
       },
       actorId: null,
@@ -287,9 +285,7 @@ describe('savePricingSettings', () => {
       expectedUpdatedAt: settings.settingsUpdatedAt,
       pricing: {
         ...pricingAsStored(settings),
-        unitTypes: [
-          { slug: 'penthouse', base_rate_cents: bnd(500), max_pax: 2, car_parks: 1 },
-        ],
+        unitTypes: [{ slug: 'penthouse', base_rate_cents: bnd(500), max_pax: 2, car_parks: 1 }],
       },
       actorId: null,
     })
@@ -375,9 +371,7 @@ describe('saveDayPassSettings', () => {
       expectedUpdatedAt: settings.settingsUpdatedAt,
       dayPass: {
         ...stored,
-        bands: stored.bands.map((band) =>
-          band.min_age === 0 ? { ...band, min_age: 2 } : band,
-        ),
+        bands: stored.bands.map((band) => (band.min_age === 0 ? { ...band, min_age: 2 } : band)),
       },
       actorId: null,
     })
@@ -395,9 +389,7 @@ describe('saveDayPassSettings', () => {
       dayPass: {
         ...stored,
         facilities: stored.facilities.map((facility) =>
-          facility.id === waterPark!.id
-            ? { ...facility, included_in_day_pass: false }
-            : facility,
+          facility.id === waterPark!.id ? { ...facility, included_in_day_pass: false } : facility,
         ),
       },
       actorId: null,
@@ -482,9 +474,7 @@ describe('saveDocumentRetention', () => {
     })
 
     const events = await auditEventsFor(propertyId)
-    const retention = events.findLast(
-      (event) => event.action === 'document_retention.updated',
-    )
+    const retention = events.findLast((event) => event.action === 'document_retention.updated')
 
     // `kind` survives on both sides deliberately: it is what the event is
     // about, so a diff that stripped it would leave "12 became 6" governing

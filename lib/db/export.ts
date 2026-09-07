@@ -65,7 +65,10 @@ const CHUNK = 1000
  * carries its range and cannot be re-ranged after it has been awaited.
  */
 export async function readAllRows<T>(
-  build: (from: number, to: number) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  build: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
   chunk: number = CHUNK,
 ): Promise<T[]> {
   const rows: T[] = []
@@ -129,7 +132,11 @@ function yesNo(value: boolean | null | undefined): CsvValue {
 }
 
 function text(value: unknown): CsvValue {
-  return typeof value === 'string' ? value : value === null || value === undefined ? '' : String(value)
+  return typeof value === 'string'
+    ? value
+    : value === null || value === undefined
+      ? ''
+      : String(value)
 }
 
 /** A nested object or array, as JSON. Text, so the formula guard applies. */
@@ -251,14 +258,7 @@ const bookingLines: ExportTable = {
     )
 
     return {
-      headers: [
-        'Booking',
-        'Kind',
-        'Description',
-        'Quantity',
-        'Unit price (BND)',
-        'Amount (BND)',
-      ],
+      headers: ['Booking', 'Kind', 'Description', 'Quantity', 'Unit price (BND)', 'Amount (BND)'],
       rows: rows.map((row) => [
         text(row.booking?.reference),
         row.line_type,
@@ -805,7 +805,16 @@ const auditEvents: ExportTable = {
     )
 
     return {
-      headers: ['When', 'Actor id', 'Action', 'Record type', 'Record id', 'Record', 'Before', 'After'],
+      headers: [
+        'When',
+        'Actor id',
+        'Action',
+        'Record type',
+        'Record id',
+        'Record',
+        'Before',
+        'After',
+      ],
       rows: rows.map((row) => [
         row.at,
         text(row.actor_id),

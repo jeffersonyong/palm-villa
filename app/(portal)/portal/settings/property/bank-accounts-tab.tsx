@@ -151,8 +151,8 @@ export function BankAccountsTab({ settings }: BankAccountsTabProps) {
 
             <Notice className="mt-lg">
               A customer is shown the number alone — no account name — and picks whichever bank is
-              their own. Nothing shows these to customers yet: the public booking site is phase
-              two, and the desk reads them off a phone today.
+              their own. Nothing shows these to customers yet: the public booking site is phase two,
+              and the desk reads them off a phone today.
             </Notice>
           </FormSection>
         </Card>

@@ -266,11 +266,25 @@ any → out_of_service → available
 
 **[A]** Facility capacity is configurable per facility. The configured number represents headroom available to day-pass visitors, not raw physical capacity, because long-term tenants have facility access at no service charge and form a permanent baseline load.
 
+### As built (capability F3, 12 September 2026)
+
+**The table above is now rows, and the screen is Property settings → Day pass.** Every facility carries a name, a checkbox for whether the day pass admits it, and a capacity — so the two facilities the client has not settled cost nothing to leave as they are, and settling them is a tick rather than a deploy. That is his own framing made real.
+
+**The sauna is seeded OUT.** He named it neither way, and of the two readings only one can mis-sell a pass: a guest turned away from a sauna they were never sold is a disappointment, where a guest admitted to one the business did not price is revenue given away and a precedent set. It flips with a tick the day he says.
+
+**Every capacity is empty, and that is the honest state** ([C2](open-questions.md)). The field exists; no number has ever been agreed. Until one is, nothing is limited and §14's day-pass panel still has no denominator to state.
+
+**[A] A facility carries a slug it never loses.** Derived from the name once, at creation, and untouched by a rename — so "Playroom" becoming "Indoor playground" does not break a public page pointing at it. Nothing joins on it yet; it is what [architecture.md §8](architecture.md)'s F7 note asks this capability to leave behind.
+
 ---
 
 ## 8. Pricing engine
 
 Pricing is a line-item calculation, never a single stored price. Every booking produces itemised `BookingLine` records that sum to a total.
+
+**[C] Every figure below is a setting, not a constant** (capability F3, 12 September 2026). Rates, the extra-person charge, the sofa bed, early and late hours, the deposit and the advance window are rows the client edits on Property settings; the values stated in this section are what the property was **seeded** with. A figure carrying **[O]** is now a provisional *setting* rather than provisional code — he can answer it by typing.
+
+**[A] There is no effective dating, and that is a decision** ([N33](open-questions.md)). A rate change touches no stored `booking_line`: a booking already taken keeps the figures it was quoted, and an amendment reprices the whole stay at today's — which is §9.6's rule, unchanged. Nobody has asked for a rate that starts on a date, and a valid-from column nothing reads would be a second copy of the fact F3 exists to hold once. The screen says so where somebody changes a rate, because "does this change what I already sold" is the first thing anybody wonders.
 
 ### 8.1 Day passes
 
@@ -374,7 +388,7 @@ draft → held → awaiting_payment_verification → confirmed → checked_in
 
 Framed to the client as a **checkout timer**, not a reservation: the unit is held while payment completes, then released automatically.
 
-**[C] There is no timer** (10 September 2026, answering [N7](open-questions.md)). Asked how long a unit should be held for someone promising a transfer, Jason said indefinitely, until somebody checks. The automatic release above is therefore **not built and not wanted**: a hold ends when a staff member confirms the payment or cancels the booking, and nothing else ends it. `holdMinutesStay` and `holdMinutesDayPass` stay in configuration as inert values rather than being deleted, because the public flow may still want a *displayed* expectation even when nothing enforces one — and that is a decision about a screen, not about the schema.
+**[C] There is no timer** (10 September 2026, answering [N7](open-questions.md)). Asked how long a unit should be held for someone promising a transfer, Jason said indefinitely, until somebody checks. The automatic release above is therefore **not built and not wanted**: a hold ends when a staff member confirms the payment or cancels the booking, and nothing else ends it. `holdMinutesStay` and `holdMinutesDayPass` were **deleted with capability F3** (12 September 2026) rather than given a settings row. They had been kept as inert values in case the public flow wanted a *displayed* expectation, and a number the client can change that changes nothing is worse than no number at all: it invites him to shorten a timer that does not exist. If phase two wants to state an expectation to a customer, that is a decision about a screen with nothing behind it.
 
 **The consequence for phase two:** §10.3's transfer flow shows the customer "a countdown". With no expiry behind it that is a promise the system does not keep, so the public flow states the reference and the amount and says the unit is held until payment is confirmed. Capability A4 in scope-of-capabilities.md is worded as a checkout timer and needs the same correction.
 
@@ -453,6 +467,8 @@ Nothing in the PRD gives staff anywhere to write down what they know about a sta
 | Baiduri | `03-0110-455273` |
 
 **[C] The number alone is what a customer is shown — no account name.** Two accounts exist for one reason: a Bruneian customer already banks with one or the other and transfers within their own bank without a fee or a delay. It is a choice of convenience, not two products, and nothing in the system routes on which one they pick or reconciles them differently.
+
+**As built (capability F3, 12 September 2026):** both accounts are rows, edited on Property settings → Bank accounts, and nothing else reads them yet. The customer-facing transfer instructions are capability A5, phase two; the desk still reads the number off a phone. What this buys today is that the day a number changes, there is one place to change it.
 
 **[A] These are property configuration, not copy.** They belong beside the rates in the property's settings (capability F3), because the day a number changes is the day every transfer instruction and every accounting pack has to change with it — and a number pasted into a marketing page is the copy nobody remembers to update. Neither is in the product yet: the customer-facing transfer instructions are phase two (capability A5), and the desk reads them off a phone today.
 
@@ -617,7 +633,7 @@ Brunei's Personal Data Protection Order 2025 commenced most substantive provisio
 
 ### As built (capabilities B10, G2–G4, 7 September 2026; G5, 8 September 2026)
 
-Requirements 1 to 4 are met — the accounting pack arrived a day after the rest — and requirement 5 (data export) is capability F5, unbuilt. The technical shape is [architecture.md §8.1 and §8.2](architecture.md). The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
+All five requirements are met. Requirements 1 to 4 arrived with the documents slice (the accounting pack a day after the rest), and requirement 5 — data export — is capability F5, delivered 12 September 2026: every table the business runs on downloads as a CSV from Property settings → Export data. A document exports as a **record** of what was held and never as the file, and an identity document's filename is left out of it, because §8.1 counts that filename as content and a spreadsheet is not gated the way the document route is. The technical shape is [architecture.md §8.1 and §8.2](architecture.md). The following are **[A]** assumptions made while building, and are the ones to put in front of the client.
 
 **[A] Three kinds of document, one mechanism.** A guest's IC on the booking, a transfer slip on a payment, and photographs on an inspection all use the same private storage, the same permission gate, the same access log and the same retention clock. That is why the slip (§10.4) and the inspection photographs (§11 requirement 2) arrive with this and not separately: they were never a different problem.
 
@@ -626,6 +642,10 @@ Requirements 1 to 4 are met — the accounting pack arrived a day after the rest
 **[A] Existence is not content.** Anyone who may view a booking sees *that* an identity document is on file, what kind it is, how big it is and when it arrived; only opening it is gated. **The filename is not among them**, and that was a correction: an IC arrives named by whoever scanned it, so printing it would hand the guest's name — and often their IC number — to every reader the file itself was withheld from, through the one field nobody had gated. A reader who may not open it is shown the kind of document instead. A guard who can see the IC was collected is being told something useful and shown nothing, and hiding the row entirely would make "did anyone take it?" unanswerable by the people whose job it is to ask. Security and Housekeeping therefore see the row and never the file, which is the principle §4 states.
 
 **[A] Retention is anchored differently per kind.** An identity document is kept twelve months after **checkout**, and its clock follows the stay — extending a booking moves it. A slip and a pack run seven years from when they were taken, because an accounting record dates from the transaction; a photograph two years from the inspection. Periods are configuration, not code, and capability F3 is the screen that edits them — **so no screen states the number.** An upload dialog that reads "kept for two years" is a second copy of that setting in the one place nothing will think to update, and it would start lying the first time Jason shortens the period himself. The copy says a file is kept privately and deleted when its retention period ends; what the period *is* belongs to F3, and to the document's own row.
+
+**[A] Changing a period re-anchors what is already held** (12 September 2026, with F3). Shorten identity documents to six months and every one on file is re-dated to six months after its own stay — the anchors above are untouched, only the period moves. A retention policy describes what the business keeps, not what it happened to promise on the day each file arrived, and a screen that said "twelve months" while holding files under four different periods would be describing nothing. A file that is past its new date stops being viewable at once — every read already refuses an expired document — and the nightly job destroys it on its next run, rather than a settings save reaching into Storage. The event records how many files moved, because shortening a period that re-dates forty files is a different act from one that re-dates none.
+
+**[O] The anchor for a cancelled booking is still open** ([N22](open-questions.md)). F3 makes the *duration* editable and no setting moves the anchor: an identity document taken for a booking that was cancelled still expires twelve months after a checkout that never happened.
 
 **[O] What a cancelled booking's identity document should do is [N22](open-questions.md).** It keeps an anchor on a checkout that never happened. Under the PDPO the client may well want it destroyed sooner, and that is their call rather than an assumption to bury in a default.
 
@@ -697,7 +717,7 @@ Five of the six are live. Day-pass volume against capacity is not, and cannot be
 | **Timezone** | Brunei time (UTC+8). All dates stored in UTC, displayed local. |
 | **Currency** | BND. |
 | **Language** | English. **[O]** Whether field screens require Malay is unconfirmed. |
-| **Audit** | All state changes on bookings, payments, deposits and charges recorded with actor and timestamp. |
+| **Audit** | All state changes on bookings, payments, deposits and charges recorded with actor and timestamp. Readable in full on one screen since 12 September 2026 (capability F4), filtered by what changed, which record, who did it and when — and settings changes are recorded there too, which F4's wording predates. |
 | **Backups** | Automated daily, with a tested restore procedure. |
 | **Support** | Support terms to be defined separately. This is a 24/7 operational system and unbounded informal support is the primary delivery risk. |
 

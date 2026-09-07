@@ -75,7 +75,11 @@ export function AuditFilters({
 
   const range: StayDateRange | null = from && to ? { start: from, end: to } : null
   const isFiltered =
-    families.length > 0 || entityTypes.length > 0 || actor !== null || search !== '' || range !== null
+    families.length > 0 ||
+    entityTypes.length > 0 ||
+    actor !== null ||
+    search !== '' ||
+    range !== null
 
   /**
    * The whole query string is rebuilt on every change rather than patched, so
@@ -120,9 +124,9 @@ export function AuditFilters({
     }
 
     const query = params.toString()
-    const href = (query === ''
-      ? '/portal/settings/audit'
-      : `/portal/settings/audit?${query}`) as Route
+    const href = (
+      query === '' ? '/portal/settings/audit' : `/portal/settings/audit?${query}`
+    ) as Route
 
     startTransition(() => {
       router.push(href, { scroll: false })

@@ -91,9 +91,7 @@ function settings(): PropertySettings {
       { kind: 'inspection_photo', months: 24 },
       { kind: 'accounting_pack', months: 84 },
     ],
-    bankAccounts: [
-      { id: 'k1', bankName: 'BIBD', accountNumber: '0018-02-0010611', sortOrder: 1 },
-    ],
+    bankAccounts: [{ id: 'k1', bankName: 'BIBD', accountNumber: '0018-02-0010611', sortOrder: 1 }],
   }
 }
 

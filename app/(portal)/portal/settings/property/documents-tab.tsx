@@ -115,10 +115,10 @@ export function DocumentsTab({ settings }: DocumentsTabProps) {
 
             <Notice className="mt-lg">
               Changing a period applies to files already held, not only to new ones — shorten
-              identity documents to six months and every one on file is re-dated to six months
-              after its stay. Anything that is then already past its date stops being viewable at
-              once and is deleted on the next nightly run. The record that the file existed, who
-              uploaded it and who opened it is kept either way.
+              identity documents to six months and every one on file is re-dated to six months after
+              its stay. Anything that is then already past its date stops being viewable at once and
+              is deleted on the next nightly run. The record that the file existed, who uploaded it
+              and who opened it is kept either way.
             </Notice>
           </FormSection>
         </Card>

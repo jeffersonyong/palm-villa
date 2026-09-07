@@ -79,11 +79,9 @@ describe('describeAuditEvent', () => {
   })
 
   test('carries the figure on the verbs a reader came for', () => {
-    expect(
-      describeAuditEvent(
-        event('charge.created', { after: { amount_cents: bnd(130) } }),
-      ),
-    ).toBe('Charge added — BND 130.00')
+    expect(describeAuditEvent(event('charge.created', { after: { amount_cents: bnd(130) } }))).toBe(
+      'Charge added — BND 130.00',
+    )
 
     expect(
       describeAuditEvent(

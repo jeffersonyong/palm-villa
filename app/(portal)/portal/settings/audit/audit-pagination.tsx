@@ -45,9 +45,7 @@ export function AuditPagination({ page, pageSize, total, params }: AuditPaginati
     }
 
     const query = next.toString()
-    const href = (query
-      ? `/portal/settings/audit?${query}`
-      : '/portal/settings/audit') as Route
+    const href = (query ? `/portal/settings/audit?${query}` : '/portal/settings/audit') as Route
 
     startTransition(() => {
       // `scroll: false`: the operations panel owns the scroll rather than the

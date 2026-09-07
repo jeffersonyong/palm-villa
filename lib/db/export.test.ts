@@ -4,7 +4,12 @@ import { dataClient } from '@/lib/supabase/data'
 
 import { EXPORT_TABLES, exportTableById, readAllRows } from './export'
 import { currentPropertyId } from './property'
-import { givenBooking, givenDepartedBooking, givenDocument, givenTransferBooking } from './test/factory'
+import {
+  givenBooking,
+  givenDepartedBooking,
+  givenDocument,
+  givenTransferBooking,
+} from './test/factory'
 
 /**
  * The whole-business export (capability F5).
@@ -27,9 +32,7 @@ describe('EXPORT_TABLES', () => {
       expect(document.headers.length, `${table.id} has no headers`).toBeGreaterThan(0)
 
       for (const row of document.rows) {
-        expect(row.length, `${table.id} has a row of the wrong width`).toBe(
-          document.headers.length,
-        )
+        expect(row.length, `${table.id} has a row of the wrong width`).toBe(document.headers.length)
       }
     }
   })

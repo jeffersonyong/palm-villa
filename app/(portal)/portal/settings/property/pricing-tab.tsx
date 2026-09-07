@@ -149,9 +149,7 @@ export function PricingTab({ settings }: PricingTabProps) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="surcharge_threshold">
-                      Charge for each extra guest
-                    </SelectItem>
+                    <SelectItem value="surcharge_threshold">Charge for each extra guest</SelectItem>
                     <SelectItem value="hard_cap">Refuse the booking</SelectItem>
                   </SelectContent>
                 </Select>

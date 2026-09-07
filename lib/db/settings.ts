@@ -191,8 +191,7 @@ export interface SettingsError {
 }
 
 export type SettingsWriteResult =
-  | { ok: true; settingsUpdatedAt: string; changed: number }
-  | { ok: false; error: SettingsError }
+  { ok: true; settingsUpdatedAt: string; changed: number } | { ok: false; error: SettingsError }
 
 interface SettingsRefusal {
   ok: false
@@ -201,8 +200,7 @@ interface SettingsRefusal {
 }
 
 type SettingsRpcResult =
-  | { ok: true; settings_updated_at: string; changed: number }
-  | SettingsRefusal
+  { ok: true; settings_updated_at: string; changed: number } | SettingsRefusal
 
 async function callSave(
   fn: string,

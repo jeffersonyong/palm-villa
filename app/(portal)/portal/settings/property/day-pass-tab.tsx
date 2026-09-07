@@ -63,7 +63,11 @@ export function DayPassTab({ settings }: DayPassTabProps) {
     setDraft((current) => ({ ...current, ...next }))
   }
 
-  function setBand(index: number, field: 'label' | 'minAge' | 'maxAgeExclusive' | 'price', value: string) {
+  function setBand(
+    index: number,
+    field: 'label' | 'minAge' | 'maxAgeExclusive' | 'price',
+    value: string,
+  ) {
     update({
       bands: draft.bands.map((band, position) =>
         position === index ? { ...band, [field]: value } : band,
@@ -82,9 +86,7 @@ export function DayPassTab({ settings }: DayPassTabProps) {
   function setBundleLine(index: number, bandKey: string, value: string) {
     update({
       bundles: draft.bundles.map((bundle, position) =>
-        position === index
-          ? { ...bundle, lines: { ...bundle.lines, [bandKey]: value } }
-          : bundle,
+        position === index ? { ...bundle, lines: { ...bundle.lines, [bandKey]: value } } : bundle,
       ),
     })
   }

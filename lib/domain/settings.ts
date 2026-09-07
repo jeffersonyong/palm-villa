@@ -174,16 +174,11 @@ export function configFromSettings(settings: PropertySettings): PropertyConfig {
 }
 
 /** The facilities a day pass admits, in display order (prd.md §7.2). */
-export function includedFacilities(
-  settings: PropertySettings,
-): readonly FacilitySettings[] {
+export function includedFacilities(settings: PropertySettings): readonly FacilitySettings[] {
   return settings.facilities.filter((facility) => facility.includedInDayPass)
 }
 
 /** The retention period for a kind, or null when none is configured. */
-export function retentionMonths(
-  settings: PropertySettings,
-  kind: DocumentKind,
-): number | null {
+export function retentionMonths(settings: PropertySettings, kind: DocumentKind): number | null {
   return settings.retention.find((period) => period.kind === kind)?.months ?? null
 }

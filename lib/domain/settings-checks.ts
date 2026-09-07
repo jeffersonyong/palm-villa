@@ -37,8 +37,7 @@ export interface SettingsProblem {
 }
 
 export type SettingsCheck<T> =
-  | { ok: true; value: T }
-  | { ok: false; problems: readonly SettingsProblem[] }
+  { ok: true; value: T } | { ok: false; problems: readonly SettingsProblem[] }
 
 // ── Drafts ─────────────────────────────────────────────────────────────────
 
@@ -217,12 +216,7 @@ class Problems {
 }
 
 /** An amount in BND as typed, in cents, or null with a problem recorded. */
-function readCents(
-  problems: Problems,
-  field: string,
-  value: string,
-  label: string,
-): Cents | null {
+function readCents(problems: Problems, field: string, value: string, label: string): Cents | null {
   const amount = centsFromInput(value.trim())
 
   if (amount === null) {
@@ -476,9 +470,15 @@ function checkBandCoverage(problems: Problems, bands: readonly BandPayload[]): v
 
 function checkBands(problems: Problems, drafts: readonly BandDraft[]): readonly BandPayload[] {
   const bands = drafts.map((band, index) => {
-    const minAge = readCount(problems, `bands.${index}.minAge`, band.minAge, 'The age it starts at', {
-      max: MAX_AGE,
-    })
+    const minAge = readCount(
+      problems,
+      `bands.${index}.minAge`,
+      band.minAge,
+      'The age it starts at',
+      {
+        max: MAX_AGE,
+      },
+    )
     const maxAge = readOptionalCount(
       problems,
       `bands.${index}.maxAgeExclusive`,
@@ -488,16 +488,15 @@ function checkBands(problems: Problems, drafts: readonly BandDraft[]): readonly 
     )
 
     if (minAge !== null && maxAge !== null && maxAge <= minAge) {
-      problems.add(
-        `bands.${index}.maxAgeExclusive`,
-        'A band has to end after it starts.',
-      )
+      problems.add(`bands.${index}.maxAgeExclusive`, 'A band has to end after it starts.')
     }
 
     return {
       key: band.key,
       id: band.id,
-      label: readLabel(problems, `bands.${index}.label`, band.label, 'The band name', MAX_BAND_LABEL) ?? '',
+      label:
+        readLabel(problems, `bands.${index}.label`, band.label, 'The band name', MAX_BAND_LABEL) ??
+        '',
       min_age: minAge ?? 0,
       max_age_exclusive: maxAge,
       price_cents: readCents(problems, `bands.${index}.price`, band.price, 'The price') ?? 0,

@@ -121,9 +121,7 @@ function seededSettings(): PropertySettings {
       { kind: 'identity', months: 12 },
       { kind: 'payment_slip', months: 84 },
     ],
-    bankAccounts: [
-      { id: 'k1', bankName: 'BIBD', accountNumber: '0018-02-0010611', sortOrder: 1 },
-    ],
+    bankAccounts: [{ id: 'k1', bankName: 'BIBD', accountNumber: '0018-02-0010611', sortOrder: 1 }],
   }
 }
 

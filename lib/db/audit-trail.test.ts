@@ -81,11 +81,7 @@ describe('listAuditTrail', () => {
     // A window that ended before the property existed matches nothing. The
     // conversion is the point: a bare date compared against a timestamptz would
     // put the first eight hours of every Brunei day on the day before.
-    const before = await listAuditTrail(
-      { window: { from: '2020-01-01', to: '2020-01-02' } },
-      1,
-      25,
-    )
+    const before = await listAuditTrail({ window: { from: '2020-01-01', to: '2020-01-02' } }, 1, 25)
 
     expect(before.events).toHaveLength(0)
     expect(before.total).toBe(0)

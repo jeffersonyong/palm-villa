@@ -131,13 +131,25 @@ Four things worth saying plainly, because they are the decisions behind the figu
 |---|---|
 | F1 | Manage staff accounts and assign roles — one person can hold several roles (e.g. Front Office + Finance + Admin), so the system fits the team as it is today and as it grows |
 | F2 | Adjust what each role is allowed to do, without developer involvement |
-| F3 | Configure pricing, facility inclusion and capacity, hold durations, and document retention periods — pending decisions (e.g. whether gym, snooker or sauna are included in the day pass) become a settings change, not a development change |
+| F3 | Configure pricing, facility inclusion and capacity, and document retention periods — pending decisions (e.g. whether gym, snooker or sauna are included in the day pass) become a settings change, not a development change. **Hold durations struck from this wording 12 September 2026**, see the note below |
 | F4 | Review the full audit trail: every change to bookings, payments, deposits, and charges, with actor and timestamp |
 | F5 | Export all business data at any time in a usable format — the data is yours |
 | F6 | Name the units the way they are labelled on the actual doors, and set how many of each type the building has — so the system matches the building without a developer. Names are set as a pattern per unit type and can be adjusted one at a time where a block does not follow the pattern. Every rename is recorded, and a unit that has hosted a booking is taken out of service rather than deleted, so its history survives. **(added 2 September 2026 — it removes two of the open questions from the critical path)** |
 | F7 | Replace the photographs on the public site — one current image per unit type and per facility, uploaded from the portal with the descriptive text that goes with it. A repaint, a renovation or a new photo shoot is an upload, not a developer deploy. **(proposed 10 September 2026 by Jeff, pending client agreement — not yet part of the quoted delivery)** |
 
 > **F7 is provisional, and it depends on a conversation A11 is already waiting for.** The public site currently shows a labelled placeholder where each photograph belongs — no real images exist yet — so this is a capability and the imagery it manages, not a control added over something already built. It is recorded here so the baseline stays honest, on the same footing as A11, and both belong in one conversation: the landing page A11 describes is the surface F7's photographs appear on, and neither is in the quoted work until confirmed.
+
+> **F3, F4 and F5 delivered 12 September 2026.** Property settings edits the rates, the day-pass prices, what a day pass admits, how long each kind of document is kept, and the bank accounts customers transfer to. The audit log reads the whole trail on one screen. Export data hands over every table as a spreadsheet.
+>
+> Five things worth saying plainly, because they are the decisions behind the screens:
+>
+> - **"Hold durations" has gone from F3's wording, and nothing was lost.** The owner's answer of 10 September was that a unit is held indefinitely until somebody checks — so a setting for how long a hold lasts would be a number he could change that changed nothing, inviting him to shorten a timer that does not exist.
+> - **A rate change is not retrospective.** A booking already taken keeps the price it was quoted; only a new booking, or an amendment to an existing one, is priced at the new rate. The screen says so where the rates are edited.
+> - **Shortening a retention period does apply to files already held.** Cut identity documents to six months and every one on file is re-dated to six months after its stay; anything then past its date stops being viewable at once and is destroyed on the next nightly run. The record that the file existed, who uploaded it and who opened it survives either way.
+> - **The export is the records, never the files.** Documents come out as a list of what was held — kind, size, who uploaded it, when it stops being kept — and an identity document's filename is left out, because it usually carries the guest's name and IC number and a spreadsheet is not protected the way the document screen is.
+> - **The audit log and the export are Admin-only, and downloads are not themselves logged.** Neither decision is in the PRD; both are in the register for confirmation.
+>
+> **One thing F3 cannot finish alone:** every facility's day-pass capacity is empty, because no capacity has ever been agreed (see the register, C2). The field is there; the number is his.
 
 ---
 

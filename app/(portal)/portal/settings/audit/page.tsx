@@ -114,9 +114,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
   // A `who` that names nobody is dropped rather than applied, so a hand-edited
   // URL narrows to nothing visible instead of silently filtering everything out.
   const who =
-    params.who === SYSTEM_ACTOR || (params.who && actorNames.has(params.who))
-      ? params.who
-      : null
+    params.who === SYSTEM_ACTOR || (params.who && actorNames.has(params.who)) ? params.who : null
 
   const filter = {
     families,
@@ -181,9 +179,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
           <TableBody>
             {events.length === 0 ? (
               <TableEmpty colSpan={5}>
-                {isFiltered
-                  ? 'No events match these filters.'
-                  : 'Nothing has been recorded yet.'}
+                {isFiltered ? 'No events match these filters.' : 'Nothing has been recorded yet.'}
               </TableEmpty>
             ) : null}
 
