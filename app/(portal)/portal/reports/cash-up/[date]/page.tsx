@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Landmark } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Landmark } from 'lucide-react'
 
 import { CashUpStateBadge } from '@/components/portal/cash-up-state-badge'
 import { EmptyState } from '@/components/portal/empty-state'
@@ -143,7 +143,22 @@ export default async function CashUpDayPage({ params }: PageProps) {
 
   return (
     <>
+      {/* The way back out, the construction the deposit and unit record screens
+          already use: a `ghost` link above the title rather than beside it,
+          because it is navigation and not one of this record's actions — and
+          the action slot here is spoken for twice over. The day stepper moves
+          *between* days and cannot leave them, so without this the only way
+          back to the list was the browser's own button. Named for the screen it
+          returns to rather than "all days", which does not say what of. */}
+      <Button asChild variant="ghost" className="-ml-sm">
+        <Link href="/portal/reports/cash-up">
+          <ArrowLeft aria-hidden />
+          Daily cash-up
+        </Link>
+      </Button>
+
       <PageHeader
+        className="mt-md"
         title="Cash-up"
         meta={<CashUpStateBadge state={state} />}
         actions={
