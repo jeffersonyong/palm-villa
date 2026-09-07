@@ -29,7 +29,7 @@ Everyone works from the same live data, so availability, payments, and booking s
 | A1 | Check live availability for any dates — without messaging anyone |
 | A2 | See the exact itemised price before booking: nightly rate, extra persons, sofa beds, early check-in, late check-out |
 | A3 | Book a facility day pass online, with per-person rates and family bundles applied automatically — the system always charges the cheapest applicable combination |
-| A4 | Book a short stay online; the unit is held on a checkout timer while payment completes, then released automatically if unpaid |
+| A4 | Book a short stay online; the unit is held while payment completes — **reworded 10 September 2026, see the note below** |
 | A5 | Receive bank transfer instructions (BIBD / Baiduri) with a unique payment reference to include in the transfer |
 | A6 | Upload their transfer slip directly, instead of sending it over WhatsApp |
 | A7 | Provide guest details and identity document as part of the booking, replacing the paper/WhatsApp collection step |
@@ -37,6 +37,8 @@ Everyone works from the same live data, so availability, payments, and booking s
 | A9 | Look up their own booking any time using booking reference + phone number |
 | A10 | Get answers to common questions from a self-serve FAQ page |
 | A11 | Browse a public landing page presenting the day-pass facilities, the unit types and "from" rates, with an enquiry route for long-term lets — **(proposed 27 August 2026, pending client agreement — not yet part of the quoted delivery)** |
+
+> **A4 no longer promises a timer.** Asked how long a unit should be held for a guest who says they are transferring, the answer was *indefinitely, until somebody checks* — so nothing releases a booking automatically, by decision rather than by omission. The public flow will state the reference and the amount and say the unit is held until payment is confirmed; a countdown the system does not enforce would be a promise it does not keep. Nothing about the delivery changes. See the register.
 
 > **A11 is provisional.** A1–A10 describe a booking site; a marketing landing page is a separate surface that was built ahead of agreement and is recorded here so the baseline stays honest. It is included in the quoted work only once confirmed.
 
@@ -156,7 +158,7 @@ Four things worth saying plainly, because they are what the guarantees actually 
 
 **G5 delivered 8 September 2026.** Every booking with a verified payment now carries an accounting pack — one PDF with the itemised booking, the record of who confirmed each payment and what they saw in the bank, the transfer slip copied in, and the record of the guest's identity document — assembled by the system the moment a payment is verified, and rebuilt overnight whenever a slip or IC is attached later, a payment is confirmed, or the booking changes. It sits on the booking beside the payments, opens like any other document, and is kept for seven years. Two things worth saying plainly:
 
-- **The IC is referenced in the pack, not copied into it.** The pack records that the IC was collected, when and by whom. It does not carry the image, because the pack is kept seven years and can be opened by every role that can view a booking, while the IC itself is kept twelve months and opened only by Admin and Front Office. Copying it in would quietly undo both of those promises. If the accountant needs the image inside the pack, that is a decision to make deliberately — see the register.
+- **The IC is referenced in the pack, not copied into it.** The pack records that the IC was collected, when and by whom. It does not carry the image, because the pack is kept seven years and can be opened by every role that can view a booking, while the IC itself is kept twelve months and opened only by Admin and Front Office. Copying it in would quietly undo both of those promises. Confirmed with the client on 10 September 2026: the accountant does **not** need the image in the pack, so this stands as built.
 - **An earlier version of a pack is never lost.** When a pack is rebuilt, the previous one is recorded as replaced on the booking's history, so what was sent to the accountant last month remains answerable.
 
 **Still to come in this area:** **A7** — customers uploading their own IC and slip during booking — remains phase two; today staff attach what a guest sends them, which is what they do now anyway.

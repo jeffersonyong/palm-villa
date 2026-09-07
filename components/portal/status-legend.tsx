@@ -59,8 +59,16 @@ export function StatusLegend({ label, items }: StatusLegendProps) {
           <dl className="grid gap-sm">
             {items.map((item, index) => (
               <div key={index} className="grid grid-cols-[auto_1fr] items-start gap-sm">
-                <dt className="pt-[1px]">{item.badge}</dt>
-                <dd className="text-caption">{item.description}</dd>
+                <dt>{item.badge}</dt>
+                {/* The badge's own vertical padding, paid again on the text, so
+                    the chip's label and the first line of its definition sit on
+                    one line. Without it the badge is a taller box top-aligned
+                    against a line of text, and every pair in the list reads as
+                    slightly fallen. `text-pretty` because the tooltip balances
+                    its text — right for a one-line hint, wrong here, where it
+                    ragged four-line definitions into a narrow column with the
+                    panel's width going unused beside them. */}
+                <dd className="py-xxs text-caption text-pretty">{item.description}</dd>
               </div>
             ))}
           </dl>

@@ -208,12 +208,11 @@ export function BookingForm({
               error={state.fieldErrors?.lateCheckOutHours}
             />
           </div>
-          {config.standardCheckInTime === null && (
-            <p className="mt-sm text-body-sm text-muted-foreground">
-              Early check-in is not offered yet — the standard check-in time is still to be
-              confirmed with the client (prd.md §18 N6).
-            </p>
-          )}
+          <p className="mt-sm text-body-sm text-muted-foreground">
+            Check-in {config.standardCheckInTime ?? 'time not set'}, check-out{' '}
+            {config.standardCheckOutTime}. Early check-in is not sold here — it depends on the unit
+            being ready, and that rule is still to be agreed (open-questions.md N31).
+          </p>
         </FormSection>
 
         {mayDiscount ? (

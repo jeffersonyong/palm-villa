@@ -1,4 +1,4 @@
-import { Landmark } from 'lucide-react'
+import { LockKeyhole } from 'lucide-react'
 
 import { Card } from '@/components/ui/card'
 import type { Deposit } from '@/lib/db/deposits'
@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
  *
  * So the deposit is known by its **form**, the way every other register is —
  * a status is a chip, a stream is a dot, a person is a circle. A deposit is
- * the ledger's `Landmark` glyph beside the micro-label *Security deposit*,
+ * the ledger's `LockKeyhole` glyph beside the micro-label *Security deposit*,
  * standing over the same three-line table wherever it appears: on the Money
  * card, where `DepositMark` heads the inset, and on the deposit screen, where
  * the section title carries the mark and the table sits under it. The chip
@@ -46,7 +46,7 @@ export function DepositMark({
   return (
     <div className={cn('flex items-center justify-between gap-lg', className)}>
       <span className="flex items-center gap-xs micro-label text-muted-foreground">
-        <Landmark aria-hidden className="size-3.5 shrink-0" />
+        <LockKeyhole aria-hidden className="size-3.5 shrink-0" />
         Security deposit
       </span>
       {badge}

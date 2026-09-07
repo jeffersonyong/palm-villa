@@ -109,18 +109,29 @@ export interface PropertyConfig {
   /** [C] BND 10 per hour (prd.md §8.2). */
   earlyCheckInPerHour: Cents
 
-  /** [C] BND 15 per hour (prd.md §8.2). */
+  /**
+   * [C] BND 15 per hour (prd.md §8.2), reconfirmed 10 September 2026.
+   *
+   * The client's illustration of it did not match the rate he gave — a 15:00
+   * check-out was described as "another 15", where three hours at this rate
+   * is 45. Priced per hour, which is what the rate and the price list say;
+   * open-questions.md N30 settles whether it is really a flat fee.
+   */
   lateCheckOutPerHour: Cents
 
   /**
-   * TODO(client): prd.md §18 N6 — standard check-in time is not stated, so
-   * "early check-in" has no definition and the charge above cannot be applied
-   * to a real number of hours. `null` disables early check-in as a sellable
-   * extra until answered.
+   * [C] 14:00 (open-questions.md N6, answered 10 September 2026). "Early" now
+   * has a baseline, so the engine counts early check-in hours against a real
+   * number instead of refusing to price them.
    *
-   * Note also prd.md §8.2 [A]: early check-in needs an availability check, not
-   * just a charge — selling it blind puts guests in units still being cleaned.
-   * That check belongs with the schema slice; this field only defines "early".
+   * It stays nullable because the field's meaning is "the time this property
+   * checks guests in", and a second property may not have said yet.
+   *
+   * **Answering N6 did not make early check-in sellable.** prd.md §8.2 [A]
+   * needs an availability check, not just a charge, and the client's own answer
+   * is the same position — it is "up for discussion as we may or may not have
+   * room ready". The booking form therefore sends zero early hours and says so.
+   * The rule that would let it ask is open-questions.md N31.
    */
   standardCheckInTime: string | null
 
@@ -145,9 +156,14 @@ export interface PropertyConfig {
   maxAdvanceBookingDays: number
 
   /**
-   * TODO(client): prd.md §18 N7 — hold duration is unagreed. §9.3 suggests 60
-   * minutes for stays and 30 for day passes. Unused by walk-in bookings, which
-   * are paid on the spot (§9.4), so this is inert until the public flow lands.
+   * Inert, and now deliberately so. open-questions.md N7 is answered
+   * (10 September 2026): a unit is held **indefinitely**, until a person checks
+   * — which is what the product does, since nothing expires a hold. No expiry
+   * job reads these.
+   *
+   * They survive rather than being deleted because the public flow (phase two)
+   * may still want to state an expectation to a customer even when nothing
+   * enforces one. Anything that starts *enforcing* them contradicts N7.
    */
   holdMinutesStay: number
   holdMinutesDayPass: number
@@ -230,7 +246,7 @@ export const palmVillaConfig: PropertyConfig = {
 
   earlyCheckInPerHour: bnd(10),
   lateCheckOutPerHour: bnd(15),
-  standardCheckInTime: null,
+  standardCheckInTime: '14:00',
   standardCheckOutTime: '12:00',
 
   securityDeposit: bnd(100),

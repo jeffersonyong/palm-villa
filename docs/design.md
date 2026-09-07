@@ -328,13 +328,16 @@ components:
     # what it holds either way — see §Components, Overlays.
     padding: "{spacing.xs}"
     shadow: "shadow-overlay"
-  # A label, not a panel: control radius and the polarity-flip surface.
+  # The overlay shell at label scale: its own muted surface and seam, the menu
+  # radius, a chip's padding. See §Elevation.
   tooltip:
-    backgroundColor: "{colors.ink}"
-    textColor: "{colors.canvas}"
+    backgroundColor: "{themes.light.tooltip-surface}"
+    borderColor: "{themes.light.tooltip-border}"
+    textColor: "{colors.ink}"
     typography: "{typography.caption}"
-    rounded: "{rounded.md}"
+    rounded: "{rounded.lg}"
     padding: "{spacing.xs} {spacing.sm}"
+    shadow: "shadow-overlay"
   # Menu items are controls inside the overlay shell.
   menu-item:
     # Ink, not mute: an option is the content of the menu, not a label on it
@@ -433,6 +436,12 @@ themes:
     secondary-hover: "mix({colors.ink} 6%, {colors.canvas-soft})"
     invert-surface: "{colors.ink}"
     invert-foreground: "{colors.canvas}"
+    # The overlay shell: light stays at the card white, dark lifts off it —
+    # see §Elevation.
+    tooltip-surface: "{colors.canvas}"
+    # A step stronger than `hairline`: a tooltip often opens over the very card
+    # it has to be told apart from.
+    tooltip-border: "{colors.ink} @ 12%"
     footer-surface: "{colors.ink}"
     ring: "{colors.brand-deep}"
     scrim: "{colors.ink} @ 45%"
@@ -490,6 +499,11 @@ themes:
     secondary-hover: "mix({colors.canvas} 12%, {colors.ink-raised})"
     invert-surface: "{colors.canvas-soft}"
     invert-foreground: "{colors.ink}"
+    # Dark mutes by lifting: `ink-deep` sits under both grounds a tooltip opens
+    # over, so a muted-downward chip reads as a hole.
+    tooltip-surface: "mix({colors.canvas} 6%, {colors.ink-raised})"
+    # Dark's fill went up, so the standard bounding edge still reads.
+    tooltip-border: "{colors.canvas} @ 9%"
     footer-surface: "mix({colors.ink-deep} 60%, {colors.ink})"
     ring: "{colors.brand}"
     # Dimming an ink ground with ink does nothing, so dark reaches past the
@@ -587,7 +601,7 @@ The same tokens serve all three surfaces. The public site gets slightly more air
 - **Stream colour is a fourth register, and it says *which product was sold*.** The three revenue streams of prd.md §1 — short stay, day pass, tenancy — labelled **Type** on screen. It exists because a booking's stream is neither a state nor a person, and colouring it from the semantic set would have said a day pass is something a booking can *turn out to be*. Three `{colors.stream-*}` hues, **mid only and no tints**, identical in both themes and on every surface.
 - **The missing tint is the rule, not an omission.** The other two registers are tint/deep pairs because something sits *on* them — a status word, a person's initials. A stream is only ever a **6px dot beside its own label**, so it needs no ground; and having no tint token means a stream badge cannot be built, which is what stops a row carrying two tinted rectangles where only one of them is the outcome. **Form is what separates the registers**, exactly as it does for identity: a status is a chip *containing* a word, a stream is a dot *beside* one, a person is a circle with two letters. Like a status dot, a stream dot never appears without its label.
 - Hues sit **beside** the arcs status already spends, never on them. `stream-day-pass` is the deliberate near-miss — orange ≈25° against warning's amber ≈32°, never literally `{colors.warning}` — and the two genuinely do meet, on a day pass awaiting payment. What separates them there is a saturated point against a pale chip four times its size, the same bet `identity-orange` makes. `stream-short-stay` is indigo rather than a blue nearer `{colors.info}`, and in any case the two never share a register: `info` marks a notice panel and is not a tone a booking status can take.
-- **The security deposit is not a fifth register, and the request for one is worth recording.** A purple ground under the deposit was proposed (2026-09-05) so staff could tell it from the other gray insets on a booking screen — the identity document, the transfer slip, the accounting pack. Refused, on three grounds that hold generally. A tint that is *always* there is decoration, and a tint has to mean "look at this". Violet is already worn by an identity hue and indigo and fuchsia by two streams, so another purple would be learned against three. And the stage chip already sits on the inset, so a coloured ground would nest one tint inside another and dull the chip that needed reading. Recognition comes from **form**, as it does for every other register: the deposit's mark is the ledger's `Landmark` glyph beside the micro-label *Security deposit*, standing directly over one three-line figure table — Held, Less charges, the line that is returned or owed — identical wherever a deposit appears (`deposit-figures.tsx`). On the Money card the mark heads the inset; on the deposit screen the section title carries it. The chip keeps the colour, because the chip answers the one question colour is for.
+- **The security deposit is not a fifth register, and the request for one is worth recording.** A purple ground under the deposit was proposed (2026-09-05) so staff could tell it from the other gray insets on a booking screen — the identity document, the transfer slip, the accounting pack. Refused, on three grounds that hold generally. A tint that is *always* there is decoration, and a tint has to mean "look at this". Violet is already worn by an identity hue and indigo and fuchsia by two streams, so another purple would be learned against three. And the stage chip already sits on the inset, so a coloured ground would nest one tint inside another and dull the chip that needed reading. Recognition comes from **form**, as it does for every other register: the deposit's mark is the ledger's `LockKeyhole` glyph beside the micro-label *Security deposit* — `Landmark` first, until the cash-up gave banking a Record banking button wearing the same glyph, and a mark shared with an action means neither — standing directly over one three-line figure table — Held, Less charges, the line that is returned or owed — identical wherever a deposit appears (`deposit-figures.tsx`). On the Money card the mark heads the inset; on the deposit screen the section title carries it. The chip keeps the colour, because the chip answers the one question colour is for.
 
 ### Accessibility
 - Content `{colors.ink}` on the card: 19:1, and 17.4:1 on the ground. There is no third text value to measure — the middle rung was removed (§Typography).
@@ -699,7 +713,9 @@ Standard control height is **36px** (buttons, inputs, selects) on the customer s
 
 **`shadow-overlay` survives for things that genuinely float**, recut much quieter to sit in a flatter system. A menu, a select panel, a popover and a tooltip open with no scrim behind them and in the same `canvas` as the card they cover, so tone-layering is unavailable and 4% of shade is invisible at that size — the hairline alone would be carrying the entire claim that the thing is in front. That is the case the shadow exists for, and the only one.
 
-Overlays sit over a `scrim` (ink @ 45% in light; black @ 60% in dark, because dimming an ink ground with ink does nothing) and take `{rounded.xl}` 16px, a hairline and `shadow-overlay`. Three exceptions: **menu panels** — select, dropdown, multi-select and both date pickers — take `{rounded.lg}` 12px, because they open out of a control and have to look like they belong to it (§Components — Overlays); **edge-anchored drawers** drop the radius on the edges they meet, a rounded corner against the viewport edge reading as a rendering error; and **tooltips** take the control radius on the polarity-flip surface, because at caption height a 16px corner reads as a pill.
+Overlays sit over a `scrim` (ink @ 45% in light; black @ 60% in dark, because dimming an ink ground with ink does nothing) and take `{rounded.xl}` 16px, a hairline and `shadow-overlay`. Three exceptions: **menu panels** — select, dropdown, multi-select and both date pickers — take `{rounded.lg}` 12px, because they open out of a control and have to look like they belong to it (§Components — Overlays); **edge-anchored drawers** drop the radius on the edges they meet, a rounded corner against the viewport edge reading as a rendering error; and **tooltips** take that same menu radius, for the same reason — a tooltip opens out of the thing it explains — with the surface 16px reading as a pill at caption height.
+
+**A tooltip is an overlay, not an inversion** (recut 2026-09-07). It used to be the polarity flip, ink-on-white, which is the convention everywhere and wrong here twice over: a black chip is the loudest object on a screen built out of four grays, and what it carries — a hint, a key — is the least urgent text on the page. The second reason is the harder one. A tooltip in this system is rarely a one-word label: a section hint is two sentences and a status legend is a definition list of the *real* badges, and those badges are constructed against the card ground, so on ink they read as a string of lights. So the tooltip takes level 4 like every other overlay — hairline, `shadow-overlay`, and its own `tooltip-surface`: the shell muted one step, because a hint is the quietest thing on the page that floats. **Light stays at the card white and only dark mutes.** The instinct is to mute both, and in light there is nowhere to mute *to*: `canvas-soft` is the neutral badge's own fill, and a status legend shows the real badges, so a tooltip in the container tone made every neutral chip inside it disappear into its own ground; a step further down cleared the chips and read as a flat gray slab — the tone the system spends on *disabled* — on the one overlay that is pure information. White is what level 4 says anyway, and it is the ground the badge tints were mixed against. Dark has the opposite problem and the room to solve it: it cannot mute downward at all, because `ink-deep` sits *under* both grounds a tooltip opens over — the panel and the card — so a chip in it reads as a hole punched in the page. Dark lifts a half-step past the card ceiling instead. **The seam is a step stronger than the card's** either way — `tooltip-border`, ink 12% in light — because a tooltip is small, has no scrim behind it, and often opens over the very card it has to be told apart from.
 
 ### Motion
 Overlays fade and zoom in at ~150ms; drawers slide (300ms in, 200ms out). Motion stays on `opacity` and `transform`. Every animation is suppressed under `prefers-reduced-motion` — the element appears in its final state rather than moving.

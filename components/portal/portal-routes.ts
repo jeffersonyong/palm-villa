@@ -7,9 +7,9 @@ import {
   Coins,
   DoorOpen,
   Globe,
-  Landmark,
   LayoutDashboard,
   List,
+  LockKeyhole,
   Plus,
   ScrollText,
   Settings,
@@ -70,7 +70,7 @@ export const navGroups = [
   {
     label: 'Finance',
     items: [
-      { href: '/portal/deposits', label: 'Deposits', icon: Landmark },
+      { href: '/portal/deposits', label: 'Deposits', icon: LockKeyhole },
       { href: '/portal/reports', label: 'Reports', icon: BarChart3 },
       // Its own item rather than a tab inside Reports: the cash-up is worked
       // daily and the reports are read occasionally, so filing it behind a
