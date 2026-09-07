@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listCashBankings } from '@/lib/db/cash-banking'
+import { cashOnHandBefore, listCashBankings } from '@/lib/db/cash-banking'
 import { listDepositsCollectedBetween } from '@/lib/db/deposits'
 import { listPayments } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
@@ -114,7 +114,7 @@ export default async function CashUpDayPage({ params }: PageProps) {
   const bounds = bruneiDayBounds(date)
   const window = { from: date, to: date }
 
-  const [payments, deposits, bankings, staff] = await Promise.all([
+  const [payments, deposits, bankings, staff, opening] = await Promise.all([
     listPayments({
       methods: ['cash'],
       collectedFrom: bounds.start,
@@ -124,6 +124,7 @@ export default async function CashUpDayPage({ params }: PageProps) {
     listDepositsCollectedBetween(bounds, 'cash'),
     listCashBankings(window),
     listStaff(),
+    cashOnHandBefore(date),
   ])
 
   const names = new Map(staff.map((account) => [account.id, account.displayName]))
@@ -131,8 +132,11 @@ export default async function CashUpDayPage({ params }: PageProps) {
   const recorded = sumCents(payments.map((payment) => payment.amount ?? 0))
   const banked = sumCents(bankings.map((banking) => banking.amount))
   const depositCash = sumCents(deposits.map((deposit) => deposit.amount))
-  const variance = banked - recorded
-  const state = cashUpStateOf(recorded, banked)
+  // The running balance this day closes on: what was already unbanked before
+  // it, plus what it took, less what went to the bank. The figure somebody can
+  // check by opening the safe.
+  const closing = opening + recorded - banked
+  const state = cashUpStateOf(closing)
 
   const mayBank = hasPermission(actor.permissions, 'payment.verify')
 
@@ -187,9 +191,13 @@ export default async function CashUpDayPage({ params }: PageProps) {
         <Card className="h-full">
           <Stat
             size="sm"
-            label="Variance"
-            value={<Variance amount={variance} />}
-            hint="Banked, less what was recorded"
+            label="In the safe"
+            value={<Balance amount={closing} />}
+            hint={
+              opening === 0
+                ? 'Taken and not yet banked'
+                : `Includes BND ${formatCents(opening)} brought forward`
+            }
           />
         </Card>
       </div>
@@ -206,7 +214,7 @@ export default async function CashUpDayPage({ params }: PageProps) {
             description="Cash recorded against a booking appears here, with who collected it."
           />
         ) : (
-          <Table className="mt-md">
+          <Table containerClassName="mt-md">
             <TableHeader>
               <TableHeaderRow>
                 <TableHead>Collected</TableHead>
@@ -240,9 +248,9 @@ export default async function CashUpDayPage({ params }: PageProps) {
                 </TableRow>
               ))}
               <TableRow className="bg-canvas-soft">
-                <TableCell className="text-foreground">Recorded</TableCell>
+                <TableCell className="font-semibold text-foreground">Recorded</TableCell>
                 <TableCell colSpan={3} />
-                <TableCell className="text-right text-foreground tabular-nums">
+                <TableCell className="text-right font-semibold text-foreground tabular-nums">
                   BND {formatCents(recorded)}
                 </TableCell>
               </TableRow>
@@ -288,7 +296,7 @@ export default async function CashUpDayPage({ params }: PageProps) {
             }
           />
         ) : (
-          <Table className="mt-md">
+          <Table containerClassName="mt-md">
             <TableHeader>
               <TableHeaderRow>
                 <TableHead>Recorded</TableHead>
@@ -316,14 +324,14 @@ export default async function CashUpDayPage({ params }: PageProps) {
                 </TableRow>
               ))}
               <TableRow className="bg-canvas-soft">
-                <TableCell className="text-foreground">
+                <TableCell className="font-semibold text-foreground">
                   <span className="flex items-center gap-sm">
                     <Landmark aria-hidden className="size-4 text-muted-foreground" />
                     Banked
                   </span>
                 </TableCell>
                 <TableCell colSpan={2} />
-                <TableCell className="text-right text-foreground tabular-nums">
+                <TableCell className="text-right font-semibold text-foreground tabular-nums">
                   BND {formatCents(banked)}
                 </TableCell>
               </TableRow>
@@ -333,7 +341,7 @@ export default async function CashUpDayPage({ params }: PageProps) {
 
         <p className="mt-md text-caption text-muted-foreground">
           A banking cannot be edited. If one was recorded wrongly, add a second entry — both stay on
-          the day, and the variance moves.
+          the day, and the balance moves.
         </p>
       </section>
     </>
@@ -360,15 +368,12 @@ function PersonCell({ id, name }: { id: string | null; name: string | undefined 
 }
 
 /**
- * A variance, signed the way a bank statement reads it: negative means less
- * reached the bank than the desk took. A day that agrees shows a plain zero,
- * because zero is the answer rather than the absence of one.
+ * A carried balance. A negative one is not "less than expected" but
+ * over-banked — more has reached the bank than was ever recorded as taken —
+ * so it keeps its minus sign rather than being dressed up as a shortfall.
+ * Zero shows as a plain zero, because zero is the answer rather than the
+ * absence of one.
  */
-function Variance({ amount }: { amount: Cents }) {
-  return (
-    <span className="tabular-nums">
-      {amount > 0 ? '+' : ''}
-      BND {formatCents(amount)}
-    </span>
-  )
+function Balance({ amount }: { amount: Cents }) {
+  return <span className="tabular-nums">BND {formatCents(amount)}</span>
 }

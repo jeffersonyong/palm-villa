@@ -11,33 +11,29 @@ import { CASH_UP_STATE_LABELS, type CashUpState } from '@/lib/domain/reports/cas
  *
  * ── The mapping ───────────────────────────────────────────────────────────
  *
- * A cash-up state is an **outcome** rather than a stage of a workflow, which
- * is what makes the semantic set right for it: a day is settled, or it is a
- * question for somebody.
+ * The state describes the **balance carried forward**, not a day's own two
+ * figures, so the three tones answer "where is the money" rather than "did
+ * this day agree".
  *
- * `balanced` takes **positive** — the day agrees and nobody need look again.
+ * `clear` takes **positive** — nothing is outstanding and nobody need look
+ * again.
  *
- * `unbanked` takes **warning**. It is the day's ordinary end state until
- * somebody walks to the bank, so it is not wrong; it is outstanding, which is
- * exactly `awaiting_inspection`'s reading on a deposit.
+ * `holding` takes **neutral**, and that is the deliberate choice here. Cash in
+ * the safe is the ordinary state of a business that banks twice a week, not a
+ * fault; giving it `warning` would put an amber chip on most rows of most
+ * weeks, which is how a warning stops being read. It is the units board's
+ * `available` argument — colour is spent on the rows that need attention.
  *
- * `short` and `over` both take **negative**, and deliberately the same tone.
- * Neither is worse than the other: a day where less reached the bank than the
- * desk took, and a day where more did, are the same class of problem — the
- * figures do not agree and somebody has to say why. Splitting them by colour
- * would imply one is recoverable and the other is not.
- *
- * `nothing` takes **neutral**. A day the desk took no cash is not an event,
- * and colour is spent on the rows that need attention (the units board's
- * `available` argument).
+ * `over_banked` takes **negative**. It is the one state arithmetic can call
+ * wrong: more has reached the bank than was ever recorded as taken, so either
+ * a payment went unrecorded or a banking was entered twice. Unlike the others
+ * it cannot be resolved by waiting.
  */
 
 const STATE_TONES = {
-  nothing: 'neutral',
-  unbanked: 'warning',
-  balanced: 'positive',
-  short: 'negative',
-  over: 'negative',
+  clear: 'positive',
+  holding: 'neutral',
+  over_banked: 'negative',
 } as const satisfies Record<CashUpState, StatusTone>
 
 export type CashUpStateTone = (typeof STATE_TONES)[CashUpState]

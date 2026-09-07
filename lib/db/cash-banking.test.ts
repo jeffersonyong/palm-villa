@@ -3,7 +3,8 @@ import { describe, expect, test } from 'vitest'
 import { todayInBrunei } from '@/lib/domain/dates'
 import { bnd } from '@/lib/domain/money'
 
-import { listCashBankings, recordCashBanking } from './cash-banking'
+import { cashOnHandBefore, listCashBankings, recordCashBanking } from './cash-banking'
+import { givenBooking } from './test/factory'
 import { auditEventsFor } from './test/inspect'
 
 /**
@@ -18,6 +19,7 @@ import { auditEventsFor } from './test/inspect'
 
 const TODAY = todayInBrunei()
 const YESTERDAY = todayInBrunei(new Date(Date.now() - 86_400_000))
+const TOMORROW = todayInBrunei(new Date(Date.now() + 86_400_000))
 
 function window(from: string, to: string) {
   return { from, to }
@@ -126,5 +128,74 @@ describe('listCashBankings', () => {
 
     expect(both.map((row) => row.businessDate)).toEqual([YESTERDAY, TODAY])
     expect(await listCashBankings(window(TODAY, TODAY))).toHaveLength(1)
+  })
+})
+
+describe('cashOnHandBefore', () => {
+  test('is nothing when no cash has ever been taken', async () => {
+    expect(await cashOnHandBefore(TODAY)).toBe(0)
+  })
+
+  test('counts cash taken before the day and leaves that day itself out', async () => {
+    // The opening balance of a window is what happened *before* it. Including
+    // the day itself would double-count every figure the table then shows.
+    await givenBooking({ unitRef: '3B-01', checkIn: '2026-11-02', checkOut: '2026-11-04' })
+
+    expect(await cashOnHandBefore(TODAY)).toBe(0)
+    expect(await cashOnHandBefore(TOMORROW)).toBeGreaterThan(0)
+  })
+
+  test('a banking reduces what is on hand, and the two net off', async () => {
+    const booking = await givenBooking({
+      unitRef: '3B-01',
+      checkIn: '2026-11-02',
+      checkOut: '2026-11-04',
+    })
+
+    await recordCashBanking({
+      businessDate: TODAY,
+      amount: booking.total,
+      note: null,
+      actorId: null,
+    })
+
+    expect(await cashOnHandBefore(TOMORROW)).toBe(0)
+  })
+
+  test('one lump sum clears several days of takings', async () => {
+    // The case a per-day variance got wrong: cash taken across bookings, all
+    // of it banked in a single trip, nothing matched day to day.
+    const first = await givenBooking({
+      unitRef: '3B-01',
+      checkIn: '2026-11-02',
+      checkOut: '2026-11-04',
+    })
+    const second = await givenBooking({
+      unitRef: '3B-02',
+      checkIn: '2026-11-02',
+      checkOut: '2026-11-04',
+    })
+
+    await recordCashBanking({
+      businessDate: TODAY,
+      amount: first.total + second.total,
+      note: 'One trip',
+      actorId: null,
+    })
+
+    expect(await cashOnHandBefore(TOMORROW)).toBe(0)
+  })
+
+  test('banking more than was taken goes negative rather than clamping', async () => {
+    // Over-banked is a real state and the figure has to be able to express it,
+    // or the one arithmetic error this screen can catch reads as balanced.
+    await recordCashBanking({
+      businessDate: TODAY,
+      amount: bnd(500),
+      note: null,
+      actorId: null,
+    })
+
+    expect(await cashOnHandBefore(TOMORROW)).toBe(bnd(-500))
   })
 })

@@ -78,6 +78,30 @@ export async function listCashBankings(window: StayWindow): Promise<readonly Cas
   return (data as CashBankingRow[]).map(toBanking)
 }
 
+/**
+ * What was taken and not yet banked before a given day — the balance a window
+ * opens on.
+ *
+ * A database aggregate rather than a read of every historical row, because the
+ * answer is one integer and the rows behind it grow for the life of the
+ * building. Without it a period starting on the 1st would open at zero and
+ * report the safe as light by whatever the previous week left in it.
+ */
+export async function cashOnHandBefore(date: StayDate): Promise<Cents> {
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await dataClient().rpc('cash_on_hand_before', {
+    p_property_id: propertyId,
+    p_date: date,
+  })
+
+  if (error) {
+    throw new Error(`Could not read the opening cash balance: ${error.message}`)
+  }
+
+  return (data as number | null) ?? 0
+}
+
 export type CashBankingErrorCode =
   'date_required' | 'future_date' | 'invalid_amount' | 'note_too_long' | 'not_found'
 

@@ -259,22 +259,27 @@ begin
   -- Every cash payment above is stamped `collected_at = now()` by the real
   -- functions, and rule 2 forbids updating a row this file did not write
   -- through the product — so all demo cash lands on TODAY however the stays
-  -- are dated. That is the shape the seed can honestly produce, and it is
-  -- enough: today reads as banked-but-short, and yesterday as banked with
-  -- nothing recorded, which is the pair that shows a variance in both
-  -- directions.
+  -- are dated. That is the shape the seed can honestly produce.
+  --
+  -- Both bankings therefore go against today, in two runs, which is worth more
+  -- than one: it shows that a day is not a single trip to the bank, and it
+  -- leaves a balance still in the safe so the running figure is not zero on
+  -- first sight. Nothing is banked against an earlier day, deliberately —
+  -- money filed against a day that recorded none reads as `over_banked`, and
+  -- seeding an error state would open the screen on a red chip describing a
+  -- fault nobody made.
   select coalesce(sum(amount_cents), 0) into v_banked_cents
   from payment
   where property_id = v_property_id and method = 'cash' and status = 'verified';
 
   perform record_cash_banking(
     v_property_id, v_today, greatest(v_banked_cents - 25000, 5000),
-    'DEMO — Morning run to BIBD, the rest goes tomorrow.', null
+    'DEMO — Morning run to BIBD.', null
   );
 
   perform record_cash_banking(
-    v_property_id, v_today - 1, 20000,
-    'DEMO — Banked yesterday; the takings it covers predate this seed.', null
+    v_property_id, v_today, 20000,
+    'DEMO — Second run after the afternoon check-ins.', null
   );
 end;
 $demo$;

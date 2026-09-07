@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { EmptyState } from '@/components/portal/empty-state'
 import { overlapRangeOf } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
+import { readChoices } from '@/components/portal/list-params'
+import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
 import { SectionHint } from '@/components/portal/section-hint'
 import { Stat } from '@/components/portal/stat'
 import { StreamDot } from '@/components/portal/stream-dot'
@@ -38,6 +40,9 @@ import { BOOKING_STREAM_LABELS } from '@/lib/domain/stream'
 import { owedTotalOf, totalsOf } from '../deposits/ledger-view'
 import { readReportWindow } from './report-window'
 import { ReportsFilters } from './reports-filters'
+import { OccupancyFilter } from './occupancy-filter'
+import { readPage, readPageSize } from './page-size'
+import { ReportsPagination } from './reports-pagination'
 
 export const metadata: Metadata = {
   title: 'Reports',
@@ -67,7 +72,13 @@ export const dynamic = 'force-dynamic'
  */
 
 interface PageProps {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{
+    from?: string
+    to?: string
+    type?: string | string[]
+    page?: string
+    size?: string
+  }>
 }
 
 export default async function ReportsPage({ searchParams }: PageProps) {
@@ -106,6 +117,35 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const byUnit = occupancyByUnit(units, occupancies, range)
   const byType = occupancyByType(unitTypes, byUnit, range)
   const totals = occupancyTotals(byType)
+
+  // The by-unit table narrows to a type and pages; the tiles and the by-type
+  // summary above it deliberately do not move with it, because they answer for
+  // the building.
+  const typeOptions = unitTypes.map((type) => ({ value: type.id, label: type.name }))
+  const chosenTypes = readChoices(
+    params.type,
+    unitTypes.map((type) => type.id),
+    (candidate): candidate is string => unitTypes.some((type) => type.id === candidate),
+  )
+  const visibleUnits =
+    chosenTypes.length > 0
+      ? byUnit.filter((row) => chosenTypes.includes(row.unit.unitTypeId))
+      : byUnit
+
+  const pageSize = readPageSize(params.size)
+  const currentPage = clampPage(readPage(params.page), pageCountFor(visibleUnits.length, pageSize))
+  const pagedUnits = visibleUnits.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  const unitParams = new URLSearchParams()
+
+  if (isExplicit) {
+    unitParams.set('from', window.from)
+    unitParams.set('to', window.to)
+  }
+
+  for (const type of chosenTypes) {
+    unitParams.append('type', type)
+  }
 
   const revenue = revenueByStream(revenueInWindow(payments, window))
   const heldTotals = totalsOf(held)
@@ -172,7 +212,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           broke down should not read as fuller than one that did not.
         </SectionHeading>
 
-        <Table className="mt-md">
+        <Table containerClassName="mt-md">
           <TableHeader>
             <TableHeaderRow>
               <TableHead>Type</TableHead>
@@ -210,7 +250,27 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       <section aria-labelledby="occupancy-by-unit" className="mt-2xl">
         <SectionHeading id="occupancy-by-unit" title="Occupancy by unit" />
 
-        <Table className="mt-md">
+        <div className="mt-lg">
+          <OccupancyFilter
+            options={typeOptions}
+            selected={chosenTypes}
+            period={isExplicit ? { from: window.from, to: window.to } : null}
+          />
+        </div>
+
+        <Table
+          containerClassName="mt-md"
+          footer={
+            <ReportsPagination
+              route="/portal/reports"
+              page={currentPage}
+              pageSize={pageSize}
+              total={visibleUnits.length}
+              itemLabel="units"
+              params={unitParams.toString()}
+            />
+          }
+        >
           <TableHeader>
             <TableHeaderRow>
               <TableHead>Unit</TableHead>
@@ -220,7 +280,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </TableHeaderRow>
           </TableHeader>
           <TableBody>
-            {byUnit.map((row) => (
+            {pagedUnits.map((row) => (
               <TableRow key={row.unit.id} interactive className="group">
                 <TableCell className="font-mono text-foreground tabular-nums">
                   <TableRowLink href={`/portal/units/${row.unit.ref}`}>{row.unit.ref}</TableRowLink>
@@ -246,7 +306,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           deposits are excluded — they are held, not earned.
         </SectionHeading>
 
-        <Table className="mt-md">
+        <Table containerClassName="mt-md">
           <TableHeader>
             <TableHeaderRow>
               <TableHead>Type</TableHead>
@@ -334,13 +394,17 @@ function Money({ amount }: { amount: Cents }) {
  * paginated table uses: it is a value in the same columns as the rows above
  * it, so it belongs in the body, with the container tone marking it as the sum
  * and the label saying so in words.
+ *
+ * Set in 600 throughout, label and figures alike. The tone alone was doing the
+ * work of saying "this line is different in kind", and a reader scanning a
+ * column of numbers reads weight before they read a background.
  */
 function TotalRow({ label, cells }: { label: string; cells: readonly (string | number)[] }) {
   return (
     <TableRow className="bg-canvas-soft">
-      <TableRowHead className="text-foreground">{label}</TableRowHead>
+      <TableRowHead className="font-semibold text-foreground">{label}</TableRowHead>
       {cells.map((cell, index) => (
-        <TableCell key={index} className="text-right text-foreground tabular-nums">
+        <TableCell key={index} className="text-right font-semibold text-foreground tabular-nums">
           {cell}
         </TableCell>
       ))}

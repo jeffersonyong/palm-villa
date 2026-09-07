@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listCashBankings } from '@/lib/db/cash-banking'
+import { cashOnHandBefore, listCashBankings } from '@/lib/db/cash-banking'
 import { listDepositsCollectedBetween } from '@/lib/db/deposits'
 import { listPayments } from '@/lib/db/payments'
 import {
@@ -32,7 +32,11 @@ import {
   type StayDate,
 } from '@/lib/domain/dates'
 import { formatCents, type Cents } from '@/lib/domain/money'
+import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
 import { cashUpDays, cashUpTotals, clampWindowToToday } from '@/lib/domain/reports/cash-up'
+
+import { readPage, readPageSize } from '../page-size'
+import { ReportsPagination } from '../reports-pagination'
 
 import { readReportWindow } from '../report-window'
 import { ReportsFilters } from '../reports-filters'
@@ -59,7 +63,7 @@ export const dynamic = 'force-dynamic'
  */
 
 interface PageProps {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{ from?: string; to?: string; page?: string; size?: string }>
 }
 
 export default async function CashUpPage({ searchParams }: PageProps) {
@@ -113,7 +117,7 @@ export default async function CashUpPage({ searchParams }: PageProps) {
 
   const bounds = bruneiWindowBounds(window)
 
-  const [payments, deposits, bankings] = await Promise.all([
+  const [payments, deposits, bankings, opening] = await Promise.all([
     listPayments({
       methods: ['cash'],
       collectedFrom: bounds.start,
@@ -122,26 +126,48 @@ export default async function CashUpPage({ searchParams }: PageProps) {
     }),
     listDepositsCollectedBetween(bounds, 'cash'),
     listCashBankings(window),
+    // What the safe was already holding when the period opened. Without it a
+    // window starting on the 1st would report the balance light by whatever
+    // the previous week left unbanked.
+    cashOnHandBefore(window.from),
   ])
 
-  const days = cashUpDays(window, {
-    payments: payments.flatMap((payment) =>
-      payment.collectedAt
-        ? [{ collectedAt: payment.collectedAt, amount: payment.amount ?? 0 }]
-        : [],
-    ),
-    deposits: deposits.map((deposit) => ({
-      collectedAt: deposit.collectedAt,
-      amount: deposit.amount,
-    })),
-    bankings: bankings.map((banking) => ({
-      businessDate: banking.businessDate,
-      amount: banking.amount,
-    })),
-  })
+  const days = cashUpDays(
+    window,
+    {
+      payments: payments.flatMap((payment) =>
+        payment.collectedAt
+          ? [{ collectedAt: payment.collectedAt, amount: payment.amount ?? 0 }]
+          : [],
+      ),
+      deposits: deposits.map((deposit) => ({
+        collectedAt: deposit.collectedAt,
+        amount: deposit.amount,
+      })),
+      bankings: bankings.map((banking) => ({
+        businessDate: banking.businessDate,
+        amount: banking.amount,
+      })),
+    },
+    opening,
+  )
 
-  const totals = cashUpTotals(days)
+  const totals = cashUpTotals(days, opening)
   const mayBank = hasPermission(actor.permissions, 'payment.verify')
+
+  // Paged after the balance is accumulated, never before: every row already
+  // carries its own closing figure, so page 2 continues the running total
+  // rather than restarting it.
+  const pageSize = readPageSize(params.size)
+  const currentPage = clampPage(readPage(params.page), pageCountFor(days.length, pageSize))
+  const pagedDays = days.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  const pageParams = new URLSearchParams()
+
+  if (isExplicit) {
+    pageParams.set('from', window.from)
+    pageParams.set('to', window.to)
+  }
 
   return (
     <>
@@ -169,9 +195,13 @@ export default async function CashUpPage({ searchParams }: PageProps) {
         <Card className="h-full">
           <Stat
             size="sm"
-            label="Variance"
-            value={<Variance amount={totals.variance} />}
-            hint="Banked, less what was recorded"
+            label="In the safe"
+            value={<Balance amount={totals.closing} />}
+            hint={
+              totals.opening === 0
+                ? 'Taken and not yet banked'
+                : `Includes BND ${formatCents(totals.opening)} brought forward`
+            }
           />
         </Card>
 
@@ -185,45 +215,64 @@ export default async function CashUpPage({ searchParams }: PageProps) {
         </Card>
       </div>
 
-      <div className="mt-xl flex flex-wrap items-center gap-md">
-        <ReportsFilters
-          route="/portal/reports/cash-up"
-          from={window.from}
-          to={window.to}
-          isExplicit={isExplicit}
-        />
-
-        {mayBank ? (
-          <div className="ml-auto">
-            {/* Defaulted to the last day of the period rather than to today:
-                the window is already clamped to today, so on the ordinary view
-                the two are the same day — and on a past period it opens on a
-                day the reader can actually see, instead of filing cash against
-                a row that is not on the screen. */}
-            <RecordBanking defaultDate={window.to} today={today} />
-          </div>
-        ) : null}
-      </div>
-
+      {/* Heading, then the control line, then the rows — the order every list
+          screen reads in (design.md §Components — stat tiles). The controls sat
+          above the heading in the first cut, which put the period chip and the
+          screen's one filled button in the gap between the strip and the
+          section they belong to, reading as page furniture rather than as this
+          table's controls. */}
       <section aria-labelledby="cash-up-days" className="mt-2xl">
         <h2 id="cash-up-days" className="flex items-center gap-sm text-display-xs text-foreground">
           Day by day
           <SectionHint label="How a day is counted">
             Cash recorded is the cash payments taken against bookings that day, in Brunei time.
             Security deposits are counted separately: the notes are in the same drawer, but a
-            deposit is money held rather than earned. Banked is what was filed against that day,
-            whenever the trip to the bank actually happened.
+            deposit is money held rather than earned. In the safe is a running figure — everything
+            taken, less everything banked — so a single trip to the bank clears whatever has built
+            up, whichever days it came from. Days do not have to be banked one by one.
           </SectionHint>
         </h2>
 
-        <Table className="mt-md">
+        <div className="mt-lg flex flex-wrap items-center gap-md">
+          <ReportsFilters
+            route="/portal/reports/cash-up"
+            from={window.from}
+            to={window.to}
+            isExplicit={isExplicit}
+          />
+
+          {mayBank ? (
+            <div className="ml-auto">
+              {/* Defaulted to the last day of the period rather than to today:
+                  the window is already clamped to today, so on the ordinary
+                  view the two are the same day — and on a past period it opens
+                  on a day the reader can actually see, instead of filing cash
+                  against a row that is not on the screen. */}
+              <RecordBanking defaultDate={window.to} today={today} />
+            </div>
+          ) : null}
+        </div>
+
+        <Table
+          containerClassName="mt-md"
+          footer={
+            <ReportsPagination
+              route="/portal/reports/cash-up"
+              page={currentPage}
+              pageSize={pageSize}
+              total={days.length}
+              itemLabel="days"
+              params={pageParams.toString()}
+            />
+          }
+        >
           <TableHeader>
             <TableHeaderRow>
               <TableHead>Day</TableHead>
               <TableHead className="text-right">Cash recorded</TableHead>
               <TableHead className="text-right">Deposits taken</TableHead>
               <TableHead className="text-right">Banked</TableHead>
-              <TableHead className="text-right">Variance</TableHead>
+              <TableHead className="text-right">In the safe</TableHead>
               <TableHead>State</TableHead>
               <TableHead className="w-0">
                 <span className="sr-only">Open</span>
@@ -231,7 +280,7 @@ export default async function CashUpPage({ searchParams }: PageProps) {
             </TableHeaderRow>
           </TableHeader>
           <TableBody>
-            {days.map((day) => (
+            {pagedDays.map((day) => (
               <TableRow key={day.date} interactive className="group">
                 <TableCell className="text-foreground tabular-nums">
                   <TableRowLink href={`/portal/reports/cash-up/${day.date}`}>
@@ -252,8 +301,8 @@ export default async function CashUpPage({ searchParams }: PageProps) {
                 <TableCell className="text-right tabular-nums">
                   BND {formatCents(day.banked)}
                 </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  <Variance amount={day.variance} />
+                <TableCell className="text-right text-foreground tabular-nums">
+                  <Balance amount={day.balance} />
                 </TableCell>
                 <TableCell>
                   <CashUpStateBadge state={day.state} />
@@ -288,19 +337,15 @@ function CashUpHeader({ window }: { window: { from: StayDate; to: StayDate } }) 
 }
 
 /**
- * A variance, signed.
+ * The balance carried forward at the end of a day.
  *
- * The sign reads the way a bank statement does — negative means less reached
- * the bank than the desk took — and a day that agrees shows a plain zero
- * rather than a dash, because zero is the answer rather than the absence of
- * one. The figure itself stays ink: the state badge beside it carries the
- * colour, and a column of figures should read as a column.
+ * A plain zero rather than a dash when nothing is outstanding, because zero is
+ * the answer rather than the absence of one, and a minus sign kept as a minus
+ * sign: a negative balance is over-banked — more reached the bank than was
+ * ever recorded — which is a different fact from a shortfall and should not be
+ * dressed as one. The figure itself stays ink; the state badge beside it
+ * carries the colour, and a column of figures should read as a column.
  */
-function Variance({ amount }: { amount: Cents }) {
-  return (
-    <span className="tabular-nums">
-      {amount > 0 ? '+' : ''}
-      BND {formatCents(amount)}
-    </span>
-  )
+function Balance({ amount }: { amount: Cents }) {
+  return <span className="tabular-nums">BND {formatCents(amount)}</span>
 }

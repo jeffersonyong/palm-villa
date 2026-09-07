@@ -26,13 +26,27 @@
  * to the bank in two runs, or the next morning; what ties them to the day is
  * the business date on the record, not when the trip happened.
  *
- * ── The variance ──────────────────────────────────────────────────────────
+ * ── The running balance, and why it is not a per-day variance [A] ─────────
  *
- * `banked − recorded`, so the sign reads the way a bank statement does:
- * negative means money has not reached the bank yet, positive means more went
- * in than this day accounts for. Neither is an error the product can resolve —
- * it is a question for the person who was there — so the state names it and
- * stops.
+ * The first cut reconciled each day on its own: `banked − recorded`, a
+ * variance per row. That is only correct for a desk that banks every day it
+ * takes cash, and this one does not — an evening's notes go in the next
+ * morning, and a quiet week goes in on one trip. Under a per-day rule that
+ * trip left four days reading "Not banked" and the fifth "Over" by four days'
+ * takings, and squaring it would have meant splitting one deposit slip across
+ * five rows by hand. A reconciliation that makes the ordinary week look broken
+ * is one nobody will keep up.
+ *
+ * So a day carries a **balance brought forward**: everything taken, less
+ * everything banked, from the day the building opened. One lump sum clears
+ * whatever has built up, whichever days it came from, and no row has to be
+ * matched to another. The figure the screen leads with — what should be in the
+ * safe right now — is then the one thing here a person can verify directly, by
+ * counting it.
+ *
+ * The window's own `recorded` and `banked` totals still answer §10.5's
+ * "recorded cash against banked amounts" for the period; what moved is that
+ * the *day* is no longer the unit of reconciliation.
  *
  * Nothing here is stored. A day's reconciliation is a consequence of three sets
  * of rows, and storing it would be storing a second copy of a fact that can
@@ -47,22 +61,23 @@ import { addDays, dateInBrunei, nightsBetween, type StayDate, type StayWindow } 
 import type { Cents } from '../money'
 
 /**
- * Where a day's reconciliation stands.
+ * Where the money stands at the end of a day — a statement about the balance
+ * carried forward, not about that day's own two figures.
  *
- * `nothing` is its own state rather than a balanced day with two zeroes: a day
- * the desk took no cash and a day somebody has squared away are different
- * facts, and only one of them is worth reading.
+ * `holding` is the ordinary state of a business that banks twice a week, so it
+ * is deliberately unremarkable: cash in the safe is not a problem to be
+ * flagged. `over_banked` is the one that is wrong in a way arithmetic can
+ * prove — more has gone to the bank than was ever recorded as taken, which
+ * means a payment went unrecorded or a banking was entered twice.
  */
-export const CASH_UP_STATES = ['nothing', 'unbanked', 'balanced', 'short', 'over'] as const
+export const CASH_UP_STATES = ['clear', 'holding', 'over_banked'] as const
 
 export type CashUpState = (typeof CASH_UP_STATES)[number]
 
 export const CASH_UP_STATE_LABELS: Record<CashUpState, string> = {
-  nothing: 'No cash',
-  unbanked: 'Not banked',
-  balanced: 'Balanced',
-  short: 'Short',
-  over: 'Over',
+  clear: 'Clear',
+  holding: 'In safe',
+  over_banked: 'Over-banked',
 }
 
 /** A cash payment, reduced to what the day's arithmetic needs. */
@@ -86,8 +101,12 @@ export interface CashUpDay {
   depositCount: number
   banked: Cents
   bankingCount: number
-  /** `banked − recorded`. Negative means the bank has less than the day took. */
-  variance: Cents
+  /**
+   * Cash taken and not yet banked at the end of this day, carried forward from
+   * every day before it. This is the figure a person can check by opening the
+   * safe.
+   */
+  balance: Cents
   state: CashUpState
 }
 
@@ -95,24 +114,19 @@ export interface CashUpTotals {
   recorded: Cents
   depositCash: Cents
   banked: Cents
-  variance: Cents
+  /** What was already unbanked before the window began. */
+  opening: Cents
+  /** What is unbanked at the end of it — `opening + recorded − banked`. */
+  closing: Cents
 }
 
-/** Where a day stands, from its two figures. */
-export function cashUpStateOf(recorded: Cents, banked: Cents): CashUpState {
-  if (recorded === 0 && banked === 0) {
-    return 'nothing'
+/** What a carried balance says about where the money is. */
+export function cashUpStateOf(balance: Cents): CashUpState {
+  if (balance === 0) {
+    return 'clear'
   }
 
-  if (banked === 0) {
-    return 'unbanked'
-  }
-
-  if (banked === recorded) {
-    return 'balanced'
-  }
-
-  return banked < recorded ? 'short' : 'over'
+  return balance > 0 ? 'holding' : 'over_banked'
 }
 
 export interface CashUpInput {
@@ -122,13 +136,31 @@ export interface CashUpInput {
 }
 
 /**
- * Every day in the window, newest first.
+ * Every day in the window, newest first, each carrying the balance as it stood
+ * at the end of that day.
  *
  * Every day, including the quiet ones: a cash-up is read to confirm that
  * nothing was missed, and a list that silently omitted the days with no rows
- * would answer "was anything taken on the 4th" by not mentioning the 4th.
+ * would answer "was anything taken on the 4th" by not mentioning the 4th. A
+ * quiet day is not empty here either — it carries the balance forward
+ * unchanged, which is the whole point of a running figure.
+ *
+ * `opening` is what was unbanked before the window began. It has to be passed
+ * in rather than assumed to be zero: a window starting on the 1st inherits
+ * whatever the last week of the previous month left in the safe, and starting
+ * every period from zero would report the balance as low by exactly the amount
+ * nobody had banked yet.
+ *
+ * Accumulated forwards and reversed once at the end, because a running total
+ * has a direction and the screen reads the other way.
  */
-export function cashUpDays(window: StayWindow, input: CashUpInput): readonly CashUpDay[] {
+export function cashUpDays(
+  window: StayWindow,
+  input: CashUpInput,
+  opening: Cents = 0,
+): readonly CashUpDay[] {
+  let balance = opening
+
   return daysIn(window)
     .map((date) => {
       const payments = input.payments.filter((row) => dateInBrunei(row.collectedAt) === date)
@@ -138,6 +170,8 @@ export function cashUpDays(window: StayWindow, input: CashUpInput): readonly Cas
       const recorded = sum(payments)
       const banked = sum(bankings)
 
+      balance = balance + recorded - banked
+
       return {
         date,
         recorded,
@@ -146,15 +180,21 @@ export function cashUpDays(window: StayWindow, input: CashUpInput): readonly Cas
         depositCount: deposits.length,
         banked,
         bankingCount: bankings.length,
-        variance: banked - recorded,
-        state: cashUpStateOf(recorded, banked),
+        balance,
+        state: cashUpStateOf(balance),
       }
     })
     .reverse()
 }
 
-/** The window as one line. */
-export function cashUpTotals(days: readonly CashUpDay[]): CashUpTotals {
+/**
+ * The window as one line.
+ *
+ * `closing` is read off the newest day rather than re-derived, so the total and
+ * the top row of the table cannot disagree — the rule the list screens already
+ * follow, where a list and its summary share one predicate.
+ */
+export function cashUpTotals(days: readonly CashUpDay[], opening: Cents = 0): CashUpTotals {
   const recorded = days.reduce((total, day) => total + day.recorded, 0)
   const banked = days.reduce((total, day) => total + day.banked, 0)
 
@@ -162,7 +202,8 @@ export function cashUpTotals(days: readonly CashUpDay[]): CashUpTotals {
     recorded,
     depositCash: days.reduce((total, day) => total + day.depositCash, 0),
     banked,
-    variance: banked - recorded,
+    opening,
+    closing: days[0]?.balance ?? opening,
   }
 }
 

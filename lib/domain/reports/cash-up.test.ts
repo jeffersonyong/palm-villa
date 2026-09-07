@@ -8,21 +8,19 @@ const WINDOW = { from: '2026-09-04', to: '2026-09-06' } as const
 const NOTHING = { payments: [], deposits: [], bankings: [] }
 
 describe('cashUpStateOf', () => {
-  test('a day with neither figure is quiet, not balanced', () => {
-    // A day nobody took cash on and a day somebody squared away are different
-    // facts, and only one of them is worth reading.
-    expect(cashUpStateOf(0, 0)).toBe('nothing')
+  test('nothing left unbanked is clear', () => {
+    expect(cashUpStateOf(0)).toBe('clear')
   })
 
-  test('names each way a day can stand', () => {
-    expect(cashUpStateOf(bnd(200), 0)).toBe('unbanked')
-    expect(cashUpStateOf(bnd(200), bnd(200))).toBe('balanced')
-    expect(cashUpStateOf(bnd(200), bnd(150))).toBe('short')
-    expect(cashUpStateOf(bnd(200), bnd(260))).toBe('over')
+  test('cash still on hand is the ordinary state, not a fault', () => {
+    // A business that banks twice a week is holding cash most days. Flagging
+    // that as a problem is how a warning stops being read.
+    expect(cashUpStateOf(bnd(650))).toBe('holding')
   })
 
-  test('money banked against a day that recorded none is over, not balanced', () => {
-    expect(cashUpStateOf(0, bnd(200))).toBe('over')
+  test('more banked than was ever recorded is the one arithmetic can call wrong', () => {
+    // Either a payment went unrecorded or a banking was entered twice.
+    expect(cashUpStateOf(bnd(-50))).toBe('over_banked')
   })
 })
 
@@ -38,7 +36,59 @@ describe('cashUpDays', () => {
   test('a quiet day is listed rather than omitted', () => {
     const days = cashUpDays(WINDOW, NOTHING)
 
-    expect(days.every((day) => day.state === 'nothing')).toBe(true)
+    expect(days).toHaveLength(3)
+    expect(days.every((day) => day.state === 'clear')).toBe(true)
+  })
+
+  test('a quiet day carries the balance forward unchanged', () => {
+    // The point of a running figure: nothing happened, and what was in the
+    // safe yesterday is still in the safe today.
+    const days = cashUpDays(WINDOW, NOTHING, bnd(400))
+
+    expect(days.map((day) => day.balance)).toEqual([bnd(400), bnd(400), bnd(400)])
+  })
+
+  test('an opening balance is carried in rather than assumed to be zero', () => {
+    // A window starting on the 1st inherits whatever last week left unbanked.
+    const days = cashUpDays(WINDOW, {
+      ...NOTHING,
+      payments: [{ collectedAt: '2026-09-04T02:00:00Z', amount: bnd(100) }],
+    })
+
+    expect(days.find((day) => day.date === '2026-09-04')?.balance).toBe(bnd(100))
+
+    const carried = cashUpDays(
+      WINDOW,
+      { ...NOTHING, payments: [{ collectedAt: '2026-09-04T02:00:00Z', amount: bnd(100) }] },
+      bnd(250),
+    )
+
+    expect(carried.find((day) => day.date === '2026-09-04')?.balance).toBe(bnd(350))
+  })
+
+  test('one lump sum clears a week of takings, whichever days they came from', () => {
+    // The case the per-day variance got wrong: three days of cash, banked in a
+    // single trip on the fourth. Nothing has to be matched day to day, and the
+    // balance returns to zero.
+    const days = cashUpDays(
+      { from: '2026-09-01', to: '2026-09-04' },
+      {
+        deposits: [],
+        payments: [
+          { collectedAt: '2026-09-01T02:00:00Z', amount: bnd(300) },
+          { collectedAt: '2026-09-02T02:00:00Z', amount: bnd(250) },
+          { collectedAt: '2026-09-03T02:00:00Z', amount: bnd(100) },
+        ],
+        bankings: [{ businessDate: '2026-09-04', amount: bnd(650) }],
+      },
+    )
+
+    expect(days.map((day) => [day.date, day.balance, day.state])).toEqual([
+      ['2026-09-04', 0, 'clear'],
+      ['2026-09-03', bnd(650), 'holding'],
+      ['2026-09-02', bnd(550), 'holding'],
+      ['2026-09-01', bnd(300), 'holding'],
+    ])
   })
 
   test('a payment is placed on its Brunei day, not its UTC one', () => {
@@ -61,8 +111,8 @@ describe('cashUpDays', () => {
     expect(days.find((day) => day.date === '2026-09-04')).toMatchObject({
       banked: bnd(200),
       bankingCount: 1,
-      variance: bnd(200),
-      state: 'over',
+      balance: bnd(-200),
+      state: 'over_banked',
     })
   })
 
@@ -79,11 +129,12 @@ describe('cashUpDays', () => {
     expect(days.find((day) => day.date === '2026-09-04')).toMatchObject({
       banked: bnd(300),
       bankingCount: 2,
-      state: 'balanced',
+      balance: 0,
+      state: 'clear',
     })
   })
 
-  test('a short day carries a negative variance, so the sign reads like a statement', () => {
+  test('banking part of a day leaves the rest on the balance', () => {
     const days = cashUpDays(WINDOW, {
       ...NOTHING,
       payments: [{ collectedAt: '2026-09-05T02:00:00Z', amount: bnd(200) }],
@@ -91,8 +142,8 @@ describe('cashUpDays', () => {
     })
 
     expect(days.find((day) => day.date === '2026-09-05')).toMatchObject({
-      variance: bnd(-50),
-      state: 'short',
+      balance: bnd(50),
+      state: 'holding',
     })
   })
 
@@ -110,7 +161,8 @@ describe('cashUpDays', () => {
       recorded: bnd(200),
       depositCash: bnd(100),
       depositCount: 1,
-      state: 'balanced',
+      balance: 0,
+      state: 'clear',
     })
   })
 
@@ -134,8 +186,23 @@ describe('cashUpTotals', () => {
       recorded: bnd(300),
       depositCash: bnd(100),
       banked: bnd(250),
-      variance: bnd(-50),
+      opening: 0,
+      closing: bnd(50),
     })
+  })
+
+  test('the closing figure is the newest row, so the tile and the table agree', () => {
+    const days = cashUpDays(
+      WINDOW,
+      { ...NOTHING, payments: [{ collectedAt: '2026-09-05T02:00:00Z', amount: bnd(80) }] },
+      bnd(120),
+    )
+
+    expect(cashUpTotals(days, bnd(120))).toMatchObject({
+      opening: bnd(120),
+      closing: days[0]?.balance,
+    })
+    expect(cashUpTotals(days, bnd(120)).closing).toBe(bnd(200))
   })
 })
 
