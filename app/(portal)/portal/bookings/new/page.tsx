@@ -45,7 +45,7 @@ export const metadata: Metadata = {
 const ANY_UNIT_TYPE = 'any'
 
 interface PageProps {
-  searchParams: Promise<{ from?: string; to?: string; type?: string }>
+  searchParams: Promise<{ from?: string; to?: string; type?: string; unit?: string }>
 }
 
 export default async function NewBookingPage({ searchParams }: PageProps) {
@@ -74,6 +74,21 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   const availableUnits = hasDates
     ? await findAvailableUnits({ range: { start: checkIn, end: checkOut }, unitTypeId })
     : []
+
+  /*
+   * The unit the calendar was pointing at, when it sent us here.
+   *
+   * The form otherwise opens on the first unit free for the dates, which is
+   * fine when the dates arrived on their own but wrong when a row was clicked:
+   * the calendar's dialog names a unit, and landing on a different one would
+   * make that dialog a lie. Honoured only if it really is free for these
+   * dates — the grid and this query are two reads, and a unit taken in between
+   * must not be pre-selected.
+   */
+  const preferredUnitId =
+    params.unit === undefined
+      ? undefined
+      : availableUnits.find((unit) => unit.ref === params.unit)?.id
   const availableByType = hasDates
     ? await countAvailableByType({ start: checkIn, end: checkOut })
     : {}
@@ -221,6 +236,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
         <NewBookingScreen
           chrome={chrome}
           units={availableUnits}
+          preferredUnitId={preferredUnitId}
           config={config}
           checkIn={checkIn}
           checkOut={checkOut}

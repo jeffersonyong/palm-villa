@@ -11,6 +11,13 @@ import { cn } from '@/lib/utils'
  * §Components — Portal forms). They were declared twice, once per form, and
  * had begun to drift.
  *
+ * `content-start` is load-bearing rather than tidiness. A grid whose rows are
+ * all `auto` stretches them to fill spare height, so a short field sharing a
+ * row with a taller one — a select carrying two lines of explanation, say —
+ * had its own label and input pushed apart to fill the difference, landing the
+ * input 30px below its neighbour's. The fix belongs here and not on each
+ * containing grid: a field should hold its shape wherever it is put.
+ *
  * Fields size to their content: a count gets ~150px, not a row. `TextField`
  * runs uncontrolled unless given `value`/`onChange`, so the walk-in form's
  * plain `<form action>` fields and the amendment form's controlled ones are
@@ -77,7 +84,7 @@ export function TextField({
   error,
 }: TextFieldProps) {
   return (
-    <div className={cn('grid gap-sm', className)}>
+    <div className={cn('grid content-start gap-sm', className)}>
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
@@ -128,7 +135,7 @@ export function MoneyField({
   className,
 }: MoneyFieldProps) {
   return (
-    <div className={cn('grid gap-sm', className)}>
+    <div className={cn('grid content-start gap-sm', className)}>
       <Label htmlFor={id}>{label}</Label>
       <div className="flex items-center gap-sm">
         <span className="text-body-sm text-muted-foreground">BND</span>

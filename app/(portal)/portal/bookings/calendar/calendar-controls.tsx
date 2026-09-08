@@ -8,14 +8,16 @@ import { useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { MonthHeader } from '@/components/ui/calendar-grid'
 import { shiftMonth, type CalendarMonth } from '@/components/ui/calendar-month'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { MultiSelectFilter, type MultiSelectOption } from '@/components/ui/multi-select-filter'
-import { TextAction } from '@/components/ui/text-action'
 import { cn } from '@/lib/utils'
 
 import { calendarHref } from './calendar-params'
 
 /**
- * The calendar's control line: which month, and which unit types.
+ * The calendar's control line: which month, which unit types, and whether the
+ * empty rows are drawn.
  *
  * URL state, like every filter row on the surface — a month can be kept in a
  * tab or sent to whoever is asking about it. The current values arrive as
@@ -24,12 +26,16 @@ import { calendarHref } from './calendar-params'
  *
  * The month arrows are the date picker's own `MonthHeader`: the same 28px
  * chrome-on-something-else squares design.md gives a calendar's arrows, and
- * the same title, so the two calendars in the product read as one. "Today" is
- * offered only when it is not already the answer, which is the picker's rule
- * for its own Today.
+ * the same title, so the two calendars in the product read as one. There is
+ * no "Today": the arrows are how the month moves, the screen opens on this
+ * month unasked, and a shortcut back to where you started is a control that
+ * earns its place on a picker a customer meets once rather than on a grid the
+ * desk lives in.
  *
- * Clear keeps the month. The month is the view, not a filter: clearing the
- * type narrowing should widen the building, not jump to a different month.
+ * Clear keeps the month, and keeps the empty rows as they are. The month is
+ * the view, not a filter — clearing the type narrowing should widen the
+ * building, not jump to a different month — and "Show empty units" is how much
+ * of the grid is drawn rather than which units qualify for it.
  */
 
 interface UnitTypeOption {
@@ -45,9 +51,17 @@ interface CalendarControlsProps {
   types: readonly string[]
   /** Every unit type, for the Type panel's options. */
   unitTypes: readonly UnitTypeOption[]
+  /** Whether the units with nothing on them this month are drawn. */
+  showAllUnits: boolean
 }
 
-export function CalendarControls({ month, todayMonth, types, unitTypes }: CalendarControlsProps) {
+export function CalendarControls({
+  month,
+  todayMonth,
+  types,
+  unitTypes,
+  showAllUnits,
+}: CalendarControlsProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
@@ -62,9 +76,19 @@ export function CalendarControls({ month, todayMonth, types, unitTypes }: Calend
    * Rebuilds the whole query from one place. The current month is written as
    * the absence of the param, so the view a reader opens on unasked and the
    * same view reached by the arrows share a URL.
+   *
+   * The arrows are buttons rather than links, so nothing prefetches the
+   * neighbouring months — and `router.prefetch` was tried and removed: this
+   * route is dynamic with its state in search params, and it issued no
+   * request at all. Next's own router cache is what makes stepping cheap
+   * after the first move (measured 469ms, then ~200ms a step).
    */
-  function go(nextMonth: CalendarMonth, nextTypes: readonly string[]) {
-    const href = calendarHref(nextMonth === todayMonth ? null : nextMonth, nextTypes) as Route
+  function go(nextMonth: CalendarMonth, nextTypes: readonly string[], nextShowAll = showAllUnits) {
+    const href = calendarHref(
+      nextMonth === todayMonth ? null : nextMonth,
+      nextTypes,
+      nextShowAll,
+    ) as Route
 
     startTransition(() => {
       // `push`, not `replace`: back should undo a step through the months.
@@ -76,11 +100,15 @@ export function CalendarControls({ month, todayMonth, types, unitTypes }: Calend
     <div
       aria-busy={isPending}
       className={cn(
-        'flex flex-wrap items-center gap-sm transition-opacity duration-150 motion-reduce:transition-none',
+        'flex flex-wrap items-center gap-xl transition-opacity duration-150 motion-reduce:transition-none',
         isPending && 'opacity-60',
       )}
     >
-      {/* The header positions its arrows absolutely, so it needs a width to
+      {/* Two clusters, not one row. Which month is being looked at is a
+          different question from which units are shown, so the month keeps
+          its own space and the narrowing keeps its own.
+
+          The header positions its arrows absolutely, so it needs a width to
           stand in a row; wide enough for "September 2026" with an arrow clear
           of each end. */}
       <div className="w-[232px]">
@@ -93,23 +121,36 @@ export function CalendarControls({ month, todayMonth, types, unitTypes }: Calend
         />
       </div>
 
-      {month !== todayMonth ? (
-        <TextAction onClick={() => go(todayMonth, types)}>Today</TextAction>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-md">
+        <MultiSelectFilter
+          label="Type"
+          options={typeOptions}
+          selected={types}
+          onChange={(next) => go(month, next)}
+        />
 
-      <MultiSelectFilter
-        label="Type"
-        options={typeOptions}
-        selected={types}
-        onChange={(next) => go(month, next)}
-      />
+        {/* A checkbox rather than a chip: this is one thing that is on or off,
+            and a chip carries a chevron that promises a list to pick from
+            (design.md — a chevron promises a list). Worded as what ticking it
+            does, not as the state it leaves behind. */}
+        <div className="flex items-center gap-sm">
+          <Checkbox
+            id="showAllUnits"
+            checked={showAllUnits}
+            onCheckedChange={(checked) => go(month, types, checked === true)}
+          />
+          <Label htmlFor="showAllUnits" className="cursor-pointer text-copy">
+            Show empty units
+          </Label>
+        </div>
 
-      {types.length > 0 ? (
-        <Button variant="ghost" onClick={() => go(month, [])}>
-          <FunnelX aria-hidden />
-          Clear
-        </Button>
-      ) : null}
+        {types.length > 0 ? (
+          <Button variant="ghost" onClick={() => go(month, [])}>
+            <FunnelX aria-hidden />
+            Clear
+          </Button>
+        ) : null}
+      </div>
     </div>
   )
 }

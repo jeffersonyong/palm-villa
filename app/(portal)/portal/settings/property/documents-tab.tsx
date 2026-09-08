@@ -105,7 +105,11 @@ export function DocumentsTab({ settings }: DocumentsTabProps) {
                         <FieldError message={problemFor(`retention.${kind}`)} />
                       </div>
                     </TableCell>
-                    <TableCell className="align-top text-muted-foreground">
+                    {/* Centred, not top-aligned: two of these rows carry a
+                        second line under the document's name, and an anchor
+                        pinned to the top of a row that tall sits above the
+                        field it describes rather than beside it. */}
+                    <TableCell className="align-middle text-muted-foreground">
                       {ANCHOR[kind]}
                     </TableCell>
                   </TableRow>

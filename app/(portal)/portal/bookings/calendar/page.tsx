@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/portal/page-header'
 import { StatusLegend, type StatusLegendItem } from '@/components/portal/status-legend'
 import { UnitStatusBadge } from '@/components/portal/unit-status-badge'
 import { Button } from '@/components/ui/button'
-import { monthOf } from '@/components/ui/calendar-month'
+import { formatCalendarMonth, monthOf } from '@/components/ui/calendar-month'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listOccupanciesInWindow } from '@/lib/db/calendar'
@@ -18,7 +18,7 @@ import { getPropertyConfig } from '@/lib/db/property-config'
 import { todayInBrunei } from '@/lib/domain/dates'
 
 import { CalendarControls } from './calendar-controls'
-import { calendarHref, readMonth } from './calendar-params'
+import { calendarHref, readMonth, readShowAllUnits } from './calendar-params'
 import { buildTapeChart, monthWindow, type TapeChartSummary } from './tape-chart'
 import { TapeChartGrid } from './tape-chart-grid'
 
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
  */
 
 interface PageProps {
-  searchParams: Promise<{ month?: string; type?: string | string[] }>
+  searchParams: Promise<{ month?: string; type?: string | string[]; units?: string }>
 }
 
 export default async function BookingCalendarPage({ searchParams }: PageProps) {
@@ -99,12 +99,15 @@ export default async function BookingCalendarPage({ searchParams }: PageProps) {
   const visibleUnits =
     types.length === 0 ? units : units.filter((unit) => types.includes(unit.unitTypeId))
 
+  const showAllUnits = readShowAllUnits(params.units)
+
   const chart = buildTapeChart({
     month,
     today,
     units: visibleUnits,
     occupancies,
     create: { enabled: mayCreate, maxAdvanceDays: config.maxAdvanceBookingDays },
+    showEmptyUnits: showAllUnits,
   })
 
   const unitTypes = config.unitTypes.map((type) => ({ id: type.id, name: type.name }))
@@ -127,6 +130,7 @@ export default async function BookingCalendarPage({ searchParams }: PageProps) {
           todayMonth={monthOf(today)}
           types={types}
           unitTypes={unitTypes}
+          showAllUnits={showAllUnits}
         />
 
         <div className="ml-auto flex items-center gap-md">
@@ -160,8 +164,29 @@ export default async function BookingCalendarPage({ searchParams }: PageProps) {
             action={
               <Button asChild variant="tertiary">
                 {/* Keeps the month: the filter is what emptied the grid. */}
-                <Link href={calendarHref(month === monthOf(today) ? null : month, []) as Route}>
+                <Link
+                  href={
+                    calendarHref(month === monthOf(today) ? null : month, [], showAllUnits) as Route
+                  }
+                >
                   Clear filters
+                </Link>
+              </Button>
+            }
+          />
+        ) : chart.summary.units === 0 ? (
+          /* The month is genuinely empty, and the grid is drawing only the
+             units something happens in — so the way out is to widen it, not
+             to clear a filter that is not the reason. */
+          <EmptyState
+            title={`Nothing booked in ${formatCalendarMonth(month)}`}
+            description="No unit has a stay, a lease or an out-of-service period this month. The grid is showing only the units something happens in."
+            action={
+              <Button asChild variant="tertiary">
+                <Link
+                  href={calendarHref(month === monthOf(today) ? null : month, types, true) as Route}
+                >
+                  Show every unit
                 </Link>
               </Button>
             }
@@ -174,10 +199,22 @@ export default async function BookingCalendarPage({ searchParams }: PageProps) {
   )
 }
 
-/** "48 units · 7 stays · 1 lease" — a part that is zero is left out. */
+/**
+ * "48 units · 7 stays · 1 lease" — a part that is zero is left out.
+ *
+ * When rows are being held back the units read "6 of 48", so the number on
+ * screen is never mistaken for the size of the building. The other counts are
+ * of what is on the chart and are unaffected: a hidden row had nothing to
+ * count.
+ */
 function summaryText(summary: TapeChartSummary): string {
+  const units =
+    summary.units === summary.totalUnits
+      ? count(summary.units, 'unit', 'units')
+      : `${summary.units} of ${summary.totalUnits} units`
+
   const parts = [
-    count(summary.units, 'unit', 'units'),
+    units,
     summary.bookings > 0 ? count(summary.bookings, 'stay', 'stays') : null,
     summary.leases > 0 ? count(summary.leases, 'lease', 'leases') : null,
     summary.outOfService > 0 ? `${summary.outOfService} out of service` : null,

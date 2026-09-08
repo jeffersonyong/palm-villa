@@ -31,6 +31,8 @@ interface NewBookingScreenProps {
   /** Header, date controls and availability tiles, rendered on the server. */
   chrome: React.ReactNode
   units: readonly Unit[]
+  /** The unit to open on, when the calendar already chose one. */
+  preferredUnitId?: string
   config: PropertyConfig
   checkIn: string
   checkOut: string
