@@ -405,10 +405,31 @@ begin
     (ordinality - 1)::integer
   from jsonb_array_elements(p_lines) with ordinality as elements (entry, ordinality);
 
-  -- The assignment. available_units() applies the identical half-open overlap
-  -- and out-of-service rules the constraint and the trigger apply, so an
-  -- ordinary call finds a free door on its first attempt; the loop exists for
-  -- the seconds between the read and the write.
+  -- ── The assignment ───────────────────────────────────────────────────────
+  --
+  -- Serialised per unit type, and the lock is not optional. Without it eight
+  -- customers asking for the same type walk the same candidate list in the
+  -- same order, and the exclusion constraint makes an inserting transaction
+  -- WAIT on a conflicting uncommitted one rather than fail — so two of them
+  -- end up holding a door each and waiting on the other's, which Postgres
+  -- resolves by killing somebody's booking with "deadlock detected". That is
+  -- a customer seeing an error on a building with forty free rooms, and it is
+  -- what lib/db/public-bookings.test.ts caught.
+  --
+  -- Per type rather than per property, so a family booking a semi-detached
+  -- never queues behind somebody booking an apartment. Transaction-scoped, so
+  -- it is released by the commit or rollback that settles the booking.
+  --
+  -- **This does not replace the constraint**, it only removes the cycle among
+  -- public callers. The desk takes no such lock, so a walk-in and a customer
+  -- can still race for the same door — and the exclusion constraint is what
+  -- decides that, exactly as capability G1 promises. The handlers below are
+  -- what turn its refusal into the next room rather than an apology.
+  perform pg_advisory_xact_lock(hashtext(p_property_id::text || ':assign:' || p_unit_type_slug));
+
+  -- available_units() applies the identical half-open overlap and
+  -- out-of-service rules the constraint and the trigger apply, so an ordinary
+  -- call finds a free door on its first attempt.
   for v_candidate in
     select id, ref
     from available_units(p_property_id, p_check_in, p_check_out, p_unit_type_slug, null)

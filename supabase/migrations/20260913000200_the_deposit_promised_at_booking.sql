@@ -597,6 +597,94 @@ end;
 $function$;
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- 4a. A charge cannot be raised against money nobody has.
+--
+-- `canAddCharge()` in lib/domain/deposit.ts already refuses one, so no screen
+-- offers the control — but prd.md §11's whole posture is that the screen
+-- refuses first with a sentence and the database refuses last, from any
+-- caller. The release path has `deposit_release_needs_collection` doing that
+-- job; charges had nothing, and an integration test walked straight past the
+-- domain rule to prove it.
+--
+-- A charge against a promised deposit is not a near-miss, either: the booking
+-- is still awaiting verification, so the guest has not arrived, and there is
+-- nothing in the property for them to have damaged.
+--
+-- Everything else about this function is unchanged from 20260906000100.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+create or replace function add_deposit_charge(
+  p_property_id uuid,
+  p_deposit_id uuid,
+  p_amount_cents integer,
+  p_reason text,
+  p_actor_id uuid default null
+)
+returns jsonb
+language plpgsql
+as $function$
+declare
+  v_deposit deposit%rowtype;
+  v_booking booking%rowtype;
+  v_reason text := nullif(btrim(coalesce(p_reason, '')), '');
+  v_charge_id uuid;
+begin
+  select * into v_deposit
+  from deposit
+  where id = p_deposit_id and property_id = p_property_id
+  for update;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'error', 'not_found');
+  end if;
+
+  if v_deposit.released_at is not null then
+    return jsonb_build_object('ok', false, 'error', 'already_released');
+  end if;
+
+  -- The new one.
+  if v_deposit.collected_at is null then
+    return jsonb_build_object('ok', false, 'error', 'not_collected');
+  end if;
+
+  if p_amount_cents is null or p_amount_cents <= 0 then
+    return jsonb_build_object('ok', false, 'error', 'invalid_amount');
+  end if;
+
+  if v_reason is null then
+    return jsonb_build_object('ok', false, 'error', 'reason_required');
+  end if;
+
+  insert into deposit_charge (property_id, deposit_id, amount_cents, reason, created_by)
+  values (p_property_id, p_deposit_id, p_amount_cents, v_reason, p_actor_id)
+  returning id into v_charge_id;
+
+  select * into v_booking
+  from booking
+  where id = v_deposit.booking_id and property_id = p_property_id;
+
+  -- `reason` under that key deliberately: EventHistory quotes after.reason, so
+  -- the trail carries what the charge was for without a per-verb reader.
+  insert into audit_event (
+    property_id, actor_id, action, entity_type, entity_id, before, after
+  )
+  values (
+    p_property_id, p_actor_id, 'charge.created', 'deposit_charge', v_charge_id,
+    null,
+    jsonb_build_object(
+      'deposit_id', p_deposit_id,
+      'booking_id', v_deposit.booking_id,
+      'booking_reference', v_booking.reference,
+      'amount_cents', p_amount_cents,
+      'reason', v_reason
+    )
+  );
+
+  return jsonb_build_object('ok', true, 'charge_id', v_charge_id);
+end;
+$function$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- 5. deposit_summary carries the promise.
 --
 -- Appended, for the reason every other view change here is.

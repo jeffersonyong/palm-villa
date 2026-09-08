@@ -190,6 +190,18 @@ async function clearTransactionalData(): Promise<void> {
     throw new Error(`Could not clear cash bankings between tests: ${bankingError.message}`)
   }
 
+  // Rate-limit counters hang off nothing either, and they are the one table
+  // here whose whole purpose is to remember what happened before — so a test
+  // that did not clear them would pass or fail on the order the suite ran in.
+  const { error: attemptError } = await db
+    .from('public_attempt')
+    .delete()
+    .gte('window_start', EPOCH)
+
+  if (attemptError) {
+    throw new Error(`Could not clear public attempts between tests: ${attemptError.message}`)
+  }
+
   await emptyDocumentBuckets()
 }
 

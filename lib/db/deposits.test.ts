@@ -15,8 +15,10 @@ import {
   listDepositsForBookings,
   listHeldDeposits,
   listOwedDeposits,
+  listPendingDeposits,
   listReleasedDeposits,
   settleDepositOwed,
+  verifyDeposit,
 } from './deposits'
 import { getInspectionForBooking, recordInspection } from './inspections'
 import { currentPropertyId } from './property'
@@ -29,7 +31,8 @@ import {
   givenInspectedDeposit,
   unitIdByRef,
 } from './test/factory'
-import { createWalkInBooking } from './bookings'
+import { createWalkInBooking, getBookingById } from './bookings'
+import { createPublicStayBooking, submitPublicTransfer } from './public-bookings'
 
 /**
  * The deposit ledger against the real database (capabilities E1, E2, E3).
@@ -734,5 +737,260 @@ describe('what a deleted booking takes with it', () => {
 describe('a unit reference that is not seeded', () => {
   test('fails the test setup loudly rather than silently booking elsewhere', async () => {
     await expect(unitIdByRef('NOPE-99')).rejects.toThrow('No seeded unit')
+  })
+})
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * A deposit promised at booking (capability B16, prd.md §9.1 / N29).
+ *
+ * The client reversed his own policy on 10 September 2026: a booking is
+ * secured by the BND 100, transferred before the guest arrives. What that asks
+ * of this file is proof of the two things prd.md §11's as-built block promises
+ * and the schema now has to keep true — that a promise is never mistaken for
+ * money, and that check-in does not take a second deposit off somebody who has
+ * already paid one.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+/** A public stay whose customer has said they transferred the deposit. */
+async function givenPromisedDeposit(): Promise<{ bookingId: string; depositId: string }> {
+  const created = await createPublicStayBooking({
+    unitTypeSlug: 'three-bedroom',
+    range: { start: '2026-10-20', end: '2026-10-23' },
+    guestName: 'Promised Guest',
+    guestPhone: '+673 950 0001',
+    guestEmail: null,
+    vehicles: ['PV 2'],
+    noVehicle: false,
+    chargeableGuests: 2,
+    exemptGuests: 0,
+    total: bnd(600),
+    securityDeposit: bnd(100),
+    lines: [
+      {
+        type: 'accommodation',
+        description: '3-bedroom x 3 nights',
+        quantity: 3,
+        unitPrice: bnd(200),
+        amount: bnd(600),
+      },
+    ],
+  })
+
+  if (!created.ok) {
+    throw new Error(`Test setup could not create a public booking: ${created.error.message}`)
+  }
+
+  const submitted = await submitPublicTransfer(created.data.accessToken)
+
+  if (!submitted.ok) {
+    throw new Error(`Test setup could not submit the transfer: ${submitted.error.message}`)
+  }
+
+  const pending = await listPendingDeposits()
+  const deposit = pending.find((row) => row.bookingId === created.data.bookingId)
+
+  if (!deposit) {
+    throw new Error('Test setup expected a pending deposit')
+  }
+
+  return { bookingId: created.data.bookingId, depositId: deposit.id }
+}
+
+describe('verifying a promised deposit', () => {
+  test('confirms the booking and records what was seen', async () => {
+    const { bookingId, depositId } = await givenPromisedDeposit()
+
+    const verified = await verifyDeposit({
+      depositId,
+      observedAmount: bnd(100),
+      observedReference: 'PV-4830',
+      observedSender: 'AHMAD BIN ALI',
+      observedOn: '2026-10-01',
+      actorId: null,
+    })
+
+    expect(verified.ok).toBe(true)
+
+    const deposit = await getDepositByBookingId(bookingId)
+
+    expect(deposit?.collectedAt).not.toBeNull()
+    expect(deposit?.promisedAt).not.toBeNull()
+    expect(deposit?.stage).toBe('in_house')
+    expect(deposit?.observed).toMatchObject({ reference: 'PV-4830', sender: 'AHMAD BIN ALI' })
+
+    const booking = await getBookingById(bookingId)
+
+    expect(booking?.status).toBe('confirmed')
+
+    // The invariant the whole design turns on: the deposit settles nothing.
+    // A BND 600 stay still owes BND 600 on arrival.
+    expect(booking?.paid).toBe(0)
+  })
+
+  test('moves the deposit from the queue onto the ledger', async () => {
+    const { depositId } = await givenPromisedDeposit()
+
+    expect(await listPendingDeposits()).toHaveLength(1)
+    expect(await listHeldDeposits()).toHaveLength(0)
+
+    await verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null })
+
+    expect(await listPendingDeposits()).toHaveLength(0)
+    expect(await listHeldDeposits()).toHaveLength(1)
+  })
+
+  test('refuses a figure that disagrees with the quote unless somebody says why', async () => {
+    const { depositId } = await givenPromisedDeposit()
+
+    const short = await verifyDeposit({ depositId, observedAmount: bnd(50), actorId: null })
+
+    expect(short.ok).toBe(false)
+
+    if (short.ok) return
+
+    expect(short.error.code).toBe('reason_required')
+    expect(short.error.message).toContain('100.00')
+
+    // An overpayment is refused as firmly, because a refund is still N5.
+    const over = await verifyDeposit({ depositId, observedAmount: bnd(150), actorId: null })
+
+    expect(over.ok).toBe(false)
+  })
+
+  test('accepts a mismatch with a reason, and records it as its own event', async () => {
+    const { bookingId, depositId } = await givenPromisedDeposit()
+
+    const verified = await verifyDeposit({
+      depositId,
+      observedAmount: bnd(90),
+      overrideReason: 'Bank charged a BND 10 transfer fee; guest paid the rest in cash.',
+      actorId: null,
+    })
+
+    expect(verified.ok).toBe(true)
+
+    const deposit = await getDepositByBookingId(bookingId)
+
+    expect(deposit?.amount).toBe(bnd(90))
+    expect(deposit?.overrideReason).toContain('transfer fee')
+
+    const events = await listAuditEvents('deposit', depositId)
+    const actions = events.map((event) => event.action)
+
+    expect(actions).toContain('deposit.collected')
+    expect(actions).toContain('deposit.amount_overridden')
+  })
+
+  test('refuses to verify the same deposit twice', async () => {
+    const { depositId } = await givenPromisedDeposit()
+
+    await verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null })
+
+    const again = await verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null })
+
+    expect(again.ok).toBe(false)
+
+    if (again.ok) return
+
+    expect(again.error.code).toBe('already_collected')
+  })
+
+  test('two verifiers pressing at once produce one collection', async () => {
+    const { depositId } = await givenPromisedDeposit()
+
+    const [first, second] = await Promise.all([
+      verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null }),
+      verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null }),
+    ])
+
+    expect([first.ok, second.ok].filter(Boolean)).toHaveLength(1)
+  })
+})
+
+describe('checking in a guest whose deposit is already held', () => {
+  test('takes nothing and says so', async () => {
+    const { bookingId, depositId } = await givenPromisedDeposit()
+
+    await verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null })
+
+    const checkedIn = await checkInBooking({ bookingId, method: 'cash', actorId: null })
+
+    expect(checkedIn.ok).toBe(true)
+
+    if (!checkedIn.ok) return
+
+    // prd.md §11: "Check-in recognises a deposit already held and takes
+    // nothing." The same row comes back rather than a second one.
+    expect(checkedIn.alreadyHeld).toBe(true)
+    expect(checkedIn.depositId).toBe(depositId)
+
+    const { count } = await dataClient()
+      .from('deposit')
+      .select('id', { count: 'exact', head: true })
+      .eq('booking_id', bookingId)
+
+    expect(count).toBe(1)
+  })
+
+  test('collects a promise the guest never actually sent, at the door', async () => {
+    // The judgement recorded in the migration: the guest is standing there, and
+    // refusing check-in over an abandoned transfer would send a paying customer
+    // away to fix a row. The promise is fulfilled rather than replaced.
+    const { bookingId, depositId } = await givenPromisedDeposit()
+
+    const { error } = await dataClient()
+      .from('booking')
+      .update({ status: 'confirmed' })
+      .eq('id', bookingId)
+
+    expect(error).toBeNull()
+
+    const checkedIn = await checkInBooking({ bookingId, method: 'cash', actorId: null })
+
+    expect(checkedIn.ok).toBe(true)
+
+    if (!checkedIn.ok) return
+
+    expect(checkedIn.alreadyHeld).toBe(false)
+    expect(checkedIn.depositId).toBe(depositId)
+
+    const deposit = await getDepositByBookingId(bookingId)
+
+    expect(deposit?.collectedAt).not.toBeNull()
+    expect(deposit?.method).toBe('cash')
+    // The promise survives as the record that the customer said they had sent
+    // it, which is the question asked afterwards.
+    expect(deposit?.promisedAt).not.toBeNull()
+  })
+
+  test('a walk-in still has its deposit taken at the door', async () => {
+    // The path that existed before this slice, unchanged.
+    const { depositId } = await givenCheckedInBooking({
+      unitRef: '3B-30',
+      checkIn: '2026-10-20',
+      checkOut: '2026-10-23',
+    })
+
+    expect(depositId).not.toBeNull()
+  })
+})
+
+describe('a promised deposit answers for nothing yet', () => {
+  test('cannot be charged against', async () => {
+    const { bookingId } = await givenPromisedDeposit()
+    const deposit = await getDepositByBookingId(bookingId)
+
+    expect(deposit?.stage).toBe('awaiting_verification')
+
+    const charge = await addDepositCharge({
+      depositId: deposit?.id as string,
+      amount: bnd(30),
+      reason: 'Broken lamp',
+      actorId: null,
+    })
+
+    expect(charge.ok).toBe(false)
   })
 })
