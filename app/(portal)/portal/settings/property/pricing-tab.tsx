@@ -136,8 +136,21 @@ export function PricingTab({ settings }: PricingTabProps) {
           </FormSection>
 
           <FormSection title="Guests and extras">
+            {/* One row-major grid, and every field holds its own shape inside
+                it: the wrappers are `content-start` (components/portal/
+                form-fields.tsx), so a short field sharing a row with the
+                select and its two-line caption keeps its label and input
+                together instead of stretching to fill the difference. That is
+                what used to land "Extra guest, per night" 30px below the
+                control beside it.
+
+                Row-major rather than two independent stacks, so a field and
+                the one across from it share a line. Two independent columns
+                keep a uniform gap but drift apart wherever the columns hold
+                different amounts of copy, and this section would then be the
+                only one on the page whose halves did not line up. */}
             <div className="grid gap-lg sm:grid-cols-2">
-              <div className="grid gap-sm">
+              <div className="grid content-start gap-sm">
                 <Label htmlFor="paxPolicy">When a party is over the maximum</Label>
                 <Select
                   value={draft.policy.paxPolicy}
@@ -191,6 +204,11 @@ export function PricingTab({ settings }: PricingTabProps) {
                 label="Sofa beds available"
                 value={draft.policy.sofaBedStock}
                 width="w-[110px]"
+                // Not `0`: blank means no limit (lib/domain/pricing/stay.ts),
+                // where zero would refuse every sofa bed asked for. A
+                // placeholder that says the wrong one of those is worse than
+                // an empty box.
+                placeholder="No limit"
                 hint="Leave blank if nobody has counted them — the system will not limit bookings."
                 error={problemFor('policy.sofaBedStock')}
                 onChange={(value) => setPolicy('sofaBedStock', value)}
@@ -199,6 +217,9 @@ export function PricingTab({ settings }: PricingTabProps) {
           </FormSection>
 
           <FormSection title="Arrival and departure">
+            {/* Paired across, not down: check-in sits beside check-out and
+                the early fee beside the late one, because each pair is the
+                same question asked at the two ends of a stay. */}
             <div className="grid gap-lg sm:grid-cols-2">
               <PlainField
                 id="checkInTime"
@@ -290,7 +311,7 @@ function PlainField({
   error?: string
 }) {
   return (
-    <div className="grid gap-sm">
+    <div className="grid content-start gap-sm">
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}

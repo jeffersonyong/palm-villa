@@ -7,7 +7,6 @@ import { FormSection } from '@/components/portal/form-section'
 import { Card } from '@/components/ui/card'
 import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
-import { Notice } from '@/components/ui/notice'
 import {
   Table,
   TableBody,
@@ -148,12 +147,6 @@ export function BankAccountsTab({ settings }: BankAccountsTabProps) {
                 Add an account
               </TextAction>
             </div>
-
-            <Notice className="mt-lg">
-              A customer is shown the number alone — no account name — and picks whichever bank is
-              their own. Nothing shows these to customers yet: the public booking site is phase two,
-              and the desk reads them off a phone today.
-            </Notice>
           </FormSection>
         </Card>
       )}
