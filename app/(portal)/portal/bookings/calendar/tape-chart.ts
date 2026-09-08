@@ -47,7 +47,8 @@ import type { OccupancyStatus } from '@/lib/domain/unit-status'
  * every later cell sideways, and one corrupt row must not misplace a month.
  */
 
-export const UNIT_COLUMN_WIDTH = 176
+/** Wide enough for a type's group label — "Semi-detached · 6 units" in `micro` — on one line. */
+export const UNIT_COLUMN_WIDTH = 200
 export const DAY_COLUMN_WIDTH = 32
 export const ROW_HEIGHT = 36
 

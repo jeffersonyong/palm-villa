@@ -24,6 +24,7 @@ function Table({
   containerClassName,
   footer,
   scrollX,
+  scrollY,
   ...props
 }: React.ComponentProps<'table'> & {
   containerClassName?: string
@@ -43,13 +44,28 @@ function Table({
    * now slide past.
    */
   scrollX?: boolean
+  /**
+   * With `scrollX`, let the rows scroll *inside* the container too, so a
+   * header row pinned with `sticky top-0` and a column pinned with
+   * `sticky left-0` both hold while the body moves beneath them. The portal
+   * panel is otherwise the only vertical scroller, and a sticky header inside
+   * an `overflow-x-auto` box cannot follow it — the box is its scroll parent
+   * and never moves. The caller caps the height through `containerClassName`;
+   * it is the one place a second scroll region is worth its cost, a grid too
+   * tall for the panel whose column headings are the only way to read a row.
+   */
+  scrollY?: boolean
 }) {
   return (
     <div
       data-slot="table-container"
       className={cn(
         'rounded-lg border border-border bg-card',
-        scrollX ? 'overflow-x-auto overflow-y-hidden' : 'overflow-hidden',
+        scrollX
+          ? scrollY
+            ? 'overflow-auto'
+            : 'overflow-x-auto overflow-y-hidden'
+          : 'overflow-hidden',
         containerClassName,
       )}
     >
