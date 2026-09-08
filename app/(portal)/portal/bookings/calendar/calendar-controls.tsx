@@ -11,7 +11,6 @@ import { shiftMonth, type CalendarMonth } from '@/components/ui/calendar-month'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { MultiSelectFilter, type MultiSelectOption } from '@/components/ui/multi-select-filter'
-import { TextAction } from '@/components/ui/text-action'
 import { cn } from '@/lib/utils'
 
 import { calendarHref } from './calendar-params'
@@ -27,9 +26,11 @@ import { calendarHref } from './calendar-params'
  *
  * The month arrows are the date picker's own `MonthHeader`: the same 28px
  * chrome-on-something-else squares design.md gives a calendar's arrows, and
- * the same title, so the two calendars in the product read as one. "Today" is
- * offered only when it is not already the answer, which is the picker's rule
- * for its own Today.
+ * the same title, so the two calendars in the product read as one. There is
+ * no "Today": the arrows are how the month moves, the screen opens on this
+ * month unasked, and a shortcut back to where you started is a control that
+ * earns its place on a picker a customer meets once rather than on a grid the
+ * desk lives in.
  *
  * Clear keeps the month, and keeps the empty rows as they are. The month is
  * the view, not a filter — clearing the type narrowing should widen the
@@ -103,34 +104,21 @@ export function CalendarControls({
         isPending && 'opacity-60',
       )}
     >
-      {/* Two clusters, not one row of five things. Which month is being
-          looked at — arrows, title, and the jump back — is a different
-          question from which units are shown, and at one uniform gap "Today"
-          sat equidistant between the month it belongs to and the filter it
-          does not. Tight within a cluster, wide between them. */}
-      <div className="flex items-center gap-sm">
-        {/* The header positions its arrows absolutely, so it needs a width to
-            stand in a row; wide enough for "September 2026" with an arrow clear
-            of each end. */}
-        <div className="w-[232px]">
-          <MonthHeader
-            month={month}
-            showPrevious
-            showNext
-            onPrevious={() => go(shiftMonth(month, -1), types)}
-            onNext={() => go(shiftMonth(month, 1), types)}
-          />
-        </div>
+      {/* Two clusters, not one row. Which month is being looked at is a
+          different question from which units are shown, so the month keeps
+          its own space and the narrowing keeps its own.
 
-        {/* Offered only when it is not already the answer — the picker's rule
-            for its own Today — but its slot is held either way. Hidden rather
-            than absent, because a control that stops existing on the click
-            that used it drags the filters sideways under the pointer.
-            `invisible` takes it out of the tab order and the accessibility
-            tree, so nothing is offered that cannot be used. */}
-        <span className={cn('inline-flex', month === todayMonth && 'invisible')}>
-          <TextAction onClick={() => go(todayMonth, types)}>Today</TextAction>
-        </span>
+          The header positions its arrows absolutely, so it needs a width to
+          stand in a row; wide enough for "September 2026" with an arrow clear
+          of each end. */}
+      <div className="w-[232px]">
+        <MonthHeader
+          month={month}
+          showPrevious
+          showNext
+          onPrevious={() => go(shiftMonth(month, -1), types)}
+          onNext={() => go(shiftMonth(month, 1), types)}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-md">

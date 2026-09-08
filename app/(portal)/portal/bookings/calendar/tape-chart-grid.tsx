@@ -36,14 +36,28 @@ import { TapeChartBar } from './tape-chart-bar'
  * overlap its neighbour (G1). Layout is fixed; the unit column is declared and
  * the nights divide what is left.
  *
- * ── Both axes scroll inside the grid ────────────────────────────────────────
+ * ── Both axes scroll inside the grid, and only the grid ────────────────────
  *
  * Forty-eight rows are taller than a screen, and a row thirty columns wide is
  * unreadable once its date headings have scrolled away. So this is the one
  * table on the surface that is its own scroller vertically as well: header
- * row and unit column both pin, and the body moves beneath them. The height
- * cap below is the panel's header, the page header and the control line —
- * roughly 15rem — which leaves the grid the rest of the viewport.
+ * row and unit column both pin, and the body moves beneath them.
+ *
+ * That makes the height cap load-bearing. The panel is the surface's own
+ * scroller, so a grid one pixel too tall gives the screen **two** vertical
+ * scrollbars — which it had: the cap was `100dvh - 15rem`, and the chrome it
+ * was standing in for measured 254px, so the panel overflowed by 14px and
+ * drew a second bar for it.
+ *
+ * The cap is now the two things actually above and below the grid: `14rem`
+ * for the panel header, the page header and the control line, and the
+ * panel's own `3xl` foot padding, named rather than folded into the same
+ * number so it cannot drift from portal-panel.tsx. There is a little slack
+ * in the `14rem` on purpose — the chrome above is *content*, and a
+ * description that wraps to a second line at a narrow width would otherwise
+ * bring the second scrollbar back. If it ever does grow past the slack the
+ * panel simply scrolls a few pixels, which is a small blemish rather than a
+ * broken screen.
  *
  * ── Borders are on cells, not rows ──────────────────────────────────────────
  *
@@ -179,7 +193,7 @@ export function TapeChartGrid({ chart }: TapeChartGridProps) {
       <Table
         scrollX
         scrollY
-        containerClassName="max-h-[calc(100dvh-15rem)]"
+        containerClassName="max-h-[calc(100dvh-14rem-var(--spacing-3xl))]"
         className="table-fixed border-separate border-spacing-0"
         style={{ minWidth: width }}
       >
@@ -233,24 +247,36 @@ export function TapeChartGrid({ chart }: TapeChartGridProps) {
         </TableHeader>
 
         <TableBody className="divide-y-0">
-          {chart.groups.map((group, groupIndex) => (
+          {chart.groups.map((group) => (
             <Fragment key={group.typeId}>
-              {/* The type's name in the labelling voice, on white — the matrix's
-                  group row. The first sits closer to the header strip so the
-                  two do not double their air. */}
+              {/* The type's name in the labelling voice, on a band that runs
+                  the width of the grid.
+
+                  It was the name on the card fill with air above it, which is
+                  the matrix table's group-row grammar — but that grammar is
+                  for a table eight columns wide, where a label and a gap are
+                  enough to say "a new block starts here". Across thirty night
+                  columns the gap read as an empty row and the label as a
+                  stray, so a reader scrolled past a type boundary without
+                  seeing it. A filled strip is one object the eye can follow
+                  all the way out to the last day of the month.
+
+                  Its own tone (`group-band`, globals.css) rather than a
+                  borrowed one: the rows are `card`, and `muted` is both the
+                  header strip above and a row's hover, so a band in either
+                  said "header" rather than "new type". `canvas-sunk` was
+                  tried and sits four values off `muted` in light, which is
+                  not a distinction anybody can see. */}
               <TableRow className="hover:bg-transparent">
                 <TableRowHead
                   scope="rowgroup"
-                  className={cn(
-                    'sticky left-0 z-10 border-r border-r-divider bg-card px-md pb-xs micro-label whitespace-nowrap text-muted-foreground',
-                    groupIndex === 0 ? 'pt-md' : 'pt-lg',
-                  )}
+                  className="sticky left-0 z-10 h-8 border-y border-r border-y-divider border-r-divider bg-group-band px-md py-0 micro-label whitespace-nowrap text-muted-foreground"
                 >
                   {group.name} · {group.rows.length} {group.rows.length === 1 ? 'unit' : 'units'}
                 </TableRowHead>
                 <td
                   colSpan={dayCount}
-                  className={cn('pb-xs', groupIndex === 0 ? 'pt-md' : 'pt-lg')}
+                  className="h-8 border-y border-y-divider bg-group-band p-0"
                 />
               </TableRow>
 

@@ -610,6 +610,25 @@
     color-mix(in oklab, var(--color-canvas) 7%, transparent)
   );
 
+  /* The strip that says a new unit type starts here on the booking calendar,
+     run the full width of the grid.
+
+     It gets its own role rather than borrowing one, because both neighbours
+     are already spoken for and it has to be told apart from them at a glance:
+     the rows are `card`, and `muted` is what the header strip above is filled
+     with *and* what a row fills with on hover. `canvas-sunk` was tried and is
+     only four values off `muted` in light — the two read as the same gray, so
+     the band said "header" rather than "new type". This is a real step past
+     both: one object the eye can follow from the label out to the last day of
+     the month.
+
+     Dark steps the same way — away from the card rather than toward it — so
+     the band is deeper than both the rows and the header there too. */
+  --group-band: light-dark(
+    color-mix(in oklab, var(--color-ink) 4%, var(--color-canvas-soft)),
+    color-mix(in oklab, black 28%, var(--color-ink-deep))
+  );
+
   /* The subordinate vertical of a date grid, and the one deliberate exception
      to "light draws every edge in `hairline`".
 
@@ -920,6 +939,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-divider: var(--divider);
+  --color-group-band: var(--group-band);
   --color-grid-line: var(--grid-line);
   --color-ring: var(--ring);
   --color-scrim: var(--scrim);
