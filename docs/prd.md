@@ -154,6 +154,8 @@ Availability, pricing, booking, payment instructions, slip upload, booking looku
 ### 5.2 Operations portal (desktop)
 Booking calendar and list, manual booking creation, payment verification queue, unit management, inspection and deposit workflow, document access, reporting, configuration.
 
+**[A] The booking calendar is a unit × night grid** — one row per unit grouped by type, one column per night, one month per screen — the units board (B8) read across a date axis. **[A] It draws everything that blocks the unit**: every booking not expired or cancelled, long leases, and out-of-service periods, because that is the set the exclusion constraint counts ([architecture.md §5.2](architecture.md)); a completed stay whose last night has not passed is therefore drawn even though the units board calls the unit available. **[A] Day passes occupy no unit (§6.1) and do not appear on it** — they appear in the list view. An empty night that can still be sold opens a new booking with the night and the unit type filled in (B2).
+
 ### 5.3 Field screens (mobile web)
 Purpose-built single screens. Security: today's arrivals plus check-in. Housekeeping: today's checkouts, inspection, unit ready toggle. No app installation.
 
