@@ -610,6 +610,23 @@
     color-mix(in oklab, var(--color-canvas) 7%, transparent)
   );
 
+  /* The subordinate vertical of a date grid, and the one deliberate exception
+     to "light draws every edge in `hairline`".
+
+     The rule above holds for tables, where a second gray would be a second
+     thing saying what the surface tones already say. A tape chart is not a
+     table of rows: its columns are an axis, and reading a bar off it means
+     counting nights. Without a per-day line the eye counts across 32px of
+     nothing between Monday seams, which is the one job the grid exists to do.
+     So the day line is drawn a step under the Monday seam — subordinate by
+     construction, at a regular seven-column rhythm that reads as an axis
+     rather than as two grays disagreeing. It is used on the calendar's night
+     columns and nowhere else. */
+  --grid-line: light-dark(
+    color-mix(in oklab, var(--color-hairline) 55%, white),
+    color-mix(in oklab, var(--color-canvas) 4%, transparent)
+  );
+
   /* Focus is the action colour's ring. */
   --ring: light-dark(var(--color-brand-deep), var(--color-brand));
 
@@ -903,6 +920,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-divider: var(--divider);
+  --color-grid-line: var(--grid-line);
   --color-ring: var(--ring);
   --color-scrim: var(--scrim);
   --color-invert-surface: var(--invert-surface);
@@ -990,6 +1008,42 @@
   font-weight: 500;
   letter-spacing: 0.55px;
   text-transform: uppercase;
+}
+
+/* The `+` a free night on the booking calendar shows under the pointer.
+   Drawn as two 1px gradients on a pseudo-element rather than rendered as an
+   icon component, because of how many there are: the whole building over a
+   month is up to fifteen hundred cells, and a lucide `<svg>` in each is some
+   four thousand DOM nodes carrying a mark that is invisible until hovered.
+   `currentColor` keeps it on the text ladder like any other glyph, and the
+   hover lives in CSS so pointing at a cell costs no React render. */
+@utility night-plus {
+  &::after {
+    content: '';
+    width: 11px;
+    height: 11px;
+    background-image:
+      linear-gradient(currentColor, currentColor), linear-gradient(currentColor, currentColor);
+    background-size:
+      11px 1.5px,
+      1.5px 11px;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+
+  @media (hover: hover) {
+    &:hover::after {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      transition: none;
+    }
+  }
 }
 
 /* Card hover for the public feature grids. Motion stays on colour and a 1px
