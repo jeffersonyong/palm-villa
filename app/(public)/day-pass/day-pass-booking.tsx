@@ -13,6 +13,8 @@ import { formatStayDate, type StayDate } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 import { priceDayPass } from '@/lib/domain/pricing/day-pass'
 
+import { VehicleFields } from '@/components/vehicle-fields'
+
 import { CountField, HoneypotField, PublicField } from '../_components/booking/booking-fields'
 import { createPublicDayPassAction, type PublicDayPassState } from './actions'
 
@@ -57,6 +59,7 @@ export function DayPassBooking({
       config.dayPassAgeBands.map((band) => [band.id, band.id === 'adult' ? 2 : 0]),
     ),
   )
+  const [vehicles, setVehicles] = useState<readonly string[]>([''])
   const [noVehicle, setNoVehicle] = useState(false)
 
   const party = Object.fromEntries(Object.entries(counts).filter(([, count]) => count > 0))
@@ -90,7 +93,7 @@ export function DayPassBooking({
             <Card>
               {/* ── The day ───────────────────────────────────────────── */}
               <fieldset>
-                <legend className="micro-label text-muted-foreground">Which day</legend>
+                <legend className="pe-md micro-label text-muted-foreground">Which day</legend>
 
                 <div className="mt-md max-w-[260px]">
                   <DateField
@@ -115,9 +118,9 @@ export function DayPassBooking({
                 ) : null}
               </fieldset>
 
-              {/* ── Who is coming ─────────────────────────────────────── */}
+              {/* ── No. of guests ─────────────────────────────────────── */}
               <fieldset className="mt-xl border-t border-divider pt-lg">
-                <legend className="micro-label text-muted-foreground">Who is coming</legend>
+                <legend className="pe-md micro-label text-muted-foreground">No. of guests</legend>
 
                 <div className="mt-md flex flex-wrap gap-lg">
                   {config.dayPassAgeBands.map((band) => (
@@ -148,7 +151,7 @@ export function DayPassBooking({
 
               {/* ── Your details ──────────────────────────────────────── */}
               <fieldset className="mt-xl border-t border-divider pt-lg">
-                <legend className="micro-label text-muted-foreground">Your details</legend>
+                <legend className="pe-md micro-label text-muted-foreground">Your details</legend>
 
                 <div className="mt-md grid gap-lg sm:grid-cols-2">
                   <PublicField
@@ -164,7 +167,6 @@ export function DayPassBooking({
                     id="guestPhone"
                     name="guestPhone"
                     label="Mobile number"
-                    hint="We use this to confirm your booking."
                     required
                     type="tel"
                     inputMode="tel"
@@ -183,29 +185,22 @@ export function DayPassBooking({
                     defaultValue={state.submitted?.guestEmail}
                     error={state.fieldErrors?.guestEmail}
                   />
-                  <PublicField
-                    id="vehicle"
-                    name="vehicles"
-                    label="Car registration"
-                    hint="So security know to expect you at the gate."
-                    required={!noVehicle}
-                    defaultValue={state.submitted?.vehicles}
-                    error={state.fieldErrors?.vehicles}
-                    className={noVehicle ? 'opacity-50' : undefined}
-                  />
                 </div>
 
-                <label className="mt-md flex items-center gap-sm text-body-sm text-copy">
-                  <input
-                    type="checkbox"
-                    name="noVehicle"
-                    value="true"
-                    checked={noVehicle}
-                    onChange={(event) => setNoVehicle(event.target.checked)}
-                    className="size-4 rounded-sm border-border"
+                {/* One row per car. A family arriving in two is the ordinary
+                    case, and prd.md §12.5 makes the plate the guard's primary
+                    lookup — so a second car with nowhere to go is a car nobody
+                    can match at the gate. */}
+                <div className="mt-lg">
+                  <VehicleFields
+                    vehicles={vehicles}
+                    onChange={setVehicles}
+                    noVehicle={noVehicle}
+                    onNoVehicleChange={setNoVehicle}
+                    error={state.fieldErrors?.vehicles}
+                    noVehicleDescription={null}
                   />
-                  We are not arriving by car
-                </label>
+                </div>
               </fieldset>
 
               <HoneypotField />

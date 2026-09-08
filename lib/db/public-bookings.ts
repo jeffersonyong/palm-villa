@@ -5,7 +5,7 @@ import type { StayDate } from '@/lib/domain/dates'
 import type { DayPassPartyLine } from '@/lib/domain/day-pass-capacity'
 import type { BookingLine } from '@/lib/domain/lines'
 import type { Cents } from '@/lib/domain/money'
-import { isAccessToken, PUBLIC_LIMITS } from '@/lib/domain/public-booking'
+import { isAccessToken, PUBLIC_LIMITS, type TransferChoice } from '@/lib/domain/public-booking'
 import { dataClient } from '@/lib/supabase/data'
 
 import { getBookingById, type Booking } from './bookings'
@@ -310,8 +310,13 @@ export async function getBookingByAccessToken(token: string): Promise<Booking | 
 
 export interface PublicTransferSubmitted {
   reference: string
-  /** Which row the queue will show — a deposit for a stay, a payment otherwise. */
-  raised: 'deposit' | 'payment'
+  /**
+   * Which rows the queue will show. A stay secured by its deposit raises one
+   * or two depending on whether the customer chose to settle the stay now —
+   * both cases the client named (prd.md §9.1, N29).
+   */
+  raised: 'deposit' | 'payment' | 'deposit_and_payment'
+  /** The whole of what the customer said they sent, in one transfer. */
   amount: Cents
 }
 
@@ -329,6 +334,7 @@ export interface PublicTransferSubmitted {
  */
 export async function submitPublicTransfer(
   token: string,
+  choice: TransferChoice = 'deposit_only',
 ): Promise<PublicWriteResult<PublicTransferSubmitted>> {
   const booking = await getBookingByAccessToken(token)
 
@@ -352,6 +358,7 @@ export async function submitPublicTransfer(
     p_access_token: token,
     p_from_status: booking.status,
     p_to_status: next.status,
+    p_pay_stay_now: choice === 'everything',
   })
 
   if (error) {
@@ -359,7 +366,12 @@ export async function submitPublicTransfer(
   }
 
   const result = data as
-    | { ok: true; reference: string; raised: 'deposit' | 'payment'; amount_cents: number }
+    | {
+        ok: true
+        reference: string
+        raised: 'deposit' | 'payment' | 'deposit_and_payment'
+        amount_cents: number
+      }
     | { ok: false; error: PublicWriteErrorCode }
 
   if (!result.ok) {

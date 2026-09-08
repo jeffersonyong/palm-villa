@@ -515,7 +515,11 @@ This is the highest-leverage detail in the payment design. It turns verification
 
 **The customer says when they have paid** (steps 3–4), and the booking is created before that. Creating it holds the unit; pressing *I have made the transfer* moves it to `awaiting_payment_verification` and raises the pending row. That is what `payment.created_at` was always meant to measure — the queue’s waiting column is how long somebody has been left waiting, not how long they spent on a form. Slip upload is still A6 and still phase two, so step 3 is a transfer and not yet an upload.
 
-**What is raised depends on what was asked for.** A short stay quoting a deposit raises a pending *deposit* (§11); anything else raises a pending payment. A customer is never asked for both.
+**What is raised depends on what the customer chose**, and both answers are his own (§9.1: *the deposit only, or the full amount with the deposit*). A short stay quoting a deposit offers the two on the instructions page — the deposit is the default, since it is the smaller commitment and the one the policy is written around — and raises a pending deposit, plus a pending payment for the stay when they choose to settle it now. Anything else has nothing to defer and is simply paid for.
+
+**Two rows for one transfer, and they stay two.** The customer sends BND 700 once; the queue shows BND 100 against the deposit and BND 600 against the stay, because §11 makes one a liability the property owes back and the other revenue it has earned. Merging them into a single row would be the one place in the product those could be confused. **[A]**
+
+**Settling up front is not [N16](open-questions.md).** The stated policy is that a stay is paid in full; this is that happening earlier. A part payment would be the stay paid in halves, and nothing offers one.
 
 ### 10.4 Verification queue
 

@@ -15,7 +15,7 @@ import {
 } from '@/components/portal/discount-fields'
 import { NumberField, TextField } from '@/components/portal/form-fields'
 import { FormSection } from '@/components/portal/form-section'
-import { VehicleFields } from '@/components/portal/vehicle-fields'
+import { VehicleFields } from '@/components/vehicle-fields'
 import { QuoteSummary } from '@/components/portal/quote-summary'
 import { QuoteLines } from '@/components/quote-lines'
 import { Button } from '@/components/ui/button'

@@ -6,7 +6,12 @@ import { z } from 'zod'
 
 import { clientIpFrom, hashPublicKey } from '@/lib/auth/access-token'
 import { notePublicAttempt, submitPublicTransfer } from '@/lib/db/public-bookings'
-import { HOUR_IN_SECONDS, isAccessToken, PUBLIC_LIMITS } from '@/lib/domain/public-booking'
+import {
+  HOUR_IN_SECONDS,
+  isAccessToken,
+  isTransferChoice,
+  PUBLIC_LIMITS,
+} from '@/lib/domain/public-booking'
 
 /**
  * "I have made the transfer" (prd.md §10.3, step 3).
@@ -30,6 +35,15 @@ import { HOUR_IN_SECONDS, isAccessToken, PUBLIC_LIMITS } from '@/lib/domain/publ
 
 const submitSchema = z.object({
   token: z.string().refine(isAccessToken, 'That link is not valid.'),
+  /**
+   * Which of the two the customer sent. Defaulted rather than required, so a
+   * booking with no choice to make — a day pass, or a stay quoting no deposit
+   * — submits the same form without one.
+   */
+  choice: z
+    .string()
+    .default('deposit_only')
+    .refine(isTransferChoice, 'Choose what you are transferring.'),
 })
 
 export interface SubmitTransferState {
@@ -69,7 +83,7 @@ export async function submitTransferAction(
     }
   }
 
-  const submitted = await submitPublicTransfer(parsed.data.token)
+  const submitted = await submitPublicTransfer(parsed.data.token, parsed.data.choice)
 
   if (!submitted.ok) {
     return { status: 'error', message: submitted.error.message }

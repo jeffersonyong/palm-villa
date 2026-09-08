@@ -477,6 +477,68 @@ describe('saying the transfer has been made', () => {
     expect(pending[0]?.stage).toBe('awaiting_verification')
   })
 
+  test('raises both rows when the customer settles the stay up front', async () => {
+    // The second of the two cases the client named on 10 September 2026: "the
+    // deposit only, or the full amount with the deposit". One transfer, two
+    // rows, because a refundable liability and revenue are different money.
+    const created = await createPublicStayBooking(stayInput({ unitTypeSlug: 'three-bedroom' }))
+
+    expect(created.ok).toBe(true)
+
+    if (!created.ok) return
+
+    const submitted = await submitPublicTransfer(created.data.accessToken, 'everything')
+
+    expect(submitted.ok).toBe(true)
+
+    if (!submitted.ok) return
+
+    expect(submitted.data.raised).toBe('deposit_and_payment')
+    // What the customer sends in one go: the deposit plus the stay.
+    expect(submitted.data.amount).toBe(bnd(100) + bnd(750))
+
+    const pending = await listPendingDeposits()
+
+    expect(pending).toHaveLength(1)
+    expect(pending[0]?.amount).toBe(bnd(100))
+
+    const { data } = await dataClient()
+      .from('payment')
+      .select('expected_amount_cents, amount_cents, status')
+      .eq('booking_id', created.data.bookingId)
+
+    expect(data).toHaveLength(1)
+    expect(data?.[0]).toMatchObject({
+      expected_amount_cents: bnd(750),
+      amount_cents: null,
+      status: 'pending_verification',
+    })
+
+    // Still nothing paid: both rows are promises until somebody looks.
+    const booking = await getBookingById(created.data.bookingId)
+
+    expect(booking?.paid).toBe(0)
+  })
+
+  test('a day pass ignores the choice, because there is nothing to defer', async () => {
+    // The form never offers it; a hand-written request could still send it.
+    const created = await createPublicDayPassBooking(dayPassInput())
+
+    expect(created.ok).toBe(true)
+
+    if (!created.ok) return
+
+    const submitted = await submitPublicTransfer(created.data.accessToken, 'everything')
+
+    expect(submitted.ok).toBe(true)
+
+    if (!submitted.ok) return
+
+    expect(submitted.data.raised).toBe('payment')
+    expect(submitted.data.amount).toBe(bnd(10))
+    expect(await listPendingDeposits()).toHaveLength(0)
+  })
+
   test('raises a payment for a day pass, because there is no unit to secure', async () => {
     const created = await createPublicDayPassBooking(dayPassInput())
 

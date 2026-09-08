@@ -1,13 +1,15 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
 import { Notice } from '@/components/ui/notice'
+import { formatCents } from '@/lib/domain/money'
+import type { TransferChoice, TransferPlan } from '@/lib/domain/public-booking'
 import type { BankAccountSettings } from '@/lib/domain/settings'
-import { formatCents, type Cents } from '@/lib/domain/money'
+import { cn } from '@/lib/utils'
 
 import { submitTransferAction, type SubmitTransferState } from './actions'
 
@@ -31,6 +33,15 @@ import { submitTransferAction, type SubmitTransferState } from './actions'
  * which starts the clock in the staff verification queue — the queue measures
  * how long somebody has been left waiting, not how long they spent filling in
  * a form. Nothing about the money is known until a person opens the bank app.
+ *
+ * **A stay offers two amounts, and both are the client's own words.** Asked
+ * what a guest transfers when booking, he named the deposit only or the full
+ * amount with the deposit (N29), and the second was recorded and never built.
+ * The deposit is the default because it is the smaller commitment and the one
+ * the policy is written around; paying everything is one radio away for the
+ * guests who would rather be done with it. It is not a part payment — that is
+ * still [N16](../../../docs/open-questions.md) and still out — because the
+ * stay is settled in full either way, only sooner.
  */
 
 const initialState: SubmitTransferState = { status: 'idle' }
@@ -38,38 +49,55 @@ const initialState: SubmitTransferState = { status: 'idle' }
 export function TransferInstructions({
   token,
   reference,
-  amount,
-  kind,
-  total,
+  depositOnly,
+  everything,
   accounts,
 }: {
   token: string
   reference: string
-  amount: Cents
-  /** A deposit secures a stay; anything else is paid for in full. */
-  kind: 'deposit' | 'payment'
-  total: Cents
+  /** The default: what secures the booking. */
+  depositOnly: TransferPlan
+  /** The same booking settled outright. Ignored where there is no choice. */
+  everything: TransferPlan
   accounts: readonly BankAccountSettings[]
 }) {
   const [state, formAction, isPending] = useActionState(submitTransferAction, initialState)
+  const [choice, setChoice] = useState<TransferChoice>('deposit_only')
+
+  const plan = choice === 'everything' ? everything : depositOnly
 
   return (
     <Card className="mt-xl">
       <p className="micro-label text-muted-foreground">
-        {kind === 'deposit' ? 'Transfer the deposit' : 'Transfer the payment'}
+        {depositOnly.choosable ? 'What would you like to send now?' : 'Transfer the payment'}
       </p>
 
-      <p className="mt-md text-display-sm text-foreground tabular-nums">
-        BND {formatCents(amount)}
-      </p>
-
-      {kind === 'deposit' ? (
-        <p className="mt-xs text-body-sm text-muted-foreground">
-          The refundable security deposit, which secures your unit. The BND {formatCents(total)} for
-          the stay is paid when you arrive.
-        </p>
+      {depositOnly.choosable ? (
+        <div className="mt-md grid gap-sm">
+          <TransferOption
+            id="deposit_only"
+            checked={choice === 'deposit_only'}
+            onSelect={() => setChoice('deposit_only')}
+            title={`Just the deposit — BND ${formatCents(depositOnly.total)}`}
+            detail={`Secures your unit. The BND ${formatCents(depositOnly.stay || everything.stay)} for the stay is paid when you arrive.`}
+          />
+          <TransferOption
+            id="everything"
+            checked={choice === 'everything'}
+            onSelect={() => setChoice('everything')}
+            title={`Everything now — BND ${formatCents(everything.total)}`}
+            detail={`The BND ${formatCents(everything.deposit)} deposit and the BND ${formatCents(everything.stay)} for the stay together, so there is nothing to settle on arrival.`}
+          />
+        </div>
       ) : (
-        <p className="mt-xs text-body-sm text-muted-foreground">The full price of your day pass.</p>
+        <>
+          <p className="mt-md text-display-sm text-foreground tabular-nums">
+            BND {formatCents(plan.total)}
+          </p>
+          <p className="mt-xs text-body-sm text-muted-foreground">
+            The full price of your day pass.
+          </p>
+        </>
       )}
 
       {accounts.length > 0 ? (
@@ -89,9 +117,14 @@ export function TransferInstructions({
 
       <Notice placement="nested" className="mt-lg">
         <p className="text-body-sm">
-          Put <strong className="font-mono text-body-sm-strong">{reference}</strong> in the transfer
-          description, so we can match it to your booking. Your unit is held until we confirm the
-          transfer — there is no time limit, but the sooner you send it the sooner it is confirmed.
+          Send{' '}
+          <strong className="text-body-sm-strong tabular-nums">
+            BND {formatCents(plan.total)}
+          </strong>{' '}
+          in one transfer, and put{' '}
+          <strong className="font-mono text-body-sm-strong">{reference}</strong> in the description
+          so we can match it to your booking. Your unit is held until we confirm the transfer —
+          there is no time limit, but the sooner you send it the sooner it is confirmed.
         </p>
       </Notice>
 
@@ -103,14 +136,69 @@ export function TransferInstructions({
 
       <form action={formAction} className="mt-lg">
         <input type="hidden" name="token" value={token} />
+        <input type="hidden" name="choice" value={choice} />
         <Button type="submit" className="w-full" disabled={isPending}>
           {isPending ? 'Telling the team…' : 'I have made the transfer'}
         </Button>
       </form>
 
       <p className="mt-sm text-caption text-muted-foreground">
-        Press this once you have sent it. Somebody checks the bank and confirms your booking.
+        Confirm here once you have sent it. This will confirm your booking upon verification.
       </p>
     </Card>
+  )
+}
+
+/**
+ * One of the two amounts, as a labelled card rather than a bare radio.
+ *
+ * The figure is the thing being chosen between, so it belongs in the label at
+ * a size somebody can read across a phone — a radio with "Everything now" and
+ * the amount somewhere else would make the customer look in two places to
+ * answer one question. Selected takes the hairline and the accent fill the
+ * unit-type chooser on the booking form uses, so the two read as the same kind
+ * of choice.
+ */
+function TransferOption({
+  id,
+  checked,
+  onSelect,
+  title,
+  detail,
+}: {
+  id: string
+  checked: boolean
+  onSelect: () => void
+  title: string
+  detail: string
+}) {
+  return (
+    <label
+      htmlFor={`choice-${id}`}
+      className={cn(
+        'flex cursor-pointer items-start gap-md rounded-md border px-lg py-md transition-colors',
+        checked ? 'border-primary bg-accent' : 'border-border bg-card hover:bg-muted',
+      )}
+    >
+      <input
+        type="radio"
+        id={`choice-${id}`}
+        name="transferChoice"
+        checked={checked}
+        onChange={onSelect}
+        className="mt-[3px] size-4 accent-primary"
+      />
+      <span className="min-w-0">
+        <span
+          className={cn(
+            'block text-body-md-strong tabular-nums',
+            checked ? 'text-accent-foreground' : 'text-foreground',
+          )}
+        >
+          {title}
+        </span>
+        <span className="mt-xxs block text-caption text-muted-foreground">{detail}</span>
+      </span>
+    </label>
   )
 }

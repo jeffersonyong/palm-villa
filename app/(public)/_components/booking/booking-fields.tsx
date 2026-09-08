@@ -77,6 +77,14 @@ export function PublicField({
  * faster than nine taps, and because a stepper is a control this system has
  * never drawn. `inputMode="numeric"` puts the digits keyboard on a phone,
  * which is most of the benefit a stepper would have bought.
+ *
+ * **The column has a fixed width and the input does not fill it.** Left to
+ * itself a flex item is as wide as its widest child, which here is the hint —
+ * so "BND 28.00 each, with a pillow and blanket" made its field three times
+ * the width of "Age 3 and under" and the gaps between fields read as arbitrary
+ * rather than as a rhythm. The column is fixed so the row is even; the input
+ * stays narrow because design.md sizes a field to its content and a two-digit
+ * count does not get a row. The hint wraps inside the column instead.
  */
 export function CountField({
   id,
@@ -103,7 +111,7 @@ export function CountField({
   const errorId = error ? `${id}-error` : undefined
 
   return (
-    <div className="flex flex-col gap-xs">
+    <div className="flex w-[190px] flex-col gap-xs">
       <label htmlFor={id} className="text-body-sm-strong text-foreground">
         {label}
       </label>

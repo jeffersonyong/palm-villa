@@ -3,11 +3,12 @@ import { describe, expect, test } from 'vitest'
 import { BOOKING_STATUSES, type BookingStatus } from './booking-state'
 import { bnd } from './money'
 import {
-  amountDueFor,
   canSubmitTransfer,
   isAccessToken,
+  isTransferChoice,
   publicStageOf,
   PUBLIC_LIMITS,
+  transferPlanFor,
   type PublicStage,
 } from './public-booking'
 
@@ -43,31 +44,60 @@ describe('the private link', () => {
 })
 
 describe('what the customer is asked to transfer', () => {
-  test('a short stay is secured by its deposit, not by its price', () => {
-    // N29, 10 September 2026: the guest transfers the BND 100 to book, and the
-    // stay is settled on arrival. Asking for the whole stay here would be the
-    // policy the client reversed.
-    expect(
-      amountDueFor({ stream: 'short_stay', total: bnd(600), securityDeposit: bnd(100) }),
-    ).toEqual({ kind: 'deposit', cents: bnd(100) })
-  })
+  const stay = { stream: 'short_stay', total: bnd(600), securityDeposit: bnd(100) } as const
 
-  test('a day pass is paid for in full', () => {
-    // There is no unit to secure and prd.md §11 holds the BND 100 against a
-    // room. A pass is a small amount paid for outright.
-    expect(amountDueFor({ stream: 'day_pass', total: bnd(25), securityDeposit: 0 })).toEqual({
-      kind: 'payment',
-      cents: bnd(25),
+  test('a short stay defaults to the deposit, not to its price', () => {
+    // N29, 10 September 2026: the guest transfers the BND 100 to book, and the
+    // stay is settled on arrival. Asking for the whole stay by default would
+    // be the policy the client reversed.
+    expect(transferPlanFor(stay)).toEqual({
+      total: bnd(100),
+      deposit: bnd(100),
+      stay: 0,
+      choosable: true,
     })
   })
 
-  test('a stay quoting no deposit asks for the whole stay', () => {
+  test('and can be settled outright, which is the client’s second case', () => {
+    // He named both: "the deposit only, or the full amount with the deposit".
+    // One transfer of BND 700, and the two parts stay apart underneath.
+    expect(transferPlanFor(stay, 'everything')).toEqual({
+      total: bnd(700),
+      deposit: bnd(100),
+      stay: bnd(600),
+      choosable: true,
+    })
+  })
+
+  test('paying everything is not a part payment', () => {
+    // N16 is the stay paid in halves and is still out. This is the stay paid
+    // in full, sooner — so the stay part is the whole stay, never a fraction.
+    const plan = transferPlanFor(stay, 'everything')
+
+    expect(plan.stay).toBe(stay.total)
+    expect(plan.deposit + plan.stay).toBe(plan.total)
+  })
+
+  test('a day pass is paid for in full, with nothing to choose', () => {
+    // There is no unit to secure and prd.md §11 holds the BND 100 against a
+    // room, so there is no deposit to defer and no question to ask.
+    expect(transferPlanFor({ stream: 'day_pass', total: bnd(25), securityDeposit: 0 })).toEqual({
+      total: bnd(25),
+      deposit: 0,
+      stay: bnd(25),
+      choosable: false,
+    })
+  })
+
+  test('a stay quoting no deposit asks for the whole stay, and offers no choice', () => {
     // Reachable through configuration rather than code: an owner setting the
-    // deposit to zero on the settings screen produces the pre-N29 shape, and
-    // the unit must not then be held against nothing.
-    expect(amountDueFor({ stream: 'short_stay', total: bnd(600), securityDeposit: 0 })).toEqual({
-      kind: 'payment',
-      cents: bnd(600),
+    // deposit to zero produces the pre-N29 shape, and the unit must not then
+    // be held against nothing.
+    expect(transferPlanFor({ stream: 'short_stay', total: bnd(600), securityDeposit: 0 })).toEqual({
+      total: bnd(600),
+      deposit: 0,
+      stay: bnd(600),
+      choosable: false,
     })
   })
 
@@ -76,8 +106,22 @@ describe('what the customer is asked to transfer', () => {
     // this flow does not know is asked for its price rather than silently
     // securing a unit for BND 100.
     expect(
-      amountDueFor({ stream: 'tenancy', total: bnd(1200), securityDeposit: bnd(100) }),
-    ).toEqual({ kind: 'payment', cents: bnd(1200) })
+      transferPlanFor({ stream: 'tenancy', total: bnd(1200), securityDeposit: bnd(100) }),
+    ).toMatchObject({ total: bnd(1200), choosable: false })
+  })
+
+  test('an unasked-for choice cannot change what a day pass costs', () => {
+    // The form never offers it, but a hand-written request could send it.
+    expect(
+      transferPlanFor({ stream: 'day_pass', total: bnd(25), securityDeposit: 0 }, 'everything'),
+    ).toMatchObject({ total: bnd(25) })
+  })
+
+  test('only the two choices are accepted', () => {
+    expect(isTransferChoice('deposit_only')).toBe(true)
+    expect(isTransferChoice('everything')).toBe(true)
+    expect(isTransferChoice('half')).toBe(false)
+    expect(isTransferChoice('')).toBe(false)
   })
 })
 

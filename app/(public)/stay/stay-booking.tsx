@@ -15,6 +15,8 @@ import { priceStay } from '@/lib/domain/pricing/stay'
 import { cn } from '@/lib/utils'
 
 import { AvailabilityCalendar } from '../_components/booking/availability-calendar'
+import { VehicleFields } from '@/components/vehicle-fields'
+
 import { CountField, HoneypotField, PublicField } from '../_components/booking/booking-fields'
 import { createPublicStayAction, type PublicStayState } from './actions'
 
@@ -62,6 +64,7 @@ export function StayBooking({
   const [exemptGuests, setExemptGuests] = useState(0)
   const [sofaBeds, setSofaBeds] = useState(0)
   const [lateCheckOutHours, setLateCheckOutHours] = useState(0)
+  const [vehicles, setVehicles] = useState<readonly string[]>([''])
   const [noVehicle, setNoVehicle] = useState(false)
 
   const unitType = unitTypes.find((type) => type.id === unitTypeSlug)
@@ -109,7 +112,7 @@ export function StayBooking({
             <Card>
               {/* ── Which unit ─────────────────────────────────────────── */}
               <fieldset>
-                <legend className="micro-label text-muted-foreground">Which unit</legend>
+                <legend className="pe-md micro-label text-muted-foreground">Which unit</legend>
 
                 <div className="mt-md flex flex-wrap gap-sm">
                   {unitTypes.map((type) => (
@@ -136,7 +139,7 @@ export function StayBooking({
 
               {/* ── Your dates ─────────────────────────────────────────── */}
               <fieldset className="mt-xl border-t border-divider pt-lg">
-                <legend className="micro-label text-muted-foreground">Your dates</legend>
+                <legend className="pe-md micro-label text-muted-foreground">Your dates</legend>
 
                 <AvailabilityCalendar
                   className="mt-md"
@@ -150,15 +153,15 @@ export function StayBooking({
                 />
               </fieldset>
 
-              {/* ── Who is coming ──────────────────────────────────────── */}
+              {/* ── No. of guests ──────────────────────────────────────── */}
               <fieldset className="mt-xl border-t border-divider pt-lg">
-                <legend className="micro-label text-muted-foreground">Who is coming</legend>
+                <legend className="pe-md micro-label text-muted-foreground">No. of guests</legend>
 
                 <div className="mt-md flex flex-wrap gap-lg">
                   <CountField
                     id="chargeableGuests"
                     name="chargeableGuests"
-                    label={`Guests aged ${config.paxExemptAgeMax + 1} and over`}
+                    label={`Over age ${config.paxExemptAgeMax}`}
                     value={chargeableGuests}
                     min={1}
                     onChange={setChargeableGuests}
@@ -167,8 +170,8 @@ export function StayBooking({
                   <CountField
                     id="exemptGuests"
                     name="exemptGuests"
-                    label={`Children ${config.paxExemptAgeMax} and under`}
-                    hint="Not counted, and not charged for."
+                    label={`Age ${config.paxExemptAgeMax} and under`}
+                    hint="Not charged for."
                     value={exemptGuests}
                     onChange={setExemptGuests}
                     error={state.fieldErrors?.exemptGuests}
@@ -178,7 +181,7 @@ export function StayBooking({
 
               {/* ── Extras ─────────────────────────────────────────────── */}
               <fieldset className="mt-xl border-t border-divider pt-lg">
-                <legend className="micro-label text-muted-foreground">Extras</legend>
+                <legend className="pe-md micro-label text-muted-foreground">Extras</legend>
 
                 <div className="mt-md flex flex-wrap gap-lg">
                   <CountField
@@ -213,7 +216,7 @@ export function StayBooking({
 
               {/* ── Your details ───────────────────────────────────────── */}
               <fieldset className="mt-xl border-t border-divider pt-lg">
-                <legend className="micro-label text-muted-foreground">Your details</legend>
+                <legend className="pe-md micro-label text-muted-foreground">Your details</legend>
 
                 <div className="mt-md grid gap-lg sm:grid-cols-2">
                   <PublicField
@@ -229,7 +232,6 @@ export function StayBooking({
                     id="guestPhone"
                     name="guestPhone"
                     label="Mobile number"
-                    hint="We use this to confirm your booking."
                     required
                     type="tel"
                     inputMode="tel"
@@ -248,29 +250,22 @@ export function StayBooking({
                     defaultValue={state.submitted?.guestEmail}
                     error={state.fieldErrors?.guestEmail}
                   />
-                  <PublicField
-                    id="vehicle"
-                    name="vehicles"
-                    label="Car registration"
-                    hint="So security know to expect you at the gate."
-                    required={!noVehicle}
-                    defaultValue={state.submitted?.vehicles}
-                    error={state.fieldErrors?.vehicles}
-                    className={noVehicle ? 'opacity-50' : undefined}
-                  />
                 </div>
 
-                <label className="mt-md flex items-center gap-sm text-body-sm text-copy">
-                  <input
-                    type="checkbox"
-                    name="noVehicle"
-                    value="true"
-                    checked={noVehicle}
-                    onChange={(event) => setNoVehicle(event.target.checked)}
-                    className="size-4 rounded-sm border-border"
+                {/* One row per car. A family arriving in two is the ordinary
+                    case, and prd.md §12.5 makes the plate the guard's primary
+                    lookup — so a second car with nowhere to go is a car nobody
+                    can match at the gate. */}
+                <div className="mt-lg">
+                  <VehicleFields
+                    vehicles={vehicles}
+                    onChange={setVehicles}
+                    noVehicle={noVehicle}
+                    onNoVehicleChange={setNoVehicle}
+                    error={state.fieldErrors?.vehicles}
+                    noVehicleDescription={null}
                   />
-                  I am not arriving by car
-                </label>
+                </div>
               </fieldset>
 
               <HoneypotField />

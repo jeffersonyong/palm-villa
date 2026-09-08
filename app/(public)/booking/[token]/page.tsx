@@ -8,7 +8,7 @@ import { getBookingByAccessToken } from '@/lib/db/public-bookings'
 import { readPropertySettings } from '@/lib/db/settings'
 import { formatStayDate, formatStayRange, nightsBetween } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
-import { amountDueFor, CLOSED_REASONS, publicStageOf } from '@/lib/domain/public-booking'
+import { CLOSED_REASONS, publicStageOf, transferPlanFor } from '@/lib/domain/public-booking'
 
 import { TransferInstructions } from './transfer-instructions'
 
@@ -49,7 +49,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
   }
 
   const stage = publicStageOf(booking.status)
-  const due = amountDueFor(booking)
+  const plan = transferPlanFor(booking)
   const settings = await readPropertySettings()
 
   return (
@@ -77,9 +77,8 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
           <TransferInstructions
             token={token}
             reference={booking.reference}
-            amount={due.cents}
-            kind={due.kind}
-            total={booking.total}
+            depositOnly={plan}
+            everything={transferPlanFor(booking, 'everything')}
             accounts={settings.bankAccounts}
           />
         ) : null}

@@ -115,12 +115,27 @@ create index deposit_pending_idx on deposit (property_id, promised_at)
 -- public flow lands, the wait begins when the customer says they have
 -- transferred, not when they started filling in the form".
 --
--- Which row it raises depends on what was asked for, and that is one rule in
--- one place — a short stay is secured by its deposit (N29), and anything else
--- is paid for in full. A day pass has no unit to secure and no deposit
--- against it, so the pass itself is what is transferred. So is a stay quoting
--- no deposit, which is what an owner setting the figure to zero would produce:
--- the pre-N29 shape, reachable through configuration rather than through code.
+-- Which rows it raises depends on what the customer chose to send, and both
+-- answers are the client's own words. Asked on 10 September 2026 what a guest
+-- transfers when booking, he named two cases — *the deposit only, or the full
+-- amount with the deposit* — and N29 recorded both.
+--
+-- A short stay quoting a deposit therefore raises **the deposit, and the stay
+-- as well when `p_pay_stay_now`**. Anything else is simply paid for: a day
+-- pass has no unit to secure, and neither does a stay quoting no deposit,
+-- which is what an owner setting the figure to zero would produce.
+--
+-- **Two rows for one transfer, and they stay two.** The customer sends BND 700
+-- in one go and the queue shows BND 100 against the deposit and BND 600
+-- against the stay, because they are different kinds of money with different
+-- lives: prd.md §11 makes the deposit a liability the property owes back and
+-- the stay revenue it has earned. Merging them into one row would be the one
+-- place in the product those two could be confused, which is the failure §9.1
+-- spends a paragraph refusing.
+--
+-- Paying up front is **not** [N16](open-questions.md). The stated policy is
+-- that a stay is paid in full; this is that happening earlier, where a part
+-- payment would be the stay paid in halves.
 --
 -- The status move is the state machine's, decided in TypeScript by
 -- `transition()` and passed in (architecture.md §5.3). The update is guarded
@@ -133,7 +148,11 @@ create function submit_public_payment(
   p_property_id uuid,
   p_access_token text,
   p_from_status text,
-  p_to_status text
+  p_to_status text,
+  -- The customer chose to settle the stay now as well as securing it.
+  -- Ignored where there is no deposit, since the stay is the only thing there
+  -- is to pay for and it is already being raised.
+  p_pay_stay_now boolean default false
 )
 returns jsonb
 language plpgsql
@@ -144,7 +163,8 @@ declare
   v_payment_id uuid;
   v_updated integer;
   v_raised text;
-  v_amount integer;
+  v_amount integer := 0;
+  v_secured_by_deposit boolean := false;
 begin
   select * into v_booking
   from booking
@@ -175,6 +195,7 @@ begin
   end if;
 
   if v_booking.stream = 'short_stay' and v_booking.security_deposit_cents > 0 then
+    v_secured_by_deposit := true;
     -- A promise, not a liability. `collected_at` stays null until somebody
     -- reads the bank, which is what keeps this out of the ledger's "held".
     insert into deposit (
@@ -202,10 +223,13 @@ begin
         'method', 'bank_transfer'
       )
     );
-  else
-    -- The whole thing, promised. No amount: `payment_verified_is_observed`
-    -- keeps `amount_cents` null until a person has seen the money, which is
-    -- the rule record_transfer_payment() already runs on.
+  end if;
+
+  -- The stay itself, where there is no deposit securing it or where the
+  -- customer chose to settle it now. No amount on either:
+  -- `payment_verified_is_observed` keeps `amount_cents` null until a person
+  -- has seen the money, which is the rule record_transfer_payment() runs on.
+  if not v_secured_by_deposit or p_pay_stay_now then
     insert into payment (
       property_id, booking_id, method, status,
       expected_amount_cents, amount_cents, match_kind, created_by
@@ -216,8 +240,8 @@ begin
     )
     returning id into v_payment_id;
 
-    v_raised := 'payment';
-    v_amount := v_booking.total_cents;
+    v_raised := case when v_secured_by_deposit then 'deposit_and_payment' else 'payment' end;
+    v_amount := v_amount + v_booking.total_cents;
 
     insert into audit_event (
       property_id, actor_id, action, entity_type, entity_id, before, after
@@ -757,13 +781,13 @@ left join lateral (
 
 grant update on deposit to service_role;
 
-revoke execute on function submit_public_payment(uuid, text, text, text)
+revoke execute on function submit_public_payment(uuid, text, text, text, boolean)
   from public, anon, authenticated;
 revoke execute on function verify_deposit(
   uuid, uuid, text, text, integer, text, text, date, text, uuid
 ) from public, anon, authenticated;
 
-grant execute on function submit_public_payment(uuid, text, text, text) to service_role;
+grant execute on function submit_public_payment(uuid, text, text, text, boolean) to service_role;
 grant execute on function verify_deposit(
   uuid, uuid, text, text, integer, text, text, date, text, uuid
 ) to service_role;

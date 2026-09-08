@@ -11,7 +11,7 @@ import {
   type DiscountValue,
 } from '@/components/portal/discount-fields'
 import { FormSection } from '@/components/portal/form-section'
-import { VehicleFields } from '@/components/portal/vehicle-fields'
+import { VehicleFields } from '@/components/vehicle-fields'
 import { QuoteSummary } from '@/components/portal/quote-summary'
 import { QuoteLines } from '@/components/quote-lines'
 import { Button } from '@/components/ui/button'

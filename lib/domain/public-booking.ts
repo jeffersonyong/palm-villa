@@ -75,36 +75,70 @@ export const PUBLIC_LIMITS = {
 export const HOUR_IN_SECONDS = 3600
 export const DAY_IN_SECONDS = 86_400
 
-/**
- * What the customer is asked to transfer, and what it is for.
- *
- * One rule in one place, and it is N29's: a short stay is secured by its
- * security deposit and the stay itself is settled on arrival, so the figure on
- * the instructions page is BND 100 rather than the price of the holiday.
- * Everything else is paid for in full — a day pass has no unit to secure and
- * no deposit against it (prd.md §11 holds the BND 100 against a room), and so
- * is a stay quoting no deposit, which is what an owner setting the figure to
- * zero would produce. That last branch is the pre-N29 shape, reachable
- * through configuration rather than through code.
- *
- * `kind` is not cosmetic: it decides which row the server raises and therefore
- * which queue the booking lands in.
- */
-export interface AmountDue {
-  kind: 'deposit' | 'payment'
-  cents: Cents
+/** Which of the two things the client named the customer is sending. */
+export type TransferChoice = 'deposit_only' | 'everything'
+
+export interface TransferPlan {
+  /** What the customer sends, in one transfer. */
+  total: Cents
+  /** The refundable part of it. Zero where no deposit is quoted. */
+  deposit: Cents
+  /** The part that pays for the stay or the pass now. Zero when it is not. */
+  stay: Cents
+  /**
+   * Whether the customer is offered the choice at all.
+   *
+   * Only a short stay quoting a deposit has two answers; a day pass has no
+   * unit to secure and nothing to defer, so it is simply paid for.
+   */
+  choosable: boolean
 }
 
-export function amountDueFor(booking: {
-  stream: BookingStream
-  total: Cents
-  securityDeposit: Cents
-}): AmountDue {
-  if (booking.stream === 'short_stay' && booking.securityDeposit > 0) {
-    return { kind: 'deposit', cents: booking.securityDeposit }
+/**
+ * What the customer transfers, and what each part of it is for.
+ *
+ * **Both branches are the client's own words.** Asked on 10 September 2026
+ * what a guest sends when they book, he named two cases — *the deposit only,
+ * or the full amount with the deposit* — and N29 recorded both while only the
+ * first was built. This is the second, and it is not [N16](open-questions.md):
+ * paying everything up front is the stated policy (a stay is paid in full)
+ * happening earlier, where a part payment would be the stay paid in halves.
+ *
+ * The two parts stay separate all the way down even though the customer makes
+ * one transfer, because they are different kinds of money: the deposit is a
+ * refundable liability the property owes back, and the stay is revenue. prd.md
+ * §11 keeps them apart in the ledger, and merging them here would be the one
+ * place they could be confused.
+ */
+export function transferPlanFor(
+  booking: { stream: BookingStream; total: Cents; securityDeposit: Cents },
+  choice: TransferChoice = 'deposit_only',
+): TransferPlan {
+  const securesWithDeposit = booking.stream === 'short_stay' && booking.securityDeposit > 0
+
+  if (!securesWithDeposit) {
+    return { total: booking.total, deposit: 0, stay: booking.total, choosable: false }
   }
 
-  return { kind: 'payment', cents: booking.total }
+  if (choice === 'everything') {
+    return {
+      total: booking.securityDeposit + booking.total,
+      deposit: booking.securityDeposit,
+      stay: booking.total,
+      choosable: true,
+    }
+  }
+
+  return {
+    total: booking.securityDeposit,
+    deposit: booking.securityDeposit,
+    stay: 0,
+    choosable: true,
+  }
+}
+
+export function isTransferChoice(value: string): value is TransferChoice {
+  return value === 'deposit_only' || value === 'everything'
 }
 
 /**
