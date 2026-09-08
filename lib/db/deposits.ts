@@ -81,7 +81,18 @@ export interface Deposit {
   amount: Cents
   method: PaymentMethod
   collectedBy: string | null
-  collectedAt: string
+  /**
+   * When the money was actually seen. Null while a promised transfer is
+   * unverified (prd.md §9.1) — the one state in which this row is not yet a
+   * liability, and the reason every "what do we hold" read excludes it.
+   */
+  collectedAt: string | null
+  /** When the customer said they had transferred it, or null at the desk. */
+  promisedAt: string | null
+  /** What the verifier read off the bank, for a deposit promised online. */
+  observed: { reference: string | null; sender: string | null; on: string | null } | null
+  /** Why a figure other than the quoted one was accepted. */
+  overrideReason: string | null
   inspection: DepositInspection | null
   /** Unwaived charges standing against the deposit now. */
   charges: Cents
@@ -113,7 +124,12 @@ interface DepositSummaryRow {
   amount_cents: number
   method: string
   collected_by: string | null
-  collected_at: string
+  collected_at: string | null
+  promised_at: string | null
+  observed_reference: string | null
+  observed_sender: string | null
+  observed_on: string | null
+  amount_override_reason: string | null
   inspection_id: string | null
   inspection_outcome: string | null
   inspection_notes: string | null
@@ -165,6 +181,11 @@ const SUMMARY_COLUMNS = [
   'owed_settled_at',
   'owed_settled_by',
   'owed_settled_method',
+  'promised_at',
+  'observed_reference',
+  'observed_sender',
+  'observed_on',
+  'amount_override_reason',
 ].join(', ')
 
 function toDeposit(row: DepositSummaryRow): Deposit {
@@ -205,6 +226,16 @@ function toDeposit(row: DepositSummaryRow): Deposit {
     method: row.method as PaymentMethod,
     collectedBy: row.collected_by,
     collectedAt: row.collected_at,
+    promisedAt: row.promised_at,
+    observed:
+      row.observed_reference === null && row.observed_sender === null && row.observed_on === null
+        ? null
+        : {
+            reference: row.observed_reference,
+            sender: row.observed_sender,
+            on: row.observed_on,
+          },
+    overrideReason: row.amount_override_reason,
     inspection:
       row.inspection_id === null || row.inspection_outcome === null || row.inspected_at === null
         ? null
@@ -227,6 +258,7 @@ function toDeposit(row: DepositSummaryRow): Deposit {
             method: row.owed_settled_method as PaymentMethod,
           },
     stage: depositStageOf({
+      collected: row.collected_at !== null,
       released: release !== null,
       inspected: row.inspection_id !== null,
       bookingStatus,
@@ -259,6 +291,12 @@ export async function listHeldDeposits(): Promise<readonly Deposit[]> {
 
   const { data, error } = await summaryQuery(propertyId)
     .is('released_at', null)
+    // E1 answers what the property owes back **right now**, so a deposit a
+    // customer has promised and nobody has verified is not in it: the money
+    // is not there, and a ledger that counted it would overstate the
+    // liability by every abandoned transfer. Those rows are the payment
+    // queue's work, and `listPendingDeposits` is what reads them.
+    .not('collected_at', 'is', null)
     .order('collected_at', { ascending: true })
 
   if (error) {

@@ -49,10 +49,12 @@ import type { Cents } from './money'
  * what is waiting on Housekeeping, what can be signed off now, and what is
  * done.
  */
-export type DepositStage = 'in_house' | 'awaiting_inspection' | 'ready_for_release' | 'released'
+export type DepositStage =
+  'awaiting_verification' | 'in_house' | 'awaiting_inspection' | 'ready_for_release' | 'released'
 
 /** The stages in pipeline order. Filters and stat tiles render them in this order. */
 export const DEPOSIT_STAGES = [
+  'awaiting_verification',
   'in_house',
   'awaiting_inspection',
   'ready_for_release',
@@ -61,6 +63,7 @@ export const DEPOSIT_STAGES = [
 
 /** How each stage is named on screen. Singular: a badge labels one deposit. */
 export const DEPOSIT_STAGE_LABELS: Readonly<Record<DepositStage, string>> = {
+  awaiting_verification: 'Transfer awaited',
   in_house: 'Guest in stay',
   awaiting_inspection: 'Awaiting inspection',
   ready_for_release: 'Ready to release',
@@ -85,6 +88,13 @@ export const MAX_WAIVE_REASON_LENGTH = 280
 export const MAX_RELEASE_NOTE_LENGTH = 280
 
 export interface DepositStageFacts {
+  /**
+   * The money has actually been seen — counted at the desk, or matched in
+   * the bank app. False for a transfer the customer says they have sent and
+   * nobody has checked (prd.md §9.1), which is the one state in which this
+   * deposit is not yet a liability.
+   */
+  collected: boolean
   /** A release has been approved. */
   released: boolean
   /** An inspection has been recorded against this stay. */
@@ -103,6 +113,15 @@ export interface DepositStageFacts {
  * so a booking that has not reached `completed` has its guest in a unit.
  */
 export function depositStageOf(facts: DepositStageFacts): DepositStage {
+  // Ahead of everything, because it is the one stage where the property is
+  // holding nothing. The three below all describe money already in the safe;
+  // reading a promise as `in_house` would put an unverified BND 100 on the
+  // ledger's "what do we owe back right now", which is the one figure E1
+  // exists to answer.
+  if (!facts.collected) {
+    return 'awaiting_verification'
+  }
+
   if (facts.released) {
     return 'released'
   }
@@ -171,7 +190,8 @@ export function activeChargesTotal(charges: readonly ChargeAmount[]): Cents {
   return charges.reduce((total, charge) => (charge.waived ? total : total + charge.amount), 0)
 }
 
-export type ReleaseRefusalCode = 'already_released' | 'inspection_missing' | 'booking_not_completed'
+export type ReleaseRefusalCode =
+  'already_released' | 'inspection_missing' | 'booking_not_completed' | 'not_collected'
 
 export interface ReleaseRefusal {
   code: ReleaseRefusalCode
@@ -189,6 +209,8 @@ export type ReleaseCheck = { ok: true } | { ok: false; error: ReleaseRefusal }
  */
 const RELEASE_REFUSALS: Readonly<Record<ReleaseRefusalCode, string>> = {
   already_released: 'This deposit has already been released.',
+  not_collected:
+    'The deposit transfer has not been verified yet. Confirm it in the payments queue first.',
   booking_not_completed:
     'The guest has not checked out yet. The deposit is released after the stay ends.',
   inspection_missing:
@@ -213,6 +235,13 @@ export function canApproveRelease(facts: DepositStageFacts): ReleaseCheck {
     return refuse('already_released')
   }
 
+  // Nothing is given back that was never taken. Said here as well as by
+  // `deposit_release_needs_collection`, so the screen refuses with a sentence
+  // naming what to do rather than the database refusing with a constraint.
+  if (!facts.collected) {
+    return refuse('not_collected')
+  }
+
   if (facts.bookingStatus !== 'completed') {
     return refuse('booking_not_completed')
   }
@@ -235,7 +264,10 @@ export function canApproveRelease(facts: DepositStageFacts): ReleaseCheck {
  * ends up in WhatsApp instead.
  */
 export function canAddCharge(facts: DepositStageFacts): boolean {
-  return !facts.released
+  // A promised deposit answers for nothing yet: a charge raised against one
+  // could be deducted from money that never arrives, and the guest has not
+  // even checked in.
+  return facts.collected && !facts.released
 }
 
 /** Whether the guest owes anything beyond the deposit, and whether they have paid it. */

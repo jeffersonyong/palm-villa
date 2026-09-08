@@ -223,10 +223,14 @@ async function buildCashUp(window: StayWindow, params: URLSearchParams): Promise
           ? [{ collectedAt: payment.collectedAt, amount: payment.amount ?? 0 }]
           : [],
       ),
-      deposits: deposits.map((deposit) => ({
-        collectedAt: deposit.collectedAt,
-        amount: deposit.amount,
-      })),
+      // A promised transfer is money nobody has seen, so it is in neither
+      // figure — the rule the cash-up screen applies, said the same way here
+      // so the download and the screen cannot disagree.
+      deposits: deposits.flatMap((deposit) =>
+        deposit.collectedAt
+          ? [{ collectedAt: deposit.collectedAt, amount: deposit.amount }]
+          : [],
+      ),
       bankings: bankings.map((banking) => ({
         businessDate: banking.businessDate,
         amount: banking.amount,
