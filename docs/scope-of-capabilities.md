@@ -70,6 +70,8 @@ Everyone works from the same live data, so availability, payments, and booking s
 
 **B8 is delivered across two slices.** Four of the six states — available, held, booked, occupied — are live now, alongside out of service and leased long-term from B9. **Awaiting inspection** and **cleaning** are the two the housekeeping flow writes, so they arrive with **C2–C3** and B8 is not complete until those screens land. Said here rather than left to be noticed: until then the board can tell you a unit is empty, but not whether it has been cleaned.
 
+**B1's calendar half delivered 8 September 2026.** Every stay, hold and lease is laid out by unit and by night, one month at a time, coloured by state; an empty night starts a booking with the night and the unit type filled in (B2). Day passes are not on the grid: they occupy no unit and nothing writes one yet — they appear in the list view, and arrive on their own terms with the day-pass flow in phase two.
+
 ---
 
 ## C. What Housekeeping can do (phone)
