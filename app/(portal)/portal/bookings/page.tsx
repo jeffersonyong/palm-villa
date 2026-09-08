@@ -32,7 +32,7 @@ import {
   type BookingListFilter,
 } from '@/lib/db/bookings'
 import { BOOKING_STATUSES, type BookingStatus } from '@/lib/domain/booking-state'
-import { formatStayDates, nightsBetween } from '@/lib/domain/dates'
+import { formatStayDate, formatStayDates, nightsBetween } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 import { BOOKING_STREAMS, BOOKING_STREAM_LABELS, isBookingStream } from '@/lib/domain/stream'
 
@@ -385,6 +385,9 @@ function BookingRow({ booking }: { booking: Booking }) {
       {/* One column where there were two. Nights moves under the dates as the
           quiet half of the same fact rather than taking a column of its own —
           a column only stays could ever fill. */}
+      {/* A day pass has a date of its own now (capability A3): it occupies no
+          unit, so `stay` is null, and the em dash this cell used to draw was
+          correct only while nothing recorded the day it was sold for. */}
       <TableCell className="whitespace-nowrap">
         {stay ? (
           <>
@@ -392,6 +395,11 @@ function BookingRow({ booking }: { booking: Booking }) {
             <span className="mt-xxs block text-caption text-muted-foreground">
               {nights} {nights === 1 ? 'night' : 'nights'}
             </span>
+          </>
+        ) : booking.dayPass ? (
+          <>
+            <span className="text-copy">{formatStayDate(booking.dayPass.date)}</span>
+            <span className="mt-xxs block text-caption text-muted-foreground">One day</span>
           </>
         ) : (
           <Absent title="No stay dates" />

@@ -116,9 +116,16 @@ export default async function StatementPage({ params }: PageProps) {
         />
         <Line
           label="Deposit taken"
-          value={`${formatTimestamp(deposit.collectedAt)}, in ${PAYMENT_METHOD_LABELS[
-            deposit.method
-          ].toLowerCase()}`}
+          value={
+            deposit.collectedAt === null
+              ? // Unreachable: a statement renders only once a release is
+                // approved, and `deposit_release_needs_collection` refuses a
+                // release over money nobody collected.
+                'Not recorded'
+              : `${formatTimestamp(deposit.collectedAt)}, in ${PAYMENT_METHOD_LABELS[
+                  deposit.method
+                ].toLowerCase()}`
+          }
         />
       </dl>
 

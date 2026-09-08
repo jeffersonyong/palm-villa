@@ -163,10 +163,14 @@ export default async function CashUpPage({ searchParams }: PageProps) {
           ? [{ collectedAt: payment.collectedAt, amount: payment.amount ?? 0 }]
           : [],
       ),
-      deposits: deposits.map((deposit) => ({
-        collectedAt: deposit.collectedAt,
-        amount: deposit.amount,
-      })),
+      // A promised transfer is not in the drawer and not in the bank, so it
+      // is in neither figure here. The same flatMap the payments above use,
+      // and for the same reason: money nobody has seen is not money.
+      deposits: deposits.flatMap((deposit) =>
+        deposit.collectedAt
+          ? [{ collectedAt: deposit.collectedAt, amount: deposit.amount }]
+          : [],
+      ),
       bankings: bankings.map((banking) => ({
         businessDate: banking.businessDate,
         amount: banking.amount,

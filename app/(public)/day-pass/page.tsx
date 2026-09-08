@@ -1,97 +1,66 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { listDayPassHeadroom } from '@/lib/db/day-passes'
+import { getPropertyConfig } from '@/lib/db/property-config'
+import { readPropertySettings } from '@/lib/db/settings'
+import { addDays, todayInBrunei, type StayDate } from '@/lib/domain/dates'
 
-import { PendingDetail } from '../_components/pending-detail'
-import { contact, pendingDayPassDetails, pricingCopy } from '../_content/landing'
+import { DayPassBooking } from './day-pass-booking'
 
 export const metadata: Metadata = {
-  title: 'Day pass — Palm Villa',
+  title: 'Day passes — Palm Villa',
   description:
-    'One day pass for the swimming pool, water park and indoor children’s playground at Palm Villa.',
+    'Book a facility day pass at Palm Villa, Bandar Seri Begawan. Per-person rates with family bundles applied automatically.',
 }
 
-const priceRows = [
-  { label: 'Per person', value: 'from BND 5' },
-  { label: 'Family bundles', value: 'from BND 20' },
-]
-
 /**
- * Stub route. The real day-pass booking flow replaces this page at the same
- * URL, so every CTA pointing here keeps working.
+ * Booking a facility day pass (capability A3).
+ *
+ * The first screen anywhere that sells one — `priceDayPass` has been written
+ * and tested since the pricing slice with nothing calling it, and `day_pass`
+ * did not exist as a table until this one.
+ *
+ * Two things come from the database rather than from copy. **What the pass
+ * admits** is the facility list with its `included_in_day_pass` ticks, which
+ * capability F3 made a setting precisely so the two facilities the client has
+ * not settled (C1: the water park and the sauna) cost nothing to leave as they
+ * are. **How many places are left** is the headroom read, which is null on
+ * every date today because no capacity has ever been agreed (C2) — so nothing
+ * is limited, and the screen says nothing about limits it cannot enforce.
  */
-export default function DayPassPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function DayPassPage() {
+  const today = todayInBrunei()
+  const config = await getPropertyConfig()
+  const lastDay = addDays(today, config.maxAdvanceBookingDays)
+
+  const [settings, headroom] = await Promise.all([
+    readPropertySettings(),
+    listDayPassHeadroom({ from: today, to: lastDay }),
+  ])
+
+  // Serialised as a plain object for the client island: a Map does not cross
+  // the boundary, and only the dates with nothing left actually matter to it.
+  const soldOut: Record<StayDate, number> = {}
+
+  for (const day of headroom) {
+    if (day.capacity !== null) {
+      soldOut[day.date] = Math.max(day.capacity - day.taken, 0)
+    }
+  }
+
+  const included = settings.facilities
+    .filter((facility) => facility.includedInDayPass)
+    .map((facility) => facility.name)
+
   return (
-    <>
-      <section aria-labelledby="day-pass-heading" className="bg-card px-xl py-3xl">
-        <div className="mx-auto w-full max-w-[1120px]">
-          <p className="micro-label text-accent-foreground">Facility day pass</p>
-          <h1
-            id="day-pass-heading"
-            className="mt-md font-display text-display-md text-foreground sm:text-display-lg"
-          >
-            Day passes at Palm Villa
-          </h1>
-          <p className="mt-md max-w-[52ch] text-body-lg text-copy">
-            One pass for the swimming pool, water park and indoor children’s playground.
-          </p>
-        </div>
-      </section>
-
-      <section
-        aria-labelledby="day-pass-pricing-heading"
-        className="border-t border-divider bg-card px-xl py-3xl"
-      >
-        <div className="mx-auto w-full max-w-[1120px]">
-          <h2 id="day-pass-pricing-heading" className="text-display-xs text-foreground">
-            What it costs
-          </h2>
-
-          <Card className="mt-lg max-w-[560px]">
-            <dl>
-              {priceRows.map((row, index) => (
-                <div
-                  key={row.label}
-                  className={
-                    index === 0
-                      ? 'flex items-baseline justify-between gap-lg'
-                      : 'mt-md flex items-baseline justify-between gap-lg border-t border-divider pt-md'
-                  }
-                >
-                  <dt className="text-body-md text-muted-foreground">{row.label}</dt>
-                  <dd className="text-body-md-strong text-foreground">{row.value}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-lg text-caption text-muted-foreground">
-              {pricingCopy.dayPassFinePrint} {pricingCopy.paymentMethods}
-            </p>
-
-            <ul className="mt-lg flex flex-wrap gap-xs border-t border-divider pt-lg">
-              {pendingDayPassDetails.map((detail) => (
-                <li key={detail}>
-                  <PendingDetail label={detail} />
-                </li>
-              ))}
-            </ul>
-          </Card>
-
-          <p className="mt-xl max-w-[52ch] text-body-md text-copy">
-            Online booking opens soon — message us on WhatsApp and we’ll book you in today.
-          </p>
-
-          <div className="mt-lg flex flex-wrap gap-sm">
-            <Button asChild>
-              <a href={contact.whatsappUrl}>Message us on WhatsApp</a>
-            </Button>
-            <Button asChild variant="ghost">
-              <Link href="/">Back to overview</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-    </>
+    <DayPassBooking
+      config={config}
+      today={today}
+      lastDay={lastDay}
+      placesLeft={soldOut}
+      included={included}
+    />
   )
 }

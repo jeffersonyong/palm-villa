@@ -8,7 +8,7 @@ import {
 import { transition, type BookingStatus } from '@/lib/domain/booking-state'
 import type { DateRange } from '@/lib/domain/availability'
 import type { DayBounds, StayDate } from '@/lib/domain/dates'
-import type { Cents } from '@/lib/domain/money'
+import { formatCents, type Cents } from '@/lib/domain/money'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { dataClient } from '@/lib/supabase/data'
 
@@ -81,7 +81,18 @@ export interface Deposit {
   amount: Cents
   method: PaymentMethod
   collectedBy: string | null
-  collectedAt: string
+  /**
+   * When the money was actually seen. Null while a promised transfer is
+   * unverified (prd.md §9.1) — the one state in which this row is not yet a
+   * liability, and the reason every "what do we hold" read excludes it.
+   */
+  collectedAt: string | null
+  /** When the customer said they had transferred it, or null at the desk. */
+  promisedAt: string | null
+  /** What the verifier read off the bank, for a deposit promised online. */
+  observed: { reference: string | null; sender: string | null; on: string | null } | null
+  /** Why a figure other than the quoted one was accepted. */
+  overrideReason: string | null
   inspection: DepositInspection | null
   /** Unwaived charges standing against the deposit now. */
   charges: Cents
@@ -113,7 +124,12 @@ interface DepositSummaryRow {
   amount_cents: number
   method: string
   collected_by: string | null
-  collected_at: string
+  collected_at: string | null
+  promised_at: string | null
+  observed_reference: string | null
+  observed_sender: string | null
+  observed_on: string | null
+  amount_override_reason: string | null
   inspection_id: string | null
   inspection_outcome: string | null
   inspection_notes: string | null
@@ -165,6 +181,11 @@ const SUMMARY_COLUMNS = [
   'owed_settled_at',
   'owed_settled_by',
   'owed_settled_method',
+  'promised_at',
+  'observed_reference',
+  'observed_sender',
+  'observed_on',
+  'amount_override_reason',
 ].join(', ')
 
 function toDeposit(row: DepositSummaryRow): Deposit {
@@ -205,6 +226,16 @@ function toDeposit(row: DepositSummaryRow): Deposit {
     method: row.method as PaymentMethod,
     collectedBy: row.collected_by,
     collectedAt: row.collected_at,
+    promisedAt: row.promised_at,
+    observed:
+      row.observed_reference === null && row.observed_sender === null && row.observed_on === null
+        ? null
+        : {
+            reference: row.observed_reference,
+            sender: row.observed_sender,
+            on: row.observed_on,
+          },
+    overrideReason: row.amount_override_reason,
     inspection:
       row.inspection_id === null || row.inspection_outcome === null || row.inspected_at === null
         ? null
@@ -227,6 +258,7 @@ function toDeposit(row: DepositSummaryRow): Deposit {
             method: row.owed_settled_method as PaymentMethod,
           },
     stage: depositStageOf({
+      collected: row.collected_at !== null,
       released: release !== null,
       inspected: row.inspection_id !== null,
       bookingStatus,
@@ -259,6 +291,12 @@ export async function listHeldDeposits(): Promise<readonly Deposit[]> {
 
   const { data, error } = await summaryQuery(propertyId)
     .is('released_at', null)
+    // E1 answers what the property owes back **right now**, so a deposit a
+    // customer has promised and nobody has verified is not in it: the money
+    // is not there, and a ledger that counted it would overstate the
+    // liability by every abandoned transfer. Those rows are the payment
+    // queue's work, and `listPendingDeposits` is what reads them.
+    .not('collected_at', 'is', null)
     .order('collected_at', { ascending: true })
 
   if (error) {
@@ -552,9 +590,15 @@ export interface CheckInBookingInput {
  * not a failure: the caller says so on screen rather than implying money
  * changed hands.
  */
-export async function checkInBooking(
-  input: CheckInBookingInput,
-): Promise<DepositWriteResult<{ status: BookingStatus; depositId: string | null; amount: Cents }>> {
+export async function checkInBooking(input: CheckInBookingInput): Promise<
+  DepositWriteResult<{
+    status: BookingStatus
+    depositId: string | null
+    amount: Cents
+    /** True when a deposit was already held, so nothing was taken at the door. */
+    alreadyHeld: boolean
+  }>
+> {
   const propertyId = await currentPropertyId()
 
   const { data: booking, error: readError } = await dataClient()
@@ -596,7 +640,13 @@ export async function checkInBooking(
   }
 
   const result = data as
-    | { ok: true; status: BookingStatus; deposit_id: string | null; amount_cents: number }
+    | {
+        ok: true
+        status: BookingStatus
+        deposit_id: string | null
+        amount_cents: number
+        already_held: boolean
+      }
     | RpcRefusal
 
   if (!result.ok) {
@@ -614,6 +664,7 @@ export async function checkInBooking(
     status: result.status,
     depositId: result.deposit_id,
     amount: result.amount_cents,
+    alreadyHeld: result.already_held,
   }
 }
 
@@ -634,6 +685,136 @@ function describeCheckInFailure(result: RpcRefusal): DepositWriteError {
       return { code: result.error, message: 'Choose how the deposit was taken.' }
     default:
       return { code: result.error, message: 'That booking no longer exists.' }
+  }
+}
+
+/**
+ * The deposits somebody has promised and nobody has checked.
+ *
+ * The verification queue's second source (capability B4, for a deposit). It is
+ * a separate read rather than a filter on the ledger's because the two answer
+ * opposite questions: E1 asks what the property is holding, and this asks what
+ * it has been told to expect. A row here is not money.
+ *
+ * Ordered oldest first, like the payments queue, because the figure that
+ * matters to a customer standing on the other end is how long they have been
+ * waiting.
+ */
+export async function listPendingDeposits(): Promise<readonly Deposit[]> {
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await summaryQuery(propertyId)
+    .is('collected_at', null)
+    .order('promised_at', { ascending: true })
+
+  if (error) {
+    throw new Error(`Could not read the deposits awaited: ${error.message}`)
+  }
+
+  return (data as unknown as DepositSummaryRow[]).map(toDeposit)
+}
+
+export interface VerifyDepositInput {
+  depositId: string
+  /** What the verifier actually saw in the bank app. */
+  observedAmount: Cents
+  observedReference?: string | null
+  observedSender?: string | null
+  observedOn?: StayDate | null
+  /** Required when the figure disagrees with what the booking quoted. */
+  overrideReason?: string | null
+  actorId: string | null
+}
+
+/**
+ * Confirms that a promised security deposit arrived (capability B16).
+ *
+ * The same act as verifying a payment and deliberately a different function —
+ * see the migration for why the two are not one with a flag. What is repeated
+ * here is only the shape: the status move is decided by `transition()` and
+ * passed in, the amount rule is enforced in SQL under the row lock, and a
+ * figure that disagrees with the quote needs a written reason.
+ *
+ * A booking that is already `confirmed` — a desk that took cash for the stay
+ * before the transfer landed — passes no status pair, so the deposit is
+ * collected against a booking that stays exactly where it is. That is
+ * `verify_payment()`'s arrangement for a top-up, and for the same reason:
+ * writing `confirmed → confirmed` would put a second confirmation line in a
+ * history for a booking that never moved.
+ */
+export async function verifyDeposit(
+  input: VerifyDepositInput,
+): Promise<DepositWriteResult<{ amount: Cents }>> {
+  const propertyId = await currentPropertyId()
+
+  const { data: row, error: readError } = await dataClient()
+    .from('deposit_summary')
+    .select('booking_status')
+    .eq('property_id', propertyId)
+    .eq('id', input.depositId)
+    .maybeSingle()
+
+  if (readError) {
+    throw new Error(`Could not read deposit ${input.depositId}: ${readError.message}`)
+  }
+
+  if (!row) {
+    return { ok: false, error: { code: 'not_found', message: 'That deposit no longer exists.' } }
+  }
+
+  const current = (row as { booking_status: BookingStatus }).booking_status
+  const next = transition(current, 'verify_payment')
+
+  const { data, error } = await dataClient().rpc('verify_deposit', {
+    p_property_id: propertyId,
+    p_deposit_id: input.depositId,
+    p_from_status: next.ok ? current : null,
+    p_to_status: next.ok ? next.status : null,
+    p_observed_amount_cents: input.observedAmount,
+    p_observed_reference: input.observedReference ?? null,
+    p_observed_sender: input.observedSender ?? null,
+    p_observed_on: input.observedOn ?? null,
+    p_amount_override_reason: input.overrideReason ?? null,
+    p_actor_id: input.actorId,
+  })
+
+  if (error) {
+    throw new Error(`Could not verify the deposit: ${error.message}`)
+  }
+
+  const result = data as { ok: true; amount_cents: number } | RpcRefusal
+
+  if (!result.ok) {
+    return { ok: false, error: describeVerifyDepositFailure(result) }
+  }
+
+  return { ok: true, amount: result.amount_cents }
+}
+
+function describeVerifyDepositFailure(result: RpcRefusal): DepositWriteError {
+  switch (result.error) {
+    case 'reason_required': {
+      const due = typeof result.due_cents === 'number' ? formatCents(result.due_cents) : null
+
+      return {
+        code: result.error,
+        message: due
+          ? `That is not the BND ${due} this booking quoted. Say why it is being accepted.`
+          : 'That is not the figure this booking quoted. Say why it is being accepted.',
+      }
+    }
+    case 'already_collected':
+      return { code: result.error, message: 'This deposit has already been verified.' }
+    case 'status_changed':
+      return {
+        code: result.error,
+        message:
+          'Someone else moved this booking while you were working on it. Reload and try again.',
+      }
+    case 'invalid_amount':
+      return { code: result.error, message: 'Enter the amount that arrived.' }
+    default:
+      return { code: result.error, message: 'That deposit no longer exists.' }
   }
 }
 
