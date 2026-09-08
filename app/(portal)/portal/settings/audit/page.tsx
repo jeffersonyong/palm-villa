@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import { EmptyState } from '@/components/portal/empty-state'
 import { PageHeader } from '@/components/portal/page-header'
+import { SectionHint } from '@/components/portal/section-hint'
 import { readChoices, readSearch } from '@/components/portal/list-params'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { initials } from '@/components/ui/avatar-identity'
@@ -43,6 +44,9 @@ import { readPage, readPageSize } from './page-size'
 export const metadata: Metadata = {
   title: 'Audit log',
 }
+
+/** What a cell shows instead of nothing, as on the register. */
+const ABSENT = '—'
 
 /**
  * Everything that has happened, and who did it (capability F4).
@@ -173,14 +177,22 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
               <TableHead>Who</TableHead>
               <TableHead>What</TableHead>
               <TableHead>Record</TableHead>
-              <TableHead>Note</TableHead>
+              <TableHead>
+                <span className="inline-flex items-center gap-xs">
+                  Reason
+                  <SectionHint label="What a reason is">
+                    Some actions cannot be done without saying why — cancelling a booking,
+                    discounting one, waiving or charging a deposit, taking a unit out of service,
+                    accepting a payment for the wrong amount. This is what was typed at the time.
+                    Most actions never ask, so most rows have none.
+                  </SectionHint>
+                </span>
+              </TableHead>
             </TableHeaderRow>
           </TableHeader>
           <TableBody>
             {events.length === 0 ? (
-              <TableEmpty colSpan={5}>
-                {isFiltered ? 'No events match these filters.' : 'Nothing has been recorded yet.'}
-              </TableEmpty>
+              <TableEmpty colSpan={5}>{emptyMessage(isFiltered, search)}</TableEmpty>
             ) : null}
 
             {events.map((event) => (
@@ -195,7 +207,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                 <TableCell>
                   <Subject event={event} actorNames={actorNames} />
                 </TableCell>
-                <TableCell className="text-copy">{reasonOf(event)}</TableCell>
+                <ReasonCell event={event} />
               </TableRow>
             ))}
           </TableBody>
@@ -285,11 +297,43 @@ function payloadName(event: AuditTrailEvent): string | null {
   return null
 }
 
-/** The typed note a staff member left, when the action asked for one. */
-function reasonOf(event: AuditTrailEvent): string {
-  const reason = event.after?.reason
+/**
+ * Why the table is empty — and, when a search is the reason, what the search
+ * actually reaches.
+ *
+ * A term is matched against the Record column and nothing else: the reference,
+ * the unit, the bank account. Every other list screen in the portal also finds
+ * a guest by name, so somebody arriving here reasonably tries one, gets nothing
+ * back, and has no way to tell a bad term from a term this screen never reads.
+ * Said at the one moment it is useful, rather than as standing instructions
+ * above a table that usually has rows in it.
+ */
+function emptyMessage(isFiltered: boolean, search: string | null): string {
+  if (search !== null) {
+    return `Nothing recorded against “${search}”. Search matches the Record column — a booking reference, a unit, a bank account — not guest or staff names.`
+  }
 
-  return typeof reason === 'string' && reason.length > 0 ? `“${reason}”` : ''
+  return isFiltered ? 'No events match these filters.' : 'Nothing has been recorded yet.'
+}
+
+/**
+ * The reason a staff member typed, when the action refused to proceed without
+ * one — quoted, because it is somebody's words rather than the screen's.
+ *
+ * An em dash where there is none, in the muted tone the absent values on the
+ * register wear. The column is mostly empty by design, and a blank cell reads
+ * as a value that failed to load rather than as an action that was never asked
+ * to justify itself.
+ */
+function ReasonCell({ event }: { event: AuditTrailEvent }) {
+  const reason = event.after?.reason
+  const typed = typeof reason === 'string' && reason.length > 0 ? reason : null
+
+  return (
+    <TableCell className={typed ? 'text-copy' : 'text-muted-foreground'}>
+      {typed ? `“${typed}”` : ABSENT}
+    </TableCell>
+  )
 }
 
 function readWindow(from?: string, to?: string): { from: StayDate; to: StayDate } | null {

@@ -143,7 +143,11 @@ export function AuditFilters({
     >
       <SearchField
         value={search}
-        placeholder="Booking, unit or account"
+        // What the Record column shows, which is what the term is matched
+        // against. Guest names are deliberately absent — the trail is a list of
+        // records, not of people, and the register is where a guest is looked
+        // up. The empty state says so when a search finds nothing.
+        placeholder="Booking, unit or bank account"
         onChange={(term) => apply({ search: term })}
       />
 

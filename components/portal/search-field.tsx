@@ -4,6 +4,12 @@ import { Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
+import {
+  reconcileSearchDraft,
+  searchAsked,
+  searchSyncFor,
+  type SearchSync,
+} from '@/components/portal/search-draft'
 import { cn } from '@/lib/utils'
 
 /**
@@ -19,10 +25,16 @@ import { cn } from '@/lib/utils'
  *
  * The committed value arrives as a prop and the draft lives here, so the
  * field can show what is being typed while the URL still says what is
- * applied — and so a Clear elsewhere in the row empties this too.
+ * applied — and so a Clear elsewhere in the row empties this too. Which of
+ * the two wins when they disagree is decided in search-draft.ts, where the
+ * sequence that used to swallow characters is spelled out and tested.
  */
 
-const SETTLE_MS = 300
+// Long enough to sit out the gap between two keystrokes of somebody reading a
+// reference off a phone, short enough that a finished word is answered before
+// the eye leaves the field. Every commit is a round trip to the database, so
+// the cost of guessing low is a query per character.
+const SETTLE_MS = 400
 
 interface SearchFieldProps {
   /** The term the server actually applied. */
@@ -35,15 +47,21 @@ interface SearchFieldProps {
 
 export function SearchField({ value, onChange, placeholder, className }: SearchFieldProps) {
   const [draft, setDraft] = useState(value)
-  const [applied, setApplied] = useState(value)
+  const [sync, setSync] = useState<SearchSync>(() => searchSyncFor(value))
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // A change from outside — Clear, back, a tile — replaces the draft. Adjusted
-  // during render rather than in an effect, the way React asks for state that
-  // follows a prop: the field never paints a stale draft for one frame.
-  if (applied !== value) {
-    setApplied(value)
-    setDraft(value)
+  // A change from outside — Clear, back, a tile — replaces the draft; this
+  // field's own term coming back does not. Adjusted during render rather than
+  // in an effect, the way React asks for state that follows a prop: the field
+  // never paints a stale draft for one frame.
+  const change = reconcileSearchDraft(sync, value)
+
+  if (change) {
+    setSync(change.sync)
+
+    if (change.draft !== null) {
+      setDraft(change.draft)
+    }
   }
 
   useEffect(() => () => cancel(), [])
@@ -58,9 +76,19 @@ export function SearchField({ value, onChange, placeholder, className }: SearchF
   function commit(next: string) {
     cancel()
 
-    if (next.trim() !== value) {
-      onChange(next.trim())
+    const term = next.trim()
+
+    // Compared against what was last asked for rather than against the applied
+    // value: a commit fired by the timer closes over the term that was applied
+    // when the key was pressed, which by now may be one round trip behind.
+    // Asking again for what is already on its way would push a second history
+    // entry for one search, and the back button would need pressing twice.
+    if (term === sync.asked) {
+      return
     }
+
+    setSync((current) => searchAsked(current, term))
+    onChange(term)
   }
 
   function type(next: string) {
