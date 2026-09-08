@@ -12,7 +12,8 @@ describe('activeHref', () => {
     expect(activeHref('/portal/payments/cash')).toBe('/portal/payments/cash')
     // The Admin landing page is itself a route, so its children must still win.
     expect(activeHref('/portal/settings')).toBe('/portal/settings')
-    expect(activeHref('/portal/settings/pricing')).toBe('/portal/settings/pricing')
+    expect(activeHref('/portal/settings/property')).toBe('/portal/settings/property')
+    expect(activeHref('/portal/settings/export')).toBe('/portal/settings/export')
     // Reports and the cash-up are siblings in the nav and nested in the URL.
     expect(activeHref('/portal/reports/cash-up')).toBe('/portal/reports/cash-up')
   })

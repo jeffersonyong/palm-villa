@@ -5,8 +5,8 @@ import { z } from 'zod'
 
 import { requirePermission } from '@/lib/auth/require-permission'
 import { createWalkInBooking } from '@/lib/db/bookings'
+import { getPropertyConfig } from '@/lib/db/property-config'
 import { isStayDate } from '@/lib/domain/dates'
-import { palmVillaConfig } from '@/lib/domain/config'
 import { parseDepositWaiver, MAX_DEPOSIT_WAIVER_REASON_LENGTH } from '@/lib/domain/deposit-waiver'
 import { parseDiscount, MAX_DISCOUNT_REASON_LENGTH } from '@/lib/domain/discount'
 import type { PaymentMethod } from '@/lib/domain/payment'
@@ -209,7 +209,7 @@ export async function createWalkInBookingAction(
       lateCheckOutHours: input.lateCheckOutHours,
       discount: discount.discount,
     },
-    palmVillaConfig,
+    await getPropertyConfig(),
   )
 
   if (!priced.ok) {

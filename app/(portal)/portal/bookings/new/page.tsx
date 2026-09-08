@@ -16,7 +16,7 @@ import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { countAvailableByType, findAvailableUnits } from '@/lib/db/bookings'
 import { getUnitCounts } from '@/lib/db/inventory'
-import { palmVillaConfig } from '@/lib/domain/config'
+import { getPropertyConfig } from '@/lib/db/property-config'
 import { addDays, isStayDate, todayInBrunei } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 
@@ -50,7 +50,7 @@ interface PageProps {
 
 export default async function NewBookingPage({ searchParams }: PageProps) {
   const params = await searchParams
-  const config = palmVillaConfig
+  const config = await getPropertyConfig()
 
   const today = todayInBrunei()
 

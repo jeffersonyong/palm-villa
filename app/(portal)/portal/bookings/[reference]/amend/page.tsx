@@ -12,8 +12,8 @@ import { Label } from '@/components/ui/label'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { findAvailableUnits, getBookingByReference } from '@/lib/db/bookings'
+import { getPropertyConfig } from '@/lib/db/property-config'
 import { canAmend } from '@/lib/domain/booking-state'
-import { palmVillaConfig } from '@/lib/domain/config'
 import { addDays, isStayDate, todayInBrunei } from '@/lib/domain/dates'
 
 import { AmendForm } from './amend-form'
@@ -45,7 +45,7 @@ export default async function AmendBookingPage({ params, searchParams }: PagePro
   const { reference } = await params
   const query = await searchParams
   const actor = await getActor()
-  const config = palmVillaConfig
+  const config = await getPropertyConfig()
 
   if (!actor || !hasPermission(actor.permissions, 'booking.amend')) {
     return (

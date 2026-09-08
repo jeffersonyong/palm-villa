@@ -29,7 +29,7 @@ Everyone works from the same live data, so availability, payments, and booking s
 | A1 | Check live availability for any dates — without messaging anyone |
 | A2 | See the exact itemised price before booking: nightly rate, extra persons, sofa beds, early check-in, late check-out |
 | A3 | Book a facility day pass online, with per-person rates and family bundles applied automatically — the system always charges the cheapest applicable combination |
-| A4 | Book a short stay online; the unit is held while payment completes — **reworded 10 September 2026, see the note below** |
+| A4 | Book a short stay online; the unit is held while payment completes — **reworded 10 September 2026, see the notes below** |
 | A5 | Receive bank transfer instructions (BIBD / Baiduri) with a unique payment reference to include in the transfer |
 | A6 | Upload their transfer slip directly, instead of sending it over WhatsApp |
 | A7 | Provide guest details and identity document as part of the booking, replacing the paper/WhatsApp collection step |
@@ -37,6 +37,8 @@ Everyone works from the same live data, so availability, payments, and booking s
 | A9 | Look up their own booking any time using booking reference + phone number |
 | A10 | Get answers to common questions from a self-serve FAQ page |
 | A11 | Browse a public landing page presenting the day-pass facilities, the unit types and "from" rates, with an enquiry route for long-term lets — **(proposed 27 August 2026, pending client agreement — not yet part of the quoted delivery)** |
+
+> **A4 is now secured by the deposit, like B16.** The owner confirmed on 10 September 2026 that a booking is held by the BND 100 security deposit with the stay paid on arrival, which is how the business already works. The public flow asks a customer for the deposit rather than the whole stay; everything else about A4 is unchanged.
 
 > **A4 no longer promises a timer.** Asked how long a unit should be held for a guest who says they are transferring, the answer was *indefinitely, until somebody checks* — so nothing releases a booking automatically, by decision rather than by omission. The public flow will state the reference and the amount and say the unit is held until payment is confirmed; a countdown the system does not enforce would be a promise it does not keep. Nothing about the delivery changes. See the register.
 
@@ -64,6 +66,7 @@ Everyone works from the same live data, so availability, payments, and booking s
 
 | B14 | Keep a note against a **unit** — a sticking door, a temperamental aircon, where the spare key lives. It belongs to the unit rather than to whoever is staying in it, so it survives every booking, and every change to it is recorded with who made it and when. **(added 2 September 2026 at the owner's request)** |
 | B15 | Waive the security deposit on a booking at the desk, with a typed reason recorded in the booking's history — the case is a guest extending their stay, where the deposit is already held under the first booking. Waiving is its own permission, so it can be withheld from a role that otherwise takes bookings, and a waived booking checks in taking nothing and says so. **(added 5 September 2026 at the owner's request)** |
+| B16 | Take an advance booking secured by the security deposit: the guest transfers the BND 100 when they book, the unit is held until someone verifies it, and the stay itself is settled on arrival. A guest who cancels or does not turn up forfeits the deposit. **(added 10 September 2026 at the owner's request — it replaces the walk-ins-only rule the scope was written against, and is not yet built)** |
 
 **B8 is delivered across two slices.** Four of the six states — available, held, booked, occupied — are live now, alongside out of service and leased long-term from B9. **Awaiting inspection** and **cleaning** are the two the housekeeping flow writes, so they arrive with **C2–C3** and B8 is not complete until those screens land. Said here rather than left to be noticed: until then the board can tell you a unit is empty, but not whether it has been cleaned.
 
@@ -128,10 +131,25 @@ Four things worth saying plainly, because they are the decisions behind the figu
 |---|---|
 | F1 | Manage staff accounts and assign roles — one person can hold several roles (e.g. Front Office + Finance + Admin), so the system fits the team as it is today and as it grows |
 | F2 | Adjust what each role is allowed to do, without developer involvement |
-| F3 | Configure pricing, facility inclusion and capacity, hold durations, and document retention periods — pending decisions (e.g. whether gym, snooker or sauna are included in the day pass) become a settings change, not a development change |
+| F3 | Configure pricing, facility inclusion and capacity, and document retention periods — pending decisions (e.g. whether gym, snooker or sauna are included in the day pass) become a settings change, not a development change. **Hold durations struck from this wording 12 September 2026**, see the note below |
 | F4 | Review the full audit trail: every change to bookings, payments, deposits, and charges, with actor and timestamp |
 | F5 | Export all business data at any time in a usable format — the data is yours |
 | F6 | Name the units the way they are labelled on the actual doors, and set how many of each type the building has — so the system matches the building without a developer. Names are set as a pattern per unit type and can be adjusted one at a time where a block does not follow the pattern. Every rename is recorded, and a unit that has hosted a booking is taken out of service rather than deleted, so its history survives. **(added 2 September 2026 — it removes two of the open questions from the critical path)** |
+| F7 | Replace the photographs on the public site — one current image per unit type and per facility, uploaded from the portal with the descriptive text that goes with it. A repaint, a renovation or a new photo shoot is an upload, not a developer deploy. **(proposed 10 September 2026 by Jeff, pending client agreement — not yet part of the quoted delivery)** |
+
+> **F7 is provisional, and it depends on a conversation A11 is already waiting for.** The public site currently shows a labelled placeholder where each photograph belongs — no real images exist yet — so this is a capability and the imagery it manages, not a control added over something already built. It is recorded here so the baseline stays honest, on the same footing as A11, and both belong in one conversation: the landing page A11 describes is the surface F7's photographs appear on, and neither is in the quoted work until confirmed.
+
+> **F3, F4 and F5 delivered 12 September 2026.** Property settings edits the rates, the day-pass prices, what a day pass admits, how long each kind of document is kept, and the bank accounts customers transfer to. The audit log reads the whole trail on one screen. Export data hands over every table as a spreadsheet.
+>
+> Five things worth saying plainly, because they are the decisions behind the screens:
+>
+> - **"Hold durations" has gone from F3's wording, and nothing was lost.** The owner's answer of 10 September was that a unit is held indefinitely until somebody checks — so a setting for how long a hold lasts would be a number he could change that changed nothing, inviting him to shorten a timer that does not exist.
+> - **A rate change is not retrospective.** A booking already taken keeps the price it was quoted; only a new booking, or an amendment to an existing one, is priced at the new rate. The screen says so where the rates are edited.
+> - **Shortening a retention period does apply to files already held.** Cut identity documents to six months and every one on file is re-dated to six months after its stay; anything then past its date stops being viewable at once and is destroyed on the next nightly run. The record that the file existed, who uploaded it and who opened it survives either way.
+> - **The export is the records, never the files.** Documents come out as a list of what was held — kind, size, who uploaded it, when it stops being kept — and an identity document's filename is left out, because it usually carries the guest's name and IC number and a spreadsheet is not protected the way the document screen is.
+> - **The audit log and the export are Admin-only, and downloads are not themselves logged.** Neither decision is in the PRD; both are in the register for confirmation.
+>
+> **One thing F3 cannot finish alone:** every facility's day-pass capacity is empty, because no capacity has ever been agreed (see the register, C2). The field is there; the number is his.
 
 ---
 
@@ -193,7 +211,7 @@ These exclusions are deliberate. Each is either not needed on day one or depends
 | X8 | Smart locks / automated gate control | Physical access remains as-is; the system tells Security who to expect. |
 | X9 | Multi-property administration screens | The data layer supports additional properties from day one; the management UI for it is built when a second property is real. |
 | X10 | Migration of historical documents | The system holds data from go-live onward. The existing folder of accumulated documents stays outside the system. |
-| X11 | Part payments — a guest *choosing* to pay a deposit now and the balance later | Not in the quoted delivery, and not a technical limitation: the stated policy is that full payment secures a unit and that unpaid bookings hold no inventory. Raised 1 September 2026; it needs that policy revisited before it can be offered. **Note the distinction from B13:** the system can now track an outstanding balance, because an amendment can leave one. What it does not do is let a guest opt into paying in instalments at booking time. |
+| X11 | Part payments — a guest *choosing* to pay part of the **stay** now and the rest later | Not in the quoted delivery. **Read this against B16, added 10 September 2026:** a guest now pays the BND 100 security deposit to secure a booking and the stay on arrival, which is not part payment — the deposit is a separate refundable amount and the stay is still settled in full, in one go. What remains out is a guest choosing to split the stay itself, say BND 200 of a BND 400 booking. Raised 1 September 2026. **Note the distinction from B13:** the system can track an outstanding balance, because an amendment can leave one. What it does not do is let a guest opt into instalments. |
 
 ---
 

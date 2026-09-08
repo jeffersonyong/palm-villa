@@ -93,3 +93,62 @@ export function TextField({
     </div>
   )
 }
+
+interface MoneyFieldProps {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  /** Sits under the field when there is no error to show instead. */
+  hint?: string
+  error?: string
+  className?: string
+}
+
+/**
+ * An amount in BND: the currency stated beside the field, never inside it.
+ *
+ * Text rather than `type="number"`, which is the same decision
+ * discount-fields.tsx records — `centsFromInput()` refuses what it cannot read
+ * rather than repairing it, where a number input silently swallows a stray
+ * comma and hands back something plausible. A price nobody agreed is worse
+ * than a field that says no.
+ *
+ * The label is `BND` on the left rather than a suffix or a placeholder,
+ * because the figure is `tabular-nums` and right-aligned wherever these sit in
+ * a table: a prefix keeps the digits in one column.
+ */
+export function MoneyField({
+  id,
+  label,
+  value,
+  onChange,
+  hint,
+  error,
+  className,
+}: MoneyFieldProps) {
+  return (
+    <div className={cn('grid gap-sm', className)}>
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center gap-sm">
+        <span className="text-body-sm text-muted-foreground">BND</span>
+        <Input
+          id={id}
+          name={id}
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder="0.00"
+          value={value}
+          aria-invalid={error ? true : undefined}
+          className="w-[140px] tabular-nums"
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+      {error ? (
+        <FieldError message={error} />
+      ) : hint ? (
+        <p className="text-caption text-muted-foreground">{hint}</p>
+      ) : null}
+    </div>
+  )
+}

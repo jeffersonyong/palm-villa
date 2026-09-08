@@ -78,3 +78,15 @@ export function toCsv(headers: readonly string[], rows: readonly (readonly CsvVa
 export function csvFilename(report: string, from: string, to: string): string {
   return `palm-villa-${report}-${from}-to-${to}.csv`
 }
+
+/**
+ * A filename for a whole-table export, e.g.
+ * `palm-villa-bookings-2026-09-12.csv`.
+ *
+ * Dated rather than ranged, because F5 exports a table rather than a period —
+ * what varies between two downloads is the day they were taken, and a folder of
+ * `bookings.csv (3)` is what this avoids.
+ */
+export function exportFilename(table: string, on: string): string {
+  return `palm-villa-${table}-${on}.csv`
+}

@@ -1,0 +1,924 @@
+import { centsToDecimal, type Cents } from '@/lib/domain/money'
+import type { CsvValue } from '@/lib/domain/csv'
+import { dataClient } from '@/lib/supabase/data'
+
+import { currentPropertyId } from './property'
+import { readPropertySettings } from './settings'
+import { listStaff } from './staff'
+
+/**
+ * Every table the business runs on, as CSV (capability F5).
+ *
+ * scope-of-capabilities.md F5 is "export all business data at any time in a
+ * usable format — the data is yours", and prd.md §19 makes it an ownership
+ * promise rather than a feature: the client owns their data outright, with an
+ * export right. So this is deliberately the whole of it, table by table, rather
+ * than a report — the reports screen already exports what it shows (E5), and
+ * that is a different thing entirely.
+ *
+ * ── Usable means a spreadsheet ─────────────────────────────────────────────
+ *
+ * One file per table rather than one file of everything: an accountant opens a
+ * spreadsheet, and a single archive of eighteen tables is a developer's
+ * convenience. Money goes out as bare decimals with the currency in the column
+ * header, because a cell reading `BND 2,360.00` is text a spreadsheet cannot
+ * sum. Booleans are yes/no for the same reason a person reads them.
+ *
+ * ── Documents are metadata, never bytes ────────────────────────────────────
+ *
+ * A document row exports what is known ABOUT the file — kind, size, who
+ * uploaded it, when it stops being kept — and never the file, never its storage
+ * key, and **never an identity document's filename**: architecture.md §8.1
+ * counts that filename as content, and a CSV is not permission-gated the way
+ * the document route is. The files themselves stay behind their permissions and
+ * their retention clocks, which is what G2 and G4 promise.
+ *
+ * ── The 1000-row cap ───────────────────────────────────────────────────────
+ *
+ * PostgREST is configured with `max_rows = 1000` (supabase/config.toml), and it
+ * TRUNCATES rather than failing. An export that silently stopped at a thousand
+ * bookings would be worse than one that refused, so every read here is chunked
+ * and the loop is what the test proves.
+ */
+
+export interface CsvDocument {
+  headers: readonly string[]
+  rows: readonly (readonly CsvValue[])[]
+}
+
+export interface ExportTable {
+  id: string
+  label: string
+  /** What the table holds, in a sentence, for the screen that lists it. */
+  description: string
+  count: () => Promise<number>
+  document: () => Promise<CsvDocument>
+}
+
+/** PostgREST's configured ceiling. A page of exactly this many means more. */
+const CHUNK = 1000
+
+/**
+ * Every row, however many pages that takes.
+ *
+ * `build` is called per page rather than once, because a PostgREST builder
+ * carries its range and cannot be re-ranged after it has been awaited.
+ */
+export async function readAllRows<T>(
+  build: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  chunk: number = CHUNK,
+): Promise<T[]> {
+  const rows: T[] = []
+
+  for (let from = 0; ; from += chunk) {
+    const { data, error } = await build(from, from + chunk - 1)
+
+    if (error) {
+      throw new Error(`Could not read rows for export: ${error.message}`)
+    }
+
+    const page = (data ?? []) as T[]
+
+    rows.push(...page)
+
+    if (page.length < chunk) {
+      return rows
+    }
+  }
+}
+
+async function countOf(table: string): Promise<number> {
+  const propertyId = await currentPropertyId()
+
+  const { count, error } = await dataClient()
+    .from(table)
+    .select('*', { count: 'exact', head: true })
+    .eq('property_id', propertyId)
+
+  if (error) {
+    throw new Error(`Could not count ${table}: ${error.message}`)
+  }
+
+  return count ?? 0
+}
+
+/** Reads a whole table for the property, ordered so two exports agree. */
+async function allOf<T>(table: string, columns: string, orderBy: string): Promise<T[]> {
+  const propertyId = await currentPropertyId()
+
+  return readAllRows<T>((from, to) =>
+    dataClient()
+      .from(table)
+      .select(columns)
+      .eq('property_id', propertyId)
+      .order(orderBy, { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to),
+  )
+}
+
+// ── Cell helpers ───────────────────────────────────────────────────────────
+
+/** Money as a bare decimal. The currency belongs in the column header. */
+function money(amount: Cents | null | undefined): CsvValue {
+  return amount === null || amount === undefined ? '' : Number(centsToDecimal(amount))
+}
+
+function yesNo(value: boolean | null | undefined): CsvValue {
+  return value === null || value === undefined ? '' : value ? 'yes' : 'no'
+}
+
+function text(value: unknown): CsvValue {
+  return typeof value === 'string'
+    ? value
+    : value === null || value === undefined
+      ? ''
+      : String(value)
+}
+
+/** A nested object or array, as JSON. Text, so the formula guard applies. */
+function json(value: unknown): CsvValue {
+  return value === null || value === undefined ? '' : JSON.stringify(value)
+}
+
+// ── The tables ─────────────────────────────────────────────────────────────
+
+interface BookingRow {
+  reference: string
+  status: string
+  stream: string
+  guest_name: string
+  guest_phone: string
+  unit_ref: string | null
+  unit_type_slug: string | null
+  check_in: string | null
+  check_out: string | null
+  chargeable_guests: number
+  exempt_guests: number
+  total_cents: number
+  paid_cents: number | null
+  security_deposit_cents: number
+  deposit_waiver_reason: string | null
+  discount_kind: string | null
+  discount_value: number | null
+  discount_reason: string | null
+  no_vehicle: boolean
+  vehicles: unknown
+  created_at: string
+  updated_at: string
+}
+
+const bookings: ExportTable = {
+  id: 'bookings',
+  label: 'Bookings',
+  description: 'Every booking with its guest, unit, dates, total and what has been paid.',
+  count: () => countOf('booking'),
+  document: async () => {
+    const rows = await allOf<BookingRow>(
+      'booking_summary',
+      'id, reference, status, stream, guest_name, guest_phone, unit_ref, unit_type_slug, check_in, check_out, chargeable_guests, exempt_guests, total_cents, paid_cents, security_deposit_cents, deposit_waiver_reason, discount_kind, discount_value, discount_reason, no_vehicle, vehicles, created_at, updated_at',
+      'created_at',
+    )
+
+    return {
+      headers: [
+        'Reference',
+        'Status',
+        'Stream',
+        'Guest',
+        'Phone',
+        'Unit',
+        'Unit type',
+        'Check in',
+        'Check out',
+        'Guests charged',
+        'Guests exempt',
+        'Total (BND)',
+        'Paid (BND)',
+        'Security deposit (BND)',
+        'Deposit waiver reason',
+        'Discount kind',
+        'Discount value',
+        'Discount reason',
+        'No vehicle',
+        'Vehicles',
+        'Created',
+        'Updated',
+      ],
+      rows: rows.map((row) => [
+        row.reference,
+        row.status,
+        row.stream,
+        row.guest_name,
+        row.guest_phone,
+        text(row.unit_ref),
+        text(row.unit_type_slug),
+        text(row.check_in),
+        text(row.check_out),
+        row.chargeable_guests,
+        row.exempt_guests,
+        money(row.total_cents),
+        money(row.paid_cents),
+        money(row.security_deposit_cents),
+        text(row.deposit_waiver_reason),
+        text(row.discount_kind),
+        row.discount_value ?? '',
+        text(row.discount_reason),
+        yesNo(row.no_vehicle),
+        json(row.vehicles),
+        row.created_at,
+        row.updated_at,
+      ]),
+    }
+  },
+}
+
+interface LineRow {
+  line_type: string
+  description: string
+  quantity: number
+  unit_price_cents: number
+  amount_cents: number
+  booking: { reference: string } | null
+}
+
+const bookingLines: ExportTable = {
+  id: 'booking-lines',
+  label: 'Booking lines',
+  description: 'The itemised price behind every booking — the lines that sum to its total.',
+  count: () => countOf('booking_line'),
+  document: async () => {
+    const rows = await allOf<LineRow>(
+      'booking_line',
+      'id, line_type, description, quantity, unit_price_cents, amount_cents, booking(reference)',
+      'sort_order',
+    )
+
+    return {
+      headers: ['Booking', 'Kind', 'Description', 'Quantity', 'Unit price (BND)', 'Amount (BND)'],
+      rows: rows.map((row) => [
+        text(row.booking?.reference),
+        row.line_type,
+        row.description,
+        row.quantity,
+        money(row.unit_price_cents),
+        money(row.amount_cents),
+      ]),
+    }
+  },
+}
+
+interface VehicleRow {
+  registration: string
+  created_at: string
+  booking: { reference: string } | null
+}
+
+const bookingVehicles: ExportTable = {
+  id: 'booking-vehicles',
+  label: 'Vehicles',
+  description: 'The registrations recorded against each booking, for the gate.',
+  count: () => countOf('booking_vehicle'),
+  document: async () => {
+    const rows = await allOf<VehicleRow>(
+      'booking_vehicle',
+      'id, registration, created_at, booking(reference)',
+      'created_at',
+    )
+
+    return {
+      headers: ['Booking', 'Registration', 'Recorded'],
+      rows: rows.map((row) => [text(row.booking?.reference), row.registration, row.created_at]),
+    }
+  },
+}
+
+interface NoteRow {
+  audience: string
+  body: string
+  author_id: string | null
+  created_at: string
+  booking: { reference: string } | null
+}
+
+const bookingNotes: ExportTable = {
+  id: 'booking-notes',
+  label: 'Booking notes',
+  description: 'What staff wrote against a booking, and who wrote it.',
+  count: () => countOf('booking_note'),
+  document: async () => {
+    const rows = await allOf<NoteRow>(
+      'booking_note',
+      'id, audience, body, author_id, created_at, booking(reference)',
+      'created_at',
+    )
+
+    return {
+      headers: ['Booking', 'Audience', 'Note', 'Author id', 'Written'],
+      rows: rows.map((row) => [
+        text(row.booking?.reference),
+        row.audience,
+        row.body,
+        text(row.author_id),
+        row.created_at,
+      ]),
+    }
+  },
+}
+
+interface GuestRow {
+  name: string
+  phone: string
+  email: string | null
+  created_at: string
+}
+
+const guests: ExportTable = {
+  id: 'guests',
+  label: 'Guests',
+  description: 'Everyone who has stayed, with the contact details they gave.',
+  count: () => countOf('guest'),
+  document: async () => {
+    const rows = await allOf<GuestRow>('guest', 'id, name, phone, email, created_at', 'created_at')
+
+    return {
+      headers: ['Name', 'Phone', 'Email', 'First recorded'],
+      rows: rows.map((row) => [row.name, row.phone, text(row.email), row.created_at]),
+    }
+  },
+}
+
+interface PaymentRow {
+  booking_reference: string
+  method: string
+  status: string
+  expected_amount_cents: number
+  amount_cents: number | null
+  observed_reference: string | null
+  observed_sender: string | null
+  observed_on: string | null
+  match_kind: string | null
+  amount_override_reason: string | null
+  match_reason: string | null
+  collected_at: string | null
+  verified_at: string | null
+  created_at: string
+}
+
+const payments: ExportTable = {
+  id: 'payments',
+  label: 'Payments',
+  description: 'Every payment raised or taken, what was expected, and what arrived.',
+  count: () => countOf('payment'),
+  document: async () => {
+    const rows = await allOf<PaymentRow>(
+      'payment_summary',
+      'id, booking_reference, method, status, expected_amount_cents, amount_cents, observed_reference, observed_sender, observed_on, match_kind, amount_override_reason, match_reason, collected_at, verified_at, created_at',
+      'created_at',
+    )
+
+    return {
+      headers: [
+        'Booking',
+        'Method',
+        'Status',
+        'Expected (BND)',
+        'Received (BND)',
+        'Reference seen',
+        'Sender seen',
+        'Seen on',
+        'Matched',
+        'Override reason',
+        'Match reason',
+        'Collected',
+        'Verified',
+        'Raised',
+      ],
+      rows: rows.map((row) => [
+        row.booking_reference,
+        row.method,
+        row.status,
+        money(row.expected_amount_cents),
+        money(row.amount_cents),
+        text(row.observed_reference),
+        text(row.observed_sender),
+        text(row.observed_on),
+        text(row.match_kind),
+        text(row.amount_override_reason),
+        text(row.match_reason),
+        text(row.collected_at),
+        text(row.verified_at),
+        row.created_at,
+      ]),
+    }
+  },
+}
+
+interface DepositRow {
+  booking_reference: string
+  unit_ref: string | null
+  amount_cents: number
+  method: string
+  collected_at: string | null
+  inspection_outcome: string | null
+  inspected_at: string | null
+  charges_total_cents: number
+  approved_charges_total_cents: number | null
+  released_at: string | null
+  released_amount_cents: number | null
+  release_note: string | null
+  owed_cents: number | null
+  owed_settled_at: string | null
+  owed_settled_method: string | null
+}
+
+const deposits: ExportTable = {
+  id: 'deposits',
+  label: 'Deposits',
+  description: 'What was held per booking, what was charged against it, and what was returned.',
+  count: () => countOf('deposit'),
+  document: async () => {
+    const rows = await allOf<DepositRow>(
+      'deposit_summary',
+      'id, booking_reference, unit_ref, amount_cents, method, collected_at, inspection_outcome, inspected_at, charges_total_cents, approved_charges_total_cents, released_at, released_amount_cents, release_note, owed_cents, owed_settled_at, owed_settled_method',
+      'collected_at',
+    )
+
+    return {
+      headers: [
+        'Booking',
+        'Unit',
+        'Held (BND)',
+        'Taken as',
+        'Collected',
+        'Inspection',
+        'Inspected',
+        'Charges (BND)',
+        'Approved charges (BND)',
+        'Released',
+        'Returned (BND)',
+        'Release note',
+        'Owed (BND)',
+        'Owed settled',
+        'Owed settled as',
+      ],
+      rows: rows.map((row) => [
+        row.booking_reference,
+        text(row.unit_ref),
+        money(row.amount_cents),
+        row.method,
+        text(row.collected_at),
+        text(row.inspection_outcome),
+        text(row.inspected_at),
+        money(row.charges_total_cents),
+        money(row.approved_charges_total_cents),
+        text(row.released_at),
+        money(row.released_amount_cents),
+        text(row.release_note),
+        money(row.owed_cents),
+        text(row.owed_settled_at),
+        text(row.owed_settled_method),
+      ]),
+    }
+  },
+}
+
+interface ChargeRow {
+  amount_cents: number
+  reason: string
+  created_at: string
+  waived_at: string | null
+  waive_reason: string | null
+  deposit: { booking: { reference: string } | null } | null
+}
+
+const depositCharges: ExportTable = {
+  id: 'deposit-charges',
+  label: 'Charges',
+  description: 'Every charge raised against a deposit, and every one waived.',
+  count: () => countOf('deposit_charge'),
+  document: async () => {
+    const rows = await allOf<ChargeRow>(
+      'deposit_charge',
+      'id, amount_cents, reason, created_at, waived_at, waive_reason, deposit(booking(reference))',
+      'created_at',
+    )
+
+    return {
+      headers: ['Booking', 'Amount (BND)', 'Reason', 'Raised', 'Waived', 'Waive reason'],
+      rows: rows.map((row) => [
+        text(row.deposit?.booking?.reference),
+        money(row.amount_cents),
+        row.reason,
+        row.created_at,
+        text(row.waived_at),
+        text(row.waive_reason),
+      ]),
+    }
+  },
+}
+
+interface InspectionRow {
+  outcome: string
+  notes: string | null
+  inspected_at: string
+  occupancy: { unit: { ref: string } | null; booking: { reference: string } | null } | null
+}
+
+const inspections: ExportTable = {
+  id: 'inspections',
+  label: 'Inspections',
+  description: 'What each unit looked like after a stay, and when it was checked.',
+  count: () => countOf('inspection'),
+  document: async () => {
+    const rows = await allOf<InspectionRow>(
+      'inspection',
+      'id, outcome, notes, inspected_at, occupancy(unit(ref), booking(reference))',
+      'inspected_at',
+    )
+
+    return {
+      headers: ['Booking', 'Unit', 'Outcome', 'Notes', 'Inspected'],
+      rows: rows.map((row) => [
+        text(row.occupancy?.booking?.reference),
+        text(row.occupancy?.unit?.ref),
+        row.outcome,
+        text(row.notes),
+        row.inspected_at,
+      ]),
+    }
+  },
+}
+
+interface DocumentRow {
+  kind: string
+  original_filename: string
+  mime_type: string
+  byte_size: number
+  uploaded_by: string | null
+  uploaded_at: string
+  retain_until: string
+  deleted_at: string | null
+  deleted_reason: string | null
+  purged_at: string | null
+  booking: { reference: string } | null
+}
+
+const documents: ExportTable = {
+  id: 'documents',
+  label: 'Documents',
+  description:
+    'What files exist and what is known about them — never the files themselves, and never an identity document’s filename.',
+  count: () => countOf('document'),
+  document: async () => {
+    const rows = await allOf<DocumentRow>(
+      'document',
+      'id, kind, original_filename, mime_type, byte_size, uploaded_by, uploaded_at, retain_until, deleted_at, deleted_reason, purged_at, booking(reference)',
+      'uploaded_at',
+    )
+
+    return {
+      headers: [
+        'Booking',
+        'Kind',
+        'Filename',
+        'Type',
+        'Bytes',
+        'Uploaded by',
+        'Uploaded',
+        'Kept until',
+        'Deleted',
+        'Deleted because',
+        'File destroyed',
+      ],
+      rows: rows.map((row) => [
+        text(row.booking?.reference),
+        row.kind,
+        // architecture.md §8.1 counts an identity document's filename as
+        // content — it routinely carries the guest's name and IC number — and a
+        // CSV is not gated the way the document route is.
+        row.kind === 'identity' ? '' : row.original_filename,
+        row.mime_type,
+        row.byte_size,
+        text(row.uploaded_by),
+        row.uploaded_at,
+        row.retain_until,
+        text(row.deleted_at),
+        text(row.deleted_reason),
+        text(row.purged_at),
+      ]),
+    }
+  },
+}
+
+interface UnitRow {
+  ref: string
+  out_of_service_since: string | null
+  out_of_service_reason: string | null
+  notes: string | null
+  created_at: string
+  unit_type: { slug: string; name: string } | null
+}
+
+const units: ExportTable = {
+  id: 'units',
+  label: 'Units',
+  description: 'Every door in the building, its type, and any note against it.',
+  count: () => countOf('unit'),
+  document: async () => {
+    const rows = await allOf<UnitRow>(
+      'unit',
+      'id, ref, out_of_service_since, out_of_service_reason, notes, created_at, unit_type(slug, name)',
+      'ref',
+    )
+
+    return {
+      headers: [
+        'Reference',
+        'Type',
+        'Out of service since',
+        'Out of service reason',
+        'Note',
+        'Added',
+      ],
+      rows: rows.map((row) => [
+        row.ref,
+        text(row.unit_type?.name),
+        text(row.out_of_service_since),
+        text(row.out_of_service_reason),
+        text(row.notes),
+        row.created_at,
+      ]),
+    }
+  },
+}
+
+interface OccupancyRow {
+  occupancy_type: string
+  status: string
+  start_date: string
+  end_date: string | null
+  occupant_name: string | null
+  unit: { ref: string } | null
+  booking: { reference: string } | null
+}
+
+const occupancies: ExportTable = {
+  id: 'occupancies',
+  label: 'Occupancy',
+  description: 'Which unit was occupied when — stays and long leases alike.',
+  count: () => countOf('occupancy'),
+  document: async () => {
+    const rows = await allOf<OccupancyRow>(
+      'occupancy',
+      'id, occupancy_type, status, start_date, end_date, occupant_name, unit(ref), booking(reference)',
+      'start_date',
+    )
+
+    return {
+      headers: ['Unit', 'Kind', 'Status', 'From', 'To', 'Booking', 'Occupant'],
+      rows: rows.map((row) => [
+        text(row.unit?.ref),
+        row.occupancy_type,
+        row.status,
+        row.start_date,
+        // A month-to-month tenancy has no agreed last day (N19).
+        text(row.end_date),
+        text(row.booking?.reference),
+        text(row.occupant_name),
+      ]),
+    }
+  },
+}
+
+interface BankingRow {
+  business_date: string
+  amount_cents: number
+  note: string | null
+  banked_by: string | null
+  banked_at: string
+}
+
+const cashBankings: ExportTable = {
+  id: 'cash-bankings',
+  label: 'Cash banked',
+  description: 'Every trip to the bank: the day the cash was taken, and how much went in.',
+  count: () => countOf('cash_banking'),
+  document: async () => {
+    const rows = await allOf<BankingRow>(
+      'cash_banking',
+      'id, business_date, amount_cents, note, banked_by, banked_at',
+      'business_date',
+    )
+
+    return {
+      headers: ['Cash taken on', 'Amount (BND)', 'Note', 'Recorded by', 'Recorded at'],
+      rows: rows.map((row) => [
+        row.business_date,
+        money(row.amount_cents),
+        text(row.note),
+        text(row.banked_by),
+        row.banked_at,
+      ]),
+    }
+  },
+}
+
+const staffAccounts: ExportTable = {
+  id: 'staff',
+  label: 'Staff',
+  description: 'Who has an account, what they are called, and which roles they hold.',
+  count: async () => (await listStaff()).length,
+  document: async () => {
+    const staff = await listStaff()
+
+    return {
+      headers: ['Name', 'Email', 'Disabled', 'Roles'],
+      rows: staff.map((account) => [
+        account.displayName,
+        account.email,
+        yesNo(account.disabled),
+        account.roles.map((role) => role.name).join('; '),
+      ]),
+    }
+  },
+}
+
+interface RolePermissionRow {
+  permission: string
+  staff_role: { slug: string; name: string } | null
+}
+
+const rolePermissions: ExportTable = {
+  id: 'role-permissions',
+  label: 'Roles',
+  description: 'What each role is allowed to do.',
+  count: () => countOf('role_permission'),
+  document: async () => {
+    const propertyId = await currentPropertyId()
+    const rows = await readAllRows<RolePermissionRow>((from, to) =>
+      dataClient()
+        .from('role_permission')
+        .select('permission, staff_role(slug, name)')
+        .eq('property_id', propertyId)
+        .order('role_id', { ascending: true })
+        .order('permission', { ascending: true })
+        .range(from, to),
+    )
+
+    return {
+      headers: ['Role', 'Permission'],
+      rows: rows.map((row) => [text(row.staff_role?.name), row.permission]),
+    }
+  },
+}
+
+interface AuditRow {
+  at: string
+  actor_id: string | null
+  action: string
+  entity_type: string
+  entity_id: string
+  subject_label: string | null
+  before: unknown
+  after: unknown
+}
+
+const auditEvents: ExportTable = {
+  id: 'audit-events',
+  label: 'Audit log',
+  description: 'Every recorded change, with who made it and when. Append-only.',
+  count: () => countOf('audit_event'),
+  document: async () => {
+    const propertyId = await currentPropertyId()
+    const rows = await readAllRows<AuditRow>((from, to) =>
+      dataClient()
+        .from('audit_event_summary')
+        .select('at, actor_id, action, entity_type, entity_id, subject_label, before, after')
+        .eq('property_id', propertyId)
+        .order('at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    )
+
+    return {
+      headers: [
+        'When',
+        'Actor id',
+        'Action',
+        'Record type',
+        'Record id',
+        'Record',
+        'Before',
+        'After',
+      ],
+      rows: rows.map((row) => [
+        row.at,
+        text(row.actor_id),
+        row.action,
+        row.entity_type,
+        row.entity_id,
+        text(row.subject_label),
+        json(row.before),
+        json(row.after),
+      ]),
+    }
+  },
+}
+
+/**
+ * The settings as they stand, one row per figure.
+ *
+ * Long format rather than one wide row, because the settings are not a table —
+ * they are a page of unrelated figures, and a spreadsheet of eighty columns
+ * with one row in it is not a thing anybody reads.
+ */
+const settings: ExportTable = {
+  id: 'settings',
+  label: 'Settings',
+  description: 'Every rate, price, period and account the property is configured with.',
+  count: async () => {
+    const current = await readPropertySettings()
+
+    return (
+      11 +
+      current.unitTypes.length * 3 +
+      current.bands.length +
+      current.bundles.length +
+      current.facilities.length +
+      current.retention.length +
+      current.bankAccounts.length
+    )
+  },
+  document: async () => {
+    const current = await readPropertySettings()
+    const rows: (readonly CsvValue[])[] = []
+
+    for (const [key, value] of Object.entries(current.policy)) {
+      rows.push(['Policy', key.replace(/([A-Z])/g, ' $1').toLowerCase(), text(value)])
+    }
+
+    for (const unitType of current.unitTypes) {
+      rows.push(['Rates', `${unitType.name} — per night (BND)`, money(unitType.baseRateCents)])
+      rows.push(['Rates', `${unitType.name} — maximum guests`, unitType.maxPax])
+      rows.push(['Rates', `${unitType.name} — car parks`, unitType.carParks])
+    }
+
+    for (const band of current.bands) {
+      rows.push([
+        'Day pass',
+        `${band.label} (${band.minAge}–${band.maxAgeExclusive ?? 'and above'}) (BND)`,
+        money(band.priceCents),
+      ])
+    }
+
+    for (const bundle of current.bundles) {
+      rows.push(['Day pass bundles', `${bundle.label} (BND)`, money(bundle.priceCents)])
+    }
+
+    for (const facility of current.facilities) {
+      rows.push([
+        'Facilities',
+        facility.name,
+        facility.includedInDayPass ? 'in the day pass' : 'not in the day pass',
+      ])
+    }
+
+    for (const period of current.retention) {
+      rows.push(['Document retention', `${period.kind} (months)`, period.months])
+    }
+
+    for (const account of current.bankAccounts) {
+      rows.push(['Bank accounts', account.bankName, account.accountNumber])
+    }
+
+    return { headers: ['Section', 'Setting', 'Value'], rows }
+  },
+}
+
+export const EXPORT_TABLES: readonly ExportTable[] = [
+  bookings,
+  bookingLines,
+  bookingVehicles,
+  bookingNotes,
+  guests,
+  payments,
+  deposits,
+  depositCharges,
+  inspections,
+  documents,
+  units,
+  occupancies,
+  cashBankings,
+  staffAccounts,
+  rolePermissions,
+  auditEvents,
+  settings,
+]
+
+export function exportTableById(id: string): ExportTable | undefined {
+  return EXPORT_TABLES.find((table) => table.id === id)
+}
