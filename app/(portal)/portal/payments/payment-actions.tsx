@@ -23,7 +23,12 @@ import { todayInBrunei } from '@/lib/domain/dates'
 import { centsFromInput, formatCents, type Cents } from '@/lib/domain/money'
 import { describeVariance, requiresReasons } from '@/lib/domain/payment-match'
 
-import { matchPaymentManuallyAction, verifyPaymentAction, type PaymentActionState } from './actions'
+import {
+  matchPaymentManuallyAction,
+  verifyDepositAction,
+  verifyPaymentAction,
+  type PaymentActionState,
+} from './actions'
 
 /**
  * Confirming a payment, and matching one by hand (capabilities B5 and B6).
@@ -366,6 +371,134 @@ function ManualMatchDialog({
             </Button>
             <Button type="submit" disabled={isPending}>
               {isPending ? 'Matching…' : 'Match and confirm'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Confirming a promised security deposit (capability B16).
+ *
+ * The confirm dialog above with two things taken out, and both absences are
+ * decisions rather than omissions.
+ *
+ * **There is no "match manually".** That escape hatch exists because a
+ * customer forgets to put the reference in, and the clerk has an unattached
+ * payment in the bank to attach to *some* booking. A deposit is raised against
+ * one booking by the customer pressing a button on that booking's own page, so
+ * there is nothing to match it to.
+ *
+ * **There is no slip.** A document hangs off a payment id (architecture.md
+ * §8.1) and a deposit is not a payment, so a guest's screenshot of the
+ * transfer has nowhere to live yet. That is the honest state and it is in the
+ * register; the bank app was always the check (prd.md §10.4).
+ */
+export function DepositActions(props: {
+  depositId: string
+  bookingReference: string
+  guestName: string
+  /** What the booking quotes, which is what the deposit is matched against. */
+  due: Cents
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <div className="flex justify-end">
+        <Button onClick={() => setOpen(true)}>Confirm deposit</Button>
+      </div>
+
+      {open ? <ConfirmDepositDialog {...props} onClose={() => setOpen(false)} /> : null}
+    </>
+  )
+}
+
+function ConfirmDepositDialog({
+  depositId,
+  bookingReference,
+  guestName,
+  due,
+  onClose,
+}: {
+  depositId: string
+  bookingReference: string
+  guestName: string
+  due: Cents
+  onClose: () => void
+}) {
+  const [state, formAction, isPending] = useActionState(verifyDepositAction, initialState)
+  const [typed, setTyped] = useState(() => formatCents(due))
+
+  useCompletion(state, bookingReference, guestName, onClose)
+
+  const observed = centsFromInput(typed)
+  const variance = observed === null ? null : observed - due
+  const needsReason = variance !== null && variance !== 0
+
+  return (
+    <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
+      <DialogContent className="max-w-[460px]">
+        <DialogHeader>
+          <DialogTitle>Confirm the deposit for {bookingReference}</DialogTitle>
+          <DialogDescription>
+            The security deposit that secures this booking. Confirming it holds the unit and
+            confirms the booking — the stay itself is still settled on arrival.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form action={formAction} className="grid gap-lg">
+          <input type="hidden" name="depositId" value={depositId} />
+
+          <div className="grid gap-sm">
+            <Label htmlFor="depositAmount">Amount received</Label>
+            <div className="flex items-center gap-sm">
+              <span className="text-body-sm text-muted-foreground">BND</span>
+              <Input
+                id="depositAmount"
+                name="amount"
+                inputMode="decimal"
+                placeholder="0.00"
+                autoComplete="off"
+                className="w-[160px] tabular-nums"
+                value={typed}
+                onChange={(event) => setTyped(event.target.value)}
+                aria-invalid={Boolean(state.fieldErrors?.amount)}
+              />
+            </div>
+            <p className="text-caption text-muted-foreground tabular-nums">
+              Quoted BND {formatCents(due)}
+            </p>
+            <FieldError message={state.fieldErrors?.amount} />
+          </div>
+
+          <div className="grid gap-sm">
+            <Label htmlFor="depositReference">Reference as it appeared</Label>
+            <Input
+              id="depositReference"
+              name="observedReference"
+              defaultValue={state.submitted?.observedReference ?? bookingReference}
+              autoComplete="off"
+              className="font-mono"
+            />
+          </div>
+
+          {needsReason ? <VarianceNotice variance={variance} state={state} /> : null}
+
+          {state.status === 'error' ? <FieldError message={state.message} /> : null}
+
+          <DialogFooter>
+            <Button type="button" variant="tertiary" onClick={onClose}>
+              Not yet
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending
+                ? 'Confirming…'
+                : needsReason
+                  ? 'Confirm with discrepancy'
+                  : 'Confirm deposit'}
             </Button>
           </DialogFooter>
         </form>

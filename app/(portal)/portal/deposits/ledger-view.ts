@@ -69,17 +69,24 @@ export function isArchiveView(view: LedgerView): boolean {
 }
 
 /**
- * The stages a held deposit can be in — every stage but `released`, which is
- * not a stage of something held but the archive's whole subject. That is why
- * the Stage chip offers three and not four: "released" is a view (`?show=`),
- * not a stage of something held, and a chip that mixed "in house" with
- * "released" would need the two reads above stitched into one list.
+ * The stages a held deposit can be in — which is every stage bar two, and the
+ * two are excluded for opposite reasons.
+ *
+ * `released` is not a stage of something held but the archive's whole subject:
+ * it is a view (`?show=`), and a chip mixing "in house" with "released" would
+ * need the two reads stitched into one list.
+ *
+ * `awaiting_verification` is the other way round — it is a deposit the
+ * property is not holding at all. A customer has said they transferred and
+ * nobody has checked (prd.md §9.1), so `listHeldDeposits` excludes it and a
+ * tile counting them here would sit at zero for the life of the building while
+ * the payments queue carried the actual work.
  */
 export const HELD_STAGES = DEPOSIT_STAGES.filter(
-  (stage): stage is HeldStage => stage !== 'released',
+  (stage): stage is HeldStage => stage !== 'released' && stage !== 'awaiting_verification',
 )
 
-export type HeldStage = Exclude<DepositStage, 'released'>
+export type HeldStage = Exclude<DepositStage, 'released' | 'awaiting_verification'>
 
 export function isHeldStage(value: string): value is HeldStage {
   return (HELD_STAGES as readonly string[]).includes(value)
@@ -101,7 +108,13 @@ export interface HeldFilter {
 /** One deposit, as this module needs to see it. */
 interface LedgerRow {
   stage: DepositStage
-  collectedAt: string
+  /**
+   * Null while a promised transfer is unverified. Every ledger read
+   * excludes those — E1 answers what is held right now, and a promise is
+   * not held — so the null is unreachable here; the type says so anyway
+   * rather than making the reader trust a filter in another file.
+   */
+  collectedAt: string | null
   bookingReference: string
   guestName: string
   stay: { unitRef: string; range: { start: string; end: string } } | null
@@ -147,7 +160,8 @@ const STAGE_ORDER: Readonly<Record<DepositStage, number>> = {
   ready_for_release: 0,
   awaiting_inspection: 1,
   in_house: 2,
-  released: 3,
+  awaiting_verification: 3,
+  released: 4,
 }
 
 export function sortForLedger<T extends LedgerRow>(deposits: readonly T[]): T[] {
@@ -163,7 +177,7 @@ export function sortForLedger<T extends LedgerRow>(deposits: readonly T[]): T[] 
 }
 
 function waitingSince(deposit: LedgerRow): string {
-  return deposit.stay?.range.end ?? deposit.collectedAt
+  return deposit.stay?.range.end ?? deposit.collectedAt ?? ''
 }
 
 /** What a set of deposits comes to — the tile's count and its figure. */

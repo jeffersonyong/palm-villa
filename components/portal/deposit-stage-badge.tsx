@@ -34,6 +34,7 @@ import { DEPOSIT_STAGE_LABELS, type DepositStage } from '@/lib/domain/deposit'
  */
 
 const STAGE_TONES = {
+  awaiting_verification: 'warning',
   in_house: 'active',
   awaiting_inspection: 'warning',
   ready_for_release: 'positive',

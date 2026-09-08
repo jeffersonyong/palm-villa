@@ -149,6 +149,7 @@ export default async function DepositPage({ params, searchParams }: PageProps) {
   const actorNames = new Map(staff.map((account) => [account.id, account.displayName]))
 
   const facts = {
+    collected: deposit.collectedAt !== null,
     released: deposit.release !== null,
     inspected: deposit.inspection !== null,
     bookingStatus: deposit.bookingStatus,
@@ -292,10 +293,8 @@ function DepositFigures({
 
       <dl className="mt-lg grid gap-md sm:grid-cols-2">
         <Field
-          label="Collected"
-          value={`${formatTimestamp(deposit.collectedAt)}, in ${PAYMENT_METHOD_LABELS[
-            deposit.method
-          ].toLowerCase()}`}
+          label={deposit.collectedAt === null ? 'Transfer awaited' : 'Collected'}
+          value={collectionLine(deposit)}
         />
         <Field label="Taken by" value={nameOf(deposit.collectedBy, actorNames)} />
         <Field
@@ -629,6 +628,26 @@ function Field({ label, value }: { label: string; value: string }) {
 }
 
 /** An action nobody performed is the system's, which is what a null actor is. */
+/**
+ * When the money arrived, or that it has not.
+ *
+ * A deposit promised online and not yet verified is holding nothing, so it
+ * reports the promise rather than a collection time it does not have
+ * (prd.md §9.1). The method is left off that line deliberately: it is always
+ * a transfer while it is pending, and naming it would imply somebody chose.
+ */
+function collectionLine(deposit: Deposit): string {
+  if (deposit.collectedAt !== null) {
+    const method = PAYMENT_METHOD_LABELS[deposit.method].toLowerCase()
+
+    return `${formatTimestamp(deposit.collectedAt)}, in ${method}`
+  }
+
+  return deposit.promisedAt
+    ? `Promised ${formatTimestamp(deposit.promisedAt)}, not yet verified`
+    : 'Not yet verified'
+}
+
 function nameOf(actorId: string | null, actorNames: ReadonlyMap<string, string>): string {
   return actorId === null ? 'the system' : (actorNames.get(actorId) ?? 'a former colleague')
 }

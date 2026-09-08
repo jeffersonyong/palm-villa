@@ -77,8 +77,18 @@ export function SecurityDepositInset({
       header={<DepositMark badge={<DepositStageBadge stage={deposit.stage} />} />}
     >
       <p className="mt-md text-caption text-muted-foreground">
-        Taken in {PAYMENT_METHOD_LABELS[deposit.method].toLowerCase()} on{' '}
-        {formatTimestamp(deposit.collectedAt)}
+        {deposit.collectedAt === null ? (
+          <>
+            {/* Promised online and not yet checked. Worded as a wait rather
+                than as money, because the property is holding nothing yet. */}
+            Transfer awaited{deposit.promisedAt ? <> since {formatTimestamp(deposit.promisedAt)}</> : null}
+          </>
+        ) : (
+          <>
+            Taken in {PAYMENT_METHOD_LABELS[deposit.method].toLowerCase()} on{' '}
+            {formatTimestamp(deposit.collectedAt)}
+          </>
+        )}
       </p>
       <p className="mt-xs text-caption">
         <Link

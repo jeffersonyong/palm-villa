@@ -28,6 +28,7 @@ import { bnd } from './money'
 const DEPOSIT = bnd(100)
 
 const facts = (overrides: Partial<DepositStageFacts> = {}): DepositStageFacts => ({
+  collected: true,
   released: false,
   inspected: false,
   bookingStatus: 'checked_in',
@@ -64,9 +65,7 @@ describe('depositStageOf', () => {
     // as released whatever else is true of it — the pipeline is one-way, and a
     // deposit that appeared to un-release itself would be a ledger nobody could
     // reconcile.
-    expect(depositStageOf({ released: true, inspected: false, bookingStatus: 'checked_in' })).toBe(
-      'released',
-    )
+    expect(depositStageOf(facts({ released: true }))).toBe('released')
   })
 
   test('an inspection outranks the booking status', () => {
@@ -210,7 +209,7 @@ describe('canApproveRelease', () => {
     // Precedence, and it matters: the second approver of a race needs to be
     // told the release happened, not sent to find an inspection that exists.
     expect(
-      canApproveRelease({ released: true, inspected: false, bookingStatus: 'checked_in' }),
+      canApproveRelease(facts({ released: true })),
     ).toMatchObject({ ok: false, error: { code: 'already_released' } })
   })
 

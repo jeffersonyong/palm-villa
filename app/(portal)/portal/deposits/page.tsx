@@ -356,7 +356,9 @@ function DepositRow({ deposit }: { deposit: Deposit }) {
           </>
         ) : (
           <span className="text-caption text-muted-foreground">
-            Held since {formatTimestamp(deposit.collectedAt)}
+            {deposit.collectedAt === null
+              ? 'Transfer awaited'
+              : `Held since ${formatTimestamp(deposit.collectedAt)}`}
           </span>
         )}
       </TableCell>

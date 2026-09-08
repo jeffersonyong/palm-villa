@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
 import { requirePermission } from '@/lib/auth/require-permission'
+import { verifyDeposit } from '@/lib/db/deposits'
 import { getPaymentById, verifyPayment } from '@/lib/db/payments'
 import { isStayDate } from '@/lib/domain/dates'
 import { centsFromInput } from '@/lib/domain/money'
@@ -235,3 +236,81 @@ function fields(parsed: { error: z.ZodError }): Record<string, string> {
 
   return fieldErrors
 }
+
+/**
+ * Confirming that a promised security deposit arrived (capability B16).
+ *
+ * The same permission as a payment, and deliberately no new string: prd.md §4
+ * mints one for a *job*, and this is the same job — somebody opening a bank
+ * app and saying what they saw. It is the position §10.7 and §13 already took
+ * for recording a transfer and for rebuilding an accounting pack.
+ *
+ * **No accounting pack is scheduled.** A pack is assembled when money is
+ * verified against a booking (capability G5), and a deposit is not money
+ * against the booking: it settles nothing and leaves the stay owed in full.
+ * The pack arrives when the stay itself is paid, on arrival.
+ */
+export async function verifyDepositAction(
+  _previous: PaymentActionState,
+  formData: FormData,
+): Promise<PaymentActionState> {
+  const actor = await requirePermission('payment.verify')
+  const parsed = verifyDepositSchema.safeParse(Object.fromEntries(formData))
+
+  if (!parsed.success) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: fields(parsed),
+    }
+  }
+
+  const input = parsed.data
+  const observed = centsFromInput(input.amount)
+
+  if (observed === null) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: { amount: 'Enter the amount that arrived.' },
+      submitted: echo(formData),
+    }
+  }
+
+  // The amount rule is enforced under the row lock in `verify_deposit()`,
+  // against the figure the booking quotes rather than against anything this
+  // form carried. What comes back is the sentence a clerk acts on.
+  const result = await verifyDeposit({
+    depositId: input.depositId,
+    observedAmount: observed,
+    observedReference: input.observedReference || null,
+    overrideReason: input.amountOverrideReason || null,
+    actorId: actor.userId,
+  })
+
+  if (!result.ok) {
+    return {
+      status: 'error',
+      message: result.error.message,
+      fieldErrors:
+        result.error.code === 'reason_required'
+          ? { amountOverrideReason: result.error.message }
+          : undefined,
+      submitted: echo(formData),
+    }
+  }
+
+  revalidatePath('/portal/payments')
+  revalidatePath('/portal/deposits')
+  revalidatePath('/portal/bookings')
+  revalidatePath('/portal')
+
+  return { status: 'done' }
+}
+
+const verifyDepositSchema = z.object({
+  depositId: z.string().min(1),
+  amount: z.string().min(1, 'Enter the amount that arrived.'),
+  observedReference: z.string().max(140).optional(),
+  amountOverrideReason: z.string().max(280).optional(),
+})

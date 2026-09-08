@@ -19,13 +19,15 @@ import {
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listPayments, type Payment } from '@/lib/db/payments'
+import { listPendingDeposits } from '@/lib/db/deposits'
+import { listPayments } from '@/lib/db/payments'
 import { elapsedMinutes, formatElapsed, formatStayDate, formatTimestamp } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 
-import { PaymentActions } from './payment-actions'
+import { DepositActions, PaymentActions } from './payment-actions'
 import { PaymentsFilters } from './payments-filters'
-import { readView, sortQueue, statusesForView, type PaymentView } from './views'
+import { buildQueue, type QueueEntry } from './queue-rows'
+import { readView, statusesForView, type PaymentView } from './views'
 
 export const metadata: Metadata = {
   title: 'Payment verification',
@@ -81,12 +83,34 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
 
   const view = readView(params.show)
   const search = readSearch(params.q)
-  const payments = sortQueue(
-    await listPayments({
+
+  // Two tables, one queue. A promised security deposit (capability B16) is the
+  // same job as a promised payment — somebody said they sent money and a
+  // person has to check the bank — and they are separate rows underneath only
+  // because prd.md §9.1 forbids a deposit being recorded as a payment.
+  const [transfers, promisedDeposits] = await Promise.all([
+    listPayments({
       methods: ['bank_transfer'],
       statuses: statusesForView(view),
       search: search ?? undefined,
     }),
+    listPendingDeposits(),
+  ])
+
+  const payments = buildQueue(
+    transfers,
+    // The deposit read is unfiltered, so the screen's search has to be applied
+    // here rather than in the query — a filter that narrowed one half of a
+    // merged list and not the other would report a count nobody could explain.
+    search === null
+      ? promisedDeposits
+      : promisedDeposits.filter((deposit) =>
+          [deposit.bookingReference, deposit.guestName, deposit.guestPhone]
+            .join(' ')
+            .toLowerCase()
+            .includes(search.toLowerCase()),
+        ),
+    view,
   )
   const mayVerify = hasPermission(actor.permissions, 'payment.verify')
 
@@ -102,7 +126,7 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
 
         <div className="ml-auto">
           <h2 id="queue-heading" className="micro-label text-muted-foreground">
-            {payments.length} {payments.length === 1 ? 'payment' : 'payments'}
+            {payments.length} {payments.length === 1 ? 'transfer' : 'transfers'}
             {view === 'waiting' ? ' waiting' : ''}
           </h2>
         </div>
@@ -153,7 +177,11 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
             </TableHeader>
             <TableBody>
               {payments.map((payment) => (
-                <QueueRow key={payment.id} payment={payment} mayVerify={mayVerify} />
+                <QueueRow
+                  key={`${payment.kind}-${payment.id}`}
+                  payment={payment}
+                  mayVerify={mayVerify}
+                />
               ))}
             </TableBody>
           </Table>
@@ -186,7 +214,7 @@ const EMPTY_DESCRIPTIONS: Readonly<Record<PaymentView, string>> = {
   verified: 'A payment appears here once someone has confirmed the money landed.',
 }
 
-function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean }) {
+function QueueRow({ payment, mayVerify }: { payment: QueueEntry; mayVerify: boolean }) {
   const waiting = formatElapsed(elapsedMinutes(payment.createdAt))
   // The booking was repriced after the guest was told what to send. Without
   // this the clerk matches against a stale quote and overrides for no reason.
@@ -200,8 +228,16 @@ function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean
           {payment.bookingReference}
         </TableRowLink>
       </TableCell>
-      <TableCell className="text-foreground">{payment.guestName}</TableCell>
-      <TableCell>{payment.checkIn ? formatStayDate(payment.checkIn) : '—'}</TableCell>
+      <TableCell className="text-foreground">
+        {payment.guestName}
+        {payment.kind === 'deposit' ? (
+          // Said on the row, because the figure alone would read as a short
+          // payment against the booking's total — which is the confusion
+          // prd.md §9.1 spends a paragraph refusing.
+          <span className="mt-xxs block text-caption text-muted-foreground">Security deposit</span>
+        ) : null}
+      </TableCell>
+      <TableCell>{payment.arriving ? formatStayDate(payment.arriving) : '—'}</TableCell>
       <TableCell className="text-right tabular-nums">
         {/* Waiting: what the guest was asked for. Settled: what actually
             arrived — showing the amount due against a payment already taken
@@ -245,7 +281,7 @@ function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean
             </a>
           </span>
         ) : (
-          <span className="text-muted-foreground">None</span>
+          <span className="text-muted-foreground">{payment.kind === 'deposit' ? '—' : 'None'}</span>
         )}
       </TableCell>
       {mayVerify ? (
@@ -253,12 +289,21 @@ function QueueRow({ payment, mayVerify }: { payment: Payment; mayVerify: boolean
           {isPending ? (
             // Above the stretched row link, or the buttons cannot be clicked.
             <div className="relative z-10">
-              <PaymentActions
-                paymentId={payment.id}
-                bookingReference={payment.bookingReference}
-                guestName={payment.guestName}
-                due={payment.due}
-              />
+              {payment.kind === 'deposit' ? (
+                <DepositActions
+                  depositId={payment.id}
+                  bookingReference={payment.bookingReference}
+                  guestName={payment.guestName}
+                  due={payment.due}
+                />
+              ) : (
+                <PaymentActions
+                  paymentId={payment.id}
+                  bookingReference={payment.bookingReference}
+                  guestName={payment.guestName}
+                  due={payment.due}
+                />
+              )}
             </div>
           ) : (
             // A tick in the success hue before the date, so a settled row is
