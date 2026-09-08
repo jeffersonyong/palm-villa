@@ -43,6 +43,7 @@ export interface AuditEventLike {
  */
 export const KNOWN_AUDIT_ACTIONS = [
   'booking.created_walk_in',
+  'booking.created_public',
   'booking.amended',
   'booking.discounted',
   'booking.hold',
@@ -61,6 +62,8 @@ export const KNOWN_AUDIT_ACTIONS = [
   'payment.matched_manually',
   'deposit.waived',
   'deposit.collected',
+  'deposit.promised',
+  'deposit.amount_overridden',
   'deposit.release_approved',
   'deposit.owed_settled',
   'charge.created',
@@ -252,6 +255,17 @@ function describeBooking(event: AuditEventLike): string | null {
       : 'Created — walk-in, paid on the spot'
   }
 
+  if (event.action === 'booking.created_public') {
+    // The customer did this themselves, which is the fact the trail is missing
+    // everywhere else: every other creation verb has a staff member beside it,
+    // and this one has nobody. The stream is named as well, because a day pass
+    // and a stay are the two things the public site sells and nothing else on
+    // the line will say which was sold.
+    return event.after?.stream === 'day_pass'
+      ? 'Booked online — day pass'
+      : 'Booked online — short stay'
+  }
+
   if (event.action === 'booking.discounted') {
     return discountLabel(event)
   }
@@ -326,6 +340,17 @@ function describeDeposit(event: AuditEventLike): string | null {
       const method = methodLabel(event.after?.method)
 
       return `Security deposit collected${amount ? ` — BND ${amount}` : ''}${method ? `, in ${method}` : ''}`
+    }
+    case 'deposit.promised': {
+      // The customer says they have transferred it. Worded as a wait rather than
+      // as money, because that is what it is until somebody looks — the same
+      // distinction `payment.recorded` draws with "awaited".
+      return `Security deposit transfer awaited${amount ? ` — BND ${amount}` : ''}`
+    }
+    case 'deposit.amount_overridden': {
+      const quoted = cents(event.before?.quoted_cents)
+
+      return `Deposit accepted at an amount other than the ${quoted ? `BND ${quoted} ` : ''}quoted figure`
     }
     case 'deposit.release_approved': {
       const owed = cents(event.after?.owed_cents)
