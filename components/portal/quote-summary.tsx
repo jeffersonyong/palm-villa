@@ -1,6 +1,4 @@
 import { Card } from '@/components/ui/card'
-import type { BookingLine } from '@/lib/domain/lines'
-import { formatCents, type Cents } from '@/lib/domain/money'
 import { cn } from '@/lib/utils'
 
 /**
@@ -46,33 +44,5 @@ export function QuoteSummary({
         {children}
       </Card>
     </div>
-  )
-}
-
-/** The priced lines and their total. Figures are `tabular-nums` throughout. */
-export function QuoteLines({ lines, total }: { lines: readonly BookingLine[]; total: Cents }) {
-  return (
-    <>
-      <dl className="mt-lg divide-y divide-divider border-t border-divider">
-        {lines.map((line) => (
-          <div
-            key={`${line.type}-${line.description}`}
-            className="flex items-baseline justify-between gap-lg py-sm"
-          >
-            <dt className="text-body-sm text-muted-foreground">{line.description}</dt>
-            <dd className="text-body-sm-strong text-foreground tabular-nums">
-              {formatCents(line.amount)}
-            </dd>
-          </div>
-        ))}
-      </dl>
-
-      <div className="flex items-baseline justify-between gap-lg border-t border-divider pt-md">
-        <span className="text-body-md-strong text-foreground">Total</span>
-        <span className="text-display-sm text-foreground tabular-nums">
-          BND {formatCents(total)}
-        </span>
-      </div>
-    </>
   )
 }
