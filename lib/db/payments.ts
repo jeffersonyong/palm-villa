@@ -81,6 +81,12 @@ export interface Payment {
    */
   slipDocumentId: string | null
   checkIn: StayDate | null
+  /**
+   * The day a day pass admits them. Null for every other stream — a pass
+   * occupies no unit, so `checkIn` is null for one and this is where the
+   * queue gets a date to show instead (prd.md §6.1).
+   */
+  passDate: StayDate | null
   unitRef: string | null
   /**
    * What the booking sold — read for revenue by stream (capability E5), which
@@ -114,6 +120,7 @@ interface PaymentSummaryRow {
   created_at: string
   slip_document_id: string | null
   check_in: StayDate | null
+  pass_date: StayDate | null
   unit_ref: string | null
   booking_stream: BookingStream
 }
@@ -123,7 +130,7 @@ const SUMMARY_COLUMNS =
   'method, status, due_amount_cents, expected_amount_cents, amount_cents, ' +
   'observed_reference, observed_sender, observed_on, match_kind, ' +
   'amount_override_reason, match_reason, collected_by, collected_at, ' +
-  'verified_by, verified_at, created_at, slip_document_id, check_in, unit_ref, ' +
+  'verified_by, verified_at, created_at, slip_document_id, check_in, pass_date, unit_ref, ' +
   'booking_stream'
 
 function toPayment(row: PaymentSummaryRow): Payment {
@@ -152,6 +159,7 @@ function toPayment(row: PaymentSummaryRow): Payment {
     createdAt: row.created_at,
     slipDocumentId: row.slip_document_id,
     checkIn: row.check_in,
+    passDate: row.pass_date,
     unitRef: row.unit_ref,
     bookingStream: row.booking_stream,
   }
