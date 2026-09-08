@@ -104,6 +104,22 @@ export interface Booking {
    * lib/domain/balance.ts, which owns the subtraction.
    */
   paid: Cents
+  /**
+   * Given by a customer booking online, and null for every booking taken at
+   * the desk — the form has never asked for one (architecture.md §9).
+   */
+  guestEmail: string | null
+  /**
+   * The day a day pass admits them, and how many bodies it covers. Null for
+   * every other stream: a pass occupies no unit, so `stay` is null and this
+   * is where its date lives instead (prd.md §6.1).
+   */
+  dayPass: { date: StayDate; headcount: number } | null
+  /**
+   * The customer's private link, for a booking they made themselves. Null at
+   * the desk, where the guest is standing in front of somebody.
+   */
+  accessToken: string | null
   createdAt: string
   /**
    * Optimistic-concurrency token for `amendBooking`, maintained by the
@@ -147,13 +163,18 @@ interface BookingSummaryRow {
   discount_reason: string | null
   paid_cents: number
   deposit_waiver_reason: string | null
+  guest_email: string | null
+  pass_date: StayDate | null
+  pass_headcount: number | null
+  access_token: string | null
 }
 
 const SUMMARY_COLUMNS =
   'id, reference, status, stream, guest_name, guest_phone, vehicles, no_vehicle, ' +
   'chargeable_guests, exempt_guests, total_cents, security_deposit_cents, ' +
   'created_at, updated_at, unit_id, unit_ref, unit_type_slug, check_in, check_out, lines, ' +
-  'discount_kind, discount_value, discount_reason, paid_cents, deposit_waiver_reason'
+  'discount_kind, discount_value, discount_reason, paid_cents, deposit_waiver_reason, ' +
+  'guest_email, pass_date, pass_headcount, access_token'
 
 /**
  * The five occupancy columns are read as one fact.
@@ -212,6 +233,12 @@ function toBooking(row: BookingSummaryRow): Booking {
     depositWaiverReason: row.deposit_waiver_reason,
     discount: toDiscount(row),
     paid: row.paid_cents,
+    guestEmail: row.guest_email,
+    dayPass:
+      row.pass_date === null || row.pass_headcount === null
+        ? null
+        : { date: row.pass_date, headcount: row.pass_headcount },
+    accessToken: row.access_token,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }

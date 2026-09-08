@@ -160,6 +160,12 @@ function describeChargeFailure(result: RpcRefusal): DepositWriteError {
         message:
           'This deposit has already been released, so its charges are closed. The statement is what was approved.',
       }
+    case 'not_collected':
+      return {
+        code: result.error,
+        message:
+          'The deposit transfer has not been verified yet, so there is nothing held to charge against. Confirm it in the payments queue first.',
+      }
     case 'already_waived':
       return { code: result.error, message: 'This charge has already been waived.' }
     case 'invalid_amount':

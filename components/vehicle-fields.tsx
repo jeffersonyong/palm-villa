@@ -43,6 +43,20 @@ import { MAX_VEHICLES_PER_BOOKING, MAX_VEHICLE_REGISTRATION_LENGTH } from '@/lib
  * every other field's state, the amendment form diffs its draft against what
  * the server holds, and a component that kept a private copy would be a second
  * source of truth for one field.
+ *
+ * ── Why it is not in components/portal ────────────────────────────────────
+ *
+ * It was, until the public booking forms needed the same control (capabilities
+ * A1–A4). A customer arriving in two cars is the same fact as a guest at the
+ * desk arriving in two cars, and §12.5 makes the plate the guard's primary
+ * lookup either way — so a second, single-field version on the public site
+ * would have been a booking the guard could not match at the gate. Every value
+ * here is a theme role, so it takes the lagoon accent on the customer surface
+ * and stays monochrome on the operations one without knowing which it is in.
+ *
+ * The only thing that differs is the sentence under the exception, which the
+ * caller passes: the desk needs to be told why the box matters, and a customer
+ * needs to be told what it means.
  */
 
 interface VehicleFieldsProps {
@@ -52,6 +66,13 @@ interface VehicleFieldsProps {
   noVehicle: boolean
   onNoVehicleChange: (noVehicle: boolean) => void
   error?: string
+  /**
+   * The line under the exception. Defaults to the desk's wording; pass `null`
+   * to drop it, which the public forms do — a customer ticking "arriving
+   * without a vehicle" does not need it explained, and the desk does, because
+   * for them it is a record-keeping rule rather than a fact about their car.
+   */
+  noVehicleDescription?: string | null
 }
 
 export function VehicleFields({
@@ -60,6 +81,7 @@ export function VehicleFields({
   noVehicle,
   onNoVehicleChange,
   error,
+  noVehicleDescription = 'Only for the rare guest with no car. Security check arrivals by registration, so a booking with neither a plate nor this box ticked cannot be matched at the gate.',
 }: VehicleFieldsProps) {
   // Always at least one row to type into: a section whose only control is an
   // "Add" button asks the staff member to do a step the form could have done.
@@ -147,10 +169,9 @@ export function VehicleFields({
         />
         <div className="grid gap-xxs">
           <Label htmlFor="noVehicle">Arriving without a vehicle</Label>
-          <p className="text-caption text-muted-foreground">
-            Only for the rare guest with no car. Security check arrivals by registration, so a
-            booking with neither a plate nor this box ticked cannot be matched at the gate.
-          </p>
+          {noVehicleDescription === null ? null : (
+            <p className="text-caption text-muted-foreground">{noVehicleDescription}</p>
+          )}
         </div>
       </div>
 

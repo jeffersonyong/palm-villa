@@ -42,6 +42,7 @@ app/
   (portal)/          # Staff desktop: calendar, bookings, payment queue, config, reports
   (field)/           # Mobile web: security check-in, housekeeping checkout
   (print)/           # Printable documents in the portal's URL space, without its shell
+  (public)/booking/[token]/   # A customer's own booking, by private link (§3)
   c/[token]/         # QR landing route (public entry, role-aware rendering)
   api/cron/          # Scheduled jobs, authorised by a shared secret (§8.1, §8.2)
 lib/
@@ -81,7 +82,7 @@ Supabase Auth, email + password. Staff accounts are created by an Admin; there i
 **No accounts.** Guest checkout only (PRD decision). Post-booking access is via:
 
 1. **Booking lookup**: reference + phone number, on the public site.
-2. **Magic link**: each confirmation email contains a signed URL to the booking summary.
+2. **Magic link**: `booking.access_token` — 16 random bytes in base64url from `node:crypto`, unique-indexed, minted when a customer books online (13 September 2026). It is the whole control on `/booking/{token}`, since there is no session behind that page: the shape is checked before the token reaches a query, and a malformed token and an unknown one render the same 404 so a guesser learns nothing from the difference. Deliberately **not** the reference, which is short, sequential and printed on a transfer (§6.1). The confirmation email that will carry it is A8, still unbuilt; `nanoid` is still not a dependency and `node:crypto` gives the same 128 bits.
 3. **QR token**: see §7.
 
 ### Field staff
@@ -110,6 +111,19 @@ One exception, and it is deliberate: `document_retention.updated` keeps `kind` o
 **`booking.discount` is a permission of its own [A].** Every other string in the set gates an operation; this one gates discretion — giving money away — so it is separable from `booking.create` and can be withheld from a role that otherwise takes bookings all day (PRD §8.4). It is checked twice on the create path: the control is not rendered without it, and the server action calls `requirePermission('booking.discount')` before pricing when a discount is present. On the amend path the check is inverted for safety — an amender **without** it has the booking's existing discount carried through untouched rather than read as a removal, because the lines are replaced wholesale and a discount nobody resubmitted would otherwise vanish. Every discount writes its own `booking.discounted` audit event, on creation and on any amendment that moves one, including removal.
 
 **`deposit.waive` follows the same construction [A]** (capability B15). The control is not rendered without it, the create action calls `requirePermission('deposit.waive')` when a waiver is present, and the amend path carries the booking's existing waiver through rather than re-deriving the deposit — `amend_booking()` is passed 0 for a waived booking, and `booking_deposit_waiver_quotes_nothing` refuses any caller that forgets. The waiver is one nullable column, `deposit_waiver_reason`, on the `booking_discount_is_whole` principle that a decision and its justification are one fact; a `deposit.waived` event against the booking records the figure not taken.
+
+### 4a. Public writes (capabilities A1–A4, 13 September 2026)
+
+Three server actions have no session, no permission and no actor: the two booking forms and "I have made the transfer". `requirePermission` cannot express an anonymous caller — `Actor.userId` is `string`, not `string | null` — and it should not be made to. What replaces it, in `app/(public)/*/actions.ts` where the whole gate is readable at once:
+
+- **Zod at the boundary**, as everywhere else, and for a stronger reason: the submitter is a stranger rather than a signed-in colleague.
+- **A honeypot field**, refused silently. Naming the failed check tells a script what to change.
+- **Fixed-window request counters** in `public_attempt`, keyed by a sha256 of the address or the phone number — both personal data under the PDPO (prd.md §13), and a counter needs only to tell two callers apart. `note_public_attempt()` sweeps its own expired rows, since the cron budget is full (§10). It **fails open** when the counter itself errors: this is a rate limit, not an authorisation check, and a database hiccup must not take the booking site down.
+- **The price re-derived on the server.** Nothing submitted is trusted — not the total, not the deposit, not the nights.
+
+The control that actually protects inventory is none of those. It is the cap on unpaid bookings per phone number, counted **inside** the write transaction against bookings with `created_by is null`, where no caller can go around it. prd.md §9.3 carries the reasoning and the register carries the figures.
+
+Everything still runs on the service-role data client, so "anonymous" describes the customer and never the connection. RLS stays enabled with no policies (§8 of 20260829000800), which is what makes the anon key see nothing at all.
 
 **Lock-out guards [A]:** the admin UI refuses the two unrecoverable-by-UI edits — removing your own path to `config.manage`, and removing `config.manage` from the `admin` role. Everything else, including one admin demoting another, is allowed.
 
@@ -165,6 +179,16 @@ The PRD's entity list (§6.2) is the conceptual model. Normative implementation 
 
 - **Reporting reads return facts; the arithmetic is in `lib/domain/reports`.** `listOccupanciesOverlapping()` and `listRevenuePayments()` are deliberately *wide*: the occupancy read filters on the four occupied statuses and on an overlap that null-guards an open-ended lease (§5.2's trap, a second time), and the revenue read casts a superset over three date columns because which day a payment counts on has branches (`revenueDateOf`). Expressing that rule as a PostgREST filter would put half of it in a query string and half in a module — the arrangement that left the accounting pack's staleness rule disagreeing with itself (§8.2). The domain applies the exact rule to what comes back, and it is the tested half.
 
+- **The public flow adds four things to this list, and three of them are shapes this section already argues for** (20260913000100 / 20260913000200, capabilities A1–A4, B16).
+
+  **`booking.access_token`** is nullable with a partial unique index, so null is visibly the ordinary case: every booking taken at the desk has no link and needs none. Its shape is a CHECK — 22 characters of base64url — because a token of any other shape means a caller minted one some other way, and that is the moment to fail rather than the moment to store it.
+
+  **`day_pass` keeps its party as a jsonb snapshot**, which is the opposite of `day_pass_bundle_line` next to it, and deliberately. A bundle's composition is configuration that must stay valid, so it takes a foreign key; a sold pass is a historic fact that must stay *readable*. Nothing ever re-prices it (a rate change is not retrospective — [N33](open-questions.md)), and an `on delete restrict` would mean the owner could never retire an age band that had ever been sold. The snapshot carries each band's label as well as its id, so a pass sold to "Child 1–11" still reads that way after a rename — the opposite of a unit's ref, which is a door and *should* be relabelled retrospectively (prd.md §7.1). `headcount` is stored rather than summed out of the jsonb because capacity and E5 both count it, and a figure two readers derive separately is a figure that will disagree.
+
+  **A pending deposit is a nullable `collected_at` on `deposit`**, not a `purpose` column on `payment` — prd.md §11's as-built block carries the argument. What it buys here is that every reader of money (`paid_cents`, the balance, revenue, the cash-up, `bookings_due_accounting_pack`) is correct without being changed.
+
+  **`public_attempt` is the one table here that is not audited**, and that is the point: it is a counter about a request, not a fact about a booking, and the audit trail is the client's record of what people did.
+
 ### 5.2 Double-booking prevention (structural)
 
 The availability invariant is enforced **in the database**, not in application logic:
@@ -189,6 +213,14 @@ Half-open ranges `[)` make back-to-back bookings (checkout day = next check-in d
 The constraint is covered by `lib/db/no-double-booking.test.ts`, which fires eight simultaneous bookings at one unit and asserts exactly one wins. That file documents how to watch it fail with the constraint dropped — a concurrency test nobody has seen fail is not evidence.
 
 Day passes have no unit; capacity is enforced by a transactional check against the configured facility headroom for the date, with the booking insert and the count in one transaction.
+
+**As built (capability A3, 13 September 2026).** A headcount against a ceiling is a property of *every* row on a date, which no exclusion constraint can express — so the control is a lock. `create_public_day_pass_booking()` takes `pg_advisory_xact_lock` on the property and the date **before** counting, so two customers buying the last two places serialise instead of both reading "one left". Per date rather than per property, so a busy Saturday does not queue behind a quiet Tuesday; transaction-scoped, so the commit or rollback that settles the question releases it and no path can leak one. An advisory lock rather than a row lock because there is no row to lock — a date with nothing sold has nothing in `day_pass`, and inventing a calendar table to lock against would be maintaining rows for a lock.
+
+**The binding ceiling is the smallest among the facilities the pass admits**, since a pass opens all of them and the first to fill decides; the largest would oversell it and the sum would count one person once per pool they walk past. Every capacity is null today (prd.md C2), which reads as no limit — the only honest reading of a number nobody has agreed. **[A]**, and in the register.
+
+`lib/db/public-bookings.test.ts` is the evidence, and it is `no-double-booking.test.ts`'s shape: eight parties against a ceiling of three, exactly three admitted. It carries instructions for removing the lock and watching it oversell, because a concurrency test nobody has seen fail is not evidence.
+
+**Public stay assignment takes a lock too, and it was a bug that put it there.** `create_public_stay_booking()` picks the unit itself, walking free doors in reference order, and the exclusion constraint makes an inserting transaction *wait* on a conflicting uncommitted one rather than fail — so eight simultaneous callers ended up holding a door each and waiting on the other's, which Postgres resolved by killing somebody's booking with `deadlock detected`. A customer seeing an error on a building with forty free rooms. A per-unit-type advisory lock removes the cycle among public callers; the desk takes no such lock, so a walk-in racing a customer is still settled by the constraint exactly as G1 promises, and the per-candidate handlers turn its refusal into the next room.
 
 **Two corrections the units slice made here, both worth stating rather than absorbing.**
 
@@ -273,6 +305,10 @@ Two writers created a `payment` row — booking creation and the cash form — s
 ### 6.3 Hold expiry
 `hold_expires_at` on the booking. A scheduled job (Vercel cron hitting an internal route, every 5 minutes) transitions lapsed `held` bookings to `expired`, freeing the exclusion-constraint row. Expiry is also checked lazily at read time so availability is never stale between cron runs.
 
+**None of that is built, and none of it will be** (13 September 2026). [N7](open-questions.md) is answered *indefinitely, until somebody checks*, so there is no duration to expire against: no job, no lazy check, and `hold_expires_at` stays a column nothing writes. The public flow is the first thing to persist `held` at all (prd.md §9.3), and it holds until a person verifies the transfer or cancels the booking.
+
+The consequence this section used to carry — that the five-minute cron cannot run on the Hobby plan, so the project moves to Pro when the job is built — is therefore **not a cost this slice incurs**. The cron budget is still two and still full.
+
 ### 6.4 Provider interface
 ```ts
 interface PaymentProvider {
@@ -286,6 +322,8 @@ v1 ships `ManualTransferProvider` only. A card gateway (Baiduri/BIBD) or stateme
 **Not built yet, deliberately, and this section is the record of that.** The payments slice implements manual verification directly in `lib/db/payments.ts` over the two database functions, and `lib/payments/` does not exist. Of the three methods above only `confirm` is reachable today, and there it *is* `verify_payment()` — one implementation, one caller, nothing to abstract over. The other two cannot be written honestly: `initiate` must return bank details and a deadline, and there are no bank details anywhere in the PRD (C6 in the open-questions register asks whether a merchant account exists) and no agreed deadline (N7); `refund` is blocked by N5 and forbidden by §9.6. `PaymentInstruction`'s shape will be decided by the phase-two public payment screen, so anything written now would be redesigned then.
 
 This is the judgement §5.1 already records about `unit.status` — "an unread status column that availability silently ignores is worse than none" — applied to an interface. The seam is cut when the second caller exists, which is the public flow.
+
+**The public flow has landed and the seam is still not cut** (13 September 2026), which is worth recording rather than quietly doing. What it settled is `PaymentInstruction`'s shape, which this section said would be decided here: the reference, the amount, what the amount is *for* — a deposit or the price — and the accounts to send it to, read from `bank_account`. That is what `/booking/{token}` renders. What it did **not** produce is a second implementation: there is still exactly one way money is taken, and `initiate` would be a method with one caller returning a shape the page already assembles. `refund` is still blocked by N5 and still forbidden by prd.md §9.6. The interface arrives with the second provider, which is a card gateway (X1) and merchant onboarding.
 
 ---
 
@@ -355,7 +393,7 @@ Everything above holds as written; the accounting pack followed a day later (§8
 
 ## 9. Email
 
-Resend, transactional only: booking created (payment instructions + deadline), booking confirmed (QR attached), payment reminder before hold expiry, deposit release note. **No auth emails** — staff provisioning and password resets are out-of-band (§3), and Supabase's own auth mailer stays unused. Sender uses the Vercel-hosted domain until the client selects a domain, at which point the domain is verified in Resend and templates re-pointed. Email capture is added to the booking form; where a customer provides no email, delivery falls back to staff forwarding the QR image via WhatsApp (accepted v1 gap, PRD assumption A6).
+Resend, transactional only: booking created (payment instructions + deadline), booking confirmed (QR attached), payment reminder before hold expiry, deposit release note. **No auth emails** — staff provisioning and password resets are out-of-band (§3), and Supabase's own auth mailer stays unused. Sender uses the Vercel-hosted domain until the client selects a domain, at which point the domain is verified in Resend and templates re-pointed. Email capture is added to the booking form; where a customer provides no email, delivery falls back to staff forwarding the QR image via WhatsApp (accepted v1 gap, PRD assumption A6). **The capture half landed on 13 September 2026** with the public booking forms — `guest.email` is written for the first time, optional, because refusing a booking for want of an address nothing yet sends to would lose the booking. **Nothing sends any email**: Resend is still not installed and no template exists. That is capability A8.
 
 ---
 

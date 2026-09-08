@@ -83,6 +83,12 @@ describe('isArchiveView', () => {
 describe('readHeldStages', () => {
   test('the three held stages, in pipeline order, and never released', () => {
     expect(HELD_STAGES).toEqual(['in_house', 'awaiting_inspection', 'ready_for_release'])
+
+    // Neither end of the pipeline belongs on this screen: a released deposit
+    // is the archive, and a promised one is money the property does not have
+    // and this ledger never reads.
+    expect(HELD_STAGES).not.toContain('released')
+    expect(HELD_STAGES).not.toContain('awaiting_verification')
     expect(readHeldStages(['ready_for_release', 'in_house'])).toEqual([
       'in_house',
       'ready_for_release',
@@ -278,6 +284,7 @@ describe('countByStage', () => {
     const counts = countByStage([row('in_house', null), row('in_house', null)])
 
     expect(counts).toEqual({
+      awaiting_verification: 0,
       in_house: 2,
       awaiting_inspection: 0,
       ready_for_release: 0,
