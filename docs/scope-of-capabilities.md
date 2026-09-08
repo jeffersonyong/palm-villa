@@ -26,10 +26,10 @@ Everyone works from the same live data, so availability, payments, and booking s
 
 | # | Capability |
 |---|---|
-| A1 | Check live availability for any dates — without messaging anyone |
-| A2 | See the exact itemised price before booking: nightly rate, extra persons, sofa beds, early check-in, late check-out |
-| A3 | Book a facility day pass online, with per-person rates and family bundles applied automatically — the system always charges the cheapest applicable combination |
-| A4 | Book a short stay online; the unit is held while payment completes — **reworded 10 September 2026, see the notes below** |
+| A1 | Check live availability for any dates — without messaging anyone — **delivered 13 September 2026** |
+| A2 | See the exact itemised price before booking: nightly rate, extra persons, sofa beds, early check-in, late check-out — **delivered 13 September 2026, less early check-in, which is not sold (see N31)** |
+| A3 | Book a facility day pass online, with per-person rates and family bundles applied automatically — the system always charges the cheapest applicable combination — **delivered 13 September 2026** |
+| A4 | Book a short stay online; the unit is held while payment completes — **reworded 10 September 2026, see the notes below; delivered 13 September 2026** |
 | A5 | Receive bank transfer instructions (BIBD / Baiduri) with a unique payment reference to include in the transfer |
 | A6 | Upload their transfer slip directly, instead of sending it over WhatsApp |
 | A7 | Provide guest details and identity document as part of the booking, replacing the paper/WhatsApp collection step |
@@ -41,6 +41,19 @@ Everyone works from the same live data, so availability, payments, and booking s
 > **A4 is now secured by the deposit, like B16.** The owner confirmed on 10 September 2026 that a booking is held by the BND 100 security deposit with the stay paid on arrival, which is how the business already works. The public flow asks a customer for the deposit rather than the whole stay; everything else about A4 is unchanged.
 
 > **A4 no longer promises a timer.** Asked how long a unit should be held for a guest who says they are transferring, the answer was *indefinitely, until somebody checks* — so nothing releases a booking automatically, by decision rather than by omission. The public flow will state the reference and the amount and say the unit is held until payment is confirmed; a countdown the system does not enforce would be a promise it does not keep. Nothing about the delivery changes. See the register.
+
+> **A1–A4 delivered 13 September 2026, and A5 is half delivered with them.** A customer picks a unit type, sees what is free on every night for the next two months with the nightly rate on each one, gets an itemised price before committing to anything, and books — a day pass or a short stay. They are then shown the reference, the amount and the bank accounts to transfer to, which is A5 without the slip upload (A6) and without the email (A8).
+>
+> Six things worth saying plainly, because they are the decisions behind the screens:
+>
+> - **A short stay is held by the deposit, and the stay is paid on arrival** — B16 for the public half. The customer transfers BND 100, somebody verifies it in the payments queue, and the booking is confirmed with the stay still owed in full. **The desk cannot yet take a deposit-secured advance booking**; the walk-in form is unchanged, so B16 is delivered for customers and not for staff.
+> - **There is no countdown, by decision.** The register's N7 makes a hold indefinite, so the page says the unit is held until the transfer is confirmed. A timer nothing enforces would be a promise the system does not keep — and an indefinite hold is only safe while somebody works the queue, which is the same sentence that answer has carried since it was given.
+> - **The system picks the unit, not the customer.** A customer chooses a *type*; the system assigns a door and the desk can move it. Units of one type are not interchangeable (bed configurations differ), so offering a choice of door would be giving away a decision nobody has agreed to give away.
+> - **A day pass never asks the customer to find the bundle.** The engine tries every arrangement and charges the cheapest, so two adults and a child pay BND 20 rather than BND 25 without needing to know a bundle exists. **Confirm before go-live** whether a bundle may apply more than once on one booking — a family of four adults and two children is BND 40 under the current reading and BND 45 under the other.
+> - **The public site is defended without a CAPTCHA.** A hidden field, a request counter, and a cap on how many unpaid bookings one phone number may hold at once. The last is the one that protects rooms; the numbers behind all three are in the register.
+> - **The 2-bedroom is not on sale.** It has no units until the count is agreed, so it is not offered rather than shown as full on every night.
+>
+> **Still to come on this surface:** the customer uploading their transfer slip (A6) and identity document (A7), the confirmation email and QR code (A8), looking a booking up by reference and phone (A9), and the FAQ (A10).
 
 > **A11 is provisional.** A1–A10 describe a booking site; a marketing landing page is a separate surface that was built ahead of agreement and is recorded here so the baseline stays honest. It is included in the quoted work only once confirmed.
 
@@ -66,7 +79,7 @@ Everyone works from the same live data, so availability, payments, and booking s
 
 | B14 | Keep a note against a **unit** — a sticking door, a temperamental aircon, where the spare key lives. It belongs to the unit rather than to whoever is staying in it, so it survives every booking, and every change to it is recorded with who made it and when. **(added 2 September 2026 at the owner's request)** |
 | B15 | Waive the security deposit on a booking at the desk, with a typed reason recorded in the booking's history — the case is a guest extending their stay, where the deposit is already held under the first booking. Waiving is its own permission, so it can be withheld from a role that otherwise takes bookings, and a waived booking checks in taking nothing and says so. **(added 5 September 2026 at the owner's request)** |
-| B16 | Take an advance booking secured by the security deposit: the guest transfers the BND 100 when they book, the unit is held until someone verifies it, and the stay itself is settled on arrival. A guest who cancels or does not turn up forfeits the deposit. **(added 10 September 2026 at the owner's request — it replaces the walk-ins-only rule the scope was written against, and is not yet built)** |
+| B16 | Take an advance booking secured by the security deposit: the guest transfers the BND 100 when they book, the unit is held until someone verifies it, and the stay itself is settled on arrival. A guest who cancels or does not turn up forfeits the deposit. **(added 10 September 2026 at the owner's request — it replaces the walk-ins-only rule the scope was written against. **Half delivered 13 September 2026**: a customer booking online transfers the deposit and the queue verifies it, and check-in then takes nothing. The desk cannot yet take one at the counter.)** |
 
 **B8 is delivered across two slices.** Four of the six states — available, held, booked, occupied — are live now, alongside out of service and leased long-term from B9. **Awaiting inspection** and **cleaning** are the two the housekeeping flow writes, so they arrive with **C2–C3** and B8 is not complete until those screens land. Said here rather than left to be noticed: until then the board can tell you a unit is empty, but not whether it has been cleaned.
 

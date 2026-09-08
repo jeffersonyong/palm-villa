@@ -147,6 +147,14 @@ All three surfaces are one codebase, one database, one deployment. What a user s
 ### 5.1 Public booking site
 Availability, pricing, booking, payment instructions, slip upload, booking lookup, FAQ.
 
+**As built (capabilities A1–A4, 13 September 2026).** Three screens, and they are the first writes in the product with no staff member behind them. `/stay` shows what is free on every night for the advance window with that unit type’s rate on each night, prices the stay as the customer builds it, and holds a unit. `/day-pass` sells a pass for a day. `/booking/{token}` is the customer’s way back to their own booking, carrying the reference, the amount and the bank accounts.
+
+**The customer chooses a type; the system assigns the door.** §7.1 records that units of one type are not interchangeable because bed configurations differ, and N9 assumes staff assign. A public form offering a choice of door would give away a decision nobody has agreed to give away, so `create_public_stay_booking()` walks the free units of the type in reference order and takes the first the exclusion constraint accepts. The desk moves it with an ordinary amendment. **[A]**
+
+**A unit type with no units is not offered.** The 2-bedroom has none until N1 is answered, and a customer shown sixty-two nights of "Full" would read that as a property with nothing free rather than a type nobody has counted. **[A]**
+
+**Early check-in is not sold**, which is N31: Jason’s own answer makes it a desk judgement about whether a unit is ready. The form sends zero hours and tells the customer to ask on arrival.
+
 **[O] Its photographs are staff-managed, or they are stale within a year** (proposed 10 September 2026, capability F7, unagreed with the client). A unit type gets repainted, a facility reopens, somebody commissions a better photo shoot — and under any arrangement where the images ship with the code, each of those is a developer deploy. That is the same argument §7.2 already accepted for facility inclusion and §7.1 for unit naming, applied to the one part of the product a customer actually looks at first.
 
 **No image is real yet.** Every unit type and facility on the public site renders a labelled placeholder, so this is not a control over something that exists — it is the images and the way to manage them, together. What that costs architecturally is §8's one departure: a **public** bucket, which is the opposite of every rule [architecture.md §8](architecture.md) states for the private ones.
@@ -181,7 +189,7 @@ Unit                  property_id, unit_type_id, ref, bed_config_id, status
 Occupancy             unit_id, type (short_stay|tenancy), start, end, booking_id
 Booking               property_id, reference, stream, status, guest_id,
                       pax_breakdown, total, created_by, hold_expires_at
-DayPass               booking_id, date, party_composition, headcount
+DayPass               booking_id, date, party_composition, headcount   -- built 13 Sept 2026
 BookingLine           booking_id, type, description, qty, unit_price, amount
 Guest                 name, phone, email, vehicle_registrations[]
 Document              owner_type, owner_id, kind, storage_key, retain_until
@@ -396,6 +404,18 @@ Framed to the client as a **checkout timer**, not a reservation: the unit is hel
 
 **And the consequence to raise rather than absorb:** an indefinite hold is only safe because a person is watching the queue. [N29](open-questions.md) is this same answer from the other end — if most guests really do pay on the day, "held indefinitely" is not a fallback, it is the product.
 
+### As built (capabilities A1–A4, 13 September 2026)
+
+**`held` is persisted for the first time.** Every booking before this went straight to `awaiting_payment_verification` or `confirmed`, because the guest was at the desk and had paid. A customer online has not, so the booking is created `held`, its occupancy row counts against the exclusion constraint, and it stays that way until somebody verifies the transfer or cancels it. Nothing expires it, which is this section’s answer unchanged.
+
+**What changes is who can now create one.** An indefinite hold reachable only from a desk is a staff member forgetting to chase somebody; the same hold reachable from the open internet is a unit anybody can take out of the property’s inventory for nothing. Three things stand in the way, and none of them is a CAPTCHA — the alternative to a booking is a phone call, so a customer asked to prove they are human is a customer lost. **[A]**
+
+- **A honeypot**, refused silently. Telling a script which check it failed is telling it what to change.
+- **Request counters**, per address and per phone number, over fixed windows. Keys are hashed, because an address and a number are both personal data (§13).
+- **A cap on unpaid bookings per phone number**, enforced inside the write transaction. This is the one that protects rooms rather than bandwidth, and it counts only bookings the customer made themselves — a desk taking four advance bookings for one regular is doing its job.
+
+The figures are constants in `lib/domain/public-booking.ts` rather than settings, deliberately: every figure the client can edit is one this document makes a business rule, and nobody has agreed these. A settings row would invite the owner to tune a control nobody has explained to him, upward, on the day a real customer trips it. They are in the register instead.
+
 ### 9.4 Manual booking (staff)
 
 **[C]** Staff can check availability and create a booking on the spot, using the same availability check, pricing engine, and document capture as the public flow.
@@ -489,6 +509,14 @@ This is the highest-leverage detail in the payment design. It turns verification
 5. Staff check the bank app, match reference and amount, and confirm.
 6. Booking becomes `confirmed`. QR is issued.
 
+**As built (13 September 2026), and two of those six steps are different.**
+
+**There is no countdown** (step 2). N7 makes the hold indefinite, so the page states the reference and the amount and says the unit is held until the transfer is confirmed. A timer nothing enforces is a promise the system does not keep.
+
+**The customer says when they have paid** (steps 3–4), and the booking is created before that. Creating it holds the unit; pressing *I have made the transfer* moves it to `awaiting_payment_verification` and raises the pending row. That is what `payment.created_at` was always meant to measure — the queue’s waiting column is how long somebody has been left waiting, not how long they spent on a form. Slip upload is still A6 and still phase two, so step 3 is a transfer and not yet an upload.
+
+**What is raised depends on what was asked for.** A short stay quoting a deposit raises a pending *deposit* (§11); anything else raises a pending payment. A customer is never asked for both.
+
 ### 10.4 Verification queue
 
 Each row shows reference, guest name, amount expected, time waiting, and the uploaded slip.
@@ -567,6 +595,20 @@ Six requirements above; five are met as written and one is not. The following ar
 - **Check-in recognises a deposit already held** and takes nothing. It is not a new state: the check-in screen already says so for a booking quoting no deposit (B15's waiver), and this is the same sentence with a different reason behind it.
 - **A deposit is still never a booking payment.** It settles no booking, appears in no cash-up total (§14, [N27](open-questions.md)) and leaves the stay fully owed. Recording it as a payment would make every deposit-secured booking read as short against its own total, which is the flag §10.7 spent a slice making meaningful.
 
+### As built (capability B16, public half, 13 September 2026)
+
+All three of the bullets above are built, for a customer booking online. The desk still cannot take a deposit-secured advance booking at the counter — the walk-in form is unchanged — so B16 is delivered for customers and not yet for staff.
+
+**A deposit can now be outstanding, and that is one nullable column rather than a status.** `collected_at` becomes nullable and `promised_at` records when the customer said they had transferred. A row with a promise and no collection is the one state in which this deposit is not yet a liability: it is not on the ledger, not in the cash-up, cannot be charged against, and cannot be released. Its stage is `awaiting_verification`, ahead of the other four.
+
+**It lives on `deposit` rather than as a kind of `payment`, and that is the decision the whole design turns on.** §9.1 above spends a paragraph on why a deposit must never read as a booking payment; putting the pending state here means `booking_summary.paid_cents`, the outstanding balance, the revenue report, the cash-up and the accounting pack’s due-list are all untouched by construction, rather than each having to remember to exclude it. The first reader to forget would have been silent. What it costs is that the verification queue reads two tables and the ledger filters one column — both stated rather than discovered. **[A]**
+
+**Verifying one is the same job as verifying a payment**, so it takes `payment.verify` and mints no new permission string — the position §10.7 and §13 already took. The amount is matched against what the booking **quoted**, not against what it owes, because no other payment moves that figure; a discrepancy needs a written reason exactly as §10.4 requires, and an overpayment is refused as firmly as a short one. It schedules no accounting pack: a pack is assembled when money is verified *against the booking*, and this settles nothing.
+
+**Check-in has three cases now, and the middle one is a judgement.** A deposit already collected means the door takes nothing and says so. **A deposit still only promised is collected at the door** rather than refused — the guest is standing there, an abandoned transfer is exactly when the desk needs the BND 100 in cash, and refusing would send a paying customer away to fix a row. The promise is fulfilled on its own row, so one-deposit-per-booking holds and `promised_at` survives as the record that the customer said they had sent it. **[A]**
+
+**There is no slip on a deposit.** A document hangs off a payment id (architecture.md §8.1) and a deposit is not a payment, so a guest’s screenshot of the transfer has nowhere to live. The queue’s cell says so rather than reading as a slip somebody forgot to attach. The bank app was always the check (§10.4); this is in the register. **[O]**
+
 **[A] The deposit can be waived — at creation, with a reason, under its own permission** (5 September 2026, capability B15). The first build held that "a deposit somebody decided not to take is a conversation, not a field", and the conversation turned out to be a real one: a guest who extends after checking in gets a second booking (§9.6), and a second booking takes a second BND 100. The waiver is a checkbox in a *Security deposit* section at the foot of the walk-in form, shown only to a holder of `deposit.waive`. Ticking it opens a dialog rather than a field — the register every other consequential act in the portal uses — which says what the tick means (nothing held, nothing to charge damage against) and takes the reason there, by convention naming the booking whose deposit covers the stay; it cannot be confirmed empty, and cancelling leaves the box unticked. Unticking clears the waiver at once. A waived booking quotes zero, which is the path check-in already had; what the waiver adds is the **record**: the reason on the booking, a `deposit.waived` event in its history carrying the figure not taken, and a schema constraint that a booking with a waiver cannot quote a deposit — so an amendment repricing the stay cannot quietly put it back. It is decided at creation only; there is no waiving at the door, for the reason above.
 
 **[A] `booking.security_deposit_cents` stays the quote; the deposit row is what was taken.** The two can differ, because an amendment can reprice a booking after it was quoted, and what is held must not move with it. Every screen that used to read the quoted figure and call it "held" now says which of the two it means.
@@ -613,6 +655,8 @@ Six requirements above; five are met as written and one is not. The following ar
 ## 13. Documents and data protection
 
 **[C]** A copy of the guest's IC is required for registration. Name and vehicle registration are required for records and security.
+
+**[C] An email address is captured, and it is optional** (13 September 2026, capabilities A1–A4). `guest.email` has existed since the first migration and nothing had ever written it; the public booking form is what architecture.md §9 meant by "email capture is added to the booking form". It is optional because A6’s fallback is a staff member forwarding the QR over WhatsApp (assumption A6), and refusing a booking for want of an address nobody needs yet would lose the booking. Nothing sends email — that is A8, still phase two.
 
 **[A] A booking records every vehicle arriving on it, and the guest with no car says so explicitly.** §6.2 already sketches vehicle registrations as a list, and §12.5 makes plate lookup the guard's primary path — a family arriving in two cars has one of them unfindable at the gate if only one plate is stored. Two assumptions sit on top of the [C] above, neither confirmed with Jason:
 
