@@ -66,6 +66,12 @@ import type { WalkInBookingState } from './actions'
 
 interface BookingFormProps {
   units: readonly Unit[]
+  /**
+   * The unit to open on, when something already chose one — the calendar,
+   * where a row was clicked. Already checked against `units` by the page, so
+   * it is either free for these dates or absent.
+   */
+  preferredUnitId?: string
   config: PropertyConfig
   checkIn: string
   checkOut: string
@@ -86,6 +92,7 @@ interface BookingFormProps {
 
 export function BookingForm({
   units,
+  preferredUnitId,
   config,
   checkIn,
   checkOut,
@@ -95,7 +102,7 @@ export function BookingForm({
   formAction,
   isPending,
 }: BookingFormProps) {
-  const [unitId, setUnitId] = useState(units[0]?.id ?? '')
+  const [unitId, setUnitId] = useState(preferredUnitId ?? units[0]?.id ?? '')
   const [chargeableGuests, setChargeableGuests] = useState(2)
   const [exemptGuests, setExemptGuests] = useState(0)
   const [sofaBeds, setSofaBeds] = useState(0)

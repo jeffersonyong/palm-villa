@@ -83,8 +83,12 @@ export interface TapeChartFreeNight {
   type: 'free'
   day: StayDate
   column: number
-  /** A new-booking link with the night filled in, or null when it cannot be sold. */
-  createHref: string | null
+  /**
+   * Whether this night could be sold: the reader may create a booking, the
+   * night is not behind us, and it is inside the advance-booking window. It is
+   * what the grid lets a stay be chosen across.
+   */
+  sellable: boolean
 }
 
 export type TapeChartSegment = TapeChartBar | TapeChartFreeNight
@@ -110,7 +114,10 @@ export interface TapeChartGroup {
 }
 
 export interface TapeChartSummary {
+  /** Rows actually drawn. */
   units: number
+  /** Every unit the type filter left, drawn or not. */
+  totalUnits: number
   bookings: number
   leases: number
   outOfService: number
@@ -139,6 +146,15 @@ export interface TapeChartInput {
   units: readonly Unit[]
   occupancies: readonly CalendarOccupancy[]
   create: CreatePolicy
+  /**
+   * Whether to keep a unit with nothing on it this month.
+   *
+   * Off by default on the screen: forty-eight rows of which six carry a bar
+   * is a grid a reader has to scan rather than read, and the question the
+   * calendar is opened with is almost always about the six. Required rather
+   * than defaulted here so the caller says which grid it is asking for.
+   */
+  showEmptyUnits: boolean
 }
 
 /** The month as a half-open range: its first day to the next month's first day. */
@@ -155,12 +171,28 @@ export function buildTapeChart(input: TapeChartInput): TapeChart {
   const lastCreatableDay = addDays(input.today, input.create.maxAdvanceDays)
 
   const groups = new Map<string, { name: string; rows: TapeChartRow[] }>()
-  const summary = { units: 0, bookings: 0, leases: 0, outOfService: 0 }
+  const summary = { units: 0, totalUnits: 0, bookings: 0, leases: 0, outOfService: 0 }
 
   for (const unit of input.units) {
     const bars = barsFor(unit, byUnit.get(unit.id) ?? [], window)
+
+    summary.totalUnits += 1
+
+    for (const bar of bars) {
+      if (bar.kind === 'booking') summary.bookings += 1
+      else if (bar.kind === 'lease') summary.leases += 1
+      else summary.outOfService += 1
+    }
+
+    // A unit with nothing on it this month is dropped unless it was asked
+    // for. Counted first, so the summary can say what is not being shown —
+    // a grid that quietly omits forty rows is worse than a full one.
+    if (!input.showEmptyUnits && bars.length === 0) {
+      continue
+    }
+
     const segments = segmentsFor(bars, columns, (day) =>
-      createHrefFor(unit, day, input.today, lastCreatableDay, input.create.enabled),
+      isSellable(day, input.today, lastCreatableDay, input.create.enabled),
     )
 
     const group = groups.get(unit.unitTypeId) ?? { name: unit.unitTypeName, rows: [] }
@@ -168,12 +200,6 @@ export function buildTapeChart(input: TapeChartInput): TapeChart {
     groups.set(unit.unitTypeId, group)
 
     summary.units += 1
-
-    for (const bar of bars) {
-      if (bar.kind === 'booking') summary.bookings += 1
-      else if (bar.kind === 'lease') summary.leases += 1
-      else summary.outOfService += 1
-    }
   }
 
   return {
@@ -353,7 +379,7 @@ function groupByUnit(
 function segmentsFor(
   bars: readonly TapeChartBar[],
   columns: readonly TapeChartColumn[],
-  createHref: (day: StayDate) => string | null,
+  sellable: (day: StayDate) => boolean,
 ): readonly TapeChartSegment[] {
   const segments: TapeChartSegment[] = []
   let column = 0
@@ -361,7 +387,7 @@ function segmentsFor(
   const freeNight = (index: number): TapeChartFreeNight => {
     const day = columns[index]?.day ?? ''
 
-    return { type: 'free', day, column: index, createHref: createHref(day) }
+    return { type: 'free', day, column: index, sellable: sellable(day) }
   }
 
   for (const bar of bars) {
@@ -381,23 +407,21 @@ function segmentsFor(
 }
 
 /**
- * The new-booking screen with this night filled in — one night, this unit's
- * type. It reads `from`, `to` and `type` already, so the link is the whole
- * hand-off. Nothing links a night that cannot be sold: one in the past, or one
- * past the advance-booking window the form itself enforces.
+ * Whether a night is one the screen would sell.
+ *
+ * A night in the past cannot be booked, and neither can one past the advance
+ * window the booking form itself enforces — so neither may be pointed at here.
+ * A reader without `booking.create` sells none of them.
+ *
+ * This used to build a whole new-booking URL per night, back when a click was
+ * a link and bought exactly one night. Choosing a stay now takes two clicks
+ * and the hand-off is built once, from the span, when it is confirmed.
  */
-function createHrefFor(
-  unit: Unit,
+function isSellable(
   day: StayDate,
   today: StayDate,
   lastCreatableDay: StayDate,
   enabled: boolean,
-): string | null {
-  if (!enabled || day < today || day > lastCreatableDay) {
-    return null
-  }
-
-  const params = new URLSearchParams({ from: day, to: addDays(day, 1), type: unit.unitTypeId })
-
-  return `/portal/bookings/new?${params.toString()}`
+): boolean {
+  return enabled && day >= today && day <= lastCreatableDay
 }

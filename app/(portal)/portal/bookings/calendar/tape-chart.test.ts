@@ -65,6 +65,9 @@ function chartOf(overrides: Partial<TapeChartInput> = {}): TapeChart {
     units: [unit('3B-01')],
     occupancies: [],
     create: { enabled: true, maxAdvanceDays: 62 },
+    // The tests above this line are about bars, columns and clipping, and
+    // describe rows that mostly hold nothing. The narrowing has its own block.
+    showEmptyUnits: true,
     ...overrides,
   })
 }
@@ -307,36 +310,34 @@ describe('tones and links', () => {
   })
 })
 
-describe('starting a booking from a free night', () => {
-  test('links a night that can be sold, with the night and the type filled in', () => {
+describe('which free nights a stay may be chosen across', () => {
+  test('marks a night that can be sold', () => {
     const night = freeNightsOf(chartOf(), '3B-01').find((n) => n.day === '2026-09-12')
 
-    expect(night?.createHref).toBe(
-      '/portal/bookings/new?from=2026-09-12&to=2026-09-13&type=three-bedroom',
-    )
+    expect(night?.sellable).toBe(true)
   })
 
-  test('does not link the past', () => {
+  test('does not offer the past', () => {
     const nights = freeNightsOf(chartOf(), '3B-01')
 
-    expect(nights.find((n) => n.day === '2026-09-07')?.createHref).toBeNull()
-    expect(nights.find((n) => n.day === TODAY)?.createHref).not.toBeNull()
+    expect(nights.find((n) => n.day === '2026-09-07')?.sellable).toBe(false)
+    expect(nights.find((n) => n.day === TODAY)?.sellable).toBe(true)
   })
 
-  test('does not link past the advance-booking window', () => {
+  test('does not offer past the advance-booking window', () => {
     const nights = freeNightsOf(chartOf({ create: { enabled: true, maxAdvanceDays: 10 } }), '3B-01')
 
-    expect(nights.find((n) => n.day === '2026-09-18')?.createHref).not.toBeNull()
-    expect(nights.find((n) => n.day === '2026-09-19')?.createHref).toBeNull()
+    expect(nights.find((n) => n.day === '2026-09-18')?.sellable).toBe(true)
+    expect(nights.find((n) => n.day === '2026-09-19')?.sellable).toBe(false)
   })
 
-  test('links nothing for a reader who cannot create a booking', () => {
+  test('offers nothing to a reader who cannot create a booking', () => {
     const nights = freeNightsOf(
       chartOf({ create: { enabled: false, maxAdvanceDays: 62 } }),
       '3B-01',
     )
 
-    expect(nights.every((n) => n.createHref === null)).toBe(true)
+    expect(nights.every((n) => !n.sellable)).toBe(true)
   })
 })
 
@@ -367,6 +368,109 @@ describe('groups and summary', () => {
       ],
     })
 
-    expect(chart.summary).toEqual({ units: 3, bookings: 2, leases: 1, outOfService: 1 })
+    expect(chart.summary).toEqual({
+      units: 3,
+      totalUnits: 3,
+      bookings: 2,
+      leases: 1,
+      outOfService: 1,
+    })
+  })
+})
+
+describe('units with nothing on them', () => {
+  const OCCUPIED = [
+    stay('3B-01', '2026-09-05', '2026-09-08', { id: 'a' }),
+    lease('3B-02', '2026-08-01', null),
+  ]
+
+  const BUILDING = [
+    unit('3B-01'),
+    unit('3B-02'),
+    unit('3B-03'),
+    unit('4B-01', { unitTypeId: 'four-bedroom', unitTypeName: 'Four-bedroom' }),
+  ]
+
+  test('drops them, keeping the rows that carry a bar', () => {
+    // Arrange / Act
+    const chart = chartOf({
+      units: BUILDING,
+      occupancies: OCCUPIED,
+      showEmptyUnits: false,
+    })
+
+    // Assert
+    expect(chart.groups.flatMap((group) => group.rows.map((row) => row.unit.ref))).toEqual([
+      '3B-01',
+      '3B-02',
+    ])
+  })
+
+  test('drops a type whose every unit is empty, rather than leaving a bare heading', () => {
+    // Arrange / Act
+    const chart = chartOf({
+      units: BUILDING,
+      occupancies: OCCUPIED,
+      showEmptyUnits: false,
+    })
+
+    // Assert
+    expect(chart.groups.map((group) => group.typeId)).toEqual(['three-bedroom'])
+  })
+
+  test('says how many units there are, not just how many are drawn', () => {
+    // Arrange / Act
+    const chart = chartOf({
+      units: BUILDING,
+      occupancies: OCCUPIED,
+      showEmptyUnits: false,
+    })
+
+    // Assert — the counts of what is on the chart are unaffected by hiding
+    // rows that had nothing on them to count.
+    expect(chart.summary).toEqual({
+      units: 2,
+      totalUnits: 4,
+      bookings: 1,
+      leases: 1,
+      outOfService: 0,
+    })
+  })
+
+  test('keeps a unit held only by being out of service', () => {
+    // Arrange / Act
+    const chart = chartOf({
+      units: [unit('3B-01'), unit('3B-02', { outOfServiceSince: '2026-09-20' })],
+      occupancies: [],
+      showEmptyUnits: false,
+    })
+
+    // Assert — a closed unit is something happening to it, not an empty row.
+    expect(chart.groups.flatMap((group) => group.rows.map((row) => row.unit.ref))).toEqual([
+      '3B-02',
+    ])
+  })
+
+  test('draws the whole building when asked to', () => {
+    // Arrange / Act
+    const chart = chartOf({
+      units: BUILDING,
+      occupancies: OCCUPIED,
+      showEmptyUnits: true,
+    })
+
+    // Assert
+    expect(chart.summary.units).toBe(4)
+    expect(chart.summary.totalUnits).toBe(4)
+  })
+
+  test('a month with nothing in it leaves no rows at all', () => {
+    // Arrange / Act
+    const chart = chartOf({ units: BUILDING, occupancies: [], showEmptyUnits: false })
+
+    // Assert — the screen has an empty state for this; the chart just says so.
+    expect(chart.groups).toEqual([])
+    expect(chart.summary.units).toBe(0)
+    expect(chart.summary.totalUnits).toBe(4)
   })
 })

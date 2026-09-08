@@ -2,7 +2,8 @@ import { isCalendarMonth, monthOf, type CalendarMonth } from '@/components/ui/ca
 import type { StayDate } from '@/lib/domain/dates'
 
 /**
- * The calendar's URL state: which month, and which unit types.
+ * The calendar's URL state: which month, which unit types, and whether the
+ * units with nothing on them are shown.
  *
  * Shared by the server page and the control-line island, so it imports
  * nothing that only one side can load — the same reason the audit screen's
@@ -44,10 +45,28 @@ export function readMonth(value: string | undefined, today: StayDate): CalendarM
 }
 
 /**
- * The calendar's own route for a month and a set of unit types. A null month
- * is "the current one" and writes no param; no params at all is the bare path.
+ * Whether every unit is drawn, or only the ones something happens in.
+ *
+ * The concise grid is the default and writes no param, which is the rule the
+ * month already follows: the view a reader opens on unasked has the bare path.
+ * `?units=all` is the widened one.
  */
-export function calendarHref(month: CalendarMonth | null, types: readonly string[]): string {
+export const ALL_UNITS = 'all'
+
+export function readShowAllUnits(value: string | undefined): boolean {
+  return value === ALL_UNITS
+}
+
+/**
+ * The calendar's own route for a month, a set of unit types, and whether the
+ * empty units are shown. A null month is "the current one" and writes no
+ * param; no params at all is the bare path.
+ */
+export function calendarHref(
+  month: CalendarMonth | null,
+  types: readonly string[],
+  showAllUnits = false,
+): string {
   const params = new URLSearchParams()
 
   if (month !== null) {
@@ -56,6 +75,10 @@ export function calendarHref(month: CalendarMonth | null, types: readonly string
 
   for (const type of types) {
     params.append('type', type)
+  }
+
+  if (showAllUnits) {
+    params.set('units', ALL_UNITS)
   }
 
   const query = params.toString()
