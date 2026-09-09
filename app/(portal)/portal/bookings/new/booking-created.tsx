@@ -75,15 +75,16 @@ export function BookingCreated({ created }: { created: CreatedBooking }) {
             label={isTransfer ? 'To transfer' : 'Paid'}
             value={`BND ${formatCents(created.total)}`}
           />
-          {/* "At check-in", not "collected": nothing has been taken yet. A
-              waived booking says so rather than printing 0.00 — a zero on a
-              receipt invites a second look at money that was never due. */}
+          {/* "Owed", not "collected": nothing has been taken yet, and since
+              prd.md §9.1 the deposit is what secures the booking rather than
+              something the door collects — so a receipt naming check-in was
+              telling a clerk to leave money uncollected. A waived booking says
+              so rather than printing 0.00 — a zero on a receipt invites a
+              second look at money that was never due. */}
           <ReceiptRow
             label="Security deposit"
             value={
-              created.depositWaived
-                ? 'Waived'
-                : `BND ${formatCents(created.securityDeposit)} at check-in`
+              created.depositWaived ? 'Waived' : `BND ${formatCents(created.securityDeposit)} owed`
             }
           />
         </dl>
@@ -93,6 +94,17 @@ export function BookingCreated({ created }: { created: CreatedBooking }) {
         <Notice placement="page" className="mt-md">
           The unit is held for this booking now. It stays held until someone confirms the transfer
           landed, so this booking needs working off the verification queue.
+        </Notice>
+      ) : null}
+
+      {/* The deposit is not taken by this form, and saying nothing about it is
+          how it goes uncollected — which is the whole failure prd.md §9.1's
+          reversal created and the staff half of B16 closes. */}
+      {!created.depositWaived && created.securityDeposit > 0 ? (
+        <Notice placement="page" className="mt-md">
+          The BND {formatCents(created.securityDeposit)} security deposit has not been taken yet. It
+          secures the booking, so record it against this booking as soon as it is paid — in cash at
+          the desk, or as a transfer for the queue to verify.
         </Notice>
       ) : null}
 

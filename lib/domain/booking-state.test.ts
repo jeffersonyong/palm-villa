@@ -35,6 +35,7 @@ const ALL_EVENTS: readonly BookingEvent[] = [
   'submit_payment',
   'verify_payment',
   'pay_in_full',
+  'secure_with_deposit',
   'check_in',
   'check_out',
   'expire',
@@ -100,9 +101,12 @@ describe('the happy paths from prd.md §9.2', () => {
 
 describe('illegal moves are refused', () => {
   test('a booking cannot be confirmed without payment', () => {
-    // The only routes to `confirmed` are verify_payment and pay_in_full. There
-    // is no "confirm" event, which is what keeps booked-ahead pay-on-arrival
-    // out of v1 (prd.md §9.4) structurally rather than by convention.
+    // Three routes to `confirmed`, and every one of them is money arriving:
+    // verify_payment (a transfer somebody checked), pay_in_full (the walk-in
+    // paying the whole price) and secure_with_deposit (the BND 100 counted at
+    // the desk, prd.md §9.1). There is still no "confirm" event, which is what
+    // keeps booked-ahead pay-on-arrival out of v1 (prd.md §9.4) structurally
+    // rather than by convention.
     const reachesConfirmed = ALL_STATUSES.flatMap((status) =>
       allowedEvents(status)
         .map((event) => ({ status, event, result: transition(status, event) }))
@@ -112,8 +116,26 @@ describe('illegal moves are refused', () => {
     expect(reachesConfirmed.map((entry) => entry.event).sort()).toEqual([
       'pay_in_full',
       'pay_in_full',
+      'secure_with_deposit',
+      'secure_with_deposit',
       'verify_payment',
     ])
+  })
+
+  test('the deposit confirms a booking without settling the stay', () => {
+    // prd.md §9.1: a booking is secured by the BND 100 and the stay is paid on
+    // arrival, so this event reaches `confirmed` from both places a booking
+    // can be waiting in. What it deliberately does not do is claim the stay
+    // was paid — that is `pay_in_full`, and the two are separate so the
+    // history cannot say something untrue about money.
+    for (const status of ['draft', 'held'] as const) {
+      const result = transition(status, 'secure_with_deposit')
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+
+      expect(result.status).toBe('confirmed')
+    }
   })
 
   test('a checked-in guest cannot be cancelled or marked no-show', () => {
@@ -134,7 +156,7 @@ describe('illegal moves are refused', () => {
   })
 
   test('a confirmed booking cannot be re-held or re-paid', () => {
-    for (const event of ['hold', 'pay_in_full', 'submit_payment'] as const) {
+    for (const event of ['hold', 'pay_in_full', 'submit_payment', 'secure_with_deposit'] as const) {
       expect(transition('confirmed', event).ok).toBe(false)
     }
   })

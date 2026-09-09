@@ -14,7 +14,7 @@ import { PAYMENT_METHODS, type PaymentMethod } from '@/lib/domain/payment'
  *
  * `check_in` and `check_out` have been in the state machine since the first
  * slice and were reachable only from a test. They become actions here because
- * the deposit slice needs them: prd.md §11 [C] collects the deposit on arrival
+ * the deposit slice needs them: prd.md §11 [C] collects any deposit not already held
  * and inspects the unit after departure, and neither has a moment to happen at
  * until a booking can actually move.
  *

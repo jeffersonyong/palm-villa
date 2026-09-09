@@ -32,6 +32,7 @@ export type BookingEvent =
   | 'submit_payment'
   | 'verify_payment'
   | 'pay_in_full'
+  | 'secure_with_deposit'
   | 'check_in'
   | 'check_out'
   | 'expire'
@@ -59,21 +60,35 @@ const TERMINAL: readonly BookingStatus[] = ['completed', 'expired', 'cancelled',
  * semantics (`hold_expires_at`, the expiry job in architecture.md §6.3) that
  * this path does not have, and whose duration is prd.md §18 N7, still open.
  *
- * There is deliberately no transition that reaches `confirmed` without either a
- * verified payment or a walk-in payment. prd.md §9.4 excludes booked-ahead,
- * pay-on-arrival from v1; §9.4 also notes that adding it later is additive —
- * a new state alongside these, not a rework of them.
+ * `secure_with_deposit` is the deposit taken in cash at the desk (prd.md §9.1,
+ * capability B16). It reaches `confirmed` without the stay being paid at all,
+ * which is exactly what the client's reversal of 10 September 2026 asks for:
+ * a booking is secured by the BND 100, and the stay is settled on arrival. It
+ * is NOT `pay_in_full` wearing two hats — that event means the guest handed
+ * over the whole price, and a booking confirmed on its deposit still owes
+ * every cent of the stay. Naming them the same would make the history say
+ * something untrue about money, which is the one thing §10.7 spent a slice
+ * making legible. A deposit transferred rather than counted uses
+ * `submit_payment` instead, because it has to be verified like any transfer.
+ *
+ * There is deliberately no transition that reaches `confirmed` without either
+ * a verified payment, a walk-in payment, or the deposit that secures it.
+ * prd.md §9.4 excludes booked-ahead, pay-on-arrival from v1; §9.4 also notes
+ * that adding it later is additive — a new state alongside these, not a
+ * rework of them.
  */
 const TRANSITIONS: Readonly<Record<BookingStatus, Partial<Record<BookingEvent, BookingStatus>>>> = {
   draft: {
     hold: 'held',
     submit_payment: 'awaiting_payment_verification',
     pay_in_full: 'confirmed',
+    secure_with_deposit: 'confirmed',
     cancel: 'cancelled',
   },
   held: {
     submit_payment: 'awaiting_payment_verification',
     pay_in_full: 'confirmed',
+    secure_with_deposit: 'confirmed',
     expire: 'expired',
     cancel: 'cancelled',
   },

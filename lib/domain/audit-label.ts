@@ -50,6 +50,7 @@ export const KNOWN_AUDIT_ACTIONS = [
   'booking.submit_payment',
   'booking.verify_payment',
   'booking.pay_in_full',
+  'booking.secure_with_deposit',
   'booking.check_in',
   'booking.check_out',
   'booking.expire',
@@ -181,6 +182,11 @@ const ACTION_LABELS: Readonly<Record<string, string>> = {
   // the money is the payment's event, the status is the booking's.
   'booking.verify_payment': 'Booking confirmed',
   'booking.pay_in_full': 'Booking confirmed',
+  // The same words as the two above it, and deliberately: what confirmed the
+  // booking is the deposit event sitting beside it in the trail, and three
+  // different phrasings for one outcome would make a reader hunt for a
+  // difference that is not there.
+  'booking.secure_with_deposit': 'Booking confirmed',
   'booking.submit_payment': 'Sent for verification',
   'booking.expire': 'Hold expired',
   'booking.mark_no_show': 'Marked no-show',

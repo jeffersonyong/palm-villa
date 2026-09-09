@@ -95,7 +95,7 @@ export interface WalkInBookingState {
     checkOut: string
     total: number
     securityDeposit: number
-    /** Nothing is taken at check-in; the receipt says so rather than printing 0.00. */
+    /** Nothing is owed at all; the receipt says so rather than printing 0.00. */
     depositWaived: boolean
     /** Decides what the confirmation panel says, and which badge it wears. */
     paymentMethod: PaymentMethod
