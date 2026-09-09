@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ChevronRight, SlidersHorizontal } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { ExportCsvButton } from '@/components/portal/export-csv'
 import { matchesSearch, readChoices, readSearch } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
 import { UnitStatusBadge } from '@/components/portal/unit-status-badge'
@@ -19,6 +20,7 @@ import {
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
+import { exportGroup } from '@/lib/db/export'
 import { getUnitTypes } from '@/lib/db/inventory'
 import { listUnitStates, type UnitState } from '@/lib/db/units'
 import { formatStayDate } from '@/lib/domain/dates'
@@ -214,6 +216,10 @@ export default async function UnitsPage({ searchParams }: PageProps) {
               ("1–50 of 54 units") and is the thing that also lets you move, so
               keeping both meant reading the same figure twice in two registers
               a hand's width apart — the register's own conclusion. */}
+
+          {/* The doors, who was in them and how they came back — the same
+              `config.manage` the registry editor beside it answers to. */}
+          {mayEditRegistry ? <ExportCsvButton tables={exportGroup('units')} /> : null}
 
           {/* Hidden rather than disabled for someone who cannot use it: an
               affordance for a screen that will refuse you is worse than no

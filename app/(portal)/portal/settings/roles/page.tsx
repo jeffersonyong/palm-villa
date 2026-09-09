@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { ExportCsvButton } from '@/components/portal/export-csv'
 import { PageHeader } from '@/components/portal/page-header'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
+import { exportGroup } from '@/lib/db/export'
 import { listRolesWithPermissions, listStaff } from '@/lib/db/staff'
 
 import { RolesStaffTabs } from './roles-staff-tabs'
@@ -43,9 +45,13 @@ export default async function RolesSettingsPage() {
 
   return (
     <>
+      {/* The screen has no control line of its own — it is two tabs — so the
+          export sits in the header's action slot. Ungated here: the whole
+          screen already answers to `config.manage`. */}
       <PageHeader
         title="Roles & staff"
         description="Staff accounts and what each role may do. One person can hold several roles."
+        actions={<ExportCsvButton tables={exportGroup('staff')} />}
       />
 
       <RolesStaffTabs staff={staff} roles={roles} currentUserId={actor.userId} />

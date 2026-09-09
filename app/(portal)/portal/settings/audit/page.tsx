@@ -3,6 +3,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { ExportCsvButton } from '@/components/portal/export-csv'
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionHint } from '@/components/portal/section-hint'
 import { readChoices, readSearch } from '@/components/portal/list-params'
@@ -22,6 +23,7 @@ import {
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listAuditTrail, type AuditTrailEvent } from '@/lib/db/audit-trail'
+import { exportGroup } from '@/lib/db/export'
 import { listStaff } from '@/lib/db/staff'
 import {
   auditSubjectHref,
@@ -40,13 +42,49 @@ import { formatTimestamp, isStayDate, type StayDate } from '@/lib/domain/dates'
 import { AuditFilters } from './audit-filters'
 import { AuditPagination } from './audit-pagination'
 import { readPage, readPageSize } from './page-size'
+import { ReasonCell } from './reason-cell'
 
 export const metadata: Metadata = {
   title: 'Audit log',
 }
 
-/** What a cell shows instead of nothing, as on the register. */
-const ABSENT = '—'
+/**
+ * The columns, and what each one is declared to be worth.
+ *
+ * Four are fixed to the longest value each actually holds — a timestamp is
+ * `12 Sept 2026, 14:32` and never longer; a reference over its kind is two
+ * short lines — and one takes whatever the panel has left over.
+ *
+ * **The elastic one is What, not Reason.** Under fixed layout the surplus goes
+ * entirely to the undeclared column, so whichever column that is ends up the
+ * widest on screen — and *Reason* is the worst possible candidate twice over.
+ * It is the column nobody controls, it is empty on most rows, and it was
+ * taking three or four hundred pixels to say "—". *What* is the opposite: the
+ * screen writes it, from a closed vocabulary of short sentences, and it wraps
+ * to a second line without complaint when the panel is narrow. So Reason is
+ * declared at a width that shows the opening of a sentence and hands the rest
+ * to the unfold, and What absorbs the screen.
+ *
+ * That also makes the unfold's threshold exact rather than approximate:
+ * Reason is the same width on every screen, so `CLIPPED_AT` in reason-cell.tsx
+ * can be set against a known number of characters instead of a guess.
+ */
+const COLUMNS = [
+  { label: 'When', width: 176 },
+  { label: 'Who', width: 176 },
+  { label: 'What', width: null },
+  { label: 'Record', width: 144 },
+  { label: 'Reason', width: 264 },
+] as const
+
+/** What What is never squeezed below before the container starts scrolling. */
+const WHAT_MIN_WIDTH = 224
+
+/** Derived, so the floor cannot drift from the widths it is a floor for. */
+const TABLE_MIN_WIDTH = COLUMNS.reduce(
+  (total, column) => total + (column.width ?? WHAT_MIN_WIDTH),
+  0,
+)
 
 /**
  * Everything that has happened, and who did it (capability F4).
@@ -147,7 +185,13 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
         description="Every change to bookings, payments, deposits, charges, units, staff and settings — who did it, and when. Nothing here can be edited or deleted."
       />
 
-      <div className="mt-xl">
+      {/* The export sits at the actions end of the control line rather than
+          on a title line: the trail has no visible heading, and this is the
+          row that produced the rows. It takes the **whole** trail, not the
+          filtered view — the file is the append-only record, and a reader who
+          wanted this month's discounts can filter a spreadsheet as easily as
+          this screen. Ungated: the screen answers to `config.manage`. */}
+      <div className="mt-xl flex flex-wrap items-start gap-md">
         <AuditFilters
           families={families}
           entityTypes={entityTypes}
@@ -157,11 +201,17 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
           to={window?.to ?? null}
           actors={staff.map((account) => ({ id: account.id, name: account.displayName }))}
         />
+
+        <div className="ml-auto">
+          <ExportCsvButton tables={exportGroup('audit')} />
+        </div>
       </div>
 
       <section aria-label="Recorded events" className="mt-lg">
         <Table
           scrollX
+          className="table-fixed"
+          style={{ minWidth: TABLE_MIN_WIDTH }}
           footer={
             <AuditPagination
               page={currentPage}
@@ -171,12 +221,37 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
             />
           }
         >
+          {/* Declared, not auto. Auto layout hands the slack to the widest
+              column, and the widest column here is free text somebody typed —
+              so one long reason narrowed *When*, *Who* and *What* for every
+              row on the screen, and the table's proportions changed from page
+              to page. Four are named and *What* takes what is left (see
+              COLUMNS); a long reason clips to a line and unfolds on request
+              (reason-cell.tsx). Below `TABLE_MIN_WIDTH` the container scrolls
+              rather than squeezing five columns into a phone. */}
+          <colgroup>
+            {COLUMNS.map((column) => (
+              <col key={column.label} style={column.width ? { width: column.width } : undefined} />
+            ))}
+          </colgroup>
+
           <TableHeader>
             <TableHeaderRow>
-              <TableHead className="w-[1%] whitespace-nowrap">When</TableHead>
+              <TableHead className="whitespace-nowrap">When</TableHead>
               <TableHead>Who</TableHead>
               <TableHead>What</TableHead>
-              <TableHead>Record</TableHead>
+              <TableHead>
+                <span className="inline-flex items-center gap-xs">
+                  Record
+                  <SectionHint label="What a record is">
+                    What the event was about, and the only column the search box matches against: a
+                    booking reference, a unit, a role, a facility, a day-pass band, or one of the
+                    property’s own bank accounts — the accounts customers transfer to, whose events
+                    are somebody adding or editing one in Property settings. Guests and staff are
+                    never matched here; look a guest up on the bookings register instead.
+                  </SectionHint>
+                </span>
+              </TableHead>
               <TableHead>
                 <span className="inline-flex items-center gap-xs">
                   Reason
@@ -196,6 +271,13 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
             ) : null}
 
             {events.map((event) => (
+              /* Cells centre in their row, as they do on every other table on
+                 the surface. They were briefly top-aligned, on the argument
+                 that an unfolded reason leaves a tall row — but the Record
+                 column already stacks a reference over its kind, so no row
+                 here was ever one line tall, and top-aligning to serve a state
+                 a reader has to ask for made the ordinary row read differently
+                 from the register beside it. */
               <TableRow key={event.id}>
                 <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                   {formatTimestamp(event.at)}
@@ -207,7 +289,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                 <TableCell>
                   <Subject event={event} actorNames={actorNames} />
                 </TableCell>
-                <ReasonCell event={event} />
+                <ReasonCell reason={reasonOf(event)} />
               </TableRow>
             ))}
           </TableBody>
@@ -224,8 +306,10 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
  */
 function Actor({ id, name }: { id: string | null; name: string | undefined }) {
   return (
-    <span className="flex items-center gap-sm whitespace-nowrap">
-      <Avatar className="size-6">
+    // The name wraps rather than running past the column's declared edge: staff
+    // are entered under the name they are called by, and some of those are long.
+    <span className="flex items-center gap-sm">
+      <Avatar className="size-6 shrink-0">
         <AvatarFallback seed={id ?? undefined}>{id ? initials(name ?? '?') : 'PV'}</AvatarFallback>
       </Avatar>
       <span className={id ? 'text-foreground' : 'text-muted-foreground'}>
@@ -301,39 +385,26 @@ function payloadName(event: AuditTrailEvent): string | null {
  * Why the table is empty — and, when a search is the reason, what the search
  * actually reaches.
  *
- * A term is matched against the Record column and nothing else: the reference,
- * the unit, the bank account. Every other list screen in the portal also finds
- * a guest by name, so somebody arriving here reasonably tries one, gets nothing
- * back, and has no way to tell a bad term from a term this screen never reads.
- * Said at the one moment it is useful, rather than as standing instructions
- * above a table that usually has rows in it.
+ * A term is matched against the Record column and nothing else. Every other
+ * list screen in the portal also finds a guest by name, so somebody arriving
+ * here reasonably tries one, gets nothing back, and has no way to tell a bad
+ * term from a term this screen never reads. Said at the one moment it is
+ * useful; the column's own hint says it in full, for anyone who asks before
+ * they type.
  */
 function emptyMessage(isFiltered: boolean, search: string | null): string {
   if (search !== null) {
-    return `Nothing recorded against “${search}”. Search matches the Record column — a booking reference, a unit, a bank account — not guest or staff names.`
+    return `Nothing recorded against “${search}”. Search matches the Record column — a booking reference, a unit, a role, one of the property’s bank accounts — not guest or staff names.`
   }
 
   return isFiltered ? 'No events match these filters.' : 'Nothing has been recorded yet.'
 }
 
-/**
- * The reason a staff member typed, when the action refused to proceed without
- * one — quoted, because it is somebody's words rather than the screen's.
- *
- * An em dash where there is none, in the muted tone the absent values on the
- * register wear. The column is mostly empty by design, and a blank cell reads
- * as a value that failed to load rather than as an action that was never asked
- * to justify itself.
- */
-function ReasonCell({ event }: { event: AuditTrailEvent }) {
+/** The reason typed at the time, if the action asked for one. */
+function reasonOf(event: AuditTrailEvent): string | null {
   const reason = event.after?.reason
-  const typed = typeof reason === 'string' && reason.length > 0 ? reason : null
 
-  return (
-    <TableCell className={typed ? 'text-copy' : 'text-muted-foreground'}>
-      {typed ? `“${typed}”` : ABSENT}
-    </TableCell>
-  )
+  return typeof reason === 'string' && reason.length > 0 ? reason : null
 }
 
 function readWindow(from?: string, to?: string): { from: StayDate; to: StayDate } | null {

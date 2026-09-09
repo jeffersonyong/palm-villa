@@ -614,19 +614,21 @@
      run the full width of the grid.
 
      It gets its own role rather than borrowing one, because both neighbours
-     are already spoken for and it has to be told apart from them at a glance:
-     the rows are `card`, and `muted` is what the header strip above is filled
-     with *and* what a row fills with on hover. `canvas-sunk` was tried and is
-     only four values off `muted` in light — the two read as the same gray, so
-     the band said "header" rather than "new type". This is a real step past
-     both: one object the eye can follow from the label out to the last day of
-     the month.
+     are spoken for: the rows are `card` and the pinned header strip above is
+     `muted`, and a band scrolling up under a header it is filled the same as
+     reads for a moment as the header having grown. So it is a **half-step
+     between the two** — nearer the header than the rows, in the direction the
+     surface ladder already runs, and the same half-step in both themes.
 
-     Dark steps the same way — away from the card rather than toward it — so
-     the band is deeper than both the rows and the header there too. */
+     It used to be a full step *past* `muted`, away from the card, which made
+     a divider the heaviest tone on the grid. What it was buying — telling the
+     band apart from the header — is now carried by the label instead: the
+     type's name is in ink where the header's columns are in mute. A large
+     area needs far less contrast than a small one to read as an object, and
+     this one is thirty columns wide. */
   --group-band: light-dark(
-    color-mix(in oklab, var(--color-ink) 4%, var(--color-canvas-soft)),
-    color-mix(in oklab, black 28%, var(--color-ink-deep))
+    color-mix(in oklab, var(--color-canvas-soft) 65%, var(--color-canvas)),
+    color-mix(in oklab, var(--color-ink-deep) 65%, var(--color-ink-raised))
   );
 
   /* The subordinate vertical of a date grid, and the one deliberate exception

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Check, ChevronRight } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { ExportCsvButton } from '@/components/portal/export-csv'
 import { readSearch } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +20,7 @@ import {
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
+import { exportGroup } from '@/lib/db/export'
 import { listPendingDeposits } from '@/lib/db/deposits'
 import { listPayments } from '@/lib/db/payments'
 import { elapsedMinutes, formatElapsed, formatStayDate, formatTimestamp } from '@/lib/domain/dates'
@@ -113,6 +115,7 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
     view,
   )
   const mayVerify = hasPermission(actor.permissions, 'payment.verify')
+  const mayExport = hasPermission(actor.permissions, 'config.manage')
 
   return (
     <>
@@ -124,11 +127,13 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
       <div className="mt-xl flex flex-wrap items-center gap-md">
         <PaymentsFilters view={view} search={search ?? ''} />
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-md">
           <h2 id="queue-heading" className="micro-label text-muted-foreground">
             {payments.length} {payments.length === 1 ? 'transfer' : 'transfers'}
             {view === 'waiting' ? ' waiting' : ''}
           </h2>
+
+          {mayExport ? <ExportCsvButton tables={exportGroup('payments')} /> : null}
         </div>
       </div>
 

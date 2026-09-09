@@ -72,8 +72,9 @@ import { TapeChartBar } from './tape-chart-bar'
  * A free night is uncoloured. Availability is the resting state of a building
  * (design.md — `available` is neutral), and forty-eight rows of green would
  * be a wall in which the four that need attention vanish. Colour is spent on
- * bars. Today is a dot under its numeral, never a column fill, and hover is
- * the row alone — the matrix rule.
+ * bars. Today is a chip around its numeral, never a column fill, and hover is
+ * the **night**, not the row: on this grid the cell is the thing being pointed
+ * at, because pointing at it is how a booking starts.
  *
  * ── Choosing a stay ─────────────────────────────────────────────────────────
  *
@@ -229,17 +230,26 @@ export function TapeChartGrid({ chart }: TapeChartGridProps) {
                 )}
               >
                 <span className="sr-only">{formatDayLabel(column.day)}</span>
-                <span aria-hidden className="relative flex flex-col items-center leading-none">
+                <span aria-hidden className="flex flex-col items-center gap-xxs leading-none">
                   <span className="micro-label text-muted-foreground">{column.weekday}</span>
-                  <span className="mt-xxs text-body-sm text-foreground tabular-nums">
+                  {/* Every numeral sits in the same 20px box, and today's is
+                      the only one with a fill in it — the "where am I" chip
+                      the pagination footer and the nav use, at date scale.
+                      It replaced the picker's dot, which hung below the
+                      numeral's line box: the cell has 4px of air under a
+                      three-line stack, so the mark sat all but on the
+                      header's rule and read as a smudge rather than as a
+                      mark. A chip is in the flow, so nothing has to be held
+                      clear of anything, and it says "here" in the language
+                      the rest of the surface already says it in. */}
+                  <span
+                    className={cn(
+                      'flex h-5 min-w-6 items-center justify-center rounded-md px-xxs text-body-sm text-foreground tabular-nums',
+                      column.isToday && 'border border-border bg-card font-medium',
+                    )}
+                  >
                     {Number(column.day.slice(8, 10))}
                   </span>
-                  {column.isToday ? (
-                    /* The date picker's today mark, out of the flow so the
-                       numeral stays where every other numeral is. Held clear
-                       of the header's rule rather than sitting on it. */
-                    <span className="absolute -bottom-[2px] left-1/2 size-[3px] -translate-x-1/2 rounded-full bg-current opacity-70" />
-                  ) : null}
                 </span>
               </th>
             ))}
@@ -247,7 +257,7 @@ export function TapeChartGrid({ chart }: TapeChartGridProps) {
         </TableHeader>
 
         <TableBody className="divide-y-0">
-          {chart.groups.map((group) => (
+          {chart.groups.map((group, groupIndex) => (
             <Fragment key={group.typeId}>
               {/* The type's name in the labelling voice, on a band that runs
                   the width of the grid.
@@ -261,22 +271,43 @@ export function TapeChartGrid({ chart }: TapeChartGridProps) {
                   seeing it. A filled strip is one object the eye can follow
                   all the way out to the last day of the month.
 
-                  Its own tone (`group-band`, globals.css) rather than a
-                  borrowed one: the rows are `card`, and `muted` is both the
-                  header strip above and a row's hover, so a band in either
-                  said "header" rather than "new type". `canvas-sunk` was
-                  tried and sits four values off `muted` in light, which is
-                  not a distinction anybody can see. */}
+                  ── Three cues, none of them loud ──────────────────────────
+
+                  The strip was the heaviest thing on the grid: a tone below
+                  the header's, 32px tall, ruled top AND bottom — and the
+                  bottom rule sat against the first unit row's own top border,
+                  so in the separate model the seam under it drew 2px. A
+                  divider was shouting louder than the data.
+
+                  What says "a new type starts here" now is three quiet things
+                  instead of one loud one: **one** hairline above (the row
+                  below draws its own, and the header draws the first, so a
+                  band never adds a second line to a seam that has one), 28px
+                  rather than 32, and the type's name in **ink** with only its
+                  count in mute — the two-step ladder, which is what carries
+                  the boundary now that the fill does not have to. That frees
+                  `group-band` to be a half-step between the card and the
+                  header strip rather than a tone below both (globals.css). */}
               <TableRow className="hover:bg-transparent">
                 <TableRowHead
                   scope="rowgroup"
-                  className="sticky left-0 z-10 h-8 border-y border-r border-y-divider border-r-divider bg-group-band px-md py-0 micro-label whitespace-nowrap text-muted-foreground"
+                  className={cn(
+                    'sticky left-0 z-10 h-7 border-r border-r-divider bg-group-band px-md py-0 micro-label whitespace-nowrap text-foreground',
+                    groupIndex > 0 && 'border-t border-t-divider',
+                  )}
                 >
-                  {group.name} · {group.rows.length} {group.rows.length === 1 ? 'unit' : 'units'}
+                  {group.name}
+                  <span className="text-muted-foreground">
+                    {' · '}
+                    {group.rows.length} {group.rows.length === 1 ? 'unit' : 'units'}
+                  </span>
                 </TableRowHead>
                 <td
                   colSpan={dayCount}
-                  className="h-8 border-y border-y-divider bg-group-band p-0"
+                  className={cn(
+                    'h-7 bg-group-band p-0',
+                    groupIndex > 0 && 'border-t border-t-divider',
+                  )}
                 />
               </TableRow>
 
@@ -345,8 +376,17 @@ const GridRow = memo(function GridRow({
   const isBanded = (column: number) => isWithinSpan(span, column) || anchorColumn === column
 
   return (
-    <TableRow className="group">
-      <TableRowHead className="sticky left-0 z-10 h-9 border-t border-r border-t-divider border-r-divider bg-card px-md py-0 font-mono text-foreground tabular-nums group-hover:bg-muted/60">
+    /* No row tint. Every other table on the surface lights the whole row under
+       the pointer, and this grid did too — but here the row is not the thing
+       being pointed at. A night is: it is a click that starts a booking, and
+       it answers with a `+` on the `muted` fill. Painting the other twenty-nine
+       cells `muted/60` at the same moment left the one cell that meant
+       something a shade apart from thirty that meant nothing, and the
+       affordance was lost inside its own row. The rules are on every row here,
+       which is what the tint was carrying the eye across on the roles matrix,
+       and the unit column is pinned. */
+    <TableRow className="hover:bg-transparent">
+      <TableRowHead className="sticky left-0 z-10 h-9 border-t border-r border-t-divider border-r-divider bg-card px-md py-0 font-mono text-foreground tabular-nums">
         {row.unit.ref}
       </TableRowHead>
 

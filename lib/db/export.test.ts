@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import { dataClient } from '@/lib/supabase/data'
 
-import { EXPORT_TABLES, exportTableById, readAllRows } from './export'
+import { EXPORT_GROUPS, EXPORT_TABLES, exportGroup, exportTableById, readAllRows } from './export'
 import { currentPropertyId } from './property'
 import {
   givenBooking,
@@ -119,6 +119,30 @@ describe('EXPORT_TABLES', () => {
     expect(document.headers).toEqual(['Section', 'Setting', 'Value'])
     expect(document.rows.map((row) => row[0])).toContain('Rates')
     expect(document.rows.map((row) => row[1])).toContain('BIBD')
+  })
+})
+
+/**
+ * F5 is a promise about *coverage* — "export all business data" — and the
+ * screen that used to list every table by name is what made coverage obvious.
+ * Now that each table is downloaded from the screen whose records it holds,
+ * nothing on any one screen can notice a table that was never given a home.
+ * This is what notices: a new table added to EXPORT_TABLES and left out of
+ * EXPORT_GROUPS fails here rather than becoming quietly unexportable.
+ */
+describe('EXPORT_GROUPS', () => {
+  test('every table is downloadable from exactly one screen', () => {
+    const grouped = Object.values(EXPORT_GROUPS).flat()
+
+    expect([...grouped].sort()).toEqual([...EXPORT_TABLES.map((table) => table.id)].sort())
+    expect(new Set(grouped).size, 'a table is listed on two screens').toBe(grouped.length)
+  })
+
+  test('a group resolves to the labels the menu shows', () => {
+    expect(exportGroup('deposits')).toEqual([
+      { id: 'deposits', label: 'Deposits' },
+      { id: 'deposit-charges', label: 'Charges' },
+    ])
   })
 })
 

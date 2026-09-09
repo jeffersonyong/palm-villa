@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 
 import { DepositStageBadge } from '@/components/portal/deposit-stage-badge'
 import { EmptyState } from '@/components/portal/empty-state'
+import { ExportCsvButton } from '@/components/portal/export-csv'
 import { overlapRangeOf, readSearch, readStayWindow } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
+import { exportGroup } from '@/lib/db/export'
 import {
   listHeldDeposits,
   listOwedDeposits,
@@ -131,6 +133,8 @@ export default async function DepositsPage({ searchParams }: PageProps) {
     )
   }
 
+  const mayExport = hasPermission(actor.permissions, 'config.manage')
+
   // Anything unusable — a hand-edited URL, half a date pair, a reversed range —
   // falls back to no filter rather than erroring, like every other param in
   // the portal.
@@ -231,11 +235,10 @@ export default async function DepositsPage({ searchParams }: PageProps) {
         otherParams={tileParams}
       />
 
-      {/* The control line, directly above the table it narrows. Chips only:
+      {/* The control line, directly above the table it narrows. No primary:
           a ledger has nothing to create — a deposit is recorded when a guest
-          is checked in — and nowhere else to go, so the slot on the right
-          that other list screens fill stays empty rather than holding
-          something to fill it. */}
+          is checked in — so the right-hand slot holds the one action a ledger
+          does have, which is taking it away as a spreadsheet. */}
       <div className="mt-md flex flex-wrap items-center gap-md">
         <DepositsFilters
           stages={stages}
@@ -244,6 +247,12 @@ export default async function DepositsPage({ searchParams }: PageProps) {
           view={view}
           search={search ?? ''}
         />
+
+        {mayExport ? (
+          <div className="ml-auto">
+            <ExportCsvButton tables={exportGroup('deposits')} />
+          </div>
+        ) : null}
       </div>
 
       <section aria-label="Deposits" className="mt-md">
