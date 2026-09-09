@@ -6,8 +6,9 @@ import { Card } from '@/components/ui/card'
 import { QuoteLines } from '@/components/quote-lines'
 import { getBookingByAccessToken } from '@/lib/db/public-bookings'
 import { readPropertySettings } from '@/lib/db/settings'
+import { balanceOf } from '@/lib/domain/balance'
 import { formatStayDate, formatStayRange, nightsBetween } from '@/lib/domain/dates'
-import { formatCents } from '@/lib/domain/money'
+import { formatCents, type Cents } from '@/lib/domain/money'
 import { CLOSED_REASONS, publicStageOf, transferPlanFor } from '@/lib/domain/public-booking'
 
 import { TransferInstructions } from './transfer-instructions'
@@ -94,7 +95,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
           <Callout tone="positive" className="mt-xl">
             Your booking is confirmed.{' '}
             {booking.stream === 'short_stay'
-              ? `The BND ${formatCents(booking.total)} for the stay is settled when you arrive.`
+              ? arrivalSentence(booking)
               : 'Show this reference at the gate.'}
           </Callout>
         ) : null}
@@ -157,6 +158,23 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
       </div>
     </section>
   )
+}
+
+/**
+ * What a confirmed guest still owes when they arrive.
+ *
+ * `balanceOf` rather than `total`, which is what this said until capability
+ * A8: a guest who chose "everything now" has already paid for the stay, and
+ * telling them the whole figure is due on arrival is a phone call to the desk
+ * — or a guest who pays twice. The confirmation email states the same figure
+ * from the same function, so the two surfaces cannot disagree about money.
+ */
+function arrivalSentence(booking: { total: Cents; paid: Cents }): string {
+  const { outstanding } = balanceOf(booking.total, booking.paid)
+
+  return outstanding > 0
+    ? `The BND ${formatCents(outstanding)} for the stay is settled when you arrive.`
+    : 'Everything is settled — there is nothing to pay on arrival.'
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

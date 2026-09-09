@@ -99,35 +99,19 @@ export const bookingSteps: BookingStep[] = [
   },
   {
     title: 'You’re confirmed',
-    description: 'Your confirmation and entry QR code arrive by email. Show the QR on arrival.',
+    description:
+      'Your confirmation arrives by email, with a link back to your booking. Quote your reference on arrival.',
   },
 ]
 
 /**
- * Contact details as supplied by the client on 2026-08-27.
+ * Contact details, re-exported so every existing consumer is unchanged.
  *
- * [C] 2026-09-05 (N14): all three numbers carry WhatsApp, and all three are
- * shown. A customer picks one and tries another if nobody answers — which is
- * what they do today anyway, and it needs no routing rule nobody has agreed.
- *
- * `whatsappUrl` remains because a single "Message us on WhatsApp" button has to
- * open one chat. It opens the first listed. Every surface that can show a
- * *list* shows all three.
+ * They moved to `lib/domain/contact.ts` with capability A8: the confirmation
+ * email's footer carries the three numbers, and `lib/domain` may not import
+ * from `app/`.
  */
-export const contact = {
-  phones: [
-    { display: '+673 8959798', whatsappUrl: 'https://wa.me/6738959798' },
-    { display: '+673 8837118', whatsappUrl: 'https://wa.me/6738837118' },
-    { display: '+673 8986733', whatsappUrl: 'https://wa.me/6738986733' },
-  ],
-  whatsappUrl: 'https://wa.me/6738959798',
-  instagramHandle: '@palmvilla.bn',
-  instagramUrl: 'https://instagram.com/palmvilla.bn',
-  tiktokHandle: '@palmvilla.bn',
-  tiktokUrl: 'https://tiktok.com/@palmvilla.bn',
-  /** Palm Villa, 4.570085, 114.220738. */
-  mapsUrl: 'https://www.google.com/maps/search/?api=1&query=4.570085,114.220738',
-}
+export { contact } from '@/lib/domain/contact'
 
 /**
  * Open [O] items from prd.md §18 that a customer would expect answered before

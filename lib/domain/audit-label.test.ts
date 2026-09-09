@@ -44,6 +44,29 @@ describe('describeAuditEvent', () => {
     expect(describeAuditEvent(event('booking.teleported'))).toBe('teleported')
   })
 
+  test('names which email was sent', () => {
+    expect(describeAuditEvent(event('email.sent', { after: { kind: 'booking_confirmed' } }))).toBe(
+      'Confirmation email sent',
+    )
+    expect(describeAuditEvent(event('email.sent', { after: { kind: 'booking_created' } }))).toBe(
+      'Booking email sent',
+    )
+  })
+
+  test('says why an email did not reach the guest', () => {
+    expect(
+      describeAuditEvent(
+        event('email.failed', { after: { kind: 'booking_confirmed', failure: 'rejected' } }),
+      ),
+    ).toBe('Confirmation email could not be sent — the mail service refused it')
+  })
+
+  test('reads as a sentence even when the failure is one it has no words for', () => {
+    expect(describeAuditEvent(event('email.failed', { after: { failure: 'something_new' } }))).toBe(
+      'Email could not be sent — something new',
+    )
+  })
+
   test('names how a walk-in paid, because it changes what happened', () => {
     expect(describeAuditEvent(event('booking.created_walk_in'))).toContain('paid on the spot')
     expect(

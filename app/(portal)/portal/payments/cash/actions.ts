@@ -8,6 +8,8 @@ import { getBookingByReference } from '@/lib/db/bookings'
 import { recordCashPayment } from '@/lib/db/payments'
 import { centsFromInput } from '@/lib/domain/money'
 
+import { scheduleBookingConfirmedEmail } from '@/app/schedule-booking-email'
+
 import { scheduleAccountingPack } from '../../schedule-accounting-pack'
 
 /**
@@ -131,6 +133,13 @@ export async function recordCashAction(
   // Cash is born verified, so the accounting record can be written now
   // (capability G5). After the response.
   scheduleAccountingPack(booking.id)
+
+  // Cash taken against a booking that was still waiting is what confirms it,
+  // and the guest is told so (capability A8). Cash against a booking already
+  // confirmed moves nothing and sends nothing.
+  if (result.confirmedNow) {
+    scheduleBookingConfirmedEmail(booking.id)
+  }
 
   return {
     status: 'done',

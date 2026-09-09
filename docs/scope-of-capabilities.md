@@ -33,7 +33,7 @@ Everyone works from the same live data, so availability, payments, and booking s
 | A5 | Receive bank transfer instructions (BIBD / Baiduri) with a unique payment reference to include in the transfer |
 | A6 | Upload their transfer slip directly, instead of sending it over WhatsApp |
 | A7 | Provide guest details and identity document as part of the booking, replacing the paper/WhatsApp collection step |
-| A8 | Receive booking confirmation and an entry QR code by email — delivered as a forwardable image so staff can also send it in an existing WhatsApp conversation |
+| A8 | Receive booking confirmation and an entry QR code by email — delivered as a forwardable image so staff can also send it in an existing WhatsApp conversation — **email half delivered 14 September 2026; the QR travels with the security screen (D3), see the notes below** |
 | A9 | Look up their own booking any time using booking reference + phone number |
 | A10 | Get answers to common questions from a self-serve FAQ page |
 | A11 | Browse a public landing page presenting the day-pass facilities, the unit types and "from" rates, with an enquiry route for long-term lets — **(proposed 27 August 2026, pending client agreement — not yet part of the quoted delivery)** |
@@ -54,7 +54,21 @@ Everyone works from the same live data, so availability, payments, and booking s
 > - **The public site is defended without a CAPTCHA.** A hidden field, a request counter, and a cap on how many unpaid bookings one phone number may hold at once. The last is the one that protects rooms; the numbers behind all three are in the register.
 > - **The 2-bedroom is not on sale.** It has no units until the count is agreed, so it is not offered rather than shown as full on every night.
 >
-> **Still to come on this surface:** the customer uploading their transfer slip (A6) and identity document (A7), the confirmation email and QR code (A8), looking a booking up by reference and phone (A9), and the FAQ (A10).
+> **Still to come on this surface:** the customer uploading their transfer slip (A6) and identity document (A7), the entry QR code (A8's other half), looking a booking up by reference and phone (A9), and the FAQ (A10).
+
+---
+
+> **A8's email half delivered 14 September 2026.** A customer who books now receives two emails: one when they book, carrying the reference, what to transfer, the bank accounts and a link back to their own booking page; one when the desk verifies the money, confirming it and saying what is left to pay on arrival. Before this, everything a customer needed lived on one page behind one link nobody had sent them — close the tab and the only way back was to message the office, which is the habit this product exists to replace.
+>
+> Five things worth saying plainly:
+>
+> - **The QR code is deliberately not in this half.** Nothing can read one yet: checking a guest in is still a desk action, because who may do it at the gate is unanswered (N11), and the security screen that would scan a code is unbuilt. A code issued now would also stop working the day the domain changes, so every guest who had one would need a new one. It arrives with the arrivals screen, and the emails say what to quote instead of promising a code that does nothing.
+> - **Nothing is being sent yet, and that is the domain question.** The mail service will only deliver to the developer's own address until a Palm Villa sending domain is verified, and no domain has been chosen. The feature is finished, tested and switched off; turning it on is one setting and a few DNS records, on the day the domain is decided. **This is now the thing the unanswered domain question is holding up.**
+> - **One email per booking, and only ever these two.** The booking form promises "we will not email you anything else", so it is a standing constraint rather than a preference: no reminders, no marketing, no receipts for each payment. A guest who pays in three instalments hears once.
+> - **The confirmation states what is actually left to pay**, which the booking page had been getting wrong. A guest who chose to send everything up front was still being told the whole stay was due on arrival. Both surfaces now read the same figure from the same place, so they cannot disagree — and a guest cannot be asked twice for money they have already sent.
+> - **A guest cannot be used to send mail to a stranger.** Anyone can reach the booking form, so the address a booking names is capped at a few emails a day — the only limit in the system that protects somebody other than the property.
+>
+> **Two things the desk should know.** A booking made online without an email address says so on its own screen, so somebody knows to confirm by phone or WhatsApp. And when an email cannot be delivered, that is recorded on the booking's history with the reason — the desk reads it there and falls back to WhatsApp, which is what it does today anyway.
 
 > **A11 is provisional.** A1–A10 describe a booking site; a marketing landing page is a separate surface that was built ahead of agreement and is recorded here so the baseline stays honest. It is included in the quoted work only once confirmed.
 

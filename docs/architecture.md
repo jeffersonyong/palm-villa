@@ -19,7 +19,7 @@
 | Hosting | **Vercel** (personal account) | Zero-ops deployment, preview deployments per PR. |
 | Database / Auth / Storage | **Supabase** (personal account), region **`ap-southeast-1` (Singapore)** | Postgres with the constraints this domain needs; closest region to Brunei; keeps personal data in-region, the defensible position under Brunei's PDPO. |
 | Styling | **Tailwind CSS + shadcn/ui**, themed from `design.md` tokens | Known toolchain; shadcn components re-skinned via CSS variables. |
-| Email | **Resend** | Transactional confirmations and QR delivery. Assumed; swappable. |
+| Email | **Resend**, over its REST API | Transactional confirmations and QR delivery. **No npm dependency** (14 September 2026, capability A8): the surface used is one endpoint, five body fields and one response field, so `lib/email/send.ts` posts to it directly — the reasoning `lib/auth/access-token.ts` already applied to `nanoid`. The SDK earns its keep the day bounce webhooks are handled, and that is the day to take it. Swappable. |
 | QR generation | **`qrcode`** (npm), server-side | Produces a PNG at confirmation time for email attachment and WhatsApp forwarding. |
 | PDF generation | **`pdf-lib`** | Accounting pack assembly server-side. |
 | Payments | **None in v1** | Bank transfer + manual verification per PRD §10. A `PaymentProvider` interface isolates this so a gateway can be added without touching booking logic. |
@@ -82,7 +82,7 @@ Supabase Auth, email + password. Staff accounts are created by an Admin; there i
 **No accounts.** Guest checkout only (PRD decision). Post-booking access is via:
 
 1. **Booking lookup**: reference + phone number, on the public site.
-2. **Magic link**: `booking.access_token` — 16 random bytes in base64url from `node:crypto`, unique-indexed, minted when a customer books online (13 September 2026). It is the whole control on `/booking/{token}`, since there is no session behind that page: the shape is checked before the token reaches a query, and a malformed token and an unknown one render the same 404 so a guesser learns nothing from the difference. Deliberately **not** the reference, which is short, sequential and printed on a transfer (§6.1). The confirmation email that will carry it is A8, still unbuilt; `nanoid` is still not a dependency and `node:crypto` gives the same 128 bits.
+2. **Magic link**: `booking.access_token` — 16 random bytes in base64url from `node:crypto`, unique-indexed, minted when a customer books online (13 September 2026). It is the whole control on `/booking/{token}`, since there is no session behind that page: the shape is checked before the token reaches a query, and a malformed token and an unknown one render the same 404 so a guesser learns nothing from the difference. Deliberately **not** the reference, which is short, sequential and printed on a transfer (§6.1). The confirmation email carrying it landed on 14 September 2026 (§9); `nanoid` is still not a dependency and `node:crypto` gives the same 128 bits.
 3. **QR token**: see §7.
 
 ### Field staff
@@ -395,7 +395,30 @@ Everything above holds as written; the accounting pack followed a day later (§8
 
 ## 9. Email
 
-Resend, transactional only: booking created (payment instructions + deadline), booking confirmed (QR attached), payment reminder before hold expiry, deposit release note. **No auth emails** — staff provisioning and password resets are out-of-band (§3), and Supabase's own auth mailer stays unused. Sender uses the Vercel-hosted domain until the client selects a domain, at which point the domain is verified in Resend and templates re-pointed. Email capture is added to the booking form; where a customer provides no email, delivery falls back to staff forwarding the QR image via WhatsApp (accepted v1 gap, PRD assumption A6). **The capture half landed on 13 September 2026** with the public booking forms — `guest.email` is written for the first time, optional, because refusing a booking for want of an address nothing yet sends to would lose the booking. **Nothing sends any email**: Resend is still not installed and no template exists. That is capability A8.
+Resend, transactional only, and **two templates rather than the four this section used to name** (14 September 2026, capability A8's email half):
+
+| When | What it says |
+|---|---|
+| A booking is created | The reference, what to transfer and what each amount is for, the bank accounts, and the link back to `/booking/{token}`. |
+| A payment or deposit is verified | Confirmed: the dates, the deposit held, and what is still owed on arrival. |
+
+**Two templates were struck rather than written, because they described behaviour the product deliberately does not have.** "Payment instructions **+ deadline**" and "payment reminder **before hold expiry**" both assume a hold that expires; [N7](open-questions.md) made the hold indefinite by the client's own decision on 10 September, and N38 answered that chasing an unpaid booking is the desk's job. A reminder is now a cron the plan has no room for rather than a template nobody wrote — see the retry note below. The deposit release note is still unbuilt and belongs to the E-series, not here.
+
+**No QR yet.** A8 promises a confirmation *and* an entry QR code; this is the first half, and the emails mention no code. Nothing can read one — check-in authority is [N11](open-questions.md) and no code has been issued — and every code minted before the domain cutover (§13) would need regenerating. The QR travels with the security gate screen.
+
+**No auth emails** — staff provisioning and password resets are out-of-band (§3), and Supabase's own auth mailer stays unused. Where a customer gives no address, delivery falls back to staff forwarding over WhatsApp (accepted v1 gap, PRD assumption A6), and the booking screen says so on a booking made online without one.
+
+**Three layers, which are `pack.ts`'s three in a third medium.** `lib/domain/booking-email.ts` decides what each email says and is pure; `lib/email/render.ts` draws it and decides nothing; `lib/db/booking-emails.ts` reads the facts, renders, sends and files the audit row. The renderer transcribes design.md's light-theme tokens as flat hex for the reason the PDF renderer holds `rgb()` literals — an email client can read neither a CSS variable nor `color-mix()` — and its test asserts every colour in the output is one of them. Table markup and inline styles throughout, because Outlook on Windows renders through Word; that is true of this file and nothing else.
+
+**Scheduling and failure.** `app/schedule-booking-email.ts` wraps `after()` exactly as `schedule-accounting-pack.ts` does: fire-and-forget, logged and swallowed, never surfaced — a booking was still made, and refusing it because a mail service was unreachable would be a lie about what the person did. Six call sites: the two public forms (before their `redirect()`, which `after()` survives), and the four portal actions that can confirm a booking. Each of the four tests `confirmedNow` rather than the booking's status, because a top-up verified against an already-confirmed booking leaves the status reading `confirmed` while nothing moved — keying on the status would email the guest again on every payment.
+
+**There is no retry cron.** `vercel.json` holds two crons and two is the Hobby ceiling (§10), and the packs job's due-list requires a verified payment so it could never see a *created*-email failure. What stands in for one is two attempts a second apart inside the same `after()`, for the four failure classes that might not repeat, under an `Idempotency-Key` of `pv.<kind>.<bookingId>` — derived from the booking and never the attempt, so a retry, or an `after()` the platform runs twice, cannot send a second copy. Beyond that: an `email.failed` row on the booking's own history, and the desk falling back to WhatsApp.
+
+**Configuration, and why sending is off.** `SITE_ORIGIN`, `EMAIL_FROM`, `RESEND_API_KEY` (§10). `SITE_ORIGIN` is configuration and **never the request's `Host` header** — the booking form is public, so a link built from a header is one an attacker redirects with a single crafted POST. `RESEND_API_KEY` is the one variable `lib/env.ts` allows to be absent: Resend delivers only to the account owner until a sending domain is verified and none is chosen, so *not sending* is a supported configuration rather than a broken one, and a booking must never fail for it. Nothing is written to a booking's history in that case — it is one fact about the environment, not a fact about each booking. `/api/dev/email-preview` renders all four combinations in a browser and 404s outside development, which is how the design is reviewed while nothing sends.
+
+**Nothing is logged that names a guest.** A failure logs the booking id, the kind and the failure class; the audit row carries the recipient's **domain** and never the address, because `audit_event` is append-only by trigger and nothing written there can be redacted later.
+
+**One abuse control that protects the recipient rather than the property.** Every other public counter keys on the caller — an address or a phone number — so a script rotating phone numbers could send a stranger hundreds of genuine Palm Villa emails, and the cost is complaints against a sending domain with no reputation yet. `PUBLIC_LIMITS.emailsPerAddressPerDay` keys on the recipient and, alone among the counters, **fails closed**: a database hiccup may safely skip an email, and must not take the booking site down.
 
 ---
 
@@ -412,7 +435,8 @@ Resend, transactional only: booking created (payment instructions + deadline), b
 - Secrets live in Vercel env vars and Supabase config; nothing secret in the repository.
 - Backups: Supabase automated daily backups; restore procedure tested once before go-live and documented in the repo.
 - Observability: Vercel logs plus Sentry (free tier) for error reporting. A 24/7 booking system with a solo maintainer needs errors to announce themselves.
-- Scheduled jobs: two Vercel crons in `vercel.json` — document retention (§8.1) and accounting packs (§8.2), both daily. **Two is the Hobby plan's ceiling**, and Hobby promises the hour rather than the minute, which is why the two sit in different hours. §6.3's five-minute hold-expiry job cannot run on Hobby at all, so the project moves to Pro when that job is built.
+- Scheduled jobs: two Vercel crons in `vercel.json` — document retention (§8.1) and accounting packs (§8.2), both daily. **Two is the Hobby plan's ceiling**, and Hobby promises the hour rather than the minute, which is why the two sit in different hours. §6.3's five-minute hold-expiry job cannot run on Hobby at all, so the project moves to Pro when that job is built. **The ceiling has now cost something** (14 September 2026): capability A8's email has no retry job because there is no third slot, so a failed send is retried twice inside the request and then recorded rather than queued (§9). A payment reminder, which N38 keeps as the desk's job today, would need the same slot.
+- Environment variables, beyond Supabase's own: `CRON_SECRET` (§8.1), and for email (§9) `SITE_ORIGIN`, `EMAIL_FROM` and `RESEND_API_KEY`. All are read through `lib/env.ts`, which throws on a missing one at first use — with one deliberate exception, `RESEND_API_KEY`, whose absence means this deployment does not send. `.env.example` documents each.
 
 ---
 
@@ -430,7 +454,7 @@ Everything is scoped by `property_id`; rates, fees, policies, facilities and ret
 
 ## 13. Open engineering items
 
-1. Client domain not yet selected; Vercel domain in use for QR URLs and email until then (links in issued QRs survive a domain move only if re-generated — regenerate tokensʼ QR images after the domain cutover).
+1. Client domain not yet selected; Vercel domain in use for QR URLs and email until then (links in issued QRs survive a domain move only if re-generated — regenerate tokensʼ QR images after the domain cutover). **This stopped being cosmetic on 14 September 2026.** Until a domain is verified in Resend, the mail service delivers only to the account owner's own address — so the confirmation email (capability A8) is built, tested and switched **off** in every environment, and the client cannot be shown it working. The switch is one environment variable (`RESEND_API_KEY`, §9) plus the DNS records Resend asks for. See also [N42](open-questions.md), which is the sender address the same conversation has to settle.
 2. Statement import format for phase-two auto-matching (depends on BIBD/Baiduri export capabilities — to investigate with real exports).
 3. WhatsApp Business API evaluation (deferred; manual forwarding accepted in v1).
 4. Whether the field surface needs Malay (PRD C4); i18n is not scaffolded in v1 and would be added via `next-intl` if confirmed.

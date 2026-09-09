@@ -370,6 +370,20 @@ function GuestAndStaySummary({
           href={`tel:${booking.guestPhone.replace(/\s+/g, '')}`}
           figures
         />
+        {/* Where the confirmation went, or why it went nowhere (capability
+            A8). The hint is only for a booking made online: the desk has
+            never asked for an address, so its absence on a walk-in is normal
+            and saying so on every one of them would be noise. */}
+        <Field
+          label="Email"
+          value={booking.guestEmail ?? 'None on file'}
+          href={booking.guestEmail ? `mailto:${booking.guestEmail}` : undefined}
+          hint={
+            booking.guestEmail === null && booking.accessToken !== null
+              ? 'Booked online without one — confirm by phone or WhatsApp'
+              : undefined
+          }
+        />
         {/* A booking with no occupancy is a day pass — it consumes facility
             capacity on a date and occupies no unit (prd.md §6.1). Nothing
             writes one yet, so this is the register's shape reaching the record

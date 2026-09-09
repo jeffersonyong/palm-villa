@@ -13,6 +13,8 @@ import { centsFromInput } from '@/lib/domain/money'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { isNoteAudience, MAX_NOTE_LENGTH } from '@/lib/domain/note'
 
+import { scheduleBookingConfirmedEmail } from '@/app/schedule-booking-email'
+
 import { scheduleAccountingPack } from '../../schedule-accounting-pack'
 
 /**
@@ -327,6 +329,12 @@ export async function recordPaymentAction(
   // not money until somebody has checked the bank, and verifying it is where
   // the pack gets assembled.
   scheduleAccountingPack(booking.id)
+
+  // And the same test for the confirmation email (capability A8): the guest
+  // hears once, when the booking actually becomes confirmed.
+  if (recorded.confirmedNow) {
+    scheduleBookingConfirmedEmail(booking.id)
+  }
 
   return { status: 'done', recorded: { method: 'cash', amount } }
 }

@@ -660,7 +660,11 @@ All three of the bullets above are built, for a customer booking online. The des
 
 **[C]** A copy of the guest's IC is required for registration. Name and vehicle registration are required for records and security.
 
-**[C] An email address is captured, and it is optional** (13 September 2026, capabilities A1–A4). `guest.email` has existed since the first migration and nothing had ever written it; the public booking form is what architecture.md §9 meant by "email capture is added to the booking form". It is optional because A6’s fallback is a staff member forwarding the QR over WhatsApp (assumption A6), and refusing a booking for want of an address nobody needs yet would lose the booking. Nothing sends email — that is A8, still phase two.
+**[C] An email address is captured, and it is optional** (13 September 2026, capabilities A1–A4). `guest.email` has existed since the first migration and nothing had ever written it; the public booking form is what architecture.md §9 meant by "email capture is added to the booking form". It is optional because A6’s fallback is a staff member forwarding the QR over WhatsApp (assumption A6), and refusing a booking for want of an address nobody needs yet would lose the booking.
+
+**[C] Two emails are sent to that address, and never a third** (14 September 2026, capability A8's email half — see [architecture.md §9](architecture.md)). One when the booking is made, carrying the reference, the amounts and the bank accounts; one when the money is verified. The field's own hint on the form says *"For your confirmation. We will not email you anything else"*, which makes this a **standing constraint on every later slice** rather than a preference: a reminder, a receipt per payment or anything marketing would break a promise the customer was shown as they typed. It is also why the optionality above still holds — a booking with no address is confirmed by phone, as it is today, and the desk is told which bookings those are.
+
+Nothing is actually delivered until a sending domain is verified, which is [N42](open-questions.md) and architecture.md §13 item 1.
 
 **[A] A booking records every vehicle arriving on it, and the guest with no car says so explicitly.** §6.2 already sketches vehicle registrations as a list, and §12.5 makes plate lookup the guard's primary path — a family arriving in two cars has one of them unfindable at the gate if only one plate is stored. Two assumptions sit on top of the [C] above, neither confirmed with Jason:
 

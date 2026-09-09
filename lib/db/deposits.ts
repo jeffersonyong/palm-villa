@@ -741,10 +741,20 @@ export interface VerifyDepositInput {
  * `verify_payment()`'s arrangement for a top-up, and for the same reason:
  * writing `confirmed → confirmed` would put a second confirmation line in a
  * history for a booking that never moved.
+ *
+ * It returns the booking it collected against, and whether this call is what
+ * confirmed it — both for capability A8's confirmation email, which is the
+ * only thing that has ever needed them. The paragraph above is what makes
+ * `confirmedNow` answerable: `verify_payment` is the one edge into
+ * `confirmed`, so a booking moved here or it was already there.
+ *
+ * **Still no accounting pack**, and that is unchanged by the widening: a
+ * deposit is not money against the booking, it settles nothing, and the pack
+ * arrives when the stay itself is paid on arrival (capability G5).
  */
 export async function verifyDeposit(
   input: VerifyDepositInput,
-): Promise<DepositWriteResult<{ amount: Cents }>> {
+): Promise<DepositWriteResult<{ amount: Cents; bookingId: string; confirmedNow: boolean }>> {
   const propertyId = await currentPropertyId()
 
   const { data: row, error: readError } = await dataClient()
@@ -782,13 +792,18 @@ export async function verifyDeposit(
     throw new Error(`Could not verify the deposit: ${error.message}`)
   }
 
-  const result = data as { ok: true; amount_cents: number } | RpcRefusal
+  const result = data as { ok: true; amount_cents: number; booking_id: string } | RpcRefusal
 
   if (!result.ok) {
     return { ok: false, error: describeVerifyDepositFailure(result) }
   }
 
-  return { ok: true, amount: result.amount_cents }
+  return {
+    ok: true,
+    amount: result.amount_cents,
+    bookingId: result.booking_id,
+    confirmedNow: next.ok,
+  }
 }
 
 function describeVerifyDepositFailure(result: RpcRefusal): DepositWriteError {

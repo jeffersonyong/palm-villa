@@ -41,6 +41,32 @@ export function isAccessToken(value: string): boolean {
 export const MAX_GUEST_EMAIL_LENGTH = 254
 
 /**
+ * Enough of an address to be worth sending to.
+ *
+ * Deliberately not an RFC 5322 validator: those refuse addresses that work and
+ * accept ones that do not, and the only authority on whether an address exists
+ * is the mail server that accepts it. What this refuses is the small set of
+ * strings that are *certainly* not one address — the ones that would otherwise
+ * be handed to a third party and billed for.
+ *
+ * The comma and the whitespace matter more than the shape. The field was a
+ * bare `includes('@')` check until capability A8, which was fine while nothing
+ * read it; a string containing a comma is two recipients to some parsers and
+ * one bounce to others, and neither is what the guest typed.
+ */
+export function isLikelyEmailAddress(value: string): boolean {
+  const trimmed = value.trim()
+
+  if (trimmed.length === 0 || trimmed.length > MAX_GUEST_EMAIL_LENGTH) {
+    return false
+  }
+
+  // One `@`, something either side, a dot in the domain, and no character that
+  // separates one address from another.
+  return /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>".]+$/.test(trimmed)
+}
+
+/**
  * ── Limits ─────────────────────────────────────────────────────────────────
  *
  * prd.md §9.3's hold is indefinite by the client's own decision (N7) and, from
@@ -70,6 +96,21 @@ export const PUBLIC_LIMITS = {
   openBookingsPerPhone: 3,
   /** "I've made the transfer" presses from one address in an hour. */
   submitsPerIpPerHour: 30,
+  /**
+   * Emails sent to one address in a day (capability A8).
+   *
+   * The only limit here that protects somebody other than the property. Every
+   * other counter keys on the caller — an IP or a phone number — so a script
+   * rotating phone numbers behind one address can make ten bookings an hour
+   * naming a victim's inbox, and each one would send them mail. The cost is
+   * not bandwidth: it is complaints against a sending domain, which is close
+   * to unrecoverable for a domain with no reputation yet.
+   *
+   * Five, because a family who books, amends and books again is nowhere near
+   * it, and because a booking is never refused for tripping it — only the
+   * email is skipped.
+   */
+  emailsPerAddressPerDay: 5,
 } as const
 
 export const HOUR_IN_SECONDS = 3600
