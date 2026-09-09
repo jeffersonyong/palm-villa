@@ -6,6 +6,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
+import { scheduleBookingCreatedEmail } from '@/app/schedule-booking-email'
 import { clientIpFrom, hashPublicKey } from '@/lib/auth/access-token'
 import { createPublicDayPassBooking, notePublicAttempt } from '@/lib/db/public-bookings'
 import { getPropertyConfig } from '@/lib/db/property-config'
@@ -15,6 +16,7 @@ import { priceDayPass } from '@/lib/domain/pricing/day-pass'
 import {
   DAY_IN_SECONDS,
   HOUR_IN_SECONDS,
+  isLikelyEmailAddress,
   MAX_GUEST_EMAIL_LENGTH,
   PUBLIC_LIMITS,
 } from '@/lib/domain/public-booking'
@@ -47,7 +49,7 @@ const dayPassSchema = z.object({
     .string()
     .trim()
     .max(MAX_GUEST_EMAIL_LENGTH)
-    .refine((value) => value === '' || value.includes('@'), 'Check the email address.')
+    .refine((value) => value === '' || isLikelyEmailAddress(value), 'Check the email address.')
     .default(''),
   vehicles: z.array(z.string().max(MAX_VEHICLE_REGISTRATION_LENGTH)).max(MAX_VEHICLES_PER_BOOKING),
   noVehicle: z.enum(['true', 'false']).default('false'),
@@ -168,6 +170,10 @@ export async function createPublicDayPassAction(
 
   revalidatePath('/portal/bookings')
   revalidatePath('/portal')
+
+  // Before the redirect, which throws — see the stay action for why that is
+  // still enough for `after()` to run it.
+  scheduleBookingCreatedEmail(created.data.bookingId)
 
   redirect(`/booking/${created.data.accessToken}` as Route)
 }

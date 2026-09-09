@@ -136,7 +136,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
         {!hasDates ? (
           /* Not a `Notice`. Blue is `info`, and design.md spends it on a fact
              the reader needs before acting — what a transfer hold does to a
-             unit, that BND 100 is collected on arrival. This is the screen
+             unit, that BND 100 secures the booking. This is the screen
              saying it has nothing to show yet, which is an absence, and the
              system draws absence in quiet gray. Spending the one attention
              colour on "fill in these two fields" would also devalue it on this

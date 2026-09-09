@@ -770,6 +770,22 @@
     color-mix(in oklab, var(--color-info) 50%, var(--color-canvas))
   );
 
+  /* The same construction in warning, for the one panel that is not telling
+     the reader something but asking them for something: the public booking
+     page's transfer instructions (capability A5). It is the amber the
+     confirmation email wears over the same block, so the screen a customer
+     books on and the email they are then sent are one design rather than
+     two. Nothing in the portal uses it — a staff surface reports status in a
+     badge, at badge scale. */
+  --notice-warning: light-dark(
+    color-mix(in oklab, var(--color-warning) 14%, var(--color-canvas)),
+    color-mix(in oklab, var(--color-warning-deep) 40%, var(--color-ink-raised))
+  );
+  --notice-warning-foreground: light-dark(
+    var(--color-warning-deep),
+    color-mix(in oklab, var(--color-warning) 50%, var(--color-canvas))
+  );
+
   /* Identity marks — the status chips' construction, so the two sets stay one
      family: the tint/deep pair simply **swaps roles** between themes. Light is
      tint ground under deep text; dark is the deep at 65% into the card under
@@ -961,6 +977,8 @@
   --color-badge-neutral-foreground: var(--badge-neutral-foreground);
   --color-notice-info: var(--notice-info);
   --color-notice-info-foreground: var(--notice-info-foreground);
+  --color-notice-warning: var(--notice-warning);
+  --color-notice-warning-foreground: var(--notice-warning-foreground);
   --color-avatar-sky: var(--avatar-sky);
   --color-avatar-sky-foreground: var(--avatar-sky-foreground);
   --color-avatar-blue: var(--avatar-blue);

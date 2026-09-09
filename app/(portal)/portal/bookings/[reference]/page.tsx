@@ -370,6 +370,20 @@ function GuestAndStaySummary({
           href={`tel:${booking.guestPhone.replace(/\s+/g, '')}`}
           figures
         />
+        {/* Where the confirmation went, or why it went nowhere (capability
+            A8). The hint is only for a booking made online: the desk has
+            never asked for an address, so its absence on a walk-in is normal
+            and saying so on every one of them would be noise. */}
+        <Field
+          label="Email"
+          value={booking.guestEmail ?? 'None on file'}
+          href={booking.guestEmail ? `mailto:${booking.guestEmail}` : undefined}
+          hint={
+            booking.guestEmail === null && booking.accessToken !== null
+              ? 'Booked online without one — confirm by phone or WhatsApp'
+              : undefined
+          }
+        />
         {/* A booking with no occupancy is a day pass — it consumes facility
             capacity on a date and occupies no unit (prd.md §6.1). Nothing
             writes one yet, so this is the register's shape reaching the record
@@ -526,7 +540,7 @@ function MoneySummary({
 }: {
   booking: Booking
   payments: readonly Payment[]
-  /** What is actually held, once the guest has checked in. Null before that. */
+  /** What is actually held. Null while no deposit has been recorded. */
   deposit: Deposit | null
   mayRecordPayment: boolean
 }) {
@@ -549,7 +563,7 @@ function MoneySummary({
       // prd.md §11: the security deposit is a refundable liability held
       // against the booking, not revenue. Said once here rather than under
       // the inset on every booking.
-      hint="The security deposit is collected at check-in and held apart from the total — never counted as revenue. It is released after the unit has been inspected."
+      hint="The security deposit secures the booking and is held apart from the total — never counted as revenue. It is taken when the booking is made, or at the door if it arrives no sooner, and released after the unit has been inspected."
     >
       <ul className="grid gap-sm">
         {booking.lines.map((entry, index) => (
@@ -626,10 +640,18 @@ function MoneySummary({
             refundable liability held against the booking, not revenue, and
             folding it in would misstate both the price and the deposit ledger. */}
       <SecurityDepositInset
+        bookingId={booking.id}
         reference={booking.reference}
         quoted={booking.securityDeposit}
         waiverReason={booking.depositWaiverReason}
         deposit={deposit}
+        // The same permission that records a booking payment, for the reason
+        // prd.md §11 gives: taking money at the counter is one job.
+        mayRecordDeposit={mayRecordPayment}
+        // Whether the deposit still has a booking to secure. Once a booking is
+        // confirmed the money is a catch-up rather than the thing that
+        // confirms it, and the dialog says so.
+        securesBooking={allowedEvents(booking.status).includes('secure_with_deposit')}
       />
     </SectionCard>
   )

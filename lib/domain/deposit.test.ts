@@ -208,9 +208,10 @@ describe('canApproveRelease', () => {
   test('an already released deposit says so rather than complaining about anything else', () => {
     // Precedence, and it matters: the second approver of a race needs to be
     // told the release happened, not sent to find an inspection that exists.
-    expect(
-      canApproveRelease(facts({ released: true })),
-    ).toMatchObject({ ok: false, error: { code: 'already_released' } })
+    expect(canApproveRelease(facts({ released: true }))).toMatchObject({
+      ok: false,
+      error: { code: 'already_released' },
+    })
   })
 
   test('the check-out refusal outranks the missing inspection', () => {

@@ -50,6 +50,7 @@ export const KNOWN_AUDIT_ACTIONS = [
   'booking.submit_payment',
   'booking.verify_payment',
   'booking.pay_in_full',
+  'booking.secure_with_deposit',
   'booking.check_in',
   'booking.check_out',
   'booking.expire',
@@ -109,6 +110,8 @@ export const KNOWN_AUDIT_ACTIONS = [
   'staff.password_reset',
   'staff.account_deleted',
   'cash.banked',
+  'email.sent',
+  'email.failed',
 ] as const
 
 /** The families the audit screen filters by, in the order it offers them. */
@@ -119,6 +122,7 @@ export const AUDIT_FAMILIES = [
   'charge',
   'inspection',
   'document',
+  'email',
   'unit',
   'unit_registry',
   'unit_type',
@@ -153,6 +157,7 @@ export const AUDIT_FAMILY_LABELS: Readonly<Record<AuditFamily, string>> = {
   charge: 'Charges',
   inspection: 'Inspections',
   document: 'Documents',
+  email: 'Emails',
   unit: 'Units',
   unit_registry: 'Unit registry',
   unit_type: 'Settings — rates',
@@ -177,6 +182,11 @@ const ACTION_LABELS: Readonly<Record<string, string>> = {
   // the money is the payment's event, the status is the booking's.
   'booking.verify_payment': 'Booking confirmed',
   'booking.pay_in_full': 'Booking confirmed',
+  // The same words as the two above it, and deliberately: what confirmed the
+  // booking is the deposit event sitting beside it in the trail, and three
+  // different phrasings for one outcome would make a reader hunt for a
+  // difference that is not there.
+  'booking.secure_with_deposit': 'Booking confirmed',
   'booking.submit_payment': 'Sent for verification',
   'booking.expire': 'Hold expired',
   'booking.mark_no_show': 'Marked no-show',
@@ -227,10 +237,56 @@ export function describeAuditEvent(event: AuditEventLike): string {
     describeBooking(event) ??
     describeDeposit(event) ??
     describeUnit(event) ??
+    describeEmail(event) ??
     describeSettings(event) ??
     ACTION_LABELS[event.action]
 
   return described ?? fallbackLabel(event.action)
+}
+
+/**
+ * The two emails a booking can send (capability A8).
+ *
+ * A branch rather than an `ACTION_LABELS` entry because the sentence depends
+ * on which email it was, and a failure is worth naming as a failure: this is
+ * the only place anybody finds out that a guest never received their
+ * confirmation. It reads as a sentence with no payload at all, which is what
+ * the walk over `KNOWN_AUDIT_ACTIONS` asserts.
+ */
+function describeEmail(event: AuditEventLike): string | null {
+  if (event.action !== 'email.sent' && event.action !== 'email.failed') {
+    return null
+  }
+
+  const kind = typeof event.after?.kind === 'string' ? event.after.kind : null
+  const what =
+    kind === 'booking_confirmed'
+      ? 'Confirmation email'
+      : kind === 'booking_created'
+        ? 'Booking email'
+        : 'Email'
+
+  if (event.action === 'email.sent') {
+    return `${what} sent`
+  }
+
+  const failure = typeof event.after?.failure === 'string' ? event.after.failure : null
+
+  return failure === null
+    ? `${what} could not be sent`
+    : `${what} could not be sent — ${EMAIL_FAILURE_LABELS[failure] ?? failure.replace(/_/g, ' ')}`
+}
+
+/** Plain readings of `lib/email/send.ts`'s failure classes, for the history. */
+const EMAIL_FAILURE_LABELS: Readonly<Record<string, string>> = {
+  unreachable: 'the mail service could not be reached',
+  timed_out: 'the mail service did not answer in time',
+  throttled: 'the mail service was rate-limiting us',
+  provider_down: 'the mail service was failing',
+  rejected: 'the mail service refused it',
+  unreadable: 'the mail service answered in a way we could not read',
+  not_configured: 'no mail service is configured',
+  rate_limited: 'too many emails to that address today',
 }
 
 /**

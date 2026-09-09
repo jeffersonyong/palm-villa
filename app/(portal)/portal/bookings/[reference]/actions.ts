@@ -6,12 +6,15 @@ import { z } from 'zod'
 import { requirePermission } from '@/lib/auth/require-permission'
 import { getBookingById, transitionBooking } from '@/lib/db/bookings'
 import { listDocumentsForBooking } from '@/lib/db/documents'
+import { recordBookingDeposit } from '@/lib/db/deposits'
 import { addBookingNote } from '@/lib/db/notes'
 import { assembleAccountingPack } from '@/lib/db/packs'
 import { recordCashPayment, recordTransferPayment } from '@/lib/db/payments'
 import { centsFromInput } from '@/lib/domain/money'
 import type { PaymentMethod } from '@/lib/domain/payment'
 import { isNoteAudience, MAX_NOTE_LENGTH } from '@/lib/domain/note'
+
+import { scheduleBookingConfirmedEmail } from '@/app/schedule-booking-email'
 
 import { scheduleAccountingPack } from '../../schedule-accounting-pack'
 
@@ -26,9 +29,10 @@ import { scheduleAccountingPack } from '../../schedule-accounting-pack'
  *
  * No refund and no forfeiture. prd.md §9.5 says the deposit paid is forfeited
  * on cancellation [C], but **which** payment that means is prd.md §18 N5 and
- * still open — the BND 100 security deposit is collected on arrival, so a
- * guest who cancels never paid it, and the answer is most likely the
- * prepayment. Computing either here would resolve an open question silently,
+ * still open. Since 10 September 2026 the BND 100 security deposit is taken at
+ * booking (§9.1), so a guest who cancels usually *has* paid it — which makes
+ * the question sharper rather than answered, because forfeiting it is money
+ * moving and nothing here moves money. Computing either here would resolve an open question silently,
  * which CLAUDE.md forbids: a gap in the PRD is a question for the client, not a
  * design decision. Settlement is therefore handled outside the system and the
  * dialog says so.
@@ -328,7 +332,97 @@ export async function recordPaymentAction(
   // the pack gets assembled.
   scheduleAccountingPack(booking.id)
 
+  // And the same test for the confirmation email (capability A8): the guest
+  // hears once, when the booking actually becomes confirmed.
+  if (recorded.confirmedNow) {
+    scheduleBookingConfirmedEmail(booking.id)
+  }
+
   return { status: 'done', recorded: { method: 'cash', amount } }
+}
+
+const recordDepositSchema = z.object({
+  bookingId: z.string().min(1),
+  method: z.enum(['cash', 'bank_transfer']),
+})
+
+export interface RecordDepositState {
+  status: 'idle' | 'error' | 'done'
+  message?: string
+  recorded?: { method: PaymentMethod; amount: number; confirmed: boolean }
+}
+
+/**
+ * Taking the security deposit at the desk (capability B16, staff half).
+ *
+ * ── The permission ────────────────────────────────────────────────────────
+ *
+ * **[A] `payment.record_cash`** — the same string that records a booking
+ * payment, and no new one. prd.md §11 already took this position twice: a
+ * deposit is verified under `payment.verify` because it is the same job as
+ * verifying a payment, and the excess above a deposit is settled by whoever
+ * may record a payment. Taking money at the counter is that job; minting
+ * `deposit.collect` would be a third string for one act and another row in a
+ * matrix the client has to understand.
+ *
+ * ── What it does not do ───────────────────────────────────────────────────
+ *
+ * **No email.** prd.md §11 is explicit that a customer hears twice about a
+ * booking and never a third time, and the booking form promises it as they
+ * type. Cash taken here confirms the booking, so the confirmation email — the
+ * second of the two — is scheduled; a promised transfer sends nothing, because
+ * the guest is told when somebody has actually seen the money.
+ *
+ * **No accounting pack.** A pack is assembled when money is verified against
+ * the booking (capability G5) and a deposit settles nothing: the stay is still
+ * owed in full on arrival. The same position `verifyDepositAction` takes.
+ */
+export async function recordDepositAction(
+  _previous: RecordDepositState,
+  formData: FormData,
+): Promise<RecordDepositState> {
+  const actor = await requirePermission('payment.record_cash')
+  const parsed = recordDepositSchema.safeParse(Object.fromEntries(formData))
+
+  if (!parsed.success) {
+    return { status: 'error', message: 'Choose how the deposit was taken.' }
+  }
+
+  const booking = await getBookingById(parsed.data.bookingId)
+
+  if (!booking) {
+    return { status: 'error', message: 'That booking no longer exists.' }
+  }
+
+  // The amount is the booking's quoted figure, read under the row lock in
+  // SQL — never anything this form carried.
+  const result = await recordBookingDeposit({
+    bookingId: parsed.data.bookingId,
+    method: parsed.data.method,
+    actorId: actor.userId,
+  })
+
+  if (!result.ok) {
+    return { status: 'error', message: result.error.message }
+  }
+
+  revalidateBooking(booking.reference)
+  // A promised deposit is now in the verification queue, and a collected one
+  // is on the ledger. Neither screen is the one the clerk is standing on.
+  revalidatePath('/portal/deposits')
+
+  if (result.confirmedNow) {
+    scheduleBookingConfirmedEmail(booking.id)
+  }
+
+  return {
+    status: 'done',
+    recorded: {
+      method: parsed.data.method,
+      amount: result.amount,
+      confirmed: result.confirmedNow,
+    },
+  }
 }
 
 /**

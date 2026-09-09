@@ -569,6 +569,165 @@ interface RpcRefusal {
   [key: string]: unknown
 }
 
+export interface RecordBookingDepositInput {
+  bookingId: string
+  /** Counted at the desk, or promised by transfer. */
+  method: PaymentMethod
+  actorId: string | null
+}
+
+/**
+ * Takes the security deposit against a booking, before the guest arrives
+ * (capability B16, staff half; prd.md §9.1, §11).
+ *
+ * The path the desk did not have. `check_in_booking()` collects a deposit at
+ * the door and `submit_public_payment()` records one a customer promised
+ * online, and between them there was no way for a staff member to record the
+ * BND 100 that secures a booking — so a guest who transferred it and never
+ * pressed the button on their own page left the desk with nothing correct to
+ * do. Recording it as a booking payment was the only reachable option and it
+ * is the wrong kind of money: prd.md §9.1 spends a paragraph on why a deposit
+ * must never read as one, and §14 keeps a cash deposit out of the cash-up
+ * total that a cash payment lands in.
+ *
+ * ── The two methods are different acts ────────────────────────────────────
+ *
+ * **Cash is counted**, so it is collected the moment it exists and the booking
+ * is secured on the spot — `secure_with_deposit`, which reaches `confirmed`
+ * without claiming the stay was paid. That distinction is the whole reason the
+ * event exists rather than reusing `pay_in_full`.
+ *
+ * **A transfer is a promise**, so it is written the way the customer's own
+ * button writes one and joins the same verification queue, settled by the same
+ * `verifyDeposit()`. Nothing here is a second way to confirm money.
+ *
+ * **Cash against an existing promise fulfils it** rather than being refused —
+ * the customer whose transfer failed, walking in with the notes. prd.md §11
+ * already makes that judgement at the door and nothing in its reasoning
+ * depends on the guest arriving, so the row is corrected to the method that
+ * actually changed hands and `promised_at` survives as the record of what
+ * they said. It moves the booking by `verify_payment`, the edge
+ * `verifyDeposit` already uses, because the promise is being settled rather
+ * than the booking secured afresh.
+ *
+ * The status pair is derived here and passed down, because architecture.md
+ * §5.3 keeps the machine in one module. A booking already `confirmed` — the
+ * desk catching up on a transfer that landed days ago — passes nulls and does
+ * not move, which is `verify_payment()`'s arrangement for a top-up and for
+ * the same reason: a second confirmation line in a history for a booking that
+ * never moved is noise.
+ *
+ * The amount is never passed. It is the booking's quoted figure, read under
+ * the row lock, exactly as check-in reads it — what is held must not move when
+ * an amendment reprices the stay (prd.md §11).
+ */
+export async function recordBookingDeposit(input: RecordBookingDepositInput): Promise<
+  DepositWriteResult<{
+    depositId: string
+    amount: Cents
+    status: BookingStatus
+    /** True when this call is what confirmed the booking, for capability A8. */
+    confirmedNow: boolean
+  }>
+> {
+  const propertyId = await currentPropertyId()
+
+  const { data: row, error: readError } = await dataClient()
+    .from('booking')
+    .select('status')
+    .eq('property_id', propertyId)
+    .eq('id', input.bookingId)
+    .maybeSingle()
+
+  if (readError) {
+    throw new Error(`Could not read booking ${input.bookingId}: ${readError.message}`)
+  }
+
+  if (!row) {
+    return { ok: false, error: { code: 'not_found', message: 'That booking no longer exists.' } }
+  }
+
+  const current = (row as { status: BookingStatus }).status
+
+  // Whether a promise is already standing decides which move this is, so it is
+  // read before the write. The database re-reads it under the row lock and is
+  // what actually settles a race; this only picks the pair to offer.
+  const standing = await getDepositByBookingId(input.bookingId)
+  const fulfilsPromise =
+    input.method === 'cash' && standing !== null && standing.collectedAt === null
+
+  // Cash secures the booking; a promised transfer sends it to the queue; cash
+  // against a promise settles it. All three are only legal from somewhere a
+  // booking is still waiting, and `transition` is what says so — a booking
+  // already confirmed simply does not move.
+  const event = fulfilsPromise
+    ? 'verify_payment'
+    : input.method === 'cash'
+      ? 'secure_with_deposit'
+      : 'submit_payment'
+  const next = transition(current, event)
+
+  const { data, error } = await dataClient().rpc('record_booking_deposit', {
+    p_property_id: propertyId,
+    p_booking_id: input.bookingId,
+    p_method: input.method,
+    p_from_status: next.ok ? current : null,
+    p_to_status: next.ok ? next.status : null,
+    p_actor_id: input.actorId,
+  })
+
+  if (error) {
+    throw new Error(`Could not record the deposit: ${error.message}`)
+  }
+
+  const result = data as
+    { ok: true; deposit_id: string; amount_cents: number; status: BookingStatus } | RpcRefusal
+
+  if (!result.ok) {
+    return { ok: false, error: describeRecordDepositFailure(result) }
+  }
+
+  return {
+    ok: true,
+    depositId: result.deposit_id,
+    amount: result.amount_cents,
+    status: result.status,
+    // Only cash confirms here. A transfer is confirmed by whoever verifies it,
+    // and `verifyDeposit` reports that moment — saying it twice would send the
+    // guest two confirmation emails for one booking.
+    confirmedNow: next.ok && next.status === 'confirmed',
+  }
+}
+
+function describeRecordDepositFailure(result: RpcRefusal): DepositWriteError {
+  switch (result.error) {
+    case 'no_deposit_quoted':
+      return {
+        code: result.error,
+        message: 'This booking quotes no security deposit, so there is nothing to take against it.',
+      }
+    case 'already_recorded':
+      return {
+        code: result.error,
+        message: 'A security deposit is already held against this booking.',
+      }
+    case 'already_promised':
+      return {
+        code: result.error,
+        message:
+          'This booking is already waiting on a deposit transfer. Confirm that one from the payments queue, or take the deposit in cash.',
+      }
+    case 'status_changed':
+      return {
+        code: result.error,
+        message:
+          'Someone else moved this booking while you were working on it. Reload and try again.',
+      }
+    default:
+      return { code: result.error, message: 'That booking no longer exists.' }
+  }
+}
+
 export interface CheckInBookingInput {
   bookingId: string
   /** How the deposit was taken. Ignored where the booking quotes none. */
@@ -741,10 +900,20 @@ export interface VerifyDepositInput {
  * `verify_payment()`'s arrangement for a top-up, and for the same reason:
  * writing `confirmed → confirmed` would put a second confirmation line in a
  * history for a booking that never moved.
+ *
+ * It returns the booking it collected against, and whether this call is what
+ * confirmed it — both for capability A8's confirmation email, which is the
+ * only thing that has ever needed them. The paragraph above is what makes
+ * `confirmedNow` answerable: `verify_payment` is the one edge into
+ * `confirmed`, so a booking moved here or it was already there.
+ *
+ * **Still no accounting pack**, and that is unchanged by the widening: a
+ * deposit is not money against the booking, it settles nothing, and the pack
+ * arrives when the stay itself is paid on arrival (capability G5).
  */
 export async function verifyDeposit(
   input: VerifyDepositInput,
-): Promise<DepositWriteResult<{ amount: Cents }>> {
+): Promise<DepositWriteResult<{ amount: Cents; bookingId: string; confirmedNow: boolean }>> {
   const propertyId = await currentPropertyId()
 
   const { data: row, error: readError } = await dataClient()
@@ -782,13 +951,18 @@ export async function verifyDeposit(
     throw new Error(`Could not verify the deposit: ${error.message}`)
   }
 
-  const result = data as { ok: true; amount_cents: number } | RpcRefusal
+  const result = data as { ok: true; amount_cents: number; booking_id: string } | RpcRefusal
 
   if (!result.ok) {
     return { ok: false, error: describeVerifyDepositFailure(result) }
   }
 
-  return { ok: true, amount: result.amount_cents }
+  return {
+    ok: true,
+    amount: result.amount_cents,
+    bookingId: result.booking_id,
+    confirmedNow: next.ok,
+  }
 }
 
 function describeVerifyDepositFailure(result: RpcRefusal): DepositWriteError {

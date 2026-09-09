@@ -61,7 +61,10 @@ export default defineConfig({
           // logic. `lib/pdf` is here too: it drives pdf-lib rather than being
           // pure, but it needs no database and no network, and what its tests
           // assert — page counts, a header, a placeholder where an attachment
-          // could not be embedded — is answered in memory. The components
+          // could not be embedded — is answered in memory. `lib/email` is here
+          // on the same terms: the renderer is a pure model-to-markup function,
+          // and the transport's only interesting behaviour is which HTTP status
+          // means retry, which is a pure function with a table of cases. The components
           // themselves are chrome over tested primitives and are verified on
           // /tokens, not here — and nothing under `app/` that touches the
           // database or renders is eligible, which is why the glob catches
@@ -70,6 +73,7 @@ export default defineConfig({
             'lib/domain/**/*.test.ts',
             'lib/auth/**/*.test.ts',
             'lib/pdf/**/*.test.ts',
+            'lib/email/**/*.test.ts',
             'lib/utils.test.ts',
             'components/**/*.test.ts',
             'app/**/*.test.ts',

@@ -329,7 +329,21 @@ export type VerifyPaymentErrorCode =
   | 'terminal_state'
 
 export type VerifyPaymentResult =
-  | { ok: true; payment: Payment }
+  | {
+      ok: true
+      payment: Payment
+      /**
+       * Whether **this call** is what confirmed the booking (capability A8).
+       *
+       * `payment.bookingStatus` cannot answer it. The payment is re-read after
+       * the write, so a top-up verified against a booking that was already
+       * confirmed reads `confirmed` too — nothing moved, and the status says
+       * `confirmed` either way. Anything that should happen once, when a
+       * booking becomes confirmed, has to key on this instead: the guest gets
+       * one confirmation email, not one per payment.
+       */
+      confirmedNow: boolean
+    }
   | {
       ok: false
       error: { code: VerifyPaymentErrorCode; message: string; dueCents?: Cents }
@@ -415,7 +429,7 @@ export async function verifyPayment(input: VerifyPaymentInput): Promise<VerifyPa
     throw new Error(`Payment ${input.paymentId} was verified but could not be read back.`)
   }
 
-  return { ok: true, payment: confirmed }
+  return { ok: true, payment: confirmed, confirmedNow: isAwaiting }
 }
 
 function describeVerifyFailure(
@@ -457,7 +471,18 @@ export interface RecordCashPaymentInput {
 }
 
 export type RecordCashPaymentResult =
-  | { ok: true; payment: Payment; bookingStatus: BookingStatus }
+  | {
+      ok: true
+      payment: Payment
+      bookingStatus: BookingStatus
+      /**
+       * Whether **this call** confirmed the booking — the same distinction
+       * `VerifyPaymentResult` draws, and for the same reason. `bookingStatus`
+       * reads `confirmed` for cash taken against a booking that was already
+       * confirmed, where nothing moved.
+       */
+      confirmedNow: boolean
+    }
   | {
       ok: false
       error: {
@@ -579,7 +604,12 @@ export async function recordCashPayment(
     throw new Error(`Payment ${result.payment_id} was recorded but could not be read back.`)
   }
 
-  return { ok: true, payment, bookingStatus: result.status }
+  return {
+    ok: true,
+    payment,
+    bookingStatus: result.status,
+    confirmedNow: next?.ok === true && next.status === 'confirmed',
+  }
 }
 
 export interface RecordTransferPaymentInput {

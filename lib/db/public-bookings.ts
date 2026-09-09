@@ -91,12 +91,21 @@ function refuse(
  * database hiccup should not take the booking site down. The controls that
  * protect inventory — the open-holds cap and the exclusion constraint — are
  * inside the write transaction and cannot be skipped this way.
+ *
+ * **`onError` inverts that for one caller.** The email counter (capability A8)
+ * is the only limit here that protects somebody other than the property: every
+ * other one keys on the caller, while that one keys on the *recipient*, and
+ * what it prevents is a stranger's inbox being filled with real Palm Villa
+ * confirmations. Failing open there would hand the abuse back on the day the
+ * database hiccups, and the cost of failing closed is one email nobody gets —
+ * against the booking still being made, which is the thing that must not fail.
  */
 export async function notePublicAttempt(input: {
   kind: string
   keyHash: string
   windowSeconds: number
   limit: number
+  onError?: 'allow' | 'deny'
 }): Promise<boolean> {
   const propertyId = await currentPropertyId()
 
@@ -109,7 +118,7 @@ export async function notePublicAttempt(input: {
   })
 
   if (error) {
-    return true
+    return input.onError !== 'deny'
   }
 
   return data as boolean

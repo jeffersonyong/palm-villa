@@ -602,8 +602,8 @@ async function NoDepositYet({ reference }: { reference: string }) {
         title="No deposit has been collected yet"
         description={
           booking.securityDeposit > 0
-            ? `The BND ${formatCents(booking.securityDeposit)} security deposit on this booking is collected when the guest is checked in.`
-            : 'This booking quotes no security deposit, so nothing is collected at check-in.'
+            ? `The BND ${formatCents(booking.securityDeposit)} security deposit on this booking has not been taken yet. It secures the booking, and is recorded from the booking itself — or at the door if it arrives no sooner.`
+            : 'This booking quotes no security deposit, so nothing is collected against it.'
         }
         action={
           <Button asChild variant="tertiary">

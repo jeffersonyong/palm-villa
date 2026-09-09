@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { DateField } from '@/components/ui/date-field'
 import { Notice } from '@/components/ui/notice'
 import { QuoteLines } from '@/components/quote-lines'
-import type { PropertyConfig } from '@/lib/domain/config'
+import type { DayPassAgeBand, PropertyConfig } from '@/lib/domain/config'
 import { formatStayDate, type StayDate } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 import { priceDayPass } from '@/lib/domain/pricing/day-pass'
@@ -54,11 +54,13 @@ export function DayPassBooking({
   const [state, formAction, isPending] = useActionState(createPublicDayPassAction, initialState)
 
   const [date, setDate] = useState<StayDate | null>(null)
-  const [counts, setCounts] = useState<Record<string, number>>(() =>
-    Object.fromEntries(
-      config.dayPassAgeBands.map((band) => [band.id, band.id === 'adult' ? 2 : 0]),
-    ),
-  )
+  const [counts, setCounts] = useState<Record<string, number>>(() => {
+    const adults = adultBandOf(config.dayPassAgeBands)
+
+    return Object.fromEntries(
+      config.dayPassAgeBands.map((band) => [band.id, band.id === adults?.id ? 2 : 0]),
+    )
+  })
   const [vehicles, setVehicles] = useState<readonly string[]>([''])
   const [noVehicle, setNoVehicle] = useState(false)
 
@@ -142,7 +144,14 @@ export function DayPassBooking({
                   ))}
                 </div>
 
-                {state.fieldErrors?.party ? (
+                {/* Dropped once the counts change, because every party error
+                    the server can return is a statement about the counts it
+                    was sent — and those are no longer the counts on screen.
+                    Leaving it up made a customer who had just added guests
+                    read "add at least one guest" and go looking for which
+                    field the system meant. If the new counts are also wrong,
+                    the next submit says so. */}
+                {state.fieldErrors?.party && headcount === 0 ? (
                   <p role="alert" className="mt-md text-body-sm text-negative-text">
                     {state.fieldErrors.party}
                   </p>
@@ -264,6 +273,21 @@ export function DayPassBooking({
 }
 
 /** "the pool, the water park and the playroom" — an Oxford-free list. */
+/**
+ * The band a lone adult falls in, whatever the property has called it.
+ *
+ * Found by shape rather than by id: age bands became editable rows with
+ * capability F3, so their ids are database uuids and the `band.id === 'adult'`
+ * this replaced matched nothing — the form opened with every count at zero and
+ * refused to submit until the customer worked out why. The open-ended top band
+ * is the adult one by construction (`maxAgeExclusive === null`, and
+ * lib/domain/config.ts requires bands not to overlap), which survives a rename,
+ * a re-price, and a property that bands its guests differently.
+ */
+function adultBandOf(bands: PropertyConfig['dayPassAgeBands']): DayPassAgeBand | null {
+  return bands.find((band) => band.maxAgeExclusive === null) ?? bands.at(-1) ?? null
+}
+
 function formatList(items: readonly string[]): string {
   if (items.length <= 1) {
     return items[0] ?? ''

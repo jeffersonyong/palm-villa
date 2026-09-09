@@ -328,7 +328,7 @@ export function BookingForm({
             <Notice className="mt-lg">
               {waiver.waived
                 ? 'No security deposit — waived on this booking. Nothing is held against the stay.'
-                : `Plus BND ${formatCents(quote.securityDeposit)} refundable security deposit, collected on arrival.`}
+                : `Plus BND ${formatCents(quote.securityDeposit)} refundable security deposit, which secures the booking. Record it from the booking once it is made.`}
             </Notice>
           </>
         ) : (

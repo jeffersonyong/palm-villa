@@ -296,17 +296,24 @@ export function StayBooking({
                 <>
                   <QuoteLines lines={quote.lines} total={quote.total} />
 
-                  <Notice placement="nested" className="mt-lg">
-                    <p className="text-body-sm">
-                      To book, transfer the{' '}
-                      <strong className="text-body-sm-strong">
-                        BND {formatCents(quote.securityDeposit)}
-                      </strong>{' '}
-                      refundable security deposit. It secures the unit and comes back to you after
-                      your stay. The BND {formatCents(quote.total)} for the stay is paid when you
-                      arrive.
-                    </p>
-                  </Notice>
+                  {/* What the total does and does not cover, and nothing
+                      else: the two amounts and which of them to send are the
+                      next screen's job (transfer-instructions.tsx), and
+                      saying it here as well made a guest read the payment
+                      terms twice. Rendered only where a deposit is quoted —
+                      the sentence has no meaning without one. */}
+                  {quote.securityDeposit > 0 ? (
+                    <Notice placement="nested" className="mt-lg">
+                      <p className="text-body-sm">
+                        The total amount above excludes a{' '}
+                        <strong className="text-body-sm-strong">
+                          BND {formatCents(quote.securityDeposit)}
+                        </strong>{' '}
+                        security deposit, which is refundable subject to the condition of the
+                        property upon check-out.
+                      </p>
+                    </Notice>
+                  ) : null}
                 </>
               ) : quote && !quote.ok ? (
                 <Callout tone="negative" placement="nested" className="mt-lg" role="alert">
@@ -325,7 +332,7 @@ export function StayBooking({
               ) : null}
 
               <Button type="submit" className="mt-lg w-full" disabled={isPending || !quote?.ok}>
-                {isPending ? 'Holding the unit…' : 'Hold this unit'}
+                {isPending ? 'Proceeding…' : 'Proceed to transfer'}
               </Button>
 
               <p className="mt-sm text-caption text-muted-foreground">

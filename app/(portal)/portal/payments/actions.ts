@@ -10,6 +10,8 @@ import { isStayDate } from '@/lib/domain/dates'
 import { centsFromInput } from '@/lib/domain/money'
 import { checkPaymentMatch } from '@/lib/domain/payment-match'
 
+import { scheduleBookingConfirmedEmail } from '@/app/schedule-booking-email'
+
 import { scheduleAccountingPack } from '../schedule-accounting-pack'
 
 /**
@@ -131,6 +133,13 @@ export async function verifyPaymentAction(
   // (capability G5). After the response, and never a reason to refuse.
   scheduleAccountingPack(result.payment.bookingId)
 
+  // Only when this verification is what confirmed the booking (capability A8).
+  // A top-up against a booking already confirmed moves nothing, and the guest
+  // had their confirmation the first time.
+  if (result.confirmedNow) {
+    scheduleBookingConfirmedEmail(result.payment.bookingId)
+  }
+
   return { status: 'done' }
 }
 
@@ -194,6 +203,13 @@ export async function matchPaymentManuallyAction(
   // Money is verified, so the booking has an accounting record to write
   // (capability G5). After the response, and never a reason to refuse.
   scheduleAccountingPack(result.payment.bookingId)
+
+  // Only when this verification is what confirmed the booking (capability A8).
+  // A top-up against a booking already confirmed moves nothing, and the guest
+  // had their confirmation the first time.
+  if (result.confirmedNow) {
+    scheduleBookingConfirmedEmail(result.payment.bookingId)
+  }
 
   return { status: 'done' }
 }
@@ -304,6 +320,12 @@ export async function verifyDepositAction(
   revalidatePath('/portal/deposits')
   revalidatePath('/portal/bookings')
   revalidatePath('/portal')
+
+  // The deposit is what secures the booking, so this is the moment it becomes
+  // confirmed for a customer who booked online (capabilities A8 and B16).
+  if (result.confirmedNow) {
+    scheduleBookingConfirmedEmail(result.bookingId)
+  }
 
   return { status: 'done' }
 }

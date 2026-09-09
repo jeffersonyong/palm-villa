@@ -57,7 +57,13 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
         </nav>
       </header>
 
-      <main className="flex-1">{children}</main>
+      {/* `bg-card` here rather than on each section, because the surface is
+          the layout's promise and not the page's: `main` is `flex-1`, so on a
+          page shorter than the viewport — a booking, a confirmation, any of
+          the short ones — the extra height showed the app ground as a grey
+          band above the footer. Sections that paint themselves (the dark
+          moments on the landing page) still cover it. */}
+      <main className="flex-1 bg-card">{children}</main>
 
       <footer className="bg-footer-surface px-xl py-3xl text-footer-foreground">
         <div className="mx-auto w-full max-w-[1120px] text-body-sm">

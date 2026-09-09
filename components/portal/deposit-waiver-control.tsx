@@ -100,8 +100,8 @@ export function DepositWaiverControl({
             <p className="text-caption text-copy">Waived — &ldquo;{value.reason}&rdquo;</p>
           ) : (
             <p className="text-caption text-muted-foreground">
-              BND {formatCents(amount)}, collected at check-in and held until the unit has been
-              inspected.
+              BND {formatCents(amount)}, which secures the booking and is held until the unit has
+              been inspected.
             </p>
           )}
           <FieldError message={error} />
