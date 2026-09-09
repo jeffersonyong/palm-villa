@@ -143,11 +143,22 @@ export function AuditFilters({
     >
       <SearchField
         value={search}
-        // What the Record column shows, which is what the term is matched
-        // against. Guest names are deliberately absent — the trail is a list of
+        // The term is matched against the **Record** column and nothing else,
+        // so the placeholder names the column rather than trying to list what
+        // it can hold — a booking reference, a unit, a role, a facility, a
+        // day-pass band, one of the property's own bank accounts. It read
+        // "Booking, unit or bank account", which named three of eleven and
+        // read as an offer to look a *guest's* bank account up; the system
+        // holds no such thing, and the one bank account in the trail is the
+        // property's own — the account customers transfer to, whose events are
+        // somebody adding or editing it in Property settings. The header's
+        // hint says all of this in full, and the empty state repeats it at the
+        // moment a search comes back with nothing.
+        //
+        // Guest names are deliberately not matched: the trail is a list of
         // records, not of people, and the register is where a guest is looked
-        // up. The empty state says so when a search finds nothing.
-        placeholder="Booking, unit or bank account"
+        // up.
+        placeholder="Booking, unit or record"
         onChange={(term) => apply({ search: term })}
       />
 

@@ -4,6 +4,7 @@ import { ChevronRight } from 'lucide-react'
 
 import { CashUpStateBadge } from '@/components/portal/cash-up-state-badge'
 import { EmptyState } from '@/components/portal/empty-state'
+import { ExportCsvButton } from '@/components/portal/export-csv'
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionHint } from '@/components/portal/section-hint'
 import { StatusLegend } from '@/components/portal/status-legend'
@@ -26,6 +27,7 @@ import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { cashOnHandBefore, listCashBankings } from '@/lib/db/cash-banking'
 import { listDepositsCollectedBetween } from '@/lib/db/deposits'
+import { exportGroup } from '@/lib/db/export'
 import { listPayments } from '@/lib/db/payments'
 import {
   bruneiWindowBounds,
@@ -167,9 +169,7 @@ export default async function CashUpPage({ searchParams }: PageProps) {
       // is in neither figure here. The same flatMap the payments above use,
       // and for the same reason: money nobody has seen is not money.
       deposits: deposits.flatMap((deposit) =>
-        deposit.collectedAt
-          ? [{ collectedAt: deposit.collectedAt, amount: deposit.amount }]
-          : [],
+        deposit.collectedAt ? [{ collectedAt: deposit.collectedAt, amount: deposit.amount }] : [],
       ),
       bankings: bankings.map((banking) => ({
         businessDate: banking.businessDate,
@@ -181,6 +181,7 @@ export default async function CashUpPage({ searchParams }: PageProps) {
 
   const totals = cashUpTotals(days, opening)
   const mayBank = hasPermission(actor.permissions, 'payment.verify')
+  const mayExportTables = hasPermission(actor.permissions, 'config.manage')
 
   // Filtered and paged after the balance is accumulated, never before: every
   // row already carries the figure it actually closed on, so a hidden day does
@@ -292,11 +293,25 @@ export default async function CashUpPage({ searchParams }: PageProps) {
               than on the title line above: it acts on exactly what the filters
               opposite it have selected, so it reads as the last control in the
               row that produced the rows — and a download that has to survive a
-              middle-click stays an anchor, wearing the button. */}
+              middle-click stays an anchor, wearing the button.
+
+              An Admin gets a menu rather than a bare button, because there are
+              two different files here and conflating them would be a lie about
+              what is in the one you clicked: *Day by day* is the screen —
+              period, states and all (E5) — while *Cash banked* is the whole
+              `cash_banking` table however far back it goes (F5). Everyone else
+              sees the report on its own, exactly as before. */}
           <div className="ml-auto flex items-center gap-sm">
-            <Button asChild variant="tertiary">
-              <a href={exportHref}>Download CSV</a>
-            </Button>
+            {mayExportTables ? (
+              <ExportCsvButton
+                tables={exportGroup('cash')}
+                view={{ label: 'Day by day (as filtered)', href: exportHref }}
+              />
+            ) : (
+              <Button asChild variant="tertiary">
+                <a href={exportHref}>Download CSV</a>
+              </Button>
+            )}
 
             {/* Defaulted to the last day of the period rather than to today:
                 the window is already clamped to today, so on the ordinary view

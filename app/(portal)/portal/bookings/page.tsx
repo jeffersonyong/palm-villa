@@ -5,6 +5,7 @@ import { ChevronRight, Plus } from 'lucide-react'
 import { BookingStatusBadge } from '@/components/portal/booking-status-badge'
 import { StreamDot } from '@/components/portal/stream-dot'
 import { EmptyState } from '@/components/portal/empty-state'
+import { ExportCsvButton } from '@/components/portal/export-csv'
 import {
   overlapRangeOf,
   readChoices,
@@ -25,6 +26,7 @@ import {
 } from '@/components/ui/table'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
+import { exportGroup } from '@/lib/db/export'
 import {
   countBookingsByStream,
   listBookings,
@@ -145,6 +147,8 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
     )
   }
 
+  const mayExport = hasPermission(actor.permissions, 'config.manage')
+
   // Anything unusable — a hand-edited URL, half a date pair, a reversed range —
   // falls back to no filter rather than erroring. A staff member who mistypes a
   // date should see the full list, not a stack trace.
@@ -261,12 +265,21 @@ export default async function BookingsListPage({ searchParams }: PageProps) {
             states it properly ("1–25 of 47 bookings") and is the thing that
             also lets you move, so keeping both meant reading the same figure
             twice in two registers a hand's width apart. */}
-        <Button asChild className="ml-auto">
-          <Link href="/portal/bookings/new">
-            <Plus aria-hidden />
-            New booking
-          </Link>
-        </Button>
+        <div className="ml-auto flex items-center gap-sm">
+          {/* The register and everything hanging off a booking — its priced
+              lines, vehicles, notes, the guest, the documents held against it
+              — each as its own sheet, because a column of nested JSON is not
+              something an accountant can use. Shown only to a reader who may
+              take it (`config.manage`); the route refuses anyone else. */}
+          {mayExport ? <ExportCsvButton tables={exportGroup('bookings')} /> : null}
+
+          <Button asChild>
+            <Link href="/portal/bookings/new">
+              <Plus aria-hidden />
+              New booking
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Named directly now that the visible heading has gone. A `section`

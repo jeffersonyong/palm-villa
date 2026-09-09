@@ -6,7 +6,6 @@ import {
   CalendarDays,
   Coins,
   DoorOpen,
-  Download,
   Globe,
   LayoutDashboard,
   List,
@@ -93,7 +92,11 @@ export const navGroups = [
       { href: '/portal/settings/units', label: 'Unit registry', icon: Building2 },
       { href: '/portal/settings/roles', label: 'Roles & staff', icon: Users },
       { href: '/portal/settings/audit', label: 'Audit log', icon: ScrollText },
-      { href: '/portal/settings/export', label: 'Export data', icon: Download },
+      // No "Export data" item. The screen it pointed at listed seventeen table
+      // names with a Download beside each, which is a schema browser filed
+      // under Admin; every table is now taken from the screen holding its
+      // records (lib/db/export.ts — EXPORT_GROUPS), and `/portal/export` is a
+      // route with no page.
     ],
   },
   /**

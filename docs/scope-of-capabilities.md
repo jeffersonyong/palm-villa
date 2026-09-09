@@ -155,7 +155,7 @@ Four things worth saying plainly, because they are the decisions behind the figu
 
 > **F7 is provisional, and it depends on a conversation A11 is already waiting for.** The public site currently shows a labelled placeholder where each photograph belongs — no real images exist yet — so this is a capability and the imagery it manages, not a control added over something already built. It is recorded here so the baseline stays honest, on the same footing as A11, and both belong in one conversation: the landing page A11 describes is the surface F7's photographs appear on, and neither is in the quoted work until confirmed.
 
-> **F3, F4 and F5 delivered 12 September 2026.** Property settings edits the rates, the day-pass prices, what a day pass admits, how long each kind of document is kept, and the bank accounts customers transfer to. The audit log reads the whole trail on one screen. Export data hands over every table as a spreadsheet.
+> **F3, F4 and F5 delivered 12 September 2026.** Property settings edits the rates, the day-pass prices, what a day pass admits, how long each kind of document is kept, and the bank accounts customers transfer to. The audit log reads the whole trail on one screen. Every table the business runs on downloads as a spreadsheet — from the screen that holds its records, so the bookings come off the register and the deposits off the ledger.
 >
 > Five things worth saying plainly, because they are the decisions behind the screens:
 >

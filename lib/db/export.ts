@@ -922,3 +922,77 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
 export function exportTableById(id: string): ExportTable | undefined {
   return EXPORT_TABLES.find((table) => table.id === id)
 }
+
+/**
+ * Which screen each table is taken from (capability F5).
+ *
+ * There is no *Export data* screen. A list of seventeen table names in Admin
+ * is a schema browser, and the person who wants the bookings as a spreadsheet
+ * is already looking at the bookings — so every table is downloaded from the
+ * screen whose records it holds, and a screen with satellites offers them
+ * together: the register hands over its lines, vehicles, notes, guests and
+ * documents alongside the bookings themselves.
+ *
+ * **Every table is in exactly one group**, which is the whole of F5 —
+ * "export all business data" is a promise about coverage, and coverage is
+ * exactly what is lost when the single screen listing everything goes away.
+ * `export.test.ts` holds it: a new table with no home fails the suite rather
+ * than quietly becoming unexportable.
+ *
+ * The gate does not move with the placement. Every one of these is still
+ * `config.manage` (architecture.md §3, open question N34), so a front-desk
+ * account sees no download on the register — the route answers 404 either way.
+ */
+export const EXPORT_GROUPS = {
+  /** The register, and everything hanging off a booking. */
+  bookings: [
+    'bookings',
+    'booking-lines',
+    'booking-vehicles',
+    'booking-notes',
+    'guests',
+    'documents',
+  ],
+  /** The verification queue. */
+  payments: ['payments'],
+  /** The deposits ledger, and what was charged against what it held. */
+  deposits: ['deposits', 'deposit-charges'],
+  /** The units board: the doors, who was in them, and how they came back. */
+  units: ['units', 'occupancies', 'inspections'],
+  /** Roles & staff. */
+  staff: ['staff', 'role-permissions'],
+  /** The audit log reading itself out. */
+  audit: ['audit-events'],
+  /** Property settings — every rate, price, period and account. */
+  settings: ['settings'],
+  /** The daily cash-up, where the trips to the bank are recorded. */
+  cash: ['cash-bankings'],
+} as const satisfies Record<string, readonly string[]>
+
+export type ExportGroupName = keyof typeof EXPORT_GROUPS
+
+/** What a screen names its table in a menu: the id to fetch, and the label. */
+export interface ExportTableRef {
+  id: string
+  label: string
+}
+
+/**
+ * One screen's tables, in the order they are listed.
+ *
+ * Resolved through `EXPORT_TABLES` rather than restating the labels, so a
+ * table renamed in one place is renamed in the menu too.
+ */
+export function exportGroup(name: ExportGroupName): readonly ExportTableRef[] {
+  return EXPORT_GROUPS[name].map((id) => {
+    const table = exportTableById(id)
+
+    if (!table) {
+      // Unreachable while the ids above are drawn from EXPORT_TABLES, which the
+      // test proves. Loud rather than a menu item that downloads nothing.
+      throw new Error(`No export table with id ${id}`)
+    }
+
+    return { id: table.id, label: table.label }
+  })
+}

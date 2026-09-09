@@ -15,6 +15,16 @@ import { todayInBrunei } from '@/lib/domain/dates'
  * already refused a caller with no session, and then re-checks the permission —
  * a URL is guessable where a link on a gated screen is not.
  *
+ * ── One route, no screen ───────────────────────────────────────────────────
+ *
+ * It used to hang under a *Export data* screen in Admin that listed all
+ * seventeen tables with a row each. The screen is gone: every table is now
+ * downloaded from the screen it belongs to — bookings from the register,
+ * deposits from the ledger — because the person who wants a spreadsheet of
+ * the bookings is looking at the bookings, not hunting through settings for a
+ * list of table names. F5 is unchanged and still whole: the grouping in
+ * `EXPORT_GROUPS` gives all seventeen a home, and a test holds it to that.
+ *
  * **404 rather than 403** to a reader without `config.manage`, exactly as the
  * reports export answers: "forbidden" would confirm to somebody who may not see
  * the business's data that there is business data to see.
@@ -22,8 +32,8 @@ import { todayInBrunei } from '@/lib/domain/dates'
  * ── Not logged ─────────────────────────────────────────────────────────────
  *
  * A download writes no audit event. That is the owner's decision, taken
- * deliberately: this screen is his own, opened by him, to take his own data —
- * and a row per click would bury the trail that F4 exists to make readable.
+ * deliberately: these are his own screens, opened by him, to take his own data
+ * — and a row per click would bury the trail that F4 exists to make readable.
  * Reading a guest's identity document IS logged (G3), and that is the promise
  * that mattered; it is a different act by a different person for a different
  * reason.
