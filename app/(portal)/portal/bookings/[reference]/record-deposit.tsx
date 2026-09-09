@@ -74,7 +74,16 @@ export function RecordDeposit(props: RecordDepositProps) {
 
   return (
     <>
-      <Button variant="secondary" className="mt-lg w-full" onClick={() => setIsOpen(true)}>
+      {/* `tertiary`, not `secondary`, because of what it stands on. Both
+          render sites put this button inside a `Card surface="inset"`, and in
+          light mode `--secondary` and `--muted` resolve to the same
+          `--color-canvas-soft` — so a secondary fill on an inset was the same
+          #f7f7f7 twice and only the label told you a button was there.
+          `tertiary` is the white card fill and a hairline, which is what
+          Attach ID two cards down already uses on the same ground. No icon:
+          that one carries a paperclip because it opens a file picker, and
+          this opens a form. */}
+      <Button variant="tertiary" className="mt-lg w-full" onClick={() => setIsOpen(true)}>
         {props.fulfilsPromise ? 'Take the deposit in cash' : 'Record the deposit'}
       </Button>
 
