@@ -132,18 +132,20 @@ export function TransferInstructions({
         </Callout>
       )}
 
-      {/* Plain text on the panel rather than its own inset: a second tinted
-          box inside this one was two containers saying one thing, which is
-          what the email's version settled. */}
+      {/* Plain text rather than the tinted inset this used to be. It sat in a
+          Notice, which put a second bordered box inside the card to say the
+          one thing the card is already about — and it is instructions, not a
+          status the screen is reporting about itself, which is what a notice
+          is for. */}
       <p className="mt-lg text-body-sm text-copy">
         Send{' '}
         <strong className="text-body-sm-strong text-foreground tabular-nums">
           BND {formatCents(plan.total)}
         </strong>{' '}
-        in one transfer, and put{' '}
+        in one transfer with{' '}
         <strong className="font-mono text-body-sm-strong text-foreground">{reference}</strong> as
-        the transfer reference so we can match it to your booking. Your unit is held for you in the
-        meantime — once we confirm the transfer, your booking is confirmed and we will let you know.
+        the transfer reference so we can match it to your booking, then confirm below. Once we
+        verify the transfer, we will email your booking confirmation and QR code for entry.
       </p>
 
       {state.status === 'error' && state.message ? (
@@ -159,10 +161,6 @@ export function TransferInstructions({
           {isPending ? 'Telling the team…' : 'I have made the transfer'}
         </Button>
       </form>
-
-      <p className="mt-sm text-caption text-muted-foreground">
-        Confirm here once you have sent it. This will confirm your booking upon verification.
-      </p>
     </Card>
   )
 }
@@ -170,9 +168,10 @@ export function TransferInstructions({
 /**
  * The rule either side of "or", so the two accounts read as one choice.
  *
- * The rule takes the word's own colour rather than `divider`: this panel is
- * the one tinted ground on the customer surface, and a hairline drawn for
- * white all but disappears on it. `aria-hidden` because the sentence above the
+ * The rule takes the word's own colour rather than `divider`, which is the
+ * weight the email settled on — there it draws over amber, where a hairline
+ * meant for white all but disappears. Kept here so the same block reads the
+ * same on both surfaces. `aria-hidden` because the sentence above the
  * list already says the accounts are alternatives — this repeats it for the
  * eye, not for a screen reader.
  */
