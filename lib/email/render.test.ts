@@ -1,33 +1,48 @@
 import { describe, expect, test } from 'vitest'
 
-import { buildBookingEmail, type BookingEmailModel } from '@/lib/domain/booking-email'
+import {
+  buildBookingEmail,
+  type BookingEmailKind,
+  type BookingEmailModel,
+} from '@/lib/domain/booking-email'
 import type { PropertyContact } from '@/lib/domain/contact'
 import { line } from '@/lib/domain/lines'
+import type { BankAccountSettings } from '@/lib/domain/settings'
 
 import { renderBookingEmail } from './render'
 
 /**
  * The markup, as against the words.
  *
- * The wording is `lib/domain/booking-email.test.ts`'s job; this asserts three
- * things that file cannot see. That the palette is still design.md's — the
- * whitelist below is the guard that catches a colour typed in by hand. That a
- * guest's name cannot break the page it is rendered into, which is the one
- * real injection surface in the slice. And that the plain-text alternative
+ * The wording is `lib/domain/booking-email.test.ts`'s job; this asserts what
+ * that file cannot see. That the palette is still design.md's — the whitelist
+ * below is the guard that catches a colour typed in by hand. That a guest's
+ * name cannot break the page it is rendered into, which is the one real
+ * injection surface in the slice. That the status a guest is shown is drawn
+ * in the status hue and nothing else is. And that the plain-text alternative
  * carries every figure the HTML does, because a client that refuses HTML shows
  * only that.
  */
 
-/** design.md's light theme. Any other colour in the output is a bug. */
+/** design.md's light theme, plus its two status hues and their oklab tints. */
 const PALETTE = new Set([
   '#111111',
   '#6b6b6b',
   '#ffffff',
   '#f3f3f3',
-  '#f7f7f7',
   '#e8e8e8',
   '#0e6b64',
+  '#d97706',
+  '#92400e',
+  '#fdf2ea',
+  '#fcece1',
+  '#1fa552',
+  '#166534',
+  '#ecf6ed',
 ])
+
+const AMBER_TINTS = ['#fdf2ea', '#fcece1']
+const GREEN_TINTS = ['#ecf6ed']
 
 const contact: PropertyContact = {
   phones: [{ display: '+673 0000001', whatsappUrl: 'https://wa.me/6730000001' }],
@@ -42,17 +57,28 @@ const contact: PropertyContact = {
 const TOKEN = 'Ab3xY9-_ZqRs7TuVwX2Kd0'
 const URL = `https://palmvilla.bn/booking/${TOKEN}`
 
+const TWO_ACCOUNTS: readonly BankAccountSettings[] = [
+  { id: 'a', bankName: 'BIBD', accountNumber: '0011223344', sortOrder: 1 },
+  { id: 'b', bankName: 'Baiduri', accountNumber: '5566778899', sortOrder: 2 },
+]
+
 function model(
-  guestName = 'Amin Hassan',
-  lineDescription = '2 nights at BND 200.00',
+  overrides: {
+    kind?: BookingEmailKind
+    guestName?: string
+    lineDescription?: string
+    accounts?: readonly BankAccountSettings[]
+  } = {},
 ): BookingEmailModel {
+  const kind = overrides.kind ?? 'booking_created'
+
   const result = buildBookingEmail({
-    kind: 'booking_created',
+    kind,
     booking: {
       reference: 'PV-4821',
       stream: 'short_stay',
-      status: 'held',
-      guestName,
+      status: kind === 'booking_created' ? 'held' : 'confirmed',
+      guestName: overrides.guestName ?? 'Amin Hassan',
       guestEmail: 'amin@example.com',
       accessToken: TOKEN,
       vehicles: ['BAA 1234'],
@@ -61,7 +87,9 @@ function model(
       exemptGuests: 0,
       stay: { unitTypeId: 'three-bedroom', range: { start: '2026-09-14', end: '2026-09-16' } },
       dayPass: null,
-      lines: [line('accommodation', lineDescription, 2, 20_000)],
+      lines: [
+        line('accommodation', overrides.lineDescription ?? '2 nights at BND 200.00', 2, 20_000),
+      ],
       total: 40_000,
       paid: 0,
       securityDeposit: 10_000,
@@ -70,7 +98,7 @@ function model(
       name: 'Palm Villa',
       checkInTime: '14:00',
       checkOutTime: '12:00',
-      bankAccounts: [{ id: 'a', bankName: 'BIBD', accountNumber: '0011223344', sortOrder: 1 }],
+      bankAccounts: overrides.accounts ?? TWO_ACCOUNTS,
       unitTypeName: 'Three-bedroom apartment',
     },
     contact,
@@ -84,15 +112,19 @@ function model(
   return result.model
 }
 
+const hexesIn = (html: string): string[] =>
+  (html.match(/#[0-9a-fA-F]{3,8}/g) ?? []).map((colour) => colour.toLowerCase())
+
 describe('the palette stays design.md’s', () => {
-  test('every colour in the markup is a light-theme token', () => {
-    const { html } = renderBookingEmail(model())
-    const used = html.match(/#[0-9a-fA-F]{3,8}/g) ?? []
+  test('every colour in the markup is a light-theme token or a status tint', () => {
+    for (const kind of ['booking_created', 'booking_confirmed'] as const) {
+      const used = hexesIn(renderBookingEmail(model({ kind })).html)
 
-    expect(used.length).toBeGreaterThan(0)
+      expect(used.length).toBeGreaterThan(0)
 
-    for (const colour of used) {
-      expect(PALETTE).toContain(colour.toLowerCase())
+      for (const colour of used) {
+        expect(PALETTE, `${kind} uses ${colour}`).toContain(colour)
+      }
     }
   })
 
@@ -116,23 +148,87 @@ describe('the palette stays design.md’s', () => {
   })
 })
 
+describe('the status a guest is shown', () => {
+  test('a created booking wears amber, and says the guest is up', () => {
+    const { html } = renderBookingEmail(model({ kind: 'booking_created' }))
+
+    expect(html).toContain('Waiting for your transfer')
+    expect(html).toContain('#92400e')
+    for (const tint of GREEN_TINTS) {
+      expect(html).not.toContain(tint)
+    }
+  })
+
+  test('a confirmed booking wears green, with a tick', () => {
+    const { html } = renderBookingEmail(model({ kind: 'booking_confirmed' }))
+
+    expect(html).toContain('✓')
+    expect(html).toContain('Confirmed')
+    expect(html).toContain('#166534')
+    for (const tint of AMBER_TINTS) {
+      expect(html).not.toContain(tint)
+    }
+  })
+
+  test('the pay panel shares the waiting amber, so status and action are one message', () => {
+    const { html } = renderBookingEmail(model({ kind: 'booking_created' }))
+
+    expect(html).toContain('background-color:#fcece1')
+  })
+
+  test('the mark is a text glyph, never an emoji or an image', () => {
+    const { html } = renderBookingEmail(model({ kind: 'booking_created' }))
+
+    expect(html).toContain('●')
+    expect(html).not.toContain('⏳')
+    expect(html).not.toContain('<img')
+  })
+})
+
+describe('where the money goes', () => {
+  test('two accounts are joined by an "or", not stacked as two jobs', () => {
+    const { html, text } = renderBookingEmail(model())
+
+    expect(html).toContain('either of these accounts')
+    expect(html).toContain('>or</td>')
+    expect(text).toContain('either of these accounts')
+    expect(text).toContain('BIBD: 0011223344\n  or\n  Baiduri: 5566778899')
+  })
+
+  test('one account has no "or"', () => {
+    const { html, text } = renderBookingEmail(model({ accounts: [TWO_ACCOUNTS[0]!] }))
+
+    expect(html).toContain('this account')
+    expect(html).not.toContain('>or</td>')
+    expect(text).not.toContain('\n  or\n')
+  })
+
+  test('the number is set in a monospace face, since it is what gets copied', () => {
+    const { html } = renderBookingEmail(model())
+
+    expect(html).toMatch(/font-family:ui-monospace[^"]*">0011223344</)
+  })
+})
+
 describe('what a guest types cannot break the email', () => {
   test('escapes a name carrying markup', () => {
-    const { html } = renderBookingEmail(model('Tan & Sons <boss>'))
+    const { html } = renderBookingEmail(model({ guestName: 'Tan & Sons <boss>' }))
 
     expect(html).toContain('Tan &amp; Sons &lt;boss&gt;')
     expect(html).not.toContain('<boss>')
   })
 
   test('escapes a line description carrying markup', () => {
-    const { html } = renderBookingEmail(model('Amin Hassan', '2 nights <script>alert(1)</script>'))
+    const { html } = renderBookingEmail(
+      model({ lineDescription: '2 nights <script>alert(1)</script>' }),
+    )
 
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;')
   })
 
   test('leaves the plain-text body unescaped, because it is not markup', () => {
-    const { text } = renderBookingEmail(model('Tan & Sons <boss>'))
+    const { text } = renderBookingEmail(model({ guestName: 'Tan & Sons <boss>' }))
 
     expect(text).toContain('Tan & Sons <boss>')
     expect(text).not.toContain('&amp;')
@@ -158,9 +254,10 @@ describe('the plain-text alternative', () => {
     }
   })
 
-  test('carries the link and the warning that goes with it', () => {
+  test('carries the status, the link and the warning that goes with it', () => {
     const { text } = renderBookingEmail(model())
 
+    expect(text).toContain('Status: Waiting for your transfer')
     expect(text).toContain(URL)
     expect(text).toContain('do not post it publicly')
   })

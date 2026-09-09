@@ -279,6 +279,46 @@ describe('the link back', () => {
   })
 })
 
+describe('whose turn it is', () => {
+  test('a created booking is marked as waiting on the guest', () => {
+    expect(built('booking_created', stay()).status).toEqual({
+      tone: 'waiting',
+      label: 'Waiting for your transfer',
+    })
+  })
+
+  test('a confirmed booking is marked done', () => {
+    expect(built('booking_confirmed', stay({ status: 'confirmed' })).status).toEqual({
+      tone: 'confirmed',
+      label: 'Confirmed',
+    })
+  })
+})
+
+describe('where the money goes', () => {
+  const oneAccount = [{ id: 'a', bankName: 'BIBD', accountNumber: '0011223344', sortOrder: 1 }]
+
+  test('two accounts are introduced as alternatives, not as two things to do', () => {
+    expect(built('booking_created', stay()).transfer?.accountsIntro).toBe(
+      'Send it to either of these accounts:',
+    )
+  })
+
+  test('one account is introduced as the account', () => {
+    const result = build('booking_created', stay(), {
+      property: property({ bankAccounts: oneAccount }),
+    })
+
+    expect(result.ok && result.model.transfer?.accountsIntro).toBe('Send it to this account:')
+  })
+
+  test('no account has nothing to introduce', () => {
+    const result = build('booking_created', stay(), { property: property({ bankAccounts: [] }) })
+
+    expect(result.ok && result.model.transfer?.accountsIntro).toBeNull()
+  })
+})
+
 describe('what the emails never say', () => {
   const everyModel = [
     built('booking_created', stay()),

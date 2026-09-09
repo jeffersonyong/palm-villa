@@ -113,10 +113,30 @@ export interface EmailAmountOption {
 export interface EmailTransfer {
   options: readonly EmailAmountOption[]
   reference: string
+  /**
+   * The sentence before the accounts, saying they are alternatives — "either
+   * of these" — because two numbers on two lines read as two things to do.
+   * Null when there is no account to introduce.
+   */
+  accountsIntro: string | null
   /** Bank name against account number. Empty when none is configured. */
   accounts: readonly EmailRow[]
   noAccountsNote: string | null
   instruction: string
+}
+
+/**
+ * Whose turn it is, shown as a chip under the headline.
+ *
+ * `waiting` is the guest's — the booking exists and nothing happens until
+ * they transfer; `confirmed` is done. The renderer maps the tone to
+ * design.md's semantic pair, amber and green, which is the one hue in the
+ * email that is not the brand's: status carries meaning and is never
+ * decorative, on every surface.
+ */
+export interface EmailStatus {
+  tone: 'waiting' | 'confirmed'
+  label: string
 }
 
 export interface EmailAction {
@@ -137,6 +157,7 @@ export interface BookingEmailModel {
   /** The hidden line a client shows beside the subject. */
   preheader: string
   headline: string
+  status: EmailStatus
   intro: string
   reference: string
   facts: readonly EmailRow[]
@@ -200,6 +221,7 @@ export function buildBookingEmail(input: BuildBookingEmailInput): BuildBookingEm
       subject: subjectFor(kind, booking, isDayPass),
       preheader: preheaderFor(kind, booking, isDayPass),
       headline: kind === 'booking_created' ? 'Almost done' : 'You are booked',
+      status: statusFor(kind),
       intro: introFor(kind, isDayPass),
       reference: booking.reference,
       facts: factsFor(booking, property, isDayPass),
@@ -215,6 +237,18 @@ export function buildBookingEmail(input: BuildBookingEmailInput): BuildBookingEm
       },
     },
   }
+}
+
+/**
+ * "Almost done" on its own could be read as nearly confirmed. The chip says
+ * whose move it is, so the two emails are told apart before a word of the body
+ * is read — and the same amber then marks the panel that says how to pay,
+ * because they are one message.
+ */
+function statusFor(kind: BookingEmailKind): EmailStatus {
+  return kind === 'booking_created'
+    ? { tone: 'waiting', label: 'Waiting for your transfer' }
+    : { tone: 'confirmed', label: 'Confirmed' }
 }
 
 function subjectFor(
@@ -375,6 +409,7 @@ function transferFor(booking: EmailBookingFacts, property: EmailPropertyFacts): 
   return {
     options,
     reference: booking.reference,
+    accountsIntro: accountsIntroFor(property.bankAccounts.length),
     accounts: property.bankAccounts.map((account) => ({
       label: account.bankName,
       value: account.accountNumber,
@@ -385,6 +420,19 @@ function transferFor(booking: EmailBookingFacts, property: EmailPropertyFacts): 
         : null,
     instruction: `Put ${booking.reference} in the transfer description so we can match it to your booking. ${HOLD_SENTENCE}`,
   }
+}
+
+/**
+ * Two accounts are a convenience, not two products (transfer-instructions.tsx)
+ * — a customer sends to whichever bank they already use. Said in words, since
+ * two numbers on two lines look like two transfers to make.
+ */
+function accountsIntroFor(count: number): string | null {
+  if (count === 0) {
+    return null
+  }
+
+  return count === 1 ? 'Send it to this account:' : 'Send it to either of these accounts:'
 }
 
 /**

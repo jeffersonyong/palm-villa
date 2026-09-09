@@ -2,6 +2,7 @@ import type {
   BookingEmailModel,
   EmailQuote,
   EmailRow,
+  EmailStatus,
   EmailTransfer,
 } from '@/lib/domain/booking-email'
 
@@ -43,9 +44,29 @@ const INK = '#111111'
 const MUTE = '#6b6b6b'
 const CANVAS = '#ffffff'
 const CANVAS_SUNK = '#f3f3f3'
-const CANVAS_SOFT = '#f7f7f7'
 const HAIRLINE = '#e8e8e8'
 const BRAND_DEEP = '#0e6b64'
+
+/**
+ * The two status hues and their tints — the one colour here that is not the
+ * brand's, which is design.md's rule on every surface: semantic colour carries
+ * meaning and is never decorative. Amber is the guest's turn; the chip under
+ * "Almost done" and the panel that says how to pay share it because they are
+ * one message. Green is done.
+ *
+ * The tints are globals.css's badge and notice constructions —
+ * `color-mix(in oklab, <hue> 10%, canvas)` for a chip, 14% for a panel —
+ * computed in oklab and written down, since an email client cannot mix. Move a
+ * hue in design.md and these have to be recomputed; the test's whitelist is
+ * what notices one typed in by eye instead.
+ */
+const WARNING = '#d97706'
+const WARNING_DEEP = '#92400e'
+const WARNING_TINT = '#fdf2ea'
+const WARNING_PANEL = '#fcece1'
+const POSITIVE = '#1fa552'
+const POSITIVE_DEEP = '#166534'
+const POSITIVE_TINT = '#ecf6ed'
 
 const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace"
@@ -93,6 +114,7 @@ function renderHtml(model: BookingEmailModel): string {
     `<tr><td style="padding:32px 28px 28px 28px;font-family:${SANS};font-size:14px;line-height:21px;color:${INK}">`,
     eyebrow(model.footer.propertyName),
     `<h1 style="margin:12px 0 0 0;font-family:${DISPLAY};font-size:28px;line-height:34px;font-weight:600;letter-spacing:-0.56px;color:${INK}">${escape(model.headline)}</h1>`,
+    statusChip(model.status),
     `<p style="margin:12px 0 0 0;font-size:16px;line-height:25px;color:${INK}">${escape(model.intro)}</p>`,
     `<p style="margin:12px 0 0 0;font-size:14px;line-height:21px;color:${MUTE}">Reference <span style="font-family:${MONO};color:${INK}">${escape(model.reference)}</span></p>`,
     section('What you booked', rows(model.facts)),
@@ -110,8 +132,31 @@ function renderHtml(model: BookingEmailModel): string {
     .join('')
 }
 
-function eyebrow(text: string): string {
-  return `<p style="margin:0;font-size:11px;line-height:14px;font-weight:500;letter-spacing:0.55px;text-transform:uppercase;color:${MUTE}">${escape(text)}</p>`
+function eyebrow(text: string, colour: string = MUTE): string {
+  return `<p style="margin:0;font-size:11px;line-height:14px;font-weight:500;letter-spacing:0.55px;text-transform:uppercase;color:${colour}">${escape(text)}</p>`
+}
+
+/**
+ * The status chip: design.md's badge — a 6px rectangle, tint under deep text
+ * — with a mark in the mid hue in front of the label.
+ *
+ * The marks are text glyphs, not emoji and not images. An emoji hourglass
+ * renders in whatever colours each client ships and cannot be tinted; an
+ * image is blocked until the reader allows it. A filled circle and a tick are
+ * in every system font, take the colour they are given, and read the same in
+ * every client — the dot is also the status idiom design.md already uses.
+ */
+function statusChip(status: EmailStatus): string {
+  const tone =
+    status.tone === 'confirmed'
+      ? { ground: POSITIVE_TINT, text: POSITIVE_DEEP, mark: POSITIVE, glyph: '✓' }
+      : { ground: WARNING_TINT, text: WARNING_DEEP, mark: WARNING, glyph: '●' }
+
+  return (
+    '<p style="margin:12px 0 0 0">' +
+    `<span style="display:inline-block;padding:3px 8px;background-color:${tone.ground};border-radius:6px;font-size:12px;line-height:16px;font-weight:500;color:${tone.text}">` +
+    `<span style="color:${tone.mark}">${tone.glyph}</span>&nbsp;${escape(status.label)}</span></p>`
+  )
 }
 
 function section(heading: string, body: string): string {
@@ -146,26 +191,65 @@ function quote(model: EmailQuote): string {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px">${lines}${total}</table>`
 }
 
+/**
+ * The call to action, and the only panel in the email with a hue.
+ *
+ * The whole section sits on the amber panel tint — the same amber as the
+ * status chip, because "your turn" and "here is what to do" are one message —
+ * and the option cards are canvas on it, a step in tone away from what they
+ * sit on, which is how design.md draws structure everywhere. The instruction
+ * that used to sit in its own grey box is plain text inside the panel; a grey
+ * box inside an amber one was two containers saying one thing.
+ */
 function transfer(model: EmailTransfer): string {
   const options = model.options
     .map(
       (option) =>
-        `<div style="margin-top:8px;padding:14px;border:1px solid ${HAIRLINE};border-radius:6px">` +
+        `<div style="margin-top:8px;padding:14px;background-color:${CANVAS};border:1px solid ${HAIRLINE};border-radius:6px">` +
         `<p style="margin:0;font-size:14px;line-height:21px;font-weight:500;color:${INK}">${escape(option.label)}</p>` +
         `<p style="margin:4px 0 0 0;font-size:12px;line-height:16px;color:${MUTE}">${escape(option.detail)}</p></div>`,
     )
     .join('')
 
+  const intro =
+    model.accountsIntro === null
+      ? ''
+      : `<p style="margin:16px 0 0 0;font-size:13px;line-height:18px;font-weight:500;color:${INK}">${escape(model.accountsIntro)}</p>`
+
   const accounts =
     model.accounts.length > 0
-      ? rows(model.accounts)
-      : `<p style="margin:8px 0 0 0;font-size:13px;line-height:18px;color:${INK}">${escape(model.noAccountsNote ?? '')}</p>`
+      ? accountList(model.accounts)
+      : `<p style="margin:16px 0 0 0;font-size:13px;line-height:18px;color:${INK}">${escape(model.noAccountsNote ?? '')}</p>`
 
-  const instruction =
-    `<div style="margin-top:16px;padding:14px;background-color:${CANVAS_SOFT};border-radius:6px">` +
-    `<p style="margin:0;font-size:13px;line-height:18px;color:${INK}">${escape(model.instruction)}</p></div>`
+  const instruction = `<p style="margin:16px 0 0 0;font-size:13px;line-height:18px;color:${INK}">${escape(model.instruction)}</p>`
 
-  return `<div style="margin-top:24px">${eyebrow('How to pay')}${options}${accounts}${instruction}</div>`
+  return (
+    `<div style="margin-top:24px;padding:20px;background-color:${WARNING_PANEL};border-radius:12px">` +
+    `${eyebrow('How to pay', WARNING_DEEP)}${options}${intro}${accounts}${instruction}</div>`
+  )
+}
+
+/**
+ * The accounts as alternatives: name against number, an "or" between them.
+ * The number is the thing a guest copies, so it is mono and a size up.
+ */
+function accountList(accounts: readonly EmailRow[]): string {
+  const cells = accounts
+    .map((account, index) => {
+      const divider =
+        index === 0
+          ? ''
+          : `<tr><td colspan="2" style="padding:2px 0;font-size:11px;line-height:14px;font-weight:500;letter-spacing:0.55px;text-transform:uppercase;color:${MUTE}">or</td></tr>`
+
+      return (
+        divider +
+        `<tr><td style="padding:6px 0;font-size:14px;line-height:21px;color:${MUTE}">${escape(account.label)}</td>` +
+        `<td align="right" style="padding:6px 0;font-family:${MONO};font-size:15px;line-height:21px;color:${INK}">${escape(account.value)}</td></tr>`
+      )
+    })
+    .join('')
+
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:4px">${cells}</table>`
 }
 
 function arrival(sentences: readonly string[]): string {
@@ -224,6 +308,7 @@ function footer(model: BookingEmailModel): string {
 function renderText(model: BookingEmailModel): string {
   const parts: string[] = [
     model.headline.toUpperCase(),
+    `Status: ${model.status.label}`,
     '',
     model.intro,
     '',
@@ -249,8 +334,14 @@ function renderText(model: BookingEmailModel): string {
       parts.push(`  ${option.label}`, `    ${option.detail}`)
     }
 
+    if (model.transfer.accountsIntro) {
+      parts.push('', model.transfer.accountsIntro)
+    }
+
     if (model.transfer.accounts.length > 0) {
-      parts.push(...model.transfer.accounts.map((row) => `  ${row.label}: ${row.value}`))
+      parts.push(
+        model.transfer.accounts.map((row) => `  ${row.label}: ${row.value}`).join('\n  or\n'),
+      )
     } else if (model.transfer.noAccountsNote) {
       parts.push(`  ${model.transfer.noAccountsNote}`)
     }
