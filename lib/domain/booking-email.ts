@@ -432,8 +432,11 @@ function transferFor(booking: EmailBookingFacts, property: EmailPropertyFacts): 
  * Two accounts are a convenience, not two products (transfer-instructions.tsx)
  * — a customer sends to whichever bank they already use. Said in words, since
  * two numbers on two lines look like two transfers to make.
+ *
+ * Exported because the booking page says it too. One sentence, so the screen a
+ * customer books on and the email they are sent cannot drift apart.
  */
-function accountsIntroFor(count: number): string | null {
+export function accountsIntroFor(count: number): string | null {
   if (count === 0) {
     return null
   }

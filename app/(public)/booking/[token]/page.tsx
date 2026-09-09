@@ -1,6 +1,8 @@
+import { Check } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
+import { Badge } from '@/components/ui/badge'
 import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
 import { QuoteLines } from '@/components/quote-lines'
@@ -9,7 +11,12 @@ import { readPropertySettings } from '@/lib/db/settings'
 import { balanceOf } from '@/lib/domain/balance'
 import { formatStayDate, formatStayRange, nightsBetween } from '@/lib/domain/dates'
 import { formatCents, type Cents } from '@/lib/domain/money'
-import { CLOSED_REASONS, publicStageOf, transferPlanFor } from '@/lib/domain/public-booking'
+import {
+  CLOSED_REASONS,
+  publicStageOf,
+  transferPlanFor,
+  type PublicStage,
+} from '@/lib/domain/public-booking'
 
 import { TransferInstructions } from './transfer-instructions'
 
@@ -52,6 +59,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
   const stage = publicStageOf(booking.status)
   const plan = transferPlanFor(booking)
   const settings = await readPropertySettings()
+  const chip = chipFor(stage)
 
   return (
     <section aria-labelledby="booking-heading" className="bg-card px-xl py-3xl">
@@ -70,6 +78,24 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
                 : 'This booking is closed'}
         </h1>
 
+        {/* Whose turn it is, in the same words and the same hue the
+            confirmation email uses — a customer who reads both should not have
+            to work out that they describe one booking. `closed` gets none: its
+            callout already names the reason, and a chip saying "Closed" above
+            it would be the same sentence twice. */}
+        {chip ? (
+          <p className="mt-md">
+            <Badge tone={chip.tone}>
+              {chip.tone === 'positive' ? (
+                <Check aria-hidden className="size-3" />
+              ) : (
+                <span aria-hidden className="size-1.5 rounded-full bg-warning" />
+              )}
+              {chip.label}
+            </Badge>
+          </p>
+        ) : null}
+
         <p className="mt-md text-body-lg text-copy">
           Reference <span className="font-mono text-foreground">{booking.reference}</span>
         </p>
@@ -86,8 +112,8 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
 
         {stage === 'checking' ? (
           <Callout tone="positive" className="mt-xl">
-            We have your booking and are checking for the transfer. Once we see it, your unit is
-            confirmed — we will call or message you on the number you gave us.
+            We have your booking and are checking for the transfer. Once we verify it, we will send
+            you an email confirmation and a QR code for entry.
           </Callout>
         ) : null}
 
@@ -158,6 +184,19 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
       </div>
     </section>
   )
+}
+
+/** The status chip's tone and words, or null where the callout says it. */
+function chipFor(stage: PublicStage): { tone: 'warning' | 'positive'; label: string } | null {
+  if (stage === 'awaiting_transfer') {
+    return { tone: 'warning', label: 'Waiting for your transfer' }
+  }
+
+  if (stage === 'checking') {
+    return { tone: 'warning', label: 'Checking for your transfer' }
+  }
+
+  return stage === 'confirmed' ? { tone: 'positive', label: 'Confirmed' } : null
 }
 
 /**

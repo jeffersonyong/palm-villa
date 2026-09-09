@@ -1,11 +1,10 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { Fragment, useActionState, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/ui/callout'
-import { Card } from '@/components/ui/card'
-import { Notice } from '@/components/ui/notice'
+import { accountsIntroFor } from '@/lib/domain/booking-email'
 import { formatCents } from '@/lib/domain/money'
 import type { TransferChoice, TransferPlan } from '@/lib/domain/public-booking'
 import type { BankAccountSettings } from '@/lib/domain/settings'
@@ -67,10 +66,8 @@ export function TransferInstructions({
   const plan = choice === 'everything' ? everything : depositOnly
 
   return (
-    <Card className="mt-xl">
-      <p className="micro-label text-muted-foreground">
-        {depositOnly.choosable ? 'What would you like to send now?' : 'Transfer the payment'}
-      </p>
+    <div className="mt-xl rounded-lg bg-notice-warning p-card">
+      <p className="micro-label text-notice-warning-foreground">How to pay</p>
 
       {depositOnly.choosable ? (
         <div className="mt-md grid gap-sm">
@@ -101,32 +98,46 @@ export function TransferInstructions({
       )}
 
       {accounts.length > 0 ? (
-        <dl className="mt-lg divide-y divide-divider border-y border-divider">
-          {accounts.map((account) => (
-            <div key={account.id} className="flex items-baseline justify-between gap-lg py-md">
-              <dt className="text-body-md text-muted-foreground">{account.bankName}</dt>
-              <dd className="font-mono text-body-md text-foreground">{account.accountNumber}</dd>
-            </div>
-          ))}
-        </dl>
+        <>
+          <p className="mt-lg text-body-sm-strong text-foreground">
+            {accountsIntroFor(accounts.length)}
+          </p>
+          <dl className="mt-sm">
+            {accounts.map((account, index) => (
+              <Fragment key={account.id}>
+                {index > 0 ? <OrRule /> : null}
+                <div className="flex items-baseline justify-between gap-lg py-xs">
+                  {/* Mute, like the "or" and its rules: a bank name labels
+                      the number beside it, and the number is the content
+                      (design.md §Typography — the two-step ladder). */}
+                  <dt className="text-body-md text-muted-foreground">{account.bankName}</dt>
+                  <dd className="font-mono text-body-md text-foreground">
+                    {account.accountNumber}
+                  </dd>
+                </div>
+              </Fragment>
+            ))}
+          </dl>
+        </>
       ) : (
         <Callout tone="negative" placement="nested" className="mt-lg">
           We cannot show the bank details right now. Please call us and we will give them to you.
         </Callout>
       )}
 
-      <Notice placement="nested" className="mt-lg">
-        <p className="text-body-sm">
-          Send{' '}
-          <strong className="text-body-sm-strong tabular-nums">
-            BND {formatCents(plan.total)}
-          </strong>{' '}
-          in one transfer, and put{' '}
-          <strong className="font-mono text-body-sm-strong">{reference}</strong> as the transfer
-          reference so we can match it to your booking. Your unit is held for you in the meantime —
-          once we confirm the transfer, your booking is confirmed and we will let you know.
-        </p>
-      </Notice>
+      {/* Plain text on the panel rather than its own inset: a second tinted
+          box inside this one was two containers saying one thing, which is
+          what the email's version settled. */}
+      <p className="mt-lg text-body-sm text-copy">
+        Send{' '}
+        <strong className="text-body-sm-strong text-foreground tabular-nums">
+          BND {formatCents(plan.total)}
+        </strong>{' '}
+        in one transfer, and put{' '}
+        <strong className="font-mono text-body-sm-strong text-foreground">{reference}</strong> as
+        the transfer reference so we can match it to your booking. Your unit is held for you in the
+        meantime — once we confirm the transfer, your booking is confirmed and we will let you know.
+      </p>
 
       {state.status === 'error' && state.message ? (
         <Callout tone="negative" placement="nested" className="mt-lg" role="alert">
@@ -145,7 +156,26 @@ export function TransferInstructions({
       <p className="mt-sm text-caption text-muted-foreground">
         Confirm here once you have sent it. This will confirm your booking upon verification.
       </p>
-    </Card>
+    </div>
+  )
+}
+
+/**
+ * The rule either side of "or", so the two accounts read as one choice.
+ *
+ * The rule takes the word's own colour rather than `divider`: this panel is
+ * the one tinted ground on the customer surface, and a hairline drawn for
+ * white all but disappears on it. `aria-hidden` because the sentence above the
+ * list already says the accounts are alternatives — this repeats it for the
+ * eye, not for a screen reader.
+ */
+function OrRule() {
+  return (
+    <div aria-hidden className="flex items-center gap-md py-xs">
+      <span className="h-px flex-1 bg-muted-foreground" />
+      <span className="micro-label text-muted-foreground">or</span>
+      <span className="h-px flex-1 bg-muted-foreground" />
+    </div>
   )
 }
 

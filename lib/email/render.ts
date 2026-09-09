@@ -240,14 +240,18 @@ function accountList(accounts: readonly EmailRow[]): string {
       // choice rather than a list. The rule is a zero-height div with a top
       // border, vertically centred by the cell, which is the one way to draw
       // a line beside text that every client agrees on.
+      //
+      // It takes the word's own colour rather than the hairline: this is the
+      // one rule in the product that is not drawn on canvas, and a hairline
+      // meant for white all but vanishes on the amber panel.
       const divider =
         index === 0
           ? ''
           : `<tr><td colspan="2" style="padding:6px 0">` +
             `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
-            `<td width="50%" valign="middle"><div style="border-top:1px solid ${HAIRLINE};height:0;line-height:0;font-size:0">&nbsp;</div></td>` +
+            `<td width="50%" valign="middle"><div style="border-top:1px solid ${MUTE};height:0;line-height:0;font-size:0">&nbsp;</div></td>` +
             `<td style="padding:0 10px;font-size:11px;line-height:14px;font-weight:500;letter-spacing:0.55px;text-transform:uppercase;color:${MUTE};white-space:nowrap">or</td>` +
-            `<td width="50%" valign="middle"><div style="border-top:1px solid ${HAIRLINE};height:0;line-height:0;font-size:0">&nbsp;</div></td>` +
+            `<td width="50%" valign="middle"><div style="border-top:1px solid ${MUTE};height:0;line-height:0;font-size:0">&nbsp;</div></td>` +
             `</tr></table></td></tr>`
 
       return (
