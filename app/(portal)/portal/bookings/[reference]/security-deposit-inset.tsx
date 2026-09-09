@@ -81,7 +81,8 @@ export function SecurityDepositInset({
           <>
             {/* Promised online and not yet checked. Worded as a wait rather
                 than as money, because the property is holding nothing yet. */}
-            Transfer awaited{deposit.promisedAt ? <> since {formatTimestamp(deposit.promisedAt)}</> : null}
+            Transfer awaited
+            {deposit.promisedAt ? <> since {formatTimestamp(deposit.promisedAt)}</> : null}
           </>
         ) : (
           <>
