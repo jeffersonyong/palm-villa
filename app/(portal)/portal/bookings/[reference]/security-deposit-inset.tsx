@@ -134,6 +134,20 @@ export function SecurityDepositInset({
           View the deposit
         </Link>
       </p>
+
+      {/* A promise the guest has come in to settle in cash. Offered here
+          because the alternative a clerk would otherwise reach for is
+          verifying a transfer that never arrived, which is a false entry in
+          the ledger about money that changed hands a different way. */}
+      {mayRecordDeposit && deposit.collectedAt === null ? (
+        <RecordDeposit
+          bookingId={bookingId}
+          reference={reference}
+          quoted={deposit.amount}
+          securesBooking={securesBooking}
+          fulfilsPromise
+        />
+      ) : null}
     </DepositFigureTable>
   )
 }

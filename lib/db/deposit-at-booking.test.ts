@@ -291,6 +291,118 @@ describe('what it refuses', () => {
   })
 })
 
+describe('a promise settled in cash', () => {
+  test('fulfils the standing row and confirms the booking', async () => {
+    // The sequence that stranded a clerk before 20260914000200: the customer
+    // says they transferred, the transfer never lands, and they walk in with
+    // the notes. prd.md §11 makes this judgement at the door already.
+    const booking = await givenHeldBooking({ guestPhone: '+673 720 5001' })
+
+    await recordBookingDeposit({
+      bookingId: booking.id,
+      method: 'bank_transfer',
+      actorId: null,
+    })
+
+    const promised = await getDepositByBookingId(booking.id)
+
+    // Act
+    const settled = await recordBookingDeposit({
+      bookingId: booking.id,
+      method: 'cash',
+      actorId: null,
+    })
+
+    // Assert
+    expect(settled).toMatchObject({ ok: true, status: 'confirmed', confirmedNow: true })
+
+    const deposit = await getDepositByBookingId(booking.id)
+
+    // The same row, corrected to how the money actually arrived.
+    expect(deposit?.id).toBe(promised?.id)
+    expect(deposit?.method).toBe('cash')
+    expect(deposit?.collectedAt).not.toBeNull()
+    expect(await depositRowCount(booking.id)).toBe(1)
+  })
+
+  test('keeps the promise as the record of what the customer claimed', async () => {
+    // The question asked afterwards is whether they ever said they had sent
+    // it, so correcting the method must not erase the claim.
+    const booking = await givenHeldBooking({ guestPhone: '+673 720 5002' })
+
+    await recordBookingDeposit({
+      bookingId: booking.id,
+      method: 'bank_transfer',
+      actorId: null,
+    })
+    await recordBookingDeposit({ bookingId: booking.id, method: 'cash', actorId: null })
+
+    const deposit = await getDepositByBookingId(booking.id)
+
+    expect(deposit?.promisedAt).not.toBeNull()
+  })
+
+  test('leaves the queue, and the stay still owed', async () => {
+    const booking = await givenHeldBooking({ guestPhone: '+673 720 5003' })
+
+    await recordBookingDeposit({
+      bookingId: booking.id,
+      method: 'bank_transfer',
+      actorId: null,
+    })
+    await recordBookingDeposit({ bookingId: booking.id, method: 'cash', actorId: null })
+
+    const pending = await listPendingDeposits()
+    const held = await listHeldDeposits()
+    const after = await getBookingById(booking.id)
+
+    expect(pending.some((entry) => entry.bookingId === booking.id)).toBe(false)
+    expect(held.some((entry) => entry.bookingId === booking.id)).toBe(true)
+    expect(after?.paid).toBe(0 as Cents)
+  })
+
+  test('refuses a second transfer against a standing promise', async () => {
+    // Replacing one awaited transfer with another says nothing new and clears
+    // nothing, so it is refused with the sentence that names the way out.
+    const booking = await givenHeldBooking({ guestPhone: '+673 720 5004' })
+
+    await recordBookingDeposit({
+      bookingId: booking.id,
+      method: 'bank_transfer',
+      actorId: null,
+    })
+
+    const second = await recordBookingDeposit({
+      bookingId: booking.id,
+      method: 'bank_transfer',
+      actorId: null,
+    })
+
+    expect(second).toMatchObject({ ok: false })
+    if (second.ok) return
+
+    expect(second.error.code).toBe('already_promised')
+    expect(await depositRowCount(booking.id)).toBe(1)
+  })
+
+  test('refuses cash against a deposit already in the safe', async () => {
+    const booking = await givenHeldBooking({ guestPhone: '+673 720 5005' })
+
+    await recordBookingDeposit({ bookingId: booking.id, method: 'cash', actorId: null })
+
+    const second = await recordBookingDeposit({
+      bookingId: booking.id,
+      method: 'cash',
+      actorId: null,
+    })
+
+    expect(second).toMatchObject({ ok: false })
+    if (second.ok) return
+
+    expect(second.error.code).toBe('already_recorded')
+  })
+})
+
 describe('a booking that is already confirmed', () => {
   test('takes the deposit without confirming it twice', async () => {
     // The catch-up case: a walk-in paid the stay in cash and the deposit is

@@ -601,6 +601,15 @@ export interface RecordBookingDepositInput {
  * button writes one and joins the same verification queue, settled by the same
  * `verifyDeposit()`. Nothing here is a second way to confirm money.
  *
+ * **Cash against an existing promise fulfils it** rather than being refused —
+ * the customer whose transfer failed, walking in with the notes. prd.md §11
+ * already makes that judgement at the door and nothing in its reasoning
+ * depends on the guest arriving, so the row is corrected to the method that
+ * actually changed hands and `promised_at` survives as the record of what
+ * they said. It moves the booking by `verify_payment`, the edge
+ * `verifyDeposit` already uses, because the promise is being settled rather
+ * than the booking secured afresh.
+ *
  * The status pair is derived here and passed down, because architecture.md
  * §5.3 keeps the machine in one module. A booking already `confirmed` — the
  * desk catching up on a transfer that landed days ago — passes nulls and does
@@ -640,10 +649,22 @@ export async function recordBookingDeposit(input: RecordBookingDepositInput): Pr
 
   const current = (row as { status: BookingStatus }).status
 
-  // Cash secures the booking; a promised transfer sends it to the queue. Both
-  // are only legal from somewhere a booking is still waiting, and `transition`
-  // is what says so — a booking already confirmed simply does not move.
-  const event = input.method === 'cash' ? 'secure_with_deposit' : 'submit_payment'
+  // Whether a promise is already standing decides which move this is, so it is
+  // read before the write. The database re-reads it under the row lock and is
+  // what actually settles a race; this only picks the pair to offer.
+  const standing = await getDepositByBookingId(input.bookingId)
+  const fulfilsPromise =
+    input.method === 'cash' && standing !== null && standing.collectedAt === null
+
+  // Cash secures the booking; a promised transfer sends it to the queue; cash
+  // against a promise settles it. All three are only legal from somewhere a
+  // booking is still waiting, and `transition` is what says so — a booking
+  // already confirmed simply does not move.
+  const event = fulfilsPromise
+    ? 'verify_payment'
+    : input.method === 'cash'
+      ? 'secure_with_deposit'
+      : 'submit_payment'
   const next = transition(current, event)
 
   const { data, error } = await dataClient().rpc('record_booking_deposit', {
@@ -688,7 +709,13 @@ function describeRecordDepositFailure(result: RpcRefusal): DepositWriteError {
     case 'already_recorded':
       return {
         code: result.error,
-        message: 'A security deposit is already recorded against this booking.',
+        message: 'A security deposit is already held against this booking.',
+      }
+    case 'already_promised':
+      return {
+        code: result.error,
+        message:
+          'This booking is already waiting on a deposit transfer. Confirm that one from the payments queue, or take the deposit in cash.',
       }
     case 'status_changed':
       return {

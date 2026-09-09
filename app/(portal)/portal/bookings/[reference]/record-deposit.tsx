@@ -59,6 +59,14 @@ interface RecordDepositProps {
   quoted: Cents
   /** Whether taking it confirms the booking, or it is already confirmed. */
   securesBooking: boolean
+  /**
+   * A transfer is already awaited on this booking, and cash settles it.
+   *
+   * The method choice disappears here rather than being shown and refused: a
+   * second promise clears nothing, so cash is the only answer and offering the
+   * other one would be offering a dead end.
+   */
+  fulfilsPromise?: boolean
 }
 
 export function RecordDeposit(props: RecordDepositProps) {
@@ -67,7 +75,7 @@ export function RecordDeposit(props: RecordDepositProps) {
   return (
     <>
       <Button variant="secondary" className="mt-lg w-full" onClick={() => setIsOpen(true)}>
-        Record the deposit
+        {props.fulfilsPromise ? 'Take the deposit in cash' : 'Record the deposit'}
       </Button>
 
       {/* Mounted only while open, so it opens with fresh action state. */}
@@ -81,6 +89,7 @@ function RecordDepositDialog({
   reference,
   quoted,
   securesBooking,
+  fulfilsPromise = false,
   onClose,
 }: RecordDepositProps & { onClose: () => void }) {
   const [state, formAction, isPending] = useActionState(recordDepositAction, initialState)
@@ -116,34 +125,48 @@ function RecordDepositDialog({
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent className="max-w-[440px]">
         <DialogHeader>
-          <DialogTitle>Record the deposit</DialogTitle>
+          <DialogTitle>
+            {fulfilsPromise ? 'Take the deposit in cash' : 'Record the deposit'}
+          </DialogTitle>
           <DialogDescription>
-            {reference} quotes a BND {formatCents(quoted)} refundable security deposit.
+            {fulfilsPromise
+              ? `${reference} is waiting on a BND ${formatCents(quoted)} transfer that has not been verified.`
+              : `${reference} quotes a BND ${formatCents(quoted)} refundable security deposit.`}
           </DialogDescription>
         </DialogHeader>
 
         <form action={formAction} className="grid gap-lg">
           <input type="hidden" name="bookingId" value={bookingId} />
 
-          <div className="grid gap-sm">
-            <Label htmlFor="deposit-method">How was it taken?</Label>
-            <Select
-              name="method"
-              value={method}
-              onValueChange={(next) => setMethod(next as PaymentMethod)}
-            >
-              <SelectTrigger id="deposit-method">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash — counted now</SelectItem>
-                <SelectItem value="bank_transfer">Bank transfer — verify later</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {fulfilsPromise ? (
+            <input type="hidden" name="method" value="cash" />
+          ) : (
+            <div className="grid gap-sm">
+              <Label htmlFor="deposit-method">How was it taken?</Label>
+              <Select
+                name="method"
+                value={method}
+                onValueChange={(next) => setMethod(next as PaymentMethod)}
+              >
+                <SelectTrigger id="deposit-method">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash — counted now</SelectItem>
+                  <SelectItem value="bank_transfer">Bank transfer — verify later</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <Notice>
-            {isCash ? (
+            {fulfilsPromise ? (
+              <>
+                The awaited transfer is settled by the BND {formatCents(quoted)} counted here, and
+                the booking is confirmed. What the customer said they sent stays on the record, so
+                the deposit still shows that a transfer was claimed.
+              </>
+            ) : isCash ? (
               <>
                 BND {formatCents(quoted)} goes on the deposit ledger as money the property holds and
                 owes back after the stay.{' '}
@@ -167,7 +190,11 @@ function RecordDepositDialog({
               Not yet
             </Button>
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Recording…' : isCash ? 'Record the deposit' : 'Send to the queue'}
+              {isPending
+                ? 'Recording…'
+                : isCash || fulfilsPromise
+                  ? 'Record the deposit'
+                  : 'Send to the queue'}
             </Button>
           </DialogFooter>
         </form>
