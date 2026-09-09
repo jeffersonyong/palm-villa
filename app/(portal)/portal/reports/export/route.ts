@@ -227,9 +227,7 @@ async function buildCashUp(window: StayWindow, params: URLSearchParams): Promise
       // figure — the rule the cash-up screen applies, said the same way here
       // so the download and the screen cannot disagree.
       deposits: deposits.flatMap((deposit) =>
-        deposit.collectedAt
-          ? [{ collectedAt: deposit.collectedAt, amount: deposit.amount }]
-          : [],
+        deposit.collectedAt ? [{ collectedAt: deposit.collectedAt, amount: deposit.amount }] : [],
       ),
       bankings: bankings.map((banking) => ({
         businessDate: banking.businessDate,
