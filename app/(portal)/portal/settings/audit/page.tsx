@@ -74,7 +74,7 @@ const COLUMNS = [
   { label: 'Who', width: 176 },
   { label: 'What', width: null },
   { label: 'Record', width: 144 },
-  { label: 'Reason', width: 264 },
+  { label: 'Reason', width: 320 },
 ] as const
 
 /** What What is never squeezed below before the container starts scrolling. */

@@ -24,10 +24,10 @@ import { TextAction } from '@/components/ui/text-action'
  * Asking the browser whether the text overflowed would mean a ref, a resize
  * observer and a second render on a table that is otherwise entirely
  * server-rendered. A character count answers it, and answers it *exactly*
- * here, because the column is a declared 264px on every screen — the elastic
+ * here, because the column is a declared 320px on every screen — the elastic
  * column is *What* (page.tsx, COLUMNS) precisely so this one never moves.
- * 264px less the cell's padding is 232px, which is about thirty characters at
- * 14px; `CLIPPED_AT` sits under that with room to spare, so the control can
+ * 320px less the cell's padding is 288px, which is about thirty-seven characters
+ * at 14px; `CLIPPED_AT` sits under that with room to spare, so the control can
  * never fail to appear over text that was silently cut. A short reason renders
  * as it always did, with no control at all.
  *
@@ -47,10 +47,10 @@ const ABSENT = '—'
 
 /**
  * Past this many characters the cell clips and offers to unfold. Comfortably
- * under what the 264px column holds, so the control never fails to appear over
+ * under what the 320px column holds, so the control never fails to appear over
  * a sentence that was cut — the quotation marks are inside the allowance.
  */
-const CLIPPED_AT = 26
+const CLIPPED_AT = 32
 
 export function ReasonCell({ reason }: { reason: string | null }) {
   const [isOpen, setOpen] = useState(false)
