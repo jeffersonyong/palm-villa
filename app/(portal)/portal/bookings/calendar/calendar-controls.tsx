@@ -16,8 +16,15 @@ import { cn } from '@/lib/utils'
 import { calendarHref } from './calendar-params'
 
 /**
- * The calendar's control line: which month, which unit types, and whether the
- * empty rows are drawn.
+ * The calendar's controls: which units are shown, and which month.
+ *
+ * Two components rather than one, because they belong at opposite ends of the
+ * control line. Every list screen on the surface reads the same way across
+ * that row — what narrows the list on the left, what you can *do* on the
+ * right — and the month is not a narrowing. It is the view itself moving, so
+ * it sits with the actions, beside the primary. The type filter and "Show
+ * empty units" are what narrow the grid, so they sit where every other
+ * screen's chips do. The page composes them; neither knows where it is.
  *
  * URL state, like every filter row on the surface — a month can be kept in a
  * tab or sent to whoever is asking about it. The current values arrive as
@@ -43,34 +50,30 @@ interface UnitTypeOption {
   name: string
 }
 
-interface CalendarControlsProps {
+interface CalendarViewProps {
   month: CalendarMonth
   /** The month today falls in — the one the screen opens on unasked. */
   todayMonth: CalendarMonth
   /** The chosen unit types, in canonical order. Empty means the whole building. */
   types: readonly string[]
-  /** Every unit type, for the Type panel's options. */
-  unitTypes: readonly UnitTypeOption[]
   /** Whether the units with nothing on them this month are drawn. */
   showAllUnits: boolean
 }
 
-export function CalendarControls({
-  month,
+/**
+ * Navigating the calendar, shared by the two clusters.
+ *
+ * Each holds its own transition rather than one being threaded through the
+ * page between them: the control a reader touched is the one that should
+ * answer, and a month arrow dimming the type chips it did not change said the
+ * wrong thing about what was happening.
+ */
+function useCalendarNavigation({
   todayMonth,
-  types,
-  unitTypes,
   showAllUnits,
-}: CalendarControlsProps) {
+}: Pick<CalendarViewProps, 'todayMonth' | 'showAllUnits'>) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-
-  // Words only, as on the units board: a type is not a state, and the
-  // semantic hues mean status and nothing else.
-  const typeOptions: readonly MultiSelectOption<string>[] = unitTypes.map((type) => ({
-    value: type.id,
-    label: type.name,
-  }))
 
   /**
    * Rebuilds the whole query from one place. The current month is written as
@@ -96,61 +99,105 @@ export function CalendarControls({
     })
   }
 
+  return { go, isPending }
+}
+
+/** The busy treatment both clusters wear while a navigation is in flight. */
+const PENDING = 'transition-opacity duration-150 motion-reduce:transition-none'
+
+/**
+ * Which units are drawn: the type narrowing, the empty rows, and the way out.
+ *
+ * The left of the control line, where every other list screen keeps the
+ * controls that narrow it.
+ */
+export function CalendarUnitControls({
+  month,
+  todayMonth,
+  types,
+  unitTypes,
+  showAllUnits,
+}: CalendarViewProps & {
+  /** Every unit type, for the Type panel's options. */
+  unitTypes: readonly UnitTypeOption[]
+}) {
+  const { go, isPending } = useCalendarNavigation({ todayMonth, showAllUnits })
+
+  // Words only, as on the units board: a type is not a state, and the
+  // semantic hues mean status and nothing else.
+  const typeOptions: readonly MultiSelectOption<string>[] = unitTypes.map((type) => ({
+    value: type.id,
+    label: type.name,
+  }))
+
   return (
     <div
       aria-busy={isPending}
-      className={cn(
-        'flex flex-wrap items-center gap-xl transition-opacity duration-150 motion-reduce:transition-none',
-        isPending && 'opacity-60',
-      )}
+      className={cn('flex flex-wrap items-center gap-md', PENDING, isPending && 'opacity-60')}
     >
-      {/* Two clusters, not one row. Which month is being looked at is a
-          different question from which units are shown, so the month keeps
-          its own space and the narrowing keeps its own.
+      <MultiSelectFilter
+        label="Type"
+        options={typeOptions}
+        selected={types}
+        onChange={(next) => go(month, next)}
+      />
 
-          The header positions its arrows absolutely, so it needs a width to
-          stand in a row; wide enough for "September 2026" with an arrow clear
-          of each end. */}
-      <div className="w-[232px]">
-        <MonthHeader
-          month={month}
-          showPrevious
-          showNext
-          onPrevious={() => go(shiftMonth(month, -1), types)}
-          onNext={() => go(shiftMonth(month, 1), types)}
+      {/* A checkbox rather than a chip: this is one thing that is on or off,
+          and a chip carries a chevron that promises a list to pick from
+          (design.md — a chevron promises a list). Worded as what ticking it
+          does, not as the state it leaves behind. */}
+      <div className="flex items-center gap-sm">
+        <Checkbox
+          id="showAllUnits"
+          checked={showAllUnits}
+          onCheckedChange={(checked) => go(month, types, checked === true)}
         />
+        <Label htmlFor="showAllUnits" className="cursor-pointer text-copy">
+          Show empty units
+        </Label>
       </div>
 
-      <div className="flex flex-wrap items-center gap-md">
-        <MultiSelectFilter
-          label="Type"
-          options={typeOptions}
-          selected={types}
-          onChange={(next) => go(month, next)}
-        />
+      {types.length > 0 ? (
+        <Button variant="ghost" onClick={() => go(month, [])}>
+          <FunnelX aria-hidden />
+          Clear
+        </Button>
+      ) : null}
+    </div>
+  )
+}
 
-        {/* A checkbox rather than a chip: this is one thing that is on or off,
-            and a chip carries a chevron that promises a list to pick from
-            (design.md — a chevron promises a list). Worded as what ticking it
-            does, not as the state it leaves behind. */}
-        <div className="flex items-center gap-sm">
-          <Checkbox
-            id="showAllUnits"
-            checked={showAllUnits}
-            onCheckedChange={(checked) => go(month, types, checked === true)}
-          />
-          <Label htmlFor="showAllUnits" className="cursor-pointer text-copy">
-            Show empty units
-          </Label>
-        </div>
+/**
+ * Which month is being looked at.
+ *
+ * The right of the control line, beside the screen's primary: stepping the
+ * month is not narrowing a list, it is moving the view, which is an action on
+ * the whole screen rather than a question about its rows.
+ *
+ * The header positions its arrows absolutely, so it needs a width to stand in
+ * a row; wide enough for "September 2026" with an arrow clear of each end, and
+ * fixed so the arrows hold their place as the month name changes length.
+ */
+export function CalendarMonthStepper({
+  month,
+  todayMonth,
+  types,
+  showAllUnits,
+}: CalendarViewProps) {
+  const { go, isPending } = useCalendarNavigation({ todayMonth, showAllUnits })
 
-        {types.length > 0 ? (
-          <Button variant="ghost" onClick={() => go(month, [])}>
-            <FunnelX aria-hidden />
-            Clear
-          </Button>
-        ) : null}
-      </div>
+  return (
+    <div
+      aria-busy={isPending}
+      className={cn('w-[232px] shrink-0', PENDING, isPending && 'opacity-60')}
+    >
+      <MonthHeader
+        month={month}
+        showPrevious
+        showNext
+        onPrevious={() => go(shiftMonth(month, -1), types)}
+        onNext={() => go(shiftMonth(month, 1), types)}
+      />
     </div>
   )
 }

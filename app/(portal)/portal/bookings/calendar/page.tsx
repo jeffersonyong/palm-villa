@@ -17,7 +17,7 @@ import { getUnits } from '@/lib/db/inventory'
 import { getPropertyConfig } from '@/lib/db/property-config'
 import { todayInBrunei } from '@/lib/domain/dates'
 
-import { CalendarControls } from './calendar-controls'
+import { CalendarMonthStepper, CalendarUnitControls } from './calendar-controls'
 import { calendarHref, readMonth, readShowAllUnits } from './calendar-params'
 import { buildTapeChart, monthWindow, type TapeChartSummary } from './tape-chart'
 import { TapeChartGrid } from './tape-chart-grid'
@@ -119,13 +119,17 @@ export default async function BookingCalendarPage({ searchParams }: PageProps) {
         description="Every stay, hold and lease across the building, by unit and by night. Day passes occupy no unit and are not on this grid."
       />
 
-      {/* The control line: what is being shown on the left — the month, then
-          the type narrowing — and on the right the count, the key to the
-          colours, and the screen's one primary fill. The legend sits here
-          rather than on a column header because this grid has no status
-          column; the colour *is* the column. */}
+      {/* The control line, read the way every list screen on the surface is
+          read: **which rows are shown** on the left, **what can be done**
+          on the right. The type narrowing and the empty-row toggle are the
+          first; the month is the second — stepping it moves the view rather
+          than narrowing it — so it stands with the primary rather than with
+          the chips. Between them the grid reports on itself: the count, and
+          the key to the colours. The legend sits here rather than on a column
+          header because this grid has no status column; the colour *is* the
+          column. */}
       <div className="mt-md flex flex-wrap items-center gap-md">
-        <CalendarControls
+        <CalendarUnitControls
           month={month}
           todayMonth={monthOf(today)}
           types={types}
@@ -133,12 +137,19 @@ export default async function BookingCalendarPage({ searchParams }: PageProps) {
           showAllUnits={showAllUnits}
         />
 
-        <div className="ml-auto flex items-center gap-md">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-md">
           <p className="micro-label text-muted-foreground tabular-nums">
             {summaryText(chart.summary)}
           </p>
 
           <StatusLegend label="What the colours mean" items={LEGEND} />
+
+          <CalendarMonthStepper
+            month={month}
+            todayMonth={monthOf(today)}
+            types={types}
+            showAllUnits={showAllUnits}
+          />
 
           {mayCreate ? (
             <Button asChild>

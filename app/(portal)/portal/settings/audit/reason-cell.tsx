@@ -19,17 +19,27 @@ import { TextAction } from '@/components/ui/text-action'
  * clips to one line and offers to unfold, so a long reason costs its own row
  * and nobody else's.
  *
- * The offer is made on **length, not on measurement**. Asking the browser
- * whether the text overflowed would mean a ref, a resize observer and a
- * second render on a table that is otherwise entirely server-rendered, to
- * answer a question a character count answers well enough: the column is
- * ~220px, which is about thirty characters of 14px text, and anything past
- * `CLIPPED_AT` is certainly longer than that. A short reason renders as it
- * always did, with no control at all.
+ * ── The offer is made on length, not on measurement ─────────────────────────
+ *
+ * Asking the browser whether the text overflowed would mean a ref, a resize
+ * observer and a second render on a table that is otherwise entirely
+ * server-rendered. A character count answers it, and answers it *exactly*
+ * here, because the column is a declared 264px on every screen — the elastic
+ * column is *What* (page.tsx, COLUMNS) precisely so this one never moves.
+ * 264px less the cell's padding is 232px, which is about thirty characters at
+ * 14px; `CLIPPED_AT` sits under that with room to spare, so the control can
+ * never fail to appear over text that was silently cut. A short reason renders
+ * as it always did, with no control at all.
+ *
+ * The control sits **under** the sentence rather than beside it. Beside it, it
+ * would eat a third of the column's width from the text it is describing — and
+ * it costs nothing below, because the Record column two cells over already
+ * stacks a reference over its kind, so every row on this table is two lines
+ * tall whatever this one does.
  *
  * `TextAction`, not a button: the cell is text, and a bordered rectangle in a
  * table cell reads as an action on the *record* rather than on the sentence
- * beside it.
+ * above it.
  */
 
 /** What a cell shows instead of nothing, as on the register. */
@@ -37,9 +47,10 @@ const ABSENT = '—'
 
 /**
  * Past this many characters the cell clips and offers to unfold. Comfortably
- * more than the column holds, so the control never appears over text that fits.
+ * under what the 264px column holds, so the control never fails to appear over
+ * a sentence that was cut — the quotation marks are inside the allowance.
  */
-const CLIPPED_AT = 44
+const CLIPPED_AT = 26
 
 export function ReasonCell({ reason }: { reason: string | null }) {
   const [isOpen, setOpen] = useState(false)
@@ -48,39 +59,24 @@ export function ReasonCell({ reason }: { reason: string | null }) {
     // An em dash in the muted tone the absent values on the register wear. The
     // column is mostly empty by design, and a blank cell reads as a value that
     // failed to load rather than as an action never asked to justify itself.
-    return <TableCell className="align-top text-muted-foreground">{ABSENT}</TableCell>
+    return <TableCell className="text-muted-foreground">{ABSENT}</TableCell>
   }
 
   const quoted = `“${reason}”`
 
   if (reason.length <= CLIPPED_AT) {
-    return <TableCell className="align-top text-copy">{quoted}</TableCell>
+    return <TableCell className="text-copy">{quoted}</TableCell>
   }
 
-  if (isOpen) {
-    return (
-      <TableCell className="align-top text-copy">
-        <span className="grid justify-items-start gap-xs">
-          <span>{quoted}</span>
-          <TextAction onClick={() => setOpen(false)}>Show less</TextAction>
-        </span>
-      </TableCell>
-    )
-  }
-
+  // One shape for both states, so unfolding moves nothing sideways: the
+  // sentence, then the control under its left edge. Only the clip and the
+  // word change.
   return (
-    <TableCell className="align-top text-copy">
-      {/* One line: the sentence takes what is left and ellipses, and the
-          control holds its own width at the end of it, so a clipped row is
-          exactly as tall as an unclipped one. */}
-      <span className="flex items-baseline gap-sm">
-        {/* `min-w-0`, or the ellipsis never appears: a flex item's default
-            `min-width: auto` refuses to shrink below its content, so the
-            sentence would push the control out of the cell instead of
-            clipping. */}
-        <span className="min-w-0 truncate">{quoted}</span>
-        <TextAction className="shrink-0" onClick={() => setOpen(true)}>
-          Show more
+    <TableCell className="text-copy">
+      <span className="grid justify-items-start gap-xs">
+        <span className={isOpen ? 'w-full' : 'w-full truncate'}>{quoted}</span>
+        <TextAction onClick={() => setOpen(!isOpen)}>
+          {isOpen ? 'Show less' : 'Show more'}
         </TextAction>
       </span>
     </TableCell>

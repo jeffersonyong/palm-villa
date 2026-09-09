@@ -51,26 +51,38 @@ export const metadata: Metadata = {
 /**
  * The columns, and what each one is declared to be worth.
  *
- * Four fixed and one elastic. The four are sized to the longest value each
- * actually holds — a timestamp is `12 Sept 2026, 14:32` and never longer, a
- * described action is a short sentence — and *Reason*, the only column whose
- * contents nobody controls, takes the remainder. That is what stops one long
- * reason resizing the four beside it.
+ * Four are fixed to the longest value each actually holds — a timestamp is
+ * `12 Sept 2026, 14:32` and never longer; a reference over its kind is two
+ * short lines — and one takes whatever the panel has left over.
+ *
+ * **The elastic one is What, not Reason.** Under fixed layout the surplus goes
+ * entirely to the undeclared column, so whichever column that is ends up the
+ * widest on screen — and *Reason* is the worst possible candidate twice over.
+ * It is the column nobody controls, it is empty on most rows, and it was
+ * taking three or four hundred pixels to say "—". *What* is the opposite: the
+ * screen writes it, from a closed vocabulary of short sentences, and it wraps
+ * to a second line without complaint when the panel is narrow. So Reason is
+ * declared at a width that shows the opening of a sentence and hands the rest
+ * to the unfold, and What absorbs the screen.
+ *
+ * That also makes the unfold's threshold exact rather than approximate:
+ * Reason is the same width on every screen, so `CLIPPED_AT` in reason-cell.tsx
+ * can be set against a known number of characters instead of a guess.
  */
 const COLUMNS = [
-  { label: 'When', width: 168 },
+  { label: 'When', width: 176 },
   { label: 'Who', width: 176 },
-  { label: 'What', width: 240 },
-  { label: 'Record', width: 160 },
-  { label: 'Reason', width: null },
+  { label: 'What', width: null },
+  { label: 'Record', width: 144 },
+  { label: 'Reason', width: 264 },
 ] as const
 
-/** What Reason is never squeezed below before the container starts scrolling. */
-const REASON_MIN_WIDTH = 220
+/** What What is never squeezed below before the container starts scrolling. */
+const WHAT_MIN_WIDTH = 224
 
 /** Derived, so the floor cannot drift from the widths it is a floor for. */
 const TABLE_MIN_WIDTH = COLUMNS.reduce(
-  (total, column) => total + (column.width ?? REASON_MIN_WIDTH),
+  (total, column) => total + (column.width ?? WHAT_MIN_WIDTH),
   0,
 )
 
@@ -213,11 +225,10 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
               column, and the widest column here is free text somebody typed —
               so one long reason narrowed *When*, *Who* and *What* for every
               row on the screen, and the table's proportions changed from page
-              to page. Four columns are named and Reason takes what is left,
-              which is the only one that can absorb it: it clips to a line and
-              unfolds on request (reason-cell.tsx). Below `TABLE_MIN_WIDTH`
-              the container scrolls rather than squeezing five columns into a
-              phone. */}
+              to page. Four are named and *What* takes what is left (see
+              COLUMNS); a long reason clips to a line and unfolds on request
+              (reason-cell.tsx). Below `TABLE_MIN_WIDTH` the container scrolls
+              rather than squeezing five columns into a phone. */}
           <colgroup>
             {COLUMNS.map((column) => (
               <col key={column.label} style={column.width ? { width: column.width } : undefined} />
@@ -260,21 +271,22 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
             ) : null}
 
             {events.map((event) => (
-              /* Cells align to the top, not the middle: an unfolded reason
-                 makes its row two or three lines tall, and a timestamp
-                 floating in the middle of it stops reading as the moment the
-                 row starts with. */
+              /* Cells centre in their row, as they do on every other table on
+                 the surface. They were briefly top-aligned, on the argument
+                 that an unfolded reason leaves a tall row — but the Record
+                 column already stacks a reference over its kind, so no row
+                 here was ever one line tall, and top-aligning to serve a state
+                 a reader has to ask for made the ordinary row read differently
+                 from the register beside it. */
               <TableRow key={event.id}>
-                <TableCell className="align-top whitespace-nowrap text-muted-foreground tabular-nums">
+                <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                   {formatTimestamp(event.at)}
                 </TableCell>
-                <TableCell className="align-top">
+                <TableCell>
                   <Actor id={event.actorId} name={actorNames.get(event.actorId ?? '')} />
                 </TableCell>
-                <TableCell className="align-top text-foreground">
-                  {describeAuditEvent(event)}
-                </TableCell>
-                <TableCell className="align-top">
+                <TableCell className="text-foreground">{describeAuditEvent(event)}</TableCell>
+                <TableCell>
                   <Subject event={event} actorNames={actorNames} />
                 </TableCell>
                 <ReasonCell reason={reasonOf(event)} />
