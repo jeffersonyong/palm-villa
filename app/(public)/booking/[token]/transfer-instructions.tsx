@@ -4,6 +4,7 @@ import { Fragment, useActionState, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/ui/callout'
+import { Card } from '@/components/ui/card'
 import { accountsIntroFor } from '@/lib/domain/booking-email'
 import { formatCents } from '@/lib/domain/money'
 import type { TransferChoice, TransferPlan } from '@/lib/domain/public-booking'
@@ -65,8 +66,14 @@ export function TransferInstructions({
 
   const plan = choice === 'everything' ? everything : depositOnly
 
+  // An ordinary card, not a tinted panel. The email fills this block with
+  // amber because it competes with an inbox for attention and has one chance
+  // to say which part of it matters; a screen the customer navigated to on
+  // purpose does not, and a page-wide wash of colour under content they came
+  // for reads as a warning about something. The eyebrow keeps the hue, so the
+  // two surfaces still name the same block the same way.
   return (
-    <div className="mt-xl rounded-lg bg-notice-warning p-card">
+    <Card className="mt-xl">
       <p className="micro-label text-notice-warning-foreground">How to pay</p>
 
       {depositOnly.choosable ? (
@@ -156,7 +163,7 @@ export function TransferInstructions({
       <p className="mt-sm text-caption text-muted-foreground">
         Confirm here once you have sent it. This will confirm your booking upon verification.
       </p>
-    </div>
+    </Card>
   )
 }
 

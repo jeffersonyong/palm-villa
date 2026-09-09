@@ -8,6 +8,7 @@ import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MAX_VEHICLES_PER_BOOKING, MAX_VEHICLE_REGISTRATION_LENGTH } from '@/lib/domain/vehicle'
+import { cn } from '@/lib/utils'
 
 /**
  * The vehicles arriving on a booking — one row per car, plus the exception.
@@ -159,12 +160,24 @@ export function VehicleFields({
         </div>
       ) : null}
 
-      {/* The fallback, kept visually subordinate to the rows above it. */}
-      <div className="flex items-start gap-sm">
+      {/* The fallback, kept visually subordinate to the rows above it.
+
+          Alignment follows the row's height rather than being one rule: with
+          a description under it the label block is two lines, so the box
+          belongs at the top and needs the optical nudge that puts it on the
+          first line's centre. On its own — which is what both public forms
+          pass — the row is one line, and `items-start` plus a nudge left the
+          box sitting visibly high against it. */}
+      <div
+        className={cn(
+          'flex gap-sm',
+          noVehicleDescription === null ? 'items-center' : 'items-start',
+        )}
+      >
         <Checkbox
           id="noVehicle"
           checked={noVehicle}
-          className="mt-[3px]"
+          className={noVehicleDescription === null ? undefined : 'mt-[3px]'}
           onCheckedChange={(checked) => onNoVehicleChange(checked === true)}
         />
         <div className="grid gap-xxs">
