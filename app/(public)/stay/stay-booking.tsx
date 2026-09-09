@@ -296,15 +296,22 @@ export function StayBooking({
                 <>
                   <QuoteLines lines={quote.lines} total={quote.total} />
 
+                  {/* What the total does and does not cover, and what the
+                      button does. The two amounts and which to send are the
+                      next page's job (transfer-instructions.tsx); saying it
+                      all here made a guest read the payment terms twice. */}
                   <Notice placement="nested" className="mt-lg">
                     <p className="text-body-sm">
-                      To book, transfer the{' '}
-                      <strong className="text-body-sm-strong">
-                        BND {formatCents(quote.securityDeposit)}
-                      </strong>{' '}
-                      refundable security deposit. It secures the unit and comes back to you after
-                      your stay. The BND {formatCents(quote.total)} for the stay is paid when you
-                      arrive.
+                      {quote.securityDeposit > 0 ? (
+                        <>
+                          The total above excludes the refundable{' '}
+                          <strong className="text-body-sm-strong">
+                            BND {formatCents(quote.securityDeposit)}
+                          </strong>{' '}
+                          security deposit, which comes back to you after your stay.{' '}
+                        </>
+                      ) : null}
+                      Hold the unit to see how to pay — nothing is charged yet.
                     </p>
                   </Notice>
                 </>

@@ -192,7 +192,7 @@ describe('where the money goes', () => {
     expect(html).toContain('either of these accounts')
     expect(html).toContain('>or</td>')
     expect(text).toContain('either of these accounts')
-    expect(text).toContain('BIBD: 0011223344\n  or\n  Baiduri: 5566778899')
+    expect(text).toContain('BIBD: 0011223344\n  -------- or --------\n  Baiduri: 5566778899')
   })
 
   test('one account has no "or"', () => {
@@ -200,7 +200,7 @@ describe('where the money goes', () => {
 
     expect(html).toContain('this account')
     expect(html).not.toContain('>or</td>')
-    expect(text).not.toContain('\n  or\n')
+    expect(text).not.toContain('-------- or --------')
   })
 
   test('the number is set in a monospace face, since it is what gets copied', () => {

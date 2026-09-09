@@ -162,11 +162,13 @@ describe('the created email', () => {
     ])
   })
 
-  test('says what goes in the transfer description, and states no deadline', () => {
+  test('says what to put as the transfer reference, and that the unit is held meanwhile', () => {
     const instruction = built('booking_created', stay()).transfer?.instruction ?? ''
 
-    expect(instruction).toContain('PV-4821')
-    expect(instruction).toContain('there is no time limit')
+    expect(instruction).toContain('PV-4821 as the transfer reference')
+    expect(instruction).toContain('held for you in the meantime')
+    // N7: no deadline is stated, because none is enforced.
+    expect(instruction).not.toMatch(/within|hour|expire|deadline|time limit/i)
   })
 
   test('carries both bank accounts', () => {

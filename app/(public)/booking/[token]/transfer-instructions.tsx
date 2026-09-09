@@ -122,9 +122,9 @@ export function TransferInstructions({
             BND {formatCents(plan.total)}
           </strong>{' '}
           in one transfer, and put{' '}
-          <strong className="font-mono text-body-sm-strong">{reference}</strong> in the description
-          so we can match it to your booking. Your unit is held until we confirm the transfer —
-          there is no time limit, but the sooner you send it the sooner it is confirmed.
+          <strong className="font-mono text-body-sm-strong">{reference}</strong> as the transfer
+          reference so we can match it to your booking. Your unit is held for you in the meantime —
+          once we confirm the transfer, your booking is confirmed and we will let you know.
         </p>
       </Notice>
 

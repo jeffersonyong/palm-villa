@@ -236,10 +236,19 @@ function transfer(model: EmailTransfer): string {
 function accountList(accounts: readonly EmailRow[]): string {
   const cells = accounts
     .map((account, index) => {
+      // A rule either side of the word, so the alternatives read as one
+      // choice rather than a list. The rule is a zero-height div with a top
+      // border, vertically centred by the cell, which is the one way to draw
+      // a line beside text that every client agrees on.
       const divider =
         index === 0
           ? ''
-          : `<tr><td colspan="2" style="padding:2px 0;font-size:11px;line-height:14px;font-weight:500;letter-spacing:0.55px;text-transform:uppercase;color:${MUTE}">or</td></tr>`
+          : `<tr><td colspan="2" style="padding:6px 0">` +
+            `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+            `<td width="50%" valign="middle"><div style="border-top:1px solid ${HAIRLINE};height:0;line-height:0;font-size:0">&nbsp;</div></td>` +
+            `<td style="padding:0 10px;font-size:11px;line-height:14px;font-weight:500;letter-spacing:0.55px;text-transform:uppercase;color:${MUTE};white-space:nowrap">or</td>` +
+            `<td width="50%" valign="middle"><div style="border-top:1px solid ${HAIRLINE};height:0;line-height:0;font-size:0">&nbsp;</div></td>` +
+            `</tr></table></td></tr>`
 
       return (
         divider +
@@ -340,7 +349,9 @@ function renderText(model: BookingEmailModel): string {
 
     if (model.transfer.accounts.length > 0) {
       parts.push(
-        model.transfer.accounts.map((row) => `  ${row.label}: ${row.value}`).join('\n  or\n'),
+        model.transfer.accounts
+          .map((row) => `  ${row.label}: ${row.value}`)
+          .join('\n  -------- or --------\n'),
       )
     } else if (model.transfer.noAccountsNote) {
       parts.push(`  ${model.transfer.noAccountsNote}`)

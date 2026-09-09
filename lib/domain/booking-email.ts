@@ -182,11 +182,17 @@ const ONLY_EMAIL_NOTE = 'This is the only email we send about this booking.'
  * The page's own sentence about the hold, minus its amount.
  *
  * N7: the hold is indefinite by the client's decision, so nothing here states
- * a deadline. prd.md §9.3 spells out why — a timer the system does not enforce
- * is a promise it does not keep.
+ * a deadline — "in the meantime" is as far as it goes. prd.md §9.3 spells out
+ * why: a timer the system does not enforce is a promise it does not keep.
+ *
+ * "We will let you know" is deliberately unspecific. Today that is the desk
+ * calling, and the confirmation email once a sending domain exists; it will
+ * name the entry QR code the day one is issued (capability A8's other half),
+ * and not before — a promise of a code nothing can read yet is the thing this
+ * slice took off the landing page.
  */
 const HOLD_SENTENCE =
-  'Your unit is held until we confirm the transfer — there is no time limit, but the sooner you send it the sooner it is confirmed.'
+  'Your unit is held for you in the meantime — once we confirm the transfer, your booking is confirmed and we will let you know.'
 
 export function buildBookingEmail(input: BuildBookingEmailInput): BuildBookingEmailResult {
   const { booking, property, contact, kind } = input
@@ -418,7 +424,7 @@ function transferFor(booking: EmailBookingFacts, property: EmailPropertyFacts): 
       property.bankAccounts.length === 0
         ? 'We cannot show the bank details here. Please call us and we will give them to you.'
         : null,
-    instruction: `Put ${booking.reference} in the transfer description so we can match it to your booking. ${HOLD_SENTENCE}`,
+    instruction: `Put ${booking.reference} as the transfer reference so we can match it to your booking. ${HOLD_SENTENCE}`,
   }
 }
 
