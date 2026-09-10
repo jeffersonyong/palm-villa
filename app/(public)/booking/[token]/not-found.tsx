@@ -43,7 +43,7 @@ export default function BookingNotFound() {
           {contact.phones.map((phone, index) => (
             <span key={phone.display}>
               {index > 0 ? ', ' : ''}
-              <a className="underline hover:no-underline" href={`tel:${phone.display}`}>
+              <a className="hover:underline" href={`tel:${phone.display.replace(/\s/g, '')}`}>
                 {phone.display}
               </a>
             </span>

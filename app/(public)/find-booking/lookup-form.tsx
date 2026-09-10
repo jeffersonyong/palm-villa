@@ -45,7 +45,8 @@ export function LookupForm() {
             id="lookup-reference"
             name="reference"
             label="Booking reference"
-            hint="On your booking page and in the description of your transfer — PV-4821."
+            hint="Found on your booking confirmation page or in your confirmation email."
+            placeholder="PV-XXXX"
             required
             defaultValue={state.submitted?.reference}
             autoComplete="off"
@@ -55,6 +56,7 @@ export function LookupForm() {
             id="lookup-phone"
             name="phone"
             label="The number you booked with"
+            placeholder="8007000"
             required
             defaultValue={state.submitted?.phone}
             type="tel"
