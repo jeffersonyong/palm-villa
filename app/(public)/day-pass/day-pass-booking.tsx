@@ -15,7 +15,12 @@ import { priceDayPass } from '@/lib/domain/pricing/day-pass'
 
 import { VehicleFields } from '@/components/vehicle-fields'
 
-import { CountField, HoneypotField, PublicField } from '../_components/booking/booking-fields'
+import {
+  CountField,
+  HoneypotField,
+  PublicField,
+  PublicPhoneField,
+} from '../_components/booking/booking-fields'
 import { createPublicDayPassAction, type PublicDayPassState } from './actions'
 
 /**
@@ -172,14 +177,12 @@ export function DayPassBooking({
                     defaultValue={state.submitted?.guestName}
                     error={state.fieldErrors?.guestName}
                   />
-                  <PublicField
+                  <PublicPhoneField
                     id="guestPhone"
                     name="guestPhone"
                     label="Mobile number"
                     required
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
+                    placeholder="712 3456"
                     defaultValue={state.submitted?.guestPhone}
                     error={state.fieldErrors?.guestPhone}
                   />

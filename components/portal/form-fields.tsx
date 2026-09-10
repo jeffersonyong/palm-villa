@@ -3,6 +3,7 @@
 import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { cn } from '@/lib/utils'
 
 /**
@@ -95,6 +96,53 @@ export function TextField({
         autoComplete={autoComplete}
         aria-invalid={error ? true : undefined}
         onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+      />
+      <FieldError message={error} />
+    </div>
+  )
+}
+
+/**
+ * The guest's number, at the desk.
+ *
+ * `TextField`'s dress around the split control. The width is a little wider
+ * than the plain field it replaces, because the dial code takes a bite out of
+ * the front and a Brunei number should not wrap onto the code beside it.
+ *
+ * Runs controlled, like the amendment form needs, and **stays quiet until it
+ * is edited**: a booking recorded years ago as `8959798` submits `8959798`
+ * unless somebody actually changes the number. See `PhoneInput` — the
+ * amendment diff and the audit event both depend on this.
+ */
+interface PhoneFieldProps {
+  id: string
+  label: string
+  value?: string
+  onChange?: (value: string) => void
+  placeholder?: string
+  className?: string
+  error?: string
+}
+
+export function PhoneField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  className,
+  error,
+}: PhoneFieldProps) {
+  return (
+    <div className={cn('grid content-start gap-sm', className)}>
+      <Label htmlFor={id}>{label}</Label>
+      <PhoneInput
+        id={id}
+        name={id}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        invalid={Boolean(error)}
       />
       <FieldError message={error} />
     </div>

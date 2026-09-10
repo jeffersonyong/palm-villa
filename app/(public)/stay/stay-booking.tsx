@@ -17,7 +17,12 @@ import { cn } from '@/lib/utils'
 import { AvailabilityCalendar } from '../_components/booking/availability-calendar'
 import { VehicleFields } from '@/components/vehicle-fields'
 
-import { CountField, HoneypotField, PublicField } from '../_components/booking/booking-fields'
+import {
+  CountField,
+  HoneypotField,
+  PublicField,
+  PublicPhoneField,
+} from '../_components/booking/booking-fields'
 import { createPublicStayAction, type PublicStayState } from './actions'
 
 /**
@@ -228,14 +233,12 @@ export function StayBooking({
                     defaultValue={state.submitted?.guestName}
                     error={state.fieldErrors?.guestName}
                   />
-                  <PublicField
+                  <PublicPhoneField
                     id="guestPhone"
                     name="guestPhone"
                     label="Mobile number"
                     required
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
+                    placeholder="712 3456"
                     defaultValue={state.submitted?.guestPhone}
                     error={state.fieldErrors?.guestPhone}
                   />
@@ -332,7 +335,7 @@ export function StayBooking({
               ) : null}
 
               <Button type="submit" className="mt-lg w-full" disabled={isPending || !quote?.ok}>
-                {isPending ? 'Proceeding…' : 'Proceed to transfer'}
+                {isPending ? 'Proceeding…' : 'Proceed to bank transfer'}
               </Button>
 
               <p className="mt-sm text-caption text-muted-foreground">

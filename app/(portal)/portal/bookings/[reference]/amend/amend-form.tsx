@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { NumberField, TextField } from '@/components/portal/form-fields'
+import { NumberField, PhoneField, TextField } from '@/components/portal/form-fields'
 import {
   DiscountFields,
   NO_DISCOUNT,
@@ -317,15 +317,13 @@ export function AmendForm({
                 className="w-[320px]"
                 error={state.fieldErrors?.guestName}
               />
-              <TextField
+              <PhoneField
                 id="guestPhone"
                 label="Phone"
-                type="tel"
-                placeholder="+673 712 3456"
+                placeholder="712 3456"
                 value={guestPhone}
                 onChange={setGuestPhone}
-                autoComplete="tel"
-                className="w-[220px]"
+                className="w-[260px]"
                 error={state.fieldErrors?.guestPhone}
               />
             </div>

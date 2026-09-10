@@ -13,7 +13,7 @@ import {
   toDiscountFormValues,
   type DiscountValue,
 } from '@/components/portal/discount-fields'
-import { NumberField, TextField } from '@/components/portal/form-fields'
+import { NumberField, PhoneField, TextField } from '@/components/portal/form-fields'
 import { FormSection } from '@/components/portal/form-section'
 import { VehicleFields } from '@/components/vehicle-fields'
 import { QuoteSummary } from '@/components/portal/quote-summary'
@@ -262,15 +262,13 @@ export function BookingForm({
               className="w-[320px]"
               error={state.fieldErrors?.guestName}
             />
-            <TextField
+            <PhoneField
               id="guestPhone"
               label="Phone"
-              type="tel"
-              placeholder="+673 712 3456"
+              placeholder="712 3456"
               value={guestPhone}
               onChange={setGuestPhone}
-              autoComplete="tel"
-              className="w-[220px]"
+              className="w-[260px]"
               error={state.fieldErrors?.guestPhone}
             />
           </div>
