@@ -90,6 +90,8 @@ export interface BuildBookingEmailInput {
   contact: PropertyContact
   /** Absolute and already validated, or null where the booking has no token. */
   bookingUrl: string | null
+  /** The public lookup page. Absolute, or null if the origin is unreadable. */
+  findBookingUrl: string | null
 }
 
 export interface EmailRow {
@@ -145,10 +147,26 @@ export interface EmailAction {
   note: string
 }
 
+/**
+ * The one link in the footer, and the only route back into a booking that
+ * survives a lost email (capability A9).
+ *
+ * It matters most for the booking this email is *not* about: a stay taken at
+ * the desk has no private link and never did, so `action` above is null and
+ * this is the whole of the way back. It costs nothing to carry on every email
+ * and it is the sentence somebody re-reads a confirmation looking for.
+ */
+export interface EmailLookup {
+  label: string
+  url: string
+}
+
 export interface EmailFooter {
   propertyName: string
   phones: readonly string[]
   notes: readonly string[]
+  /** Null only where the configured origin could not be read. */
+  lookup: EmailLookup | null
 }
 
 export interface BookingEmailModel {
@@ -177,6 +195,14 @@ export type BuildBookingEmailResult =
 const LINK_NOTE = 'Anyone with this link can see this booking, so do not post it publicly.'
 
 const ONLY_EMAIL_NOTE = 'This is the only email we send about this booking.'
+
+/**
+ * Phrased around what the guest has rather than what the page is called. The
+ * reference is printed at the top of this same email, and the number is the
+ * one they gave us — so the sentence names both, and somebody who has lost
+ * everything else still knows whether they can use it.
+ */
+const LOOKUP_LABEL = 'Lost this email? Open your booking with your reference and phone number'
 
 /**
  * The page's own sentence about the hold, minus its amount.
@@ -240,6 +266,8 @@ export function buildBookingEmail(input: BuildBookingEmailInput): BuildBookingEm
         propertyName: property.name,
         phones: contact.phones.map((phone) => phone.display),
         notes: [ONLY_EMAIL_NOTE],
+        lookup:
+          input.findBookingUrl === null ? null : { label: LOOKUP_LABEL, url: input.findBookingUrl },
       },
     },
   }

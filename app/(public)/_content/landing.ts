@@ -152,4 +152,12 @@ export const pricingCopy = {
   dayPassFinePrint: 'The BBQ area is not included in the day pass.',
   stayFinePrint: 'BND 100 refundable security deposit · bookings open up to 2 months ahead.',
   paymentMethods: 'Pay by bank transfer (BIBD / Baiduri) or cash.',
+  /**
+   * Capability A9, offered where somebody reading how booking works would
+   * think of it. The prompt is a question rather than a label because the
+   * people who need it do not know the page exists — they know they booked
+   * and cannot find the link.
+   */
+  alreadyBooked: 'Already booked?',
+  alreadyBookedLink: 'Find your booking.',
 }

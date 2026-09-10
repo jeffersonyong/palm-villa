@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { bookingUrl, normaliseOrigin } from './origin'
+import { bookingUrl, findBookingUrl, normaliseOrigin } from './origin'
 
 /**
  * The link an email carries.
@@ -74,5 +74,29 @@ describe('bookingUrl', () => {
 
   test('returns null when the origin is unusable', () => {
     expect(bookingUrl('palmvilla.bn', TOKEN)).toBeNull()
+  })
+})
+
+describe('findBookingUrl', () => {
+  test('points at the public lookup page', () => {
+    expect(findBookingUrl('https://palmvilla.bn')).toBe('https://palmvilla.bn/find-booking')
+  })
+
+  test('normalises the origin on the way through', () => {
+    expect(findBookingUrl('https://palmvilla.bn/')).toBe('https://palmvilla.bn/find-booking')
+  })
+
+  /**
+   * The difference from `bookingUrl`, and the whole point of carrying both:
+   * this one needs no token, so it is present on the email for a booking
+   * taken at the desk — which is exactly the booking with no link.
+   */
+  test('needs no token, so a desk booking still gets a way back', () => {
+    expect(findBookingUrl('https://palmvilla.bn')).not.toBeNull()
+  })
+
+  test('returns null when the origin is unusable', () => {
+    expect(findBookingUrl('palmvilla.bn')).toBeNull()
+    expect(findBookingUrl('')).toBeNull()
   })
 })

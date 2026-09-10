@@ -53,7 +53,7 @@ export function DayPassSection() {
             </p>
           </div>
           <Button asChild className="w-full sm:w-auto">
-            <Link href="/day-pass">Plan a pool day</Link>
+            <Link href="/day-pass">Book a day pass</Link>
           </Button>
         </Card>
 

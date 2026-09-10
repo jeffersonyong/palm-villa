@@ -5,7 +5,7 @@ import {
   type BookingEmailRefusal,
 } from '@/lib/domain/booking-email'
 import { contact } from '@/lib/domain/contact'
-import { bookingUrl } from '@/lib/domain/origin'
+import { bookingUrl, findBookingUrl } from '@/lib/domain/origin'
 import { DAY_IN_SECONDS, PUBLIC_LIMITS } from '@/lib/domain/public-booking'
 import { renderBookingEmail } from '@/lib/email/render'
 import { sendEmail, type SendFailureClass } from '@/lib/email/send'
@@ -102,6 +102,7 @@ export async function buildBookingEmailMessage(input: {
     },
     contact,
     bookingUrl: bookingUrl(input.origin, booking.accessToken),
+    findBookingUrl: findBookingUrl(input.origin),
   })
 
   if (!built.ok) {

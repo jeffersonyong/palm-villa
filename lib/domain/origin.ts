@@ -73,3 +73,20 @@ export function bookingUrl(origin: string, token: string | null): string | null 
 
   return base === null ? null : `${base}/booking/${token}`
 }
+
+/**
+ * The page a guest reaches their booking through when the link is gone
+ * (capability A9).
+ *
+ * The counterpart to `bookingUrl` and the reason the footer carries both. A
+ * private link only works while somebody still has it, and it never existed
+ * at all for a booking taken at the desk — so the email states the route that
+ * always works: a reference and the number the booking was made with. Unlike
+ * `bookingUrl` this has nothing to keep secret and no token to validate; it
+ * is a public page, and every email can carry it.
+ */
+export function findBookingUrl(origin: string): string | null {
+  const base = normaliseOrigin(origin)
+
+  return base === null ? null : `${base}/find-booking`
+}

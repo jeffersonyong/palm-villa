@@ -138,6 +138,7 @@ function modelFor(preview: PreviewCase) {
     },
     contact,
     bookingUrl: 'https://palmvilla.bn/booking/Ab3xY9-_ZqRs7TuVwX2Kd0',
+    findBookingUrl: 'https://palmvilla.bn/find-booking',
   })
 
   if (!built.ok) {
