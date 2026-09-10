@@ -278,6 +278,7 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
           payments={payments}
           deposit={deposit}
           mayRecordPayment={hasPermission(actor.permissions, 'payment.record_cash')}
+          mayVerify={mayVerify}
         />
       </div>
 
@@ -551,12 +552,15 @@ function MoneySummary({
   payments,
   deposit,
   mayRecordPayment,
+  mayVerify,
 }: {
   booking: Booking
   payments: readonly Payment[]
   /** What is actually held. Null while no deposit has been recorded. */
   deposit: Deposit | null
   mayRecordPayment: boolean
+  /** Whether this viewer may say what the bank showed — for an awaited deposit. */
+  mayVerify: boolean
 }) {
   // The balance, at last. This card used to state what had been taken and
   // deliberately never what was owed — the payment slice was not a ledger, and
@@ -663,6 +667,10 @@ function MoneySummary({
         // The same permission that records a booking payment, for the reason
         // prd.md §11 gives: taking money at the counter is one job.
         mayRecordDeposit={mayRecordPayment}
+        // And the same permission that verifies one, for the same reason: a
+        // deposit and a payment are one job to whoever opens the bank app,
+        // which is the position payments/actions.ts already took.
+        mayVerifyDeposit={mayVerify}
         // Whether the deposit still has a booking to secure — true wherever
         // the booking is still waiting, including on a transfer for the stay.
         // Once a booking is confirmed the money is a catch-up rather than the

@@ -67,6 +67,17 @@ interface RecordDepositProps {
    * other one would be offering a dead end.
    */
   fulfilsPromise?: boolean
+  /**
+   * Confirming the transfer is on screen beside this, so this is the way out
+   * rather than the way through.
+   *
+   * A clerk looking at an awaited deposit is nearly always looking at the bank
+   * app as well, and the answer is that the transfer arrived. Cash is the
+   * exception — the guest who never sent it and turned up with notes — so it
+   * keeps the quieter chrome and a label that says *instead*, which is also
+   * the word that stops it being read as the way to record the transfer.
+   */
+  isAlternative?: boolean
 }
 
 export function RecordDeposit(props: RecordDepositProps) {
@@ -83,8 +94,16 @@ export function RecordDeposit(props: RecordDepositProps) {
           Attach ID two cards down already uses on the same ground. No icon:
           that one carries a paperclip because it opens a file picker, and
           this opens a form. */}
-      <Button variant="tertiary" className="mt-lg w-full" onClick={() => setIsOpen(true)}>
-        {props.fulfilsPromise ? 'Take the deposit in cash' : 'Record the deposit'}
+      <Button
+        variant="tertiary"
+        className={props.isAlternative ? 'mt-sm w-full' : 'mt-lg w-full'}
+        onClick={() => setIsOpen(true)}
+      >
+        {props.isAlternative
+          ? 'Take it in cash instead'
+          : props.fulfilsPromise
+            ? 'Take the deposit in cash'
+            : 'Record the deposit'}
       </Button>
 
       {/* Mounted only while open, so it opens with fresh action state. */}
