@@ -1,25 +1,24 @@
 /**
  * Waiving the security deposit on a booking (capability B15, prd.md §11).
  *
- * prd.md §11 [C] takes BND 100 at check-in and holds it until the unit has
- * been inspected. The one case that rule gets wrong is a stay that is really
- * the continuation of another: a guest who extends by a night after checking
- * in cannot have their booking amended (§9.6 [O], N12), so the desk takes a
- * second booking for the extra night — and `check_in_booking()` would then
- * take a second BND 100 off a guest who already has one held. The waiver is
- * how the desk says "the deposit for this stay is already in the safe, under
- * another reference", and has that written down.
+ * prd.md §11 [C] takes BND 100 when a booking is made and holds it until the
+ * unit has been inspected. The one case that rule gets wrong is a stay that
+ * is really the continuation of another: a guest who extends by a night after
+ * checking in cannot have their booking amended (§9.6 [O], N12), so the desk
+ * takes a second booking for the extra night — and that booking would take a
+ * second BND 100 off a guest who already has one held. The waiver is how the
+ * desk says "the deposit for this stay is already in the safe, under another
+ * reference", and has that written down.
  *
  * ── What a waiver IS ──────────────────────────────────────────────────────
  *
- * A booking that quotes no deposit. `check_in_booking()` already checks a
- * zero-deposit booking in without writing a deposit row and says so on
- * screen; the waiver reuses that path rather than adding a state. What it adds
- * is the *record*: a reason on the booking, and a `deposit.waived` audit event
- * carrying what would otherwise have been held — because the whole point of
- * the one-transaction check-in was that "no deposit recorded" and "nobody
- * wrote it down" should never look the same, and a waiver with no reason
- * would put them back together.
+ * A booking that quotes no deposit. `create_walk_in_booking()` takes no
+ * deposit against a zero quote and `check_in_booking()` asks for none, and
+ * the screens say so; the waiver reuses that path rather than adding a state.
+ * What it adds is the *record*: a reason on the booking, and a
+ * `deposit.waived` audit event carrying what would otherwise have been held —
+ * because "no deposit recorded" and "nobody wrote it down" should never look
+ * the same, and a waiver with no reason would put them back together.
  *
  * ── What this module does NOT decide ──────────────────────────────────────
  *

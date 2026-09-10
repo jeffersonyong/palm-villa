@@ -118,17 +118,20 @@ describe('illegal moves are refused', () => {
       'pay_in_full',
       'secure_with_deposit',
       'secure_with_deposit',
+      'secure_with_deposit',
       'verify_payment',
     ])
   })
 
   test('the deposit confirms a booking without settling the stay', () => {
     // prd.md §9.1: a booking is secured by the BND 100 and the stay is paid on
-    // arrival, so this event reaches `confirmed` from both places a booking
-    // can be waiting in. What it deliberately does not do is claim the stay
-    // was paid — that is `pay_in_full`, and the two are separate so the
-    // history cannot say something untrue about money.
-    for (const status of ['draft', 'held'] as const) {
+    // arrival, so this event reaches `confirmed` from every place a booking
+    // can be waiting in — including one waiting on a transfer for the stay,
+    // where cash counted for the deposit is what confirms it and the transfer
+    // stays in the queue to settle the balance. What it deliberately does not
+    // do is claim the stay was paid — that is `pay_in_full`, and the two are
+    // separate so the history cannot say something untrue about money.
+    for (const status of ['draft', 'held', 'awaiting_payment_verification'] as const) {
       const result = transition(status, 'secure_with_deposit')
 
       expect(result.ok).toBe(true)

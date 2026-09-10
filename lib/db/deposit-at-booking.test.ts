@@ -13,7 +13,7 @@ import {
 } from './deposits'
 import { currentPropertyId } from './property'
 import { createPublicStayBooking, type CreatePublicStayInput } from './public-bookings'
-import { givenBooking } from './test/factory'
+import { givenBooking, givenBookingInState } from './test/factory'
 
 /**
  * The security deposit taken at the desk (capability B16, staff half).
@@ -295,7 +295,9 @@ describe('a promise settled in cash', () => {
   test('fulfils the standing row and confirms the booking', async () => {
     // The sequence that stranded a clerk before 20260914000200: the customer
     // says they transferred, the transfer never lands, and they walk in with
-    // the notes. prd.md §11 makes this judgement at the door already.
+    // the notes. Since 20260915000100 this is the ONLY way that guest gets
+    // through the door — check-in collects nothing and refuses a promise —
+    // so it carries the case prd.md §11 used to answer at the door.
     const booking = await givenHeldBooking({ guestPhone: '+673 720 5001' })
 
     await recordBookingDeposit({
@@ -405,14 +407,15 @@ describe('a promise settled in cash', () => {
 
 describe('a booking that is already confirmed', () => {
   test('takes the deposit without confirming it twice', async () => {
-    // The catch-up case: a walk-in paid the stay in cash and the deposit is
-    // collected afterwards. Writing `confirmed → confirmed` would put a second
-    // confirmation in a history for a booking that never moved.
-    const booking = await givenBooking({
-      unitRef: '3B-11',
-      checkIn: '2027-03-04',
-      checkOut: '2027-03-06',
-    })
+    // The catch-up case: a booking confirmed before the desk took the deposit
+    // with the booking, and the deposit collected afterwards — which is also
+    // the way out when check-in refuses it. Writing `confirmed → confirmed`
+    // would put a second confirmation in a history for a booking that never
+    // moved. The product no longer makes this shape, so it is written directly.
+    const booking = await givenBookingInState(
+      { unitRef: '3B-11', checkIn: '2027-03-04', checkOut: '2027-03-06' },
+      ['pay_in_full'],
+    )
 
     expect(booking.status).toBe('confirmed')
 
@@ -428,6 +431,67 @@ describe('a booking that is already confirmed', () => {
 
     expect(actions).not.toContain('booking.secure_with_deposit')
     expect(actions).not.toContain('booking.submit_payment')
+  })
+
+  test('a walk-in already holds one, so a second is refused', async () => {
+    const booking = await givenBooking({
+      unitRef: '3B-12',
+      checkIn: '2027-03-04',
+      checkOut: '2027-03-06',
+    })
+
+    const result = await recordBookingDeposit({
+      bookingId: booking.id,
+      method: 'cash',
+      actorId: null,
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+
+    expect(result.error.code).toBe('already_recorded')
+    expect(await depositRowCount(booking.id)).toBe(1)
+  })
+})
+
+describe('a booking waiting on a transfer for the stay', () => {
+  test('is confirmed by the deposit counted at the desk, and the transfer stays in the queue', async () => {
+    // A desk booking taken by transfer before the form took the deposit, or a
+    // customer who sent the stay and forgot the BND 100: the booking is
+    // waiting on a payment with no deposit against it. Cash for the deposit
+    // is what confirms it; the pending transfer is untouched and settles the
+    // balance when it is seen.
+    const { id, reference } = await givenBookingInState(
+      { unitRef: '3B-13', checkIn: '2027-03-08', checkOut: '2027-03-10' },
+      ['submit_payment'],
+    )
+
+    const result = await recordBookingDeposit({ bookingId: id, method: 'cash', actorId: null })
+
+    expect(result).toMatchObject({ ok: true, status: 'confirmed', confirmedNow: true })
+    expect((await getBookingById(id))?.status).toBe('confirmed')
+    expect((await getBookingById(id))?.reference).toBe(reference)
+    expect(await actionsFor('booking', id)).toContain('booking.secure_with_deposit')
+  })
+
+  test('a transfer promised for the deposit leaves it waiting', async () => {
+    const { id } = await givenBookingInState(
+      { unitRef: '3B-14', checkIn: '2027-03-08', checkOut: '2027-03-10' },
+      ['submit_payment'],
+    )
+
+    const result = await recordBookingDeposit({
+      bookingId: id,
+      method: 'bank_transfer',
+      actorId: null,
+    })
+
+    expect(result).toMatchObject({
+      ok: true,
+      status: 'awaiting_payment_verification',
+      confirmedNow: false,
+    })
+    expect(await listPendingDeposits()).toHaveLength(1)
   })
 })
 

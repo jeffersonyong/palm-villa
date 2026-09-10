@@ -11,6 +11,11 @@ import { DEPOSIT_STAGE_LABELS, type DepositStage } from '@/lib/domain/deposit'
  *
  * ── The mapping ───────────────────────────────────────────────────────────
  *
+ * `secured` takes **positive** — the pair a `confirmed` booking wears, because
+ * it is the same fact seen from the ledger's side: the deposit is in, so the
+ * booking is good, and nothing about it needs anybody until the guest has
+ * been and gone.
+ *
  * `in_house` takes **active** — the same brand pair `checked_in` and `occupied`
  * carry, because it is the same fact seen from a third side: the guest is in
  * the building and their money is with us.
@@ -35,6 +40,7 @@ import { DEPOSIT_STAGE_LABELS, type DepositStage } from '@/lib/domain/deposit'
 
 const STAGE_TONES = {
   awaiting_verification: 'warning',
+  secured: 'positive',
   in_house: 'active',
   awaiting_inspection: 'warning',
   ready_for_release: 'positive',

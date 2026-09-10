@@ -47,7 +47,12 @@ export interface RecordCashState {
   status: 'idle' | 'error' | 'done'
   message?: string
   fieldErrors?: Record<string, string>
-  recorded?: { reference: string; amount: number }
+  recorded?: {
+    reference: string
+    amount: number
+    /** The booking is confirmed once its security deposit is — not by this. */
+    awaitingDeposit: boolean
+  }
   /**
    * What was typed, echoed back so a refusal does not empty the form.
    *
@@ -134,16 +139,22 @@ export async function recordCashAction(
   // (capability G5). After the response.
   scheduleAccountingPack(booking.id)
 
-  // Cash taken against a booking that was still waiting is what confirms it,
-  // and the guest is told so (capability A8). Cash against a booking already
-  // confirmed moves nothing and sends nothing.
+  // Cash taken against a booking that was still waiting, and had nothing else
+  // left to secure it, is what confirms it — and the guest is told so
+  // (capability A8). Cash against a booking already confirmed moves nothing
+  // and sends nothing, and neither does cash against one whose deposit is
+  // still owed: that booking is confirmed when its deposit is taken.
   if (result.confirmedNow) {
     scheduleBookingConfirmedEmail(booking.id)
   }
 
   return {
     status: 'done',
-    recorded: { reference: booking.reference, amount },
+    recorded: {
+      reference: booking.reference,
+      amount,
+      awaitingDeposit: result.awaitingDeposit,
+    },
   }
 }
 

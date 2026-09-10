@@ -14,9 +14,11 @@ import { HELD_STAGES, type HeldStage, type LedgerView } from './ledger-view'
  * What is held, and what is waiting on whom (capability E1).
  *
  * The strip answers prd.md §20's fifth success criterion in one line —
- * "what deposits do we currently hold" — and then breaks it into the three
- * things somebody might do about it. A stat strip per design.md: one tile per
- * figure, cards standing directly on the ground, no container around them.
+ * "what deposits do we currently hold" — and then breaks it into the four
+ * places a held deposit can be, from the one nothing can be done about yet
+ * (held for a guest who has not arrived) to the one that can be cleared now.
+ * A stat strip per design.md: one tile per figure, cards standing directly on
+ * the ground, no container around them.
  *
  * **The first tile is the answer, not a control.** "BND 1,400 held" is the
  * liability, which is what E1 asks for and what an accountant reads, and the
@@ -26,9 +28,9 @@ import { HELD_STAGES, type HeldStage, type LedgerView } from './ledger-view'
  * figure nobody had chosen. It is a plain card now, and the unfiltered ledger
  * is what you see when no tile is chosen.
  *
- * The four that follow are each the way *into* what they count, the
+ * The five that follow are each the way *into* what they count, the
  * construction the units board and the bookings register both use. Plain
- * links, so this stays a server component. **The three stage tiles write the
+ * links, so this stays a server component. **The four stage tiles write the
  * same `stage` param the Stage chip in the filter row writes** — a tile is
  * "show me these", the chip is "these two, not that one" — and clicking the
  * current one clears it rather than reapplying it. **Owed writes `show`**,
@@ -67,7 +69,7 @@ export function DepositTiles({
   otherParams,
 }: DepositTilesProps) {
   return (
-    <div className="mt-xl grid grid-cols-2 gap-md lg:grid-cols-5">
+    <div className="mt-xl grid grid-cols-2 gap-md lg:grid-cols-3 xl:grid-cols-6">
       <Card className="h-full">
         <Stat
           size="sm"

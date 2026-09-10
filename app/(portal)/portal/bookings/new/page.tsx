@@ -114,7 +114,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
     <>
       <PageHeader
         title="New booking"
-        description="Walk-in only — the guest is here and pays now (prd.md §9.4)."
+        description="The security deposit is taken as the booking is made — it is what secures it. Say whether the guest is paying the stay with it, or settling that on arrival."
       />
 
       {/* The control line is undrawn. It asks what to show, the way a list

@@ -62,6 +62,17 @@ export interface PaymentActionState {
   message?: string
   fieldErrors?: Record<string, string>
   /**
+   * What the verification did to the booking, so the toast tells the truth:
+   * a deposit confirms it; a payment confirms it only where nothing else is
+   * quoted to, and otherwise settles money against a booking still waiting.
+   */
+  done?: {
+    kind: 'payment' | 'deposit'
+    confirmed: boolean
+    /** The booking is confirmed once its deposit is — not by this. */
+    awaitingDeposit: boolean
+  }
+  /**
    * What was typed, echoed back so a refusal does not empty the form.
    *
    * React resets an uncontrolled field once its form action resolves. Without
@@ -135,12 +146,21 @@ export async function verifyPaymentAction(
 
   // Only when this verification is what confirmed the booking (capability A8).
   // A top-up against a booking already confirmed moves nothing, and the guest
-  // had their confirmation the first time.
+  // had their confirmation the first time; a payment against a booking still
+  // waiting on its deposit moves nothing either, and the deposit's own
+  // verification sends the email.
   if (result.confirmedNow) {
     scheduleBookingConfirmedEmail(result.payment.bookingId)
   }
 
-  return { status: 'done' }
+  return {
+    status: 'done',
+    done: {
+      kind: 'payment',
+      confirmed: result.confirmedNow,
+      awaitingDeposit: result.awaitingDeposit,
+    },
+  }
 }
 
 export async function matchPaymentManuallyAction(
@@ -206,12 +226,21 @@ export async function matchPaymentManuallyAction(
 
   // Only when this verification is what confirmed the booking (capability A8).
   // A top-up against a booking already confirmed moves nothing, and the guest
-  // had their confirmation the first time.
+  // had their confirmation the first time; a payment against a booking still
+  // waiting on its deposit moves nothing either, and the deposit's own
+  // verification sends the email.
   if (result.confirmedNow) {
     scheduleBookingConfirmedEmail(result.payment.bookingId)
   }
 
-  return { status: 'done' }
+  return {
+    status: 'done',
+    done: {
+      kind: 'payment',
+      confirmed: result.confirmedNow,
+      awaitingDeposit: result.awaitingDeposit,
+    },
+  }
 }
 
 /**
@@ -322,12 +351,16 @@ export async function verifyDepositAction(
   revalidatePath('/portal')
 
   // The deposit is what secures the booking, so this is the moment it becomes
-  // confirmed for a customer who booked online (capabilities A8 and B16).
+  // confirmed (capabilities A8 and B16) — whether the guest booked online or
+  // the desk raised the promise for them.
   if (result.confirmedNow) {
     scheduleBookingConfirmedEmail(result.bookingId)
   }
 
-  return { status: 'done' }
+  return {
+    status: 'done',
+    done: { kind: 'deposit', confirmed: result.confirmedNow, awaitingDeposit: false },
+  }
 }
 
 const verifyDepositSchema = z.object({

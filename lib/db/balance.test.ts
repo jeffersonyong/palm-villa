@@ -11,7 +11,7 @@ import {
   recordTransferPayment,
   verifyPayment,
 } from './payments'
-import { givenBooking, givenTransferBooking } from './test/factory'
+import { givenBooking, givenConfirmedTransferBooking, givenTransferBooking } from './test/factory'
 import { auditEventsFor } from './test/inspect'
 
 /**
@@ -64,9 +64,15 @@ async function extend(bookingId: string, checkOut: string, nights: number) {
   })
 }
 
-/** A booking paid in full by transfer, then extended by a night. */
+/**
+ * A booking paid in full by transfer, then extended by a night.
+ *
+ * The deposit is verified first, because that is what confirms the booking
+ * (prd.md §9.1); the stay's transfer then settles the balance against a
+ * booking already confirmed.
+ */
 async function givenExtendedAfterPaying(unitRef: string) {
-  const { booking, payment } = await givenTransferBooking({
+  const { booking, payment } = await givenConfirmedTransferBooking({
     unitRef,
     checkIn: CHECK_IN,
     checkOut: ONE_NIGHT,

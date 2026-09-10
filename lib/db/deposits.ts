@@ -580,15 +580,19 @@ export interface RecordBookingDepositInput {
  * Takes the security deposit against a booking, before the guest arrives
  * (capability B16, staff half; prd.md §9.1, §11).
  *
- * The path the desk did not have. `check_in_booking()` collects a deposit at
- * the door and `submit_public_payment()` records one a customer promised
- * online, and between them there was no way for a staff member to record the
- * BND 100 that secures a booking — so a guest who transferred it and never
- * pressed the button on their own page left the desk with nothing correct to
- * do. Recording it as a booking payment was the only reachable option and it
- * is the wrong kind of money: prd.md §9.1 spends a paragraph on why a deposit
- * must never read as one, and §14 keeps a cash deposit out of the cash-up
- * total that a cash payment lands in.
+ * The path the desk did not have. `create_walk_in_booking()` takes the
+ * deposit as a booking is made and `submit_public_payment()` records one a
+ * customer promised online, and between them there was no way for a staff
+ * member to record the BND 100 against a booking that already existed — so a
+ * guest who transferred it and never pressed the button on their own page
+ * left the desk with nothing correct to do. Recording it as a booking payment
+ * was the only reachable option and it is the wrong kind of money: prd.md
+ * §9.1 spends a paragraph on why a deposit must never read as one, and §14
+ * keeps a cash deposit out of the cash-up total that a cash payment lands in.
+ *
+ * It is also the way out when check-in refuses: `check_in_booking()` takes
+ * nothing at the door, so a confirmed booking with its deposit still owed is
+ * settled here first, in cash, and then checked in.
  *
  * ── The two methods are different acts ────────────────────────────────────
  *
@@ -659,7 +663,10 @@ export async function recordBookingDeposit(input: RecordBookingDepositInput): Pr
   // Cash secures the booking; a promised transfer sends it to the queue; cash
   // against a promise settles it. All three are only legal from somewhere a
   // booking is still waiting, and `transition` is what says so — a booking
-  // already confirmed simply does not move.
+  // already confirmed simply does not move. `secure_with_deposit` leaves
+  // `awaiting_payment_verification` too: a booking waiting on a transfer for
+  // the stay is confirmed by the deposit counted here, and the transfer stays
+  // in the queue to settle the balance.
   const event = fulfilsPromise
     ? 'verify_payment'
     : input.method === 'cash'
@@ -730,33 +737,43 @@ function describeRecordDepositFailure(result: RpcRefusal): DepositWriteError {
 
 export interface CheckInBookingInput {
   bookingId: string
-  /** How the deposit was taken. Ignored where the booking quotes none. */
-  method: PaymentMethod
   actorId: string | null
 }
 
+export type CheckInRefusalCode =
+  'not_found' | 'status_changed' | 'deposit_not_secured' | 'illegal_transition' | 'terminal_state'
+
 /**
- * Checks a guest in, and collects the deposit while doing it.
+ * Checks a guest in. It collects nothing.
+ *
+ * The deposit is taken when the booking is made — at the counter, or by the
+ * transfer a customer promises online — because it is what secures the
+ * booking (prd.md §9.1, capability B16). The door is therefore not a place
+ * money changes hands, and `check_in_booking()` refuses a booking whose
+ * quoted deposit is not in the safe rather than taking it: a guest checked in
+ * with no deposit recorded is the gap this product exists to close, and the
+ * booking's Money card is one click away with the two honest ways to fix it —
+ * confirm the transfer in the queue, or take the BND 100 in cash.
  *
  * The status move is decided here and not in SQL: `transition()` in
  * lib/domain/booking-state.ts is the single place the state machine exists
  * (architecture.md §5.3), and `check_in_booking()` is passed the pair it
- * derived. What the database adds is atomicity — the move and the deposit row
- * are one transaction, because a guest checked in with no deposit recorded is
- * the gap this slice exists to close.
+ * derived.
  *
  * `depositId` comes back null where the booking quoted no deposit, which is
  * not a failure: the caller says so on screen rather than implying money
  * changed hands.
  */
 export async function checkInBooking(input: CheckInBookingInput): Promise<
-  DepositWriteResult<{
-    status: BookingStatus
-    depositId: string | null
-    amount: Cents
-    /** True when a deposit was already held, so nothing was taken at the door. */
-    alreadyHeld: boolean
-  }>
+  | {
+      ok: true
+      status: BookingStatus
+      /** The deposit held against the stay, or null where none was quoted. */
+      depositId: string | null
+      /** What is actually held — zero where nothing was quoted. */
+      amount: Cents
+    }
+  | { ok: false; error: { code: CheckInRefusalCode; message: string } }
 > {
   const propertyId = await currentPropertyId()
 
@@ -777,7 +794,10 @@ export async function checkInBooking(input: CheckInBookingInput): Promise<
 
   // Read for its status alone: the state machine decides legality here
   // (architecture.md §5.3) and the function re-checks the same status under a
-  // lock. The deposit's amount is deliberately NOT read here — see below.
+  // lock. Whether the deposit is secured is deliberately NOT read here — the
+  // function decides that under the same lock, so a deposit verified a second
+  // before the click is counted and one collected a second after is not
+  // double-counted.
   const current = booking as { status: BookingStatus }
   const next = transition(current.status, 'check_in')
 
@@ -790,7 +810,6 @@ export async function checkInBooking(input: CheckInBookingInput): Promise<
     p_booking_id: input.bookingId,
     p_from_status: current.status,
     p_to_status: next.status,
-    p_method: input.method,
     p_actor_id: input.actorId,
   })
 
@@ -799,35 +818,28 @@ export async function checkInBooking(input: CheckInBookingInput): Promise<
   }
 
   const result = data as
-    | {
-        ok: true
-        status: BookingStatus
-        deposit_id: string | null
-        amount_cents: number
-        already_held: boolean
-      }
+    | { ok: true; status: BookingStatus; deposit_id: string | null; amount_cents: number }
     | RpcRefusal
 
   if (!result.ok) {
     return { ok: false, error: describeCheckInFailure(result) }
   }
 
-  // The amount comes back from the function rather than from the read above.
-  // `confirmed` is amendable and `amend_booking()` can reprice the deposit, so
-  // an amendment landing between the two would leave this reporting one figure
-  // while the ledger held another — and the figure a clerk is shown is the one
-  // they say out loud to the guest. What comes back was written under the row
-  // lock.
+  // The amount comes back from the function rather than from a read here:
+  // it is what the ledger actually holds, written under the row lock, and the
+  // figure a clerk is shown is the one they say out loud to the guest.
   return {
     ok: true,
     status: result.status,
     depositId: result.deposit_id,
     amount: result.amount_cents,
-    alreadyHeld: result.already_held,
   }
 }
 
-function describeCheckInFailure(result: RpcRefusal): DepositWriteError {
+function describeCheckInFailure(result: RpcRefusal): {
+  code: CheckInRefusalCode
+  message: string
+} {
   switch (result.error) {
     case 'status_changed':
       return {
@@ -835,15 +847,20 @@ function describeCheckInFailure(result: RpcRefusal): DepositWriteError {
         message:
           'Someone else moved this booking while you were working on it. Reload and try again.',
       }
-    case 'already_collected':
+    case 'deposit_not_secured': {
+      const amount =
+        typeof result.amount_cents === 'number' ? `BND ${formatCents(result.amount_cents)} ` : ''
+
       return {
         code: result.error,
-        message: 'A deposit has already been recorded against this booking.',
+        message:
+          result.promised === true
+            ? `The ${amount}security deposit transfer has not been verified. Confirm it from the payments queue, or take it in cash from the booking, then check the guest in.`
+            : `The ${amount}security deposit has not been taken. Record it from the booking, then check the guest in.`,
       }
-    case 'invalid_method':
-      return { code: result.error, message: 'Choose how the deposit was taken.' }
+    }
     default:
-      return { code: result.error, message: 'That booking no longer exists.' }
+      return { code: 'not_found', message: 'That booking no longer exists.' }
   }
 }
 

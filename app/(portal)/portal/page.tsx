@@ -144,7 +144,7 @@ function ArrivalsSection({ bookings }: { bookings: readonly Booking[] }) {
       <SectionHeading
         id="arrivals-heading"
         title="Arriving today"
-        note="Confirmed bookings checking in today, by unit."
+        note="Confirmed bookings checking in today, by unit. Each one's security deposit is already held — check-in takes nothing."
       />
 
       {bookings.length === 0 ? (
@@ -244,16 +244,17 @@ function DeparturesSection({
                 <TableCell>
                   {booking.stay ? formatStayDate(booking.stay.range.start) : '—'}
                 </TableCell>
-                {/* The fact, not the quote. A booking checked in before this
-                    slice existed, or one that quoted nothing, says so rather
-                    than showing a figure nobody took. */}
+                {/* The fact, not the quote. A booking that quoted nothing, or
+                    one checked in before the door started refusing an
+                    unsecured booking, says so rather than showing a figure
+                    nobody took. */}
                 <TableCell className="text-right tabular-nums">
                   {deposits.has(booking.id) ? (
                     `BND ${formatCents(deposits.get(booking.id)!.amount)}`
                   ) : (
                     <span
                       className="text-muted-foreground"
-                      title="No deposit was recorded when this guest checked in"
+                      title="No security deposit is held against this booking"
                     >
                       Not collected
                     </span>

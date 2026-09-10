@@ -215,8 +215,22 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
               bookingId={booking.id}
               reference={booking.reference}
               guestName={booking.guestName}
-              securityDeposit={booking.securityDeposit}
-              depositWaiverReason={booking.depositWaiverReason}
+              // What the door needs to know about the deposit: the dialog says
+              // which of the three states it is in, and offers the move only
+              // from the one that can make it (stay-buttons.tsx).
+              deposit={{
+                quoted: booking.securityDeposit,
+                waiverReason: booking.depositWaiverReason,
+                held:
+                  deposit && deposit.collectedAt
+                    ? {
+                        amount: deposit.amount,
+                        method: deposit.method,
+                        collectedAt: deposit.collectedAt,
+                      }
+                    : null,
+                promised: deposit !== null && deposit.collectedAt === null,
+              }}
               checkInDate={booking.stay?.range.start ?? null}
               today={todayInBrunei()}
               canCheckIn={canCheckIn}
@@ -563,7 +577,7 @@ function MoneySummary({
       // prd.md §11: the security deposit is a refundable liability held
       // against the booking, not revenue. Said once here rather than under
       // the inset on every booking.
-      hint="The security deposit secures the booking and is held apart from the total — never counted as revenue. It is taken when the booking is made, or at the door if it arrives no sooner, and released after the unit has been inspected."
+      hint="The security deposit secures the booking and is held apart from the total — never counted as revenue. It is taken when the booking is made, at the counter or by the transfer a customer promises online, and released after the unit has been inspected. Nothing is collected at check-in."
     >
       <ul className="grid gap-sm">
         {booking.lines.map((entry, index) => (
@@ -642,15 +656,17 @@ function MoneySummary({
       <SecurityDepositInset
         bookingId={booking.id}
         reference={booking.reference}
+        bookingStatus={booking.status}
         quoted={booking.securityDeposit}
         waiverReason={booking.depositWaiverReason}
         deposit={deposit}
         // The same permission that records a booking payment, for the reason
         // prd.md §11 gives: taking money at the counter is one job.
         mayRecordDeposit={mayRecordPayment}
-        // Whether the deposit still has a booking to secure. Once a booking is
-        // confirmed the money is a catch-up rather than the thing that
-        // confirms it, and the dialog says so.
+        // Whether the deposit still has a booking to secure — true wherever
+        // the booking is still waiting, including on a transfer for the stay.
+        // Once a booking is confirmed the money is a catch-up rather than the
+        // thing that confirms it, and the dialog says so.
         securesBooking={allowedEvents(booking.status).includes('secure_with_deposit')}
       />
     </SectionCard>

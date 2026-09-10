@@ -19,19 +19,24 @@ import {
 } from '@/lib/domain/vehicle'
 
 /**
- * Walk-in booking creation (prd.md §9.4, capability B2).
+ * Booking creation at the desk (prd.md §9.1, §9.4; capabilities B2 and B16).
  *
- * The guest is present and pays on the spot, in one of the two ways the
- * property takes money (prd.md §10.1 [C]). Cash is counted at the desk and the
- * booking is confirmed outright. A bank transfer is sent from the guest's
- * phone while they stand there — payment made, but not yet payment seen — so
- * the booking lands in the verification queue and someone checks the bank
- * (§10.3). Neither is the booked-ahead, pay-on-arrival case §9.4 excludes from
- * v1: in both, the guest has actually paid.
+ * The booking is secured as it is made: the BND 100 security deposit is taken
+ * in the same action, in one of the two ways the property takes money (prd.md
+ * §10.1 [C]). Cash is counted at the desk and the booking is confirmed
+ * outright. A bank transfer is sent from the guest's phone — payment made,
+ * but not yet payment seen — so the booking lands in the verification queue
+ * and someone checks the bank (§10.3).
+ *
+ * What is paid now is the customer's own choice on their page (§10.3), given
+ * here on their behalf: the deposit alone, with the stay settled on arrival —
+ * the regular ringing ahead — or the deposit and the stay together, which is
+ * the walk-in standing at the counter. A booking quoting no deposit has
+ * nothing else to secure it, so the stay is always taken there.
  *
  * The one asterisk, recorded in createWalkInBooking()'s own doc block and in
  * prd.md §9.1: a transfer booking does hold its unit before the money lands,
- * and nothing expires it, because the hold duration is §18 N7 and still open.
+ * and nothing expires it, because N7 makes the hold indefinite.
  */
 
 const stayDate = z.string().refine(isStayDate, 'Enter a valid date.')
@@ -64,6 +69,12 @@ const walkInBookingSchema = z.object({
   /** The deliberate exception, submitted as a value on every save. */
   noVehicle: z.enum(['true', 'false']).transform((value) => value === 'true'),
   paymentMethod: z.enum(['cash', 'bank_transfer']),
+  /**
+   * What is being paid now: the deposit alone, or the deposit and the stay.
+   * The customer's two answers (prd.md §10.3), submitted on every save. Where
+   * no deposit is quoted the write path takes the stay whatever this says.
+   */
+  payingNow: z.enum(['deposit_only', 'everything']).default('everything'),
   /**
    * The discount control, always submitted — `none` when nothing is being
    * taken off. Left as loose strings here and read by `parseDiscount`, which
@@ -99,6 +110,8 @@ export interface WalkInBookingState {
     depositWaived: boolean
     /** Decides what the confirmation panel says, and which badge it wears. */
     paymentMethod: PaymentMethod
+    /** Whether the stay was paid with the deposit, or is settled on arrival. */
+    payStayNow: boolean
   }
 }
 
@@ -234,6 +247,7 @@ export async function createWalkInBookingAction(
     depositWaiverReason: waiver.reason,
     discount: discount.discount,
     paymentMethod: input.paymentMethod,
+    payStayNow: input.payingNow === 'everything',
     actorId: actor.userId,
   })
 
@@ -264,6 +278,9 @@ export async function createWalkInBookingAction(
       securityDeposit: result.booking.securityDeposit,
       depositWaived: result.booking.depositWaiverReason !== null,
       paymentMethod: input.paymentMethod,
+      // What was actually written, not what was asked: a booking quoting no
+      // deposit takes the stay whatever the form said.
+      payStayNow: result.paymentId !== null,
     },
   }
 }

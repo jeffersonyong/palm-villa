@@ -2,7 +2,7 @@ import { transition, type BookingEvent, type BookingStatus } from '@/lib/domain/
 import { nightsBetween, type StayDate } from '@/lib/domain/dates'
 import type { Discount } from '@/lib/domain/discount'
 import { line, totalOf } from '@/lib/domain/lines'
-import { bnd } from '@/lib/domain/money'
+import { bnd, type Cents } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
 
 import {
@@ -11,7 +11,7 @@ import {
   type Booking,
   type CreateWalkInBookingInput,
 } from '../bookings'
-import { checkInBooking } from '../deposits'
+import { checkInBooking, getDepositByBookingId, verifyDeposit, type Deposit } from '../deposits'
 import { attachDocument } from '../documents'
 import { recordInspection } from '../inspections'
 import { listPaymentsForBooking, type Payment } from '../payments'
@@ -77,6 +77,18 @@ export interface BookingSpec {
    * `givenTransferBooking`.
    */
   paymentMethod?: PaymentMethod
+  /**
+   * Defaults to true: the fixture is a walk-in, and a walk-in pays for the
+   * stay as well as the deposit. False is the advance booking taken over the
+   * phone — deposit only, stay on arrival.
+   */
+  payStayNow?: boolean
+  /**
+   * What the booking quotes. Defaults to BND 100, which the real path takes
+   * as the booking is made — in cash, so it is held, or by transfer, so it is
+   * promised. Zero is a booking with nothing to secure it but the stay.
+   */
+  securityDeposit?: Cents
   /** Defaults to none — a discount is the exception, not the shape. */
   discount?: Discount | null
   /** Waives the security deposit with this reason. Defaults to none. */
@@ -109,10 +121,11 @@ export async function bookingInput(spec: BookingSpec): Promise<CreateWalkInBooki
     exemptGuests: spec.exemptGuests ?? 0,
     lines,
     total: totalOf(lines),
-    securityDeposit: bnd(100),
+    securityDeposit: spec.securityDeposit ?? bnd(100),
     discount: spec.discount ?? null,
     depositWaiverReason: spec.depositWaiverReason ?? null,
     paymentMethod: spec.paymentMethod ?? 'cash',
+    payStayNow: spec.payStayNow ?? true,
     // Tests act as no one; the auth slice's own tests cover real actors.
     actorId: null,
   }
@@ -130,22 +143,55 @@ export async function givenBooking(spec: BookingSpec): Promise<Booking> {
 }
 
 /**
- * Creates a booking paid by bank transfer, and hands back its pending payment.
+ * Creates a booking paid by bank transfer, and hands back its pending payment
+ * — and the deposit promised alongside it, where the booking quotes one.
  *
  * Goes through the real path, so what these tests act on is exactly what the
  * booking form produces: a booking in `awaiting_payment_verification` with one
- * `pending_verification` payment against it.
+ * `pending_verification` payment against it and, since the deposit moved to
+ * the booking (capability B16), a promised deposit in the same queue. A test
+ * that wants the payment alone to confirm the booking passes
+ * `securityDeposit: 0`; one that wants the ordinary shape verifies the
+ * deposit too, which is what confirms it.
  */
 export async function givenTransferBooking(
   spec: BookingSpec,
-): Promise<{ booking: Booking; payment: Payment }> {
+): Promise<{ booking: Booking; payment: Payment; deposit: Deposit | null }> {
   const booking = await givenBooking({ ...spec, paymentMethod: 'bank_transfer' })
-  const payments = await listPaymentsForBooking(booking.id)
+  const [payments, deposit] = await Promise.all([
+    listPaymentsForBooking(booking.id),
+    getDepositByBookingId(booking.id),
+  ])
 
   const [payment] = payments
 
   if (payments.length !== 1 || !payment) {
     throw new Error(`Expected one payment on ${booking.reference}, found ${payments.length}.`)
+  }
+
+  return { booking, payment, deposit }
+}
+
+/**
+ * A transfer booking whose deposit has been verified, so the booking is
+ * confirmed with the stay's transfer still pending — the shape a customer who
+ * chose "everything now" leaves after the desk has worked the deposit's row.
+ */
+export async function givenConfirmedTransferBooking(
+  spec: BookingSpec,
+): Promise<{ booking: Booking; payment: Payment }> {
+  const { booking, payment, deposit } = await givenTransferBooking(spec)
+
+  if (deposit) {
+    const verified = await verifyDeposit({
+      depositId: deposit.id,
+      observedAmount: deposit.amount,
+      actorId: null,
+    })
+
+    if (!verified.ok) {
+      throw new Error(`Test setup could not verify the deposit: ${verified.error.message}`)
+    }
   }
 
   return { booking, payment }
@@ -402,19 +448,20 @@ export async function givenUnitOutOfService(
 }
 
 /**
- * Checks a guest in, which is how a deposit comes to exist.
+ * Checks a guest in.
  *
- * Through `checkInBooking`, so the booking moves by the state machine and the
- * deposit row is the one the product writes. `depositId` is null where the
- * booking quoted none — pass `securityDeposit: 0` through `spec` to exercise
- * that path.
+ * The deposit came into existence with the booking — `givenBooking` is a cash
+ * walk-in, so it is already held — and check-in takes nothing; through
+ * `checkInBooking`, so the booking moves by the state machine and refuses
+ * exactly what the product refuses. `depositId` is null where the booking
+ * quoted none — pass `securityDeposit: 0` through `spec` to exercise that
+ * path.
  */
 export async function givenCheckedInBooking(
   spec: BookingSpec,
-  method: PaymentMethod = 'cash',
 ): Promise<{ booking: Booking; depositId: string | null }> {
   const booking = await givenBooking(spec)
-  const result = await checkInBooking({ bookingId: booking.id, method, actorId: null })
+  const result = await checkInBooking({ bookingId: booking.id, actorId: null })
 
   if (!result.ok) {
     throw new Error(`Test setup could not check the guest in: ${result.error.message}`)
@@ -423,12 +470,11 @@ export async function givenCheckedInBooking(
   return { booking, depositId: result.depositId }
 }
 
-/** A stay that has ended: checked in, deposit taken, then checked out. */
+/** A stay that has ended: deposit held, checked in, then checked out. */
 export async function givenDepartedBooking(
   spec: BookingSpec,
-  method: PaymentMethod = 'cash',
 ): Promise<{ booking: Booking; depositId: string | null }> {
-  const checked = await givenCheckedInBooking(spec, method)
+  const checked = await givenCheckedInBooking(spec)
   const result = await transitionBooking(checked.booking.id, 'check_out', null)
 
   if (!result.ok) {

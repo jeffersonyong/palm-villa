@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { LogIn, LogOut } from 'lucide-react'
 
@@ -14,17 +15,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { FieldError } from '@/components/ui/field-error'
-import { Label } from '@/components/ui/label'
 import { Notice } from '@/components/ui/notice'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { toast } from '@/components/ui/toast-store'
-import { formatStayDate } from '@/lib/domain/dates'
+import { formatStayDate, formatTimestamp } from '@/lib/domain/dates'
 import { formatCents, type Cents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from '@/lib/domain/payment'
 
@@ -41,32 +34,47 @@ import { checkInAction, checkOutAction, type StayActionState } from './stay-acti
  * is worse than no affordance).
  *
  * Both open a dialog, and both dialogs exist for the same reason the units
- * board's do: to say in plain sentences what is about to happen. Check-in also
- * collects money, so it asks the one question it cannot answer itself — how
- * the deposit was taken.
+ * board's do: to say in plain sentences what is about to happen.
+ *
+ * ── Check-in collects nothing ─────────────────────────────────────────────
+ *
+ * The security deposit is taken when the booking is made (prd.md §9.1,
+ * capability B16), so by the time a guest is at the door it is either held,
+ * promised and not yet verified, or was never taken — and only the first of
+ * those can check in. This dialog used to ask how the deposit was being
+ * taken, which was the screen assuming the door was where it happened. It now
+ * states which of the three the booking is in and, for the two that cannot
+ * proceed, names the way out rather than offering a button that would refuse.
+ * The database refuses last, with the same sentence, for the clerk whose
+ * colleague verified the transfer a second after this dialog opened.
  *
  * **The screen's one primary fill** (2026-09-04; it was `tertiary` beside
  * Edit). Arriving and leaving is the record's forward action — what the desk
  * came to this screen to do with the guest standing there — where Edit is an
  * errand and Cancel an exception. Because the button exists only when the
  * state machine allows the move, the fill is on screen exactly when it is
- * actionable and absent otherwise. A record screen has no control line, so
- * design.md's rule keeping the fill out of a list screen's header does not
- * apply; the Payments card's Confirm is a fill in its own region. It leads
- * the row rather than sitting between Edit and the overflow, where a filled
- * button flanked by two bordered ones read as a pattern rather than a rank.
+ * actionable and absent otherwise.
  */
 
 const initialState: StayActionState = { status: 'idle' }
+
+/** Where the booking's security deposit stands, as the door needs to know it. */
+export interface CheckInDepositFacts {
+  /** What the booking quotes. Zero is a real answer. */
+  quoted: Cents
+  /** Why no deposit is quoted, when the booking waived it. Null otherwise. */
+  waiverReason: string | null
+  /** The deposit in the safe, or null while nothing has been collected. */
+  held: { amount: Cents; method: PaymentMethod; collectedAt: string } | null
+  /** A transfer the customer says they sent, which nobody has verified. */
+  promised: boolean
+}
 
 interface StayButtonsProps {
   bookingId: string
   reference: string
   guestName: string
-  /** What this booking quotes as a deposit. Zero is a real answer. */
-  securityDeposit: Cents
-  /** Why no deposit is taken, when the booking waived it. Null otherwise. */
-  depositWaiverReason: string | null
+  deposit: CheckInDepositFacts
   /** The day the stay begins, so the dialog can say when today is not it. */
   checkInDate: string | null
   /** Today, in the property's timezone — resolved on the server. */
@@ -103,23 +111,35 @@ export function StayButtons({ canCheckIn, canCheckOut, ...stay }: StayButtonsPro
 
 type DialogProps = Omit<StayButtonsProps, 'canCheckIn' | 'canCheckOut'> & { onClose: () => void }
 
+/** Which of the three doors the guest is standing at. */
+type DepositState = 'none_quoted' | 'held' | 'promised' | 'not_taken'
+
+function depositStateOf(deposit: CheckInDepositFacts): DepositState {
+  if (deposit.quoted === 0 && deposit.held === null) {
+    return 'none_quoted'
+  }
+
+  if (deposit.held) {
+    return 'held'
+  }
+
+  return deposit.promised ? 'promised' : 'not_taken'
+}
+
 function CheckInDialog({
   bookingId,
+  reference,
   guestName,
-  securityDeposit,
-  depositWaiverReason,
+  deposit,
   checkInDate,
   today,
   onClose,
 }: DialogProps) {
   const [state, formAction, isPending] = useActionState(checkInAction, initialState)
-  // Held in state rather than left to the DOM: React resets an uncontrolled
-  // form as soon as its action returns, so a refusal would clear the answer
-  // the clerk had already given.
-  const [method, setMethod] = useState<PaymentMethod>('cash')
   const router = useRouter()
 
-  const takesDeposit = securityDeposit > 0
+  const depositState = depositStateOf(deposit)
+  const canProceed = depositState === 'held' || depositState === 'none_quoted'
   const isEarly = checkInDate !== null && checkInDate !== today
 
   useEffect(() => {
@@ -127,16 +147,16 @@ function CheckInDialog({
       toast({
         tone: 'positive',
         title: `${guestName} is checked in`,
-        description: state.collected
-          ? `BND ${formatCents(state.collected.amount)} deposit held, taken in ${PAYMENT_METHOD_LABELS[state.collected.method].toLowerCase()}.`
-          : depositWaiverReason
+        description: state.held
+          ? `BND ${formatCents(state.held.amount)} security deposit is held against the stay.`
+          : deposit.waiverReason
             ? 'The security deposit was waived on this booking.'
             : 'No security deposit was due on this booking.',
       })
       onClose()
       router.refresh()
     }
-  }, [state.status, state.collected, guestName, depositWaiverReason, onClose, router])
+  }, [state.status, state.held, guestName, deposit.waiverReason, onClose, router])
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -144,68 +164,62 @@ function CheckInDialog({
         <DialogHeader>
           <DialogTitle>Check in {guestName}?</DialogTitle>
           <DialogDescription>
-            {takesDeposit
-              ? `The stay begins now and the BND ${formatCents(securityDeposit)} security deposit is taken. It is held until the unit has been inspected and the release is approved.`
-              : depositWaiverReason
-                ? `The stay begins now. The security deposit was waived when this booking was made — “${depositWaiverReason}” — so nothing is collected.`
-                : 'The stay begins now. This booking quotes no security deposit, so nothing is collected.'}
+            {depositState === 'held' && deposit.held
+              ? `The stay begins now. The BND ${formatCents(deposit.held.amount)} security deposit is already held — taken in ${PAYMENT_METHOD_LABELS[deposit.held.method].toLowerCase()} on ${formatTimestamp(deposit.held.collectedAt)} — and stays held until the unit has been inspected and the release is approved.`
+              : depositState === 'none_quoted'
+                ? deposit.waiverReason
+                  ? `The stay begins now. The security deposit was waived when this booking was made — “${deposit.waiverReason}” — so nothing is held.`
+                  : 'The stay begins now. This booking quotes no security deposit, so nothing is held.'
+                : `The BND ${formatCents(deposit.quoted)} security deposit secures this booking, and it is not in yet.`}
           </DialogDescription>
         </DialogHeader>
 
         <form action={formAction} className="grid gap-lg">
           <input type="hidden" name="bookingId" value={bookingId} />
-          <input type="hidden" name="method" value={method} />
 
-          {takesDeposit ? (
-            <div className="grid gap-sm">
-              <Label htmlFor="method">How was the deposit taken?</Label>
-              <Select value={method} onValueChange={(value) => setMethod(value as PaymentMethod)}>
-                <SelectTrigger id="method">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">{PAYMENT_METHOD_LABELS.cash}</SelectItem>
-                  <SelectItem value="bank_transfer">
-                    {PAYMENT_METHOD_LABELS.bank_transfer}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {state.fieldErrors?.method ? (
-                <FieldError message={state.fieldErrors.method} />
-              ) : (
-                <p className="text-caption text-muted-foreground">
-                  Recorded against the deposit with your name and the time. It is held apart from
-                  what the booking was paid, and never counted as revenue.
-                </p>
-              )}
-            </div>
+          {/* The two doors that do not open, each naming its way out. A
+              notice rather than a callout: this is what to know before
+              acting, not an outcome — and nothing here takes money. The
+              deposit is the booking's, and the Money card on this same screen
+              is where it is taken. */}
+          {depositState === 'promised' ? (
+            <Notice>
+              The customer says they transferred it, and nobody has verified that yet.{' '}
+              <Link href="/portal/payments" className="underline underline-offset-2">
+                Confirm it from the payments queue
+              </Link>
+              , or take it in cash from the Money card below, then check the guest in.
+            </Notice>
+          ) : null}
+
+          {depositState === 'not_taken' ? (
+            <Notice>
+              Nothing has been recorded against it. Record the deposit from the Money card below —
+              in cash, or as a transfer for the queue — then check the guest in.
+            </Notice>
           ) : null}
 
           {/* Said, not refused. A guest arriving a day early or late is a
               front-desk decision, and a system that blocks it sends somebody to
               amend the dates purely to satisfy it. */}
-          {isEarly && checkInDate ? (
+          {canProceed && isEarly && checkInDate ? (
             <Notice>
               This booking is dated {formatStayDate(checkInDate)}. Checking in today is recorded as
               happening today.
             </Notice>
           ) : null}
 
-          {state.status === 'error' && !state.fieldErrors ? (
-            <FieldError message={state.message} />
-          ) : null}
+          {state.status === 'error' ? <FieldError message={state.message} /> : null}
 
           <DialogFooter>
             <Button type="button" variant="tertiary" onClick={onClose}>
-              Not yet
+              {canProceed ? 'Not yet' : 'Close'}
             </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending
-                ? 'Checking in…'
-                : takesDeposit
-                  ? `Check in and hold BND ${formatCents(securityDeposit)}`
-                  : 'Check in'}
-            </Button>
+            {canProceed ? (
+              <Button type="submit" disabled={isPending}>
+                {isPending ? 'Checking in…' : `Check in ${reference}`}
+              </Button>
+            ) : null}
           </DialogFooter>
         </form>
       </DialogContent>

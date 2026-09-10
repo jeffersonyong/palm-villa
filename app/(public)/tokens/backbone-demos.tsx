@@ -144,7 +144,7 @@ export function OverlayDemos() {
           <PopoverContent>
             <p className="text-body-md-strong text-foreground">Deposit held</p>
             <p className="mt-xs text-body-sm text-muted-foreground">
-              BND 150.00, taken at check-in and released after inspection.
+              BND 150.00, taken when the booking was made and released after inspection.
             </p>
           </PopoverContent>
         </Popover>

@@ -4,7 +4,9 @@ import { bnd } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
 
 import { amendBooking, getBookingById, transitionBooking } from './bookings'
+import { getDepositByBookingId, verifyDeposit } from './deposits'
 import { listPayments, listPaymentsForBooking, recordCashPayment, verifyPayment } from './payments'
+import { currentPropertyId } from './property'
 import { givenBooking, givenTransferBooking } from './test/factory'
 import { auditEventsFor, paymentsFor } from './test/inspect'
 
@@ -29,13 +31,31 @@ import { auditEventsFor, paymentsFor } from './test/inspect'
 const CHECK_IN = '2026-11-02'
 const CHECK_OUT = '2026-11-05'
 
-/** Three nights at the seeded rate, which `bookingInput` prices. */
+/**
+ * Three nights at the seeded rate, which `bookingInput` prices, paid by
+ * transfer with the deposit promised alongside — the shape a customer who
+ * chose "everything now" leaves, and the desk's transfer booking too.
+ */
 async function transferBooking(unitRef = '3B-01') {
   return givenTransferBooking({ unitRef, checkIn: CHECK_IN, checkOut: CHECK_OUT })
 }
 
+/**
+ * The same, quoting no deposit — so the stay's money is the only thing that
+ * can confirm the booking. Used where a test is about the payment machinery
+ * itself rather than about what confirms a booking.
+ */
+async function undepositedTransferBooking(unitRef = '3B-01') {
+  return givenTransferBooking({
+    unitRef,
+    checkIn: CHECK_IN,
+    checkOut: CHECK_OUT,
+    securityDeposit: 0,
+  })
+}
+
 describe('how a booking acquires a payment', () => {
-  test('a cash walk-in is confirmed, with a verified payment against it', async () => {
+  test('a cash walk-in is confirmed, with a verified payment and a held deposit', async () => {
     const booking = await givenBooking({
       checkIn: CHECK_IN,
       checkOut: CHECK_OUT,
@@ -55,10 +75,21 @@ describe('how a booking acquires a payment', () => {
       match_kind: null,
     })
     expect(payment?.collected_at).not.toBeNull()
+
+    // The deposit is the other kind of money, on its own ledger, and never a
+    // second payment row.
+    expect(await paymentsFor(booking.id)).toHaveLength(1)
+    expect(await getDepositByBookingId(booking.id)).toMatchObject({
+      method: 'cash',
+      stage: 'secured',
+    })
+    expect((await auditEventsFor(booking.id)).map((event) => event.action)).toContain(
+      'booking.created_walk_in',
+    )
   })
 
   test('a transfer walk-in waits for verification, with an unobserved payment', async () => {
-    const { booking, payment } = await transferBooking()
+    const { booking, payment, deposit } = await transferBooking()
 
     expect(booking.status).toBe('awaiting_payment_verification')
     expect(payment.status).toBe('pending_verification')
@@ -66,6 +97,43 @@ describe('how a booking acquires a payment', () => {
     // Nobody has looked at the bank yet, so the row asserts no amount.
     expect(payment.amount).toBeNull()
     expect(payment.matchKind).toBeNull()
+    // And the deposit is a promise in the same queue.
+    expect(deposit).toMatchObject({ method: 'bank_transfer', stage: 'awaiting_verification' })
+    expect(deposit?.collectedAt).toBeNull()
+  })
+
+  test('a desk booking secured by the deposit alone owes the whole stay', async () => {
+    // The regular ringing ahead (prd.md §9.4): the BND 100 in cash secures
+    // the unit, nothing is written for the stay, and the balance says so.
+    const booking = await givenBooking({
+      checkIn: CHECK_IN,
+      checkOut: CHECK_OUT,
+      paymentMethod: 'cash',
+      payStayNow: false,
+    })
+
+    expect(booking.status).toBe('confirmed')
+    expect(booking.paid).toBe(0)
+    expect(await paymentsFor(booking.id)).toHaveLength(0)
+    expect(await getDepositByBookingId(booking.id)).toMatchObject({ stage: 'secured' })
+
+    const events = (await auditEventsFor(booking.id)).map((event) => event.action)
+
+    expect(events).toContain('booking.created_walk_in')
+    expect(events).not.toContain('payment.cash_recorded')
+  })
+
+  test('a booking quoting no deposit always takes the stay, whatever was asked', async () => {
+    const booking = await givenBooking({
+      checkIn: CHECK_IN,
+      checkOut: CHECK_OUT,
+      securityDeposit: 0,
+      payStayNow: false,
+    })
+
+    expect(booking.status).toBe('confirmed')
+    expect(booking.paid).toBe(booking.total)
+    expect(await getDepositByBookingId(booking.id)).toBeNull()
   })
 
   test('a booking that loses the race leaves no payment behind', async () => {
@@ -83,8 +151,8 @@ describe('how a booking acquires a payment', () => {
 })
 
 describe('verifying a payment', () => {
-  test('an exact amount confirms the booking and records who and when', async () => {
-    const { booking, payment } = await transferBooking()
+  test('an exact amount confirms a booking with nothing else to secure it', async () => {
+    const { booking, payment } = await undepositedTransferBooking()
 
     const result = await verifyPayment({
       paymentId: payment.id,
@@ -100,6 +168,8 @@ describe('verifying a payment', () => {
     expect(result.payment.status).toBe('verified')
     expect(result.payment.amount).toBe(booking.total)
     expect(result.payment.verifiedAt).not.toBeNull()
+    expect(result.confirmedNow).toBe(true)
+    expect(result.awaitingDeposit).toBe(false)
 
     const after = await getBookingById(booking.id)
     expect(after?.status).toBe('confirmed')
@@ -114,11 +184,107 @@ describe('verifying a payment', () => {
   })
 
   /**
+   * The rule the whole slice turns on (prd.md §9.1, §11): a booking quoting a
+   * deposit is confirmed by that deposit and by nothing else. The stay's
+   * money is verified — it settles the balance — and the booking waits.
+   */
+  test('does NOT confirm a booking whose deposit is still a promise', async () => {
+    const { booking, payment, deposit } = await transferBooking()
+
+    const result = await verifyPayment({
+      paymentId: payment.id,
+      observedAmount: booking.total,
+      match: 'reference',
+      actorId: null,
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    // The money is recorded...
+    expect(result.payment.status).toBe('verified')
+    expect((await getBookingById(booking.id))?.paid).toBe(booking.total)
+    // ...and the booking is not confirmed by it.
+    expect(result.confirmedNow).toBe(false)
+    expect(result.awaitingDeposit).toBe(true)
+    expect((await getBookingById(booking.id))?.status).toBe('awaiting_payment_verification')
+    expect((await auditEventsFor(booking.id)).map((event) => event.action)).not.toContain(
+      'booking.verify_payment',
+    )
+
+    // The deposit's own verification is what confirms it, and once, so a
+    // customer who sent everything in one transfer hears once.
+    const secured = await verifyDeposit({
+      depositId: deposit!.id,
+      observedAmount: deposit!.amount,
+      actorId: null,
+    })
+
+    expect(secured).toMatchObject({ ok: true, confirmedNow: true })
+    expect((await getBookingById(booking.id))?.status).toBe('confirmed')
+  })
+
+  test('verifying the deposit first confirms it, and the stay then settles a confirmed booking', async () => {
+    const { booking, payment, deposit } = await transferBooking()
+
+    const secured = await verifyDeposit({
+      depositId: deposit!.id,
+      observedAmount: deposit!.amount,
+      actorId: null,
+    })
+
+    expect(secured).toMatchObject({ ok: true, confirmedNow: true })
+    expect((await getBookingById(booking.id))?.status).toBe('confirmed')
+    // The deposit settles nothing: the stay is still owed in full.
+    expect((await getBookingById(booking.id))?.paid).toBe(0)
+
+    const result = await verifyPayment({
+      paymentId: payment.id,
+      observedAmount: booking.total,
+      match: 'reference',
+      actorId: null,
+    })
+
+    expect(result).toMatchObject({ ok: true, confirmedNow: false, awaitingDeposit: false })
+    expect((await getBookingById(booking.id))?.paid).toBe(booking.total)
+    // One confirmation in the trail, on the deposit's verification.
+    expect(
+      (await auditEventsFor(booking.id)).filter(
+        (event) => event.action === 'booking.verify_payment',
+      ),
+    ).toHaveLength(1)
+  })
+
+  test('the DATABASE refuses to confirm past an unsecured deposit, whatever the caller says', async () => {
+    // The guard in verify_payment() itself, reached by handing it the status
+    // pair lib/db would never pass. A caller that forgets the rule is refused
+    // with a sentence rather than trusted.
+    const { booking, payment } = await transferBooking()
+    const propertyId = await currentPropertyId()
+
+    const { data } = await dataClient().rpc('verify_payment', {
+      p_property_id: propertyId,
+      p_payment_id: payment.id,
+      p_from_status: 'awaiting_payment_verification',
+      p_to_status: 'confirmed',
+      p_observed_amount_cents: booking.total,
+      p_match_kind: 'reference',
+      p_actor_id: null,
+    })
+
+    expect(data).toMatchObject({ ok: false, error: 'deposit_not_secured' })
+
+    const [stored] = await paymentsFor(booking.id)
+    expect(stored?.status).toBe('pending_verification')
+    expect((await getBookingById(booking.id))?.status).toBe('awaiting_payment_verification')
+  })
+
+  /**
    * The headline refusal. If this test ever passes for the wrong reason, the
    * client's B5 promise is broken and nothing else in the system would say so.
    */
   test('REFUSES a short payment with no reason, and moves nothing at all', async () => {
-    const { booking, payment } = await transferBooking()
+    const { booking, payment } = await undepositedTransferBooking()
     const before = (await auditEventsFor(payment.id)).length
 
     const result = await verifyPayment({
@@ -145,7 +311,7 @@ describe('verifying a payment', () => {
   })
 
   test('confirms a short payment once a reason is given, and records the variance', async () => {
-    const { booking, payment } = await transferBooking()
+    const { booking, payment } = await undepositedTransferBooking()
 
     const result = await verifyPayment({
       paymentId: payment.id,
@@ -374,7 +540,7 @@ describe('two people working the same queue row', () => {
    * the same money is verified six times over.
    */
   test('lets exactly one of six simultaneous verifications through', async () => {
-    const { booking, payment } = await transferBooking()
+    const { booking, payment } = await undepositedTransferBooking()
 
     const results = await Promise.all(
       Array.from({ length: 6 }, () =>
@@ -405,7 +571,7 @@ describe('two people working the same queue row', () => {
    * side wins, and if it was the cancellation the payment is still pending.
    */
   test('a verification racing a cancellation cannot both happen', async () => {
-    const { booking, payment } = await transferBooking()
+    const { booking, payment } = await undepositedTransferBooking()
 
     const [verified, cancelled] = await Promise.all([
       verifyPayment({
@@ -433,8 +599,8 @@ describe('two people working the same queue row', () => {
 })
 
 describe('recording cash (B7)', () => {
-  test('settles a booking that was waiting on a transfer', async () => {
-    const { booking } = await transferBooking()
+  test('settles a booking that was waiting on a transfer, where nothing else secures it', async () => {
+    const { booking } = await undepositedTransferBooking()
 
     const result = await recordCashPayment({
       bookingId: booking.id,
@@ -446,8 +612,35 @@ describe('recording cash (B7)', () => {
     if (!result.ok) return
 
     expect(result.bookingStatus).toBe('confirmed')
+    expect(result.confirmedNow).toBe(true)
+    expect(result.awaitingDeposit).toBe(false)
     expect(result.payment.method).toBe('cash')
     expect(result.payment.collectedAt).not.toBeNull()
+  })
+
+  test('settles the stay without confirming a booking whose deposit is owed', async () => {
+    // Cash for the stay is counted and recorded; the deposit is what confirms
+    // the booking, and this is not the way to take it (prd.md §9.1, §11).
+    const { booking, deposit } = await transferBooking()
+
+    const result = await recordCashPayment({
+      bookingId: booking.id,
+      amount: booking.total,
+      actorId: null,
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.bookingStatus).toBe('awaiting_payment_verification')
+    expect(result.confirmedNow).toBe(false)
+    expect(result.awaitingDeposit).toBe(true)
+    expect((await getBookingById(booking.id))?.paid).toBe(booking.total)
+
+    // The deposit's own verification then confirms it.
+    await verifyDeposit({ depositId: deposit!.id, observedAmount: deposit!.amount, actorId: null })
+
+    expect((await getBookingById(booking.id))?.status).toBe('confirmed')
   })
 
   test('records against an already-confirmed booking without moving it', async () => {
@@ -493,7 +686,7 @@ describe('recording cash (B7)', () => {
     // Cash gets the same amount rule as a transfer. record_cash_payment()
     // could have written its own reason and satisfied the constraint quietly;
     // a machine-written justification is what B5 exists to prevent.
-    const { booking } = await transferBooking()
+    const { booking } = await undepositedTransferBooking()
 
     const result = await recordCashPayment({
       bookingId: booking.id,
@@ -511,7 +704,7 @@ describe('recording cash (B7)', () => {
     // Two clerks both take money for the same booking. That is two things that
     // genuinely happened, or one mistake — either way the system records both
     // and nets nothing off. prd.md §9.6: money is not moved by this system.
-    const { booking } = await transferBooking()
+    const { booking } = await undepositedTransferBooking()
 
     const results = await Promise.all([
       recordCashPayment({ bookingId: booking.id, amount: booking.total, actorId: null }),

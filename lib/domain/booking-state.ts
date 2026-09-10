@@ -71,6 +71,26 @@ const TERMINAL: readonly BookingStatus[] = ['completed', 'expired', 'cancelled',
  * making legible. A deposit transferred rather than counted uses
  * `submit_payment` instead, because it has to be verified like any transfer.
  *
+ * It leaves `awaiting_payment_verification` too, because a booking can be
+ * waiting on a transfer for the *stay* with no deposit yet recorded — a desk
+ * booking taken by transfer before the form took the deposit, or a customer
+ * who sent the stay and forgot the BND 100. Cash counted for the deposit is
+ * what confirms such a booking, and the pending transfer stays in the queue
+ * to settle the balance when it is seen.
+ *
+ * ── Which event confirms a booking is the deposit's decision ─────────────
+ *
+ * Three events reach `confirmed`, and the machine keeps all three legal; what
+ * it cannot see is whether the booking quotes a deposit. That rule lives one
+ * layer down, in the writers (lib/db) and the SQL functions behind them: **a
+ * booking quoting a deposit is confirmed by that deposit — counted, or
+ * verified in the queue — and by nothing else**, so `verify_payment` and
+ * `pay_in_full` against the stay's money are used only where no deposit is
+ * quoted, or where it is already in hand. A booking quoting none is confirmed
+ * by paying for it. prd.md §11's as-built block carries the rule; this
+ * comment is here so nobody reads the map and infers that a stay payment
+ * confirms a deposit-secured booking.
+ *
  * There is deliberately no transition that reaches `confirmed` without either
  * a verified payment, a walk-in payment, or the deposit that secures it.
  * prd.md §9.4 excludes booked-ahead, pay-on-arrival from v1; §9.4 also notes
@@ -94,6 +114,7 @@ const TRANSITIONS: Readonly<Record<BookingStatus, Partial<Record<BookingEvent, B
   },
   awaiting_payment_verification: {
     verify_payment: 'confirmed',
+    secure_with_deposit: 'confirmed',
     expire: 'expired',
     cancel: 'cancelled',
   },

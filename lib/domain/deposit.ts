@@ -2,18 +2,20 @@
  * What is held against a stay, and what happens to it (prd.md §11, E1–E3).
  *
  * The security deposit is the one figure in this product that is neither
- * revenue nor a payment: BND 100 taken at check-in, held as a liability, and
- * given back after the unit has been looked at. prd.md §2 names the absence of
+ * revenue nor a payment: BND 100 taken when the booking is made — it is what
+ * secures the booking (prd.md §9.1) — held as a liability, and given back
+ * after the unit has been looked at. prd.md §2 names the absence of
  * a ledger for it as one of the five problems the platform exists to solve —
  * "nobody can answer what deposits do we owe back right now" — and this module
  * is the answer's arithmetic.
  *
  * ── Why the stage is derived, not stored ──────────────────────────────────
  *
- * A deposit passes through four stages, and every one of them is already a
- * consequence of facts recorded elsewhere: whether a release has been approved
- * (a column pair on the deposit), whether an inspection exists (a row), and
- * where the booking has got to (its status). Storing a fifth copy as a `stage`
+ * A deposit passes through six stages, and every one of them is already a
+ * consequence of facts recorded elsewhere: whether it has been collected at
+ * all (`collected_at`), whether a release has been approved (a column pair on
+ * the deposit), whether an inspection exists (a row), and where the booking
+ * has got to (its status). Storing a seventh copy as a `stage`
  * column would be storing a second copy of a fact, and the copy would drift —
  * the same argument architecture.md §5.1 makes for `unit.status` and §6.2a
  * makes for the booking balance. `deposit_summary` returns the facts; this
@@ -43,18 +45,30 @@ import type { Cents } from './money'
 /**
  * Where a deposit has got to.
  *
- * Four stages, and they are a pipeline rather than a state machine: nothing
+ * Six stages, and they are a pipeline rather than a state machine: nothing
  * here moves backwards, because each step is a fact that has happened. The
- * names are the questions Finance actually asks — whose stay is still running,
- * what is waiting on Housekeeping, what can be signed off now, and what is
- * done.
+ * names are the questions Finance actually asks — what is promised and not
+ * yet seen, what is in the safe for a guest who has not arrived, whose stay
+ * is still running, what is waiting on Housekeeping, what can be signed off
+ * now, and what is done.
+ *
+ * `secured` arrived when the deposit moved from the door to the booking
+ * (prd.md §9.1, capability B16): most deposits now spend days on the ledger
+ * before the guest does, and calling that "guest in stay" was the ledger
+ * assuming a deposit could only exist because somebody had checked in.
  */
 export type DepositStage =
-  'awaiting_verification' | 'in_house' | 'awaiting_inspection' | 'ready_for_release' | 'released'
+  | 'awaiting_verification'
+  | 'secured'
+  | 'in_house'
+  | 'awaiting_inspection'
+  | 'ready_for_release'
+  | 'released'
 
 /** The stages in pipeline order. Filters and stat tiles render them in this order. */
 export const DEPOSIT_STAGES = [
   'awaiting_verification',
+  'secured',
   'in_house',
   'awaiting_inspection',
   'ready_for_release',
@@ -64,6 +78,7 @@ export const DEPOSIT_STAGES = [
 /** How each stage is named on screen. Singular: a badge labels one deposit. */
 export const DEPOSIT_STAGE_LABELS: Readonly<Record<DepositStage, string>> = {
   awaiting_verification: 'Transfer awaited',
+  secured: 'Held before arrival',
   in_house: 'Guest in stay',
   awaiting_inspection: 'Awaiting inspection',
   ready_for_release: 'Ready to release',
@@ -108,16 +123,24 @@ export interface DepositStageFacts {
  *
  * Released outranks everything, and an inspection outranks the booking's
  * status: both are facts that have happened, and reading them in that order is
- * what makes the pipeline one-way. The fall-through is `in_house` rather than
- * anything more alarming — a deposit exists only because somebody checked in,
- * so a booking that has not reached `completed` has its guest in a unit.
+ * what makes the pipeline one-way. After those the booking's status says
+ * where the guest is: gone (`completed`), in the unit (`checked_in`), or not
+ * yet arrived — which is the fall-through, because a deposit is taken when
+ * the booking is made and the ordinary deposit spends days there.
+ *
+ * A deposit held against a booking that was cancelled, expired or marked a
+ * no-show also falls through to `secured`. That is the least wrong of the
+ * stages available rather than the right one: prd.md §9.5 says the deposit is
+ * kept, and a `forfeited` outcome is the rule not yet built (N5, N32 in the
+ * register). Until it is, the money is in the safe and the guest never
+ * arrived, which is what the label says.
  */
 export function depositStageOf(facts: DepositStageFacts): DepositStage {
   // Ahead of everything, because it is the one stage where the property is
-  // holding nothing. The three below all describe money already in the safe;
-  // reading a promise as `in_house` would put an unverified BND 100 on the
-  // ledger's "what do we owe back right now", which is the one figure E1
-  // exists to answer.
+  // holding nothing. Every stage below describes money already in the safe;
+  // reading a promise as held would put an unverified BND 100 on the ledger's
+  // "what do we owe back right now", which is the one figure E1 exists to
+  // answer.
   if (!facts.collected) {
     return 'awaiting_verification'
   }
@@ -130,10 +153,14 @@ export function depositStageOf(facts: DepositStageFacts): DepositStage {
     return 'ready_for_release'
   }
 
-  return facts.bookingStatus === 'completed' ? 'awaiting_inspection' : 'in_house'
+  if (facts.bookingStatus === 'completed') {
+    return 'awaiting_inspection'
+  }
+
+  return facts.bookingStatus === 'checked_in' ? 'in_house' : 'secured'
 }
 
-/** True when the value is one of the four — for reading a URL parameter. */
+/** True when the value is one of the six — for reading a URL parameter. */
 export function isDepositStage(value: string): value is DepositStage {
   return (DEPOSIT_STAGES as readonly string[]).includes(value)
 }
@@ -258,15 +285,14 @@ export function canApproveRelease(facts: DepositStageFacts): ReleaseCheck {
  *
  * Approval freezes the figures — the statement a guest is given is what was
  * signed off — so the charges close when the release does. Before that they are
- * open all the way back to check-in: a broken window reported on the second
- * night of a five-night stay is a charge against this deposit, and making
- * somebody wait for the guest to leave before it can be written down is how it
- * ends up in WhatsApp instead.
+ * open all the way back to the moment the deposit was collected: a broken
+ * window reported on the second night of a five-night stay is a charge
+ * against this deposit, and making somebody wait for the guest to leave
+ * before it can be written down is how it ends up in WhatsApp instead.
  */
 export function canAddCharge(facts: DepositStageFacts): boolean {
   // A promised deposit answers for nothing yet: a charge raised against one
-  // could be deducted from money that never arrives, and the guest has not
-  // even checked in.
+  // could be deducted from money that never arrives.
   return facts.collected && !facts.released
 }
 

@@ -75,8 +75,33 @@ describe('depositStageOf', () => {
     expect(depositStageOf(facts({ inspected: true }))).toBe('ready_for_release')
   })
 
+  test('a deposit taken before the guest arrives is held, not in house', () => {
+    // The ordinary case since the deposit moved from the door to the booking
+    // (prd.md §9.1): the money sits on the ledger for days before anybody
+    // checks in, and calling that "guest in stay" was the ledger assuming a
+    // deposit could only exist because somebody had.
+    for (const bookingStatus of ['confirmed', 'held', 'awaiting_payment_verification'] as const) {
+      expect(depositStageOf(facts({ bookingStatus }))).toBe('secured')
+    }
+  })
+
+  test('a promise is awaited whatever the booking is doing', () => {
+    expect(depositStageOf(facts({ collected: false, bookingStatus: 'confirmed' }))).toBe(
+      'awaiting_verification',
+    )
+  })
+
+  test('a deposit held against a booking that never became a stay reads as held', () => {
+    // The least wrong of the stages available rather than the right one: the
+    // forfeiture prd.md §9.5 describes is N5/N32 in the register and not yet
+    // built, so the money is in the safe and the guest never arrived.
+    for (const bookingStatus of ['cancelled', 'no_show', 'expired'] as const) {
+      expect(depositStageOf(facts({ bookingStatus }))).toBe('secured')
+    }
+  })
+
   test.each<[DepositStage, DepositStageFacts]>([
-    ['in_house', facts({ bookingStatus: 'confirmed' })],
+    ['secured', facts({ bookingStatus: 'confirmed' })],
     ['in_house', facts({ bookingStatus: 'checked_in' })],
     ['awaiting_inspection', facts({ bookingStatus: 'completed' })],
   ])('reads as %s', (expected, given) => {
@@ -85,7 +110,7 @@ describe('depositStageOf', () => {
 })
 
 describe('isDepositStage', () => {
-  test.each(['in_house', 'awaiting_inspection', 'ready_for_release', 'released'])(
+  test.each(['secured', 'in_house', 'awaiting_inspection', 'ready_for_release', 'released'])(
     '%s is a stage',
     (value) => {
       expect(isDepositStage(value)).toBe(true)

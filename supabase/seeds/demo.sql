@@ -144,6 +144,11 @@ begin
         'amount', v_total_cents
       )),
       spec.payment_method,
+      -- Every demo guest pays for the stay as they book — a walk-in's shape.
+      -- The BND 100 is taken with it: counted for a cash booking, promised
+      -- for a transfer, which is what puts a deposit row on the ledger for
+      -- the guests in residence and a promised one in the queue.
+      true,
       -- Named from here on. The discount parameters sit between the payment
       -- method and the actor, and a positional `null` would have quietly
       -- become a discount kind the day one of them stopped being optional.
@@ -162,16 +167,30 @@ begin
 
     -- One transfer is confirmed rather than left waiting, so revenue by stream
     -- (capability E5) has a bank column that is not zero on a fresh stack —
-    -- and so the verification queue shows a worked item beside its two open
-    -- ones. Through verify_payment(), like a clerk would: the full amount
-    -- matched on reference, so no override reason is needed, and `observed_on`
-    -- is the day the money would have shown in the bank.
+    -- and so the verification queue shows a worked item beside its open ones.
+    -- Through the real functions, like a clerk would, and in the order the
+    -- rule runs: the deposit's row is what confirms the booking (prd.md
+    -- §9.1), so verify_deposit() carries the status pair, and the stay's row
+    -- is then a settlement against a booking already confirmed. The full
+    -- amount matched on reference, so no override reason is needed, and
+    -- `observed_on` is the day the money would have shown in the bank.
     if spec.payment_method = 'bank_transfer' and spec.settles_at = 'confirmed' then
+      perform verify_deposit(
+        v_property_id,
+        (v_result ->> 'deposit_id')::uuid,
+        'awaiting_payment_verification',
+        'confirmed',
+        10000,
+        p_observed_reference => v_result ->> 'reference',
+        p_observed_on => v_check_in,
+        p_actor_id => null
+      );
+
       perform verify_payment(
         v_property_id,
         (v_result ->> 'payment_id')::uuid,
-        'awaiting_payment_verification',
-        'confirmed',
+        null,
+        null,
         v_total_cents,
         'reference',
         p_observed_reference => v_result ->> 'reference',
@@ -185,14 +204,13 @@ begin
     -- actually checked in.
     --
     -- Checking in goes through check_in_booking() rather than
-    -- transition_booking(), because that is the path the portal takes and it
-    -- is what collects the BND 100 deposit in the same transaction. A demo
-    -- guest in residence with no deposit against them would show the deposits
-    -- ledger as empty on a fresh stack, which is the one screen prd.md §20
-    -- names.
+    -- transition_booking(), because that is the path the portal takes. It
+    -- collects nothing — the BND 100 was taken with the booking above — and
+    -- would refuse a guest whose deposit was not, which is the rule the desk
+    -- works to (prd.md §11, §12).
     if spec.settles_at in ('checked_in', 'completed') then
       perform check_in_booking(
-        v_property_id, v_booking_id, 'confirmed', 'checked_in', 'cash', null
+        v_property_id, v_booking_id, 'confirmed', 'checked_in', null
       );
     end if;
 

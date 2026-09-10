@@ -699,13 +699,24 @@ export interface CreateWalkInBookingInput {
    */
   discount: Discount | null
   /**
-   * How the guest is paying, which decides where the booking lands.
+   * How whatever is being paid now was paid, which decides where the booking
+   * lands: cash is counted and confirms; a transfer is promised and waits in
+   * the queue.
    *
    * Required, not defaulted, for the same reason `actorId` is: whether a
    * booking is paid or merely promised is the most consequential fact about
    * it, and a caller with no opinion should have to say so out loud.
    */
   paymentMethod: PaymentMethod
+  /**
+   * Whether the stay is paid now as well as the deposit — the desk giving the
+   * customer's own answer on their behalf (prd.md §10.3: the deposit only, or
+   * the full amount with the deposit). A walk-in pays everything; an advance
+   * booking taken over the phone secures the unit with the deposit and settles
+   * the stay on arrival. Forced true where the booking quotes no deposit, since
+   * the stay is then the only thing there is to pay for.
+   */
+  payStayNow: boolean
   /**
    * auth.users.id of the staff member acting, from requirePermission()'s
    * Actor — lands on the audit event. Required, not defaulted: a caller that
@@ -715,43 +726,52 @@ export interface CreateWalkInBookingInput {
 }
 
 export type CreateBookingResult =
-  | { ok: true; booking: Booking }
+  | {
+      ok: true
+      booking: Booking
+      /** The deposit written with the booking, or null where none was quoted. */
+      depositId: string | null
+      /** The payment for the stay, or null where the stay is settled on arrival. */
+      paymentId: string | null
+    }
   | { ok: false; error: { code: 'unit_not_found' | 'unit_unavailable'; message: string } }
 
 /**
- * Creates a walk-in booking, already paid.
+ * Creates a booking at the desk, secured as it is made.
  *
- * prd.md §9.4 [C]: the guest is present and pays immediately, so the booking is
- * created and paid in a single action and never passes through `held`. The
- * status is derived by running the state machine rather than assigned, so this
- * path cannot drift from architecture.md §5.3's rule that no code sets status
- * directly.
+ * prd.md §9.1 [C]: a booking is secured by the BND 100 security deposit and
+ * the stay is settled on arrival. So the deposit is taken here, in the same
+ * transaction as the booking — counted in cash, which confirms it on the
+ * spot, or promised by transfer, which sends it to the verification queue —
+ * and the stay is taken as well only when the guest is paying everything now
+ * (`payStayNow`). Those are the two answers a customer gives on their own
+ * page (§10.3), and the desk gives one of them on the guest's behalf: the
+ * walk-in standing at the counter pays everything; the regular ringing ahead
+ * secures the unit with the deposit and pays on arrival (§9.4). A booking
+ * quoting no deposit — a waiver — has nothing else to secure it, so the stay
+ * is always taken.
  *
- * "Pays immediately" covers both methods the property takes (prd.md §10.1
- * [C]). Cash is counted at the desk and the booking is confirmed. A transfer
- * is sent from the guest's phone while they stand there, which is payment made
- * but not yet payment seen, so the booking lands in the verification queue and
- * someone checks the bank (§10.4). Neither is the booked-ahead, pay-on-arrival
- * case §9.4 excludes: in both, the guest has actually paid.
+ * The status is derived by running the state machine rather than assigned,
+ * so this path cannot drift from architecture.md §5.3's rule that no code
+ * sets status directly. Cash confirms — `secure_with_deposit` where a deposit
+ * was counted, `pay_in_full` where none is quoted and the stay was — and a
+ * transfer is `submit_payment`, which is payment made but not yet seen.
  *
  * ── A transfer booking holds its unit before the money lands ───────────────
  *
  * Its occupancy row is neither expired nor cancelled, so the exclusion
- * constraint counts it, which sits awkwardly beside §9.1 [C] "unpaid bookings
- * do not hold inventory". §9.3 [A] sanctions exactly this window as a checkout
- * timer — but the duration is §18 N7, open, and the expiry job in
- * architecture.md §6.3 does not exist yet. So nothing expires a pending
- * transfer today: it holds the unit until it is verified or a staff member
- * cancels it. The queue sorts oldest-first and shows the wait so this is
- * visible rather than silent.
+ * constraint counts it. Nothing expires a pending transfer: N7 makes the hold
+ * indefinite by the client's own decision, and it holds the unit until it is
+ * verified or a staff member cancels it. The queue sorts oldest-first and
+ * shows the wait so this is visible rather than silent.
  *
  * ── There is deliberately no availability check here ───────────────────────
  *
  * The fixture layer re-checked the range before writing, and said in its own
  * header that the check was a stand-in which loses a genuine race. It is gone.
- * The booking, its guest, its occupancy, its lines and its audit event are
- * written by `create_walk_in_booking()` in one transaction, and the exclusion
- * constraint is the only thing that decides who wins — which is what
+ * The booking, its guest, its occupancy, its lines, its deposit and its audit
+ * events are written by `create_walk_in_booking()` in one transaction, and the
+ * exclusion constraint is the only thing that decides who wins — which is what
  * scope-of-capabilities.md G1 promises the client. A losing race comes back as
  * `unit_unavailable` with nothing left behind.
  */
@@ -760,11 +780,25 @@ export async function createWalkInBooking(
 ): Promise<CreateBookingResult> {
   const propertyId = await currentPropertyId()
 
-  // Cash settles the booking in the same action; a transfer has been sent but
-  // not seen, so it goes to the verification queue instead. Both statuses come
-  // out of the machine rather than being written down here — architecture.md
-  // §5.3 keeps the transition table in exactly one place.
-  const event: BookingEvent = input.paymentMethod === 'cash' ? 'pay_in_full' : 'submit_payment'
+  // What the booking will quote once the function has applied the waiver —
+  // the deposit is taken exactly when that is more than nothing.
+  const takesDeposit = input.depositWaiverReason === null && input.securityDeposit > 0
+  const payStayNow = input.payStayNow || !takesDeposit
+
+  // Cash confirms the booking in the same action; a transfer has been sent
+  // but not seen, so it goes to the verification queue instead. Which event
+  // confirms is the deposit's decision: counted, it is `secure_with_deposit`
+  // whether or not the stay was paid too, because it is the deposit that
+  // secures the booking; where none is quoted the stay's cash is what does
+  // it, which is `pay_in_full`. Both come out of the machine rather than being
+  // written down here — architecture.md §5.3 keeps the transition table in
+  // exactly one place.
+  const event: BookingEvent =
+    input.paymentMethod === 'cash'
+      ? takesDeposit
+        ? 'secure_with_deposit'
+        : 'pay_in_full'
+      : 'submit_payment'
   const created = transition('draft', event)
 
   if (!created.ok) {
@@ -787,6 +821,7 @@ export async function createWalkInBooking(
     p_security_deposit_cents: input.securityDeposit,
     p_lines: input.lines,
     p_payment_method: input.paymentMethod,
+    p_pay_stay_now: payStayNow,
     p_discount_kind: input.discount?.kind ?? null,
     p_discount_value: input.discount?.value ?? null,
     p_discount_reason: input.discount?.reason ?? null,
@@ -799,7 +834,13 @@ export async function createWalkInBooking(
   }
 
   const result = data as
-    | { ok: true; booking_id: string; reference: string; payment_id: string }
+    | {
+        ok: true
+        booking_id: string
+        reference: string
+        payment_id: string | null
+        deposit_id: string | null
+      }
     | { ok: false; error: 'unit_unavailable' | 'unit_not_found' }
 
   if (!result.ok) {
@@ -816,7 +857,7 @@ export async function createWalkInBooking(
     throw new Error(`Booking ${result.reference} was created but could not be read back.`)
   }
 
-  return { ok: true, booking }
+  return { ok: true, booking, depositId: result.deposit_id, paymentId: result.payment_id }
 }
 
 /**
