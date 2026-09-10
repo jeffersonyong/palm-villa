@@ -78,7 +78,18 @@ export function PaymentActions(props: PaymentActionsProps) {
   )
 }
 
-/** Shared: the toast, the close and the refresh a successful write needs. */
+/**
+ * Shared: the toast, the close and the refresh a successful write needs.
+ *
+ * The toast says what actually happened to the booking, which is not the same
+ * sentence every time. A **deposit** verified is what confirms a booking
+ * (prd.md §9.1). A **payment** verified confirms one only where no deposit is
+ * quoted or the deposit is already in; against a booking still waiting on its
+ * deposit it settles money and leaves the booking where it is, and against a
+ * booking already confirmed it is a top-up. "PV-4821 confirmed" on any of
+ * those but the first would be the screen claiming a thing that did not
+ * happen — and this queue is exactly where a clerk would believe it.
+ */
 function useCompletion(
   state: PaymentActionState,
   bookingReference: string,
@@ -89,15 +100,34 @@ function useCompletion(
 
   useEffect(() => {
     if (state.status === 'done') {
-      toast({
-        tone: 'positive',
-        title: `${bookingReference} confirmed`,
-        description: `Payment verified · ${guestName}`,
-      })
+      const done = state.done
+
+      toast(
+        done?.confirmed !== false
+          ? {
+              tone: 'positive',
+              title: `${bookingReference} confirmed`,
+              description:
+                done?.kind === 'deposit'
+                  ? `Security deposit verified · ${guestName}`
+                  : `Payment verified · ${guestName}`,
+            }
+          : done.awaitingDeposit
+            ? {
+                tone: 'positive',
+                title: `Payment verified · ${bookingReference}`,
+                description: 'Confirm its security deposit to confirm the booking.',
+              }
+            : {
+                tone: 'positive',
+                title: `Payment verified · ${bookingReference}`,
+                description: `${guestName} — the booking was already confirmed.`,
+              },
+      )
       onClose()
       router.refresh()
     }
-  }, [state.status, bookingReference, guestName, onClose, router])
+  }, [state.status, state.done, bookingReference, guestName, onClose, router])
 }
 
 function ConfirmDialog({
@@ -125,8 +155,8 @@ function ConfirmDialog({
         <DialogHeader>
           <DialogTitle>Confirm payment for {bookingReference}</DialogTitle>
           <DialogDescription>
-            Check the amount against your bank app before confirming. The slip a guest sends is
-            evidence, not verification.
+            The money for the stay. Check the amount against your bank app before confirming — the
+            slip a guest sends is evidence, not verification.
           </DialogDescription>
         </DialogHeader>
 
@@ -395,6 +425,12 @@ function ManualMatchDialog({
  * §8.1) and a deposit is not a payment, so a guest's screenshot of the
  * transfer has nowhere to live yet. That is the honest state and it is in the
  * register; the bank app was always the check (prd.md §10.4).
+ *
+ * This is the row that confirms a booking. A guest who sent the deposit and
+ * the stay in one transfer leaves two rows here, and the booking is confirmed
+ * on this one whichever is worked first — so the two figures are checked
+ * against the bank separately, as they were sent, and neither is matched
+ * against the other's expectation.
  */
 export function DepositActions(props: {
   depositId: string
@@ -444,8 +480,8 @@ function ConfirmDepositDialog({
         <DialogHeader>
           <DialogTitle>Confirm the deposit for {bookingReference}</DialogTitle>
           <DialogDescription>
-            The security deposit that secures this booking. Confirming it holds the unit and
-            confirms the booking — the stay itself is still settled on arrival.
+            The security deposit that secures this booking. Confirming it puts the money on the
+            deposit ledger and confirms the booking. What the stay owes is unchanged by it.
           </DialogDescription>
         </DialogHeader>
 

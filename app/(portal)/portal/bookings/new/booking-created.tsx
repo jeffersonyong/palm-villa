@@ -11,7 +11,7 @@ import { formatCents } from '@/lib/domain/money'
 import type { WalkInBookingState } from './actions'
 
 /**
- * What the desk sees the moment a walk-in booking exists.
+ * What the desk sees the moment a booking exists.
  *
  * It is a **screen**, not a panel on the form's screen. It was a 520px card
  * left sitting under the page header, the date controls and the four
@@ -23,8 +23,10 @@ import type { WalkInBookingState } from './actions'
  *
  * The reference is the hero because it is the only thing here that leaves the
  * building — it is what the guest quotes at the gate, and for a transfer it is
- * what the payment is matched on. Everything under it is the receipt: the same
- * four facts the clerk would otherwise read back off the form.
+ * what the payment is matched on. Everything under it is the receipt: the
+ * facts the clerk would otherwise read back off the form, and — since the
+ * deposit moved from the door to the booking (capability B16) — what was
+ * actually taken, in two lines that keep the two kinds of money apart.
  *
  * It stays in memory rather than becoming a route with the reference in the
  * URL. A `?created=PV-5428` screen could be reached for any booking by typing
@@ -38,6 +40,7 @@ type CreatedBooking = NonNullable<WalkInBookingState['created']>
 
 export function BookingCreated({ created }: { created: CreatedBooking }) {
   const isTransfer = created.paymentMethod === 'bank_transfer'
+  const takesDeposit = !created.depositWaived && created.securityDeposit > 0
   const nights = nightsBetween(created.checkIn, created.checkOut)
 
   return (
@@ -65,26 +68,41 @@ export function BookingCreated({ created }: { created: CreatedBooking }) {
 
         <dl className="mt-lg grid gap-sm border-t border-divider pt-lg">
           <ReceiptRow label="Unit" value={created.unitRef} />
+          {/* "Dates", matching the booking screen's own field: the two money
+              rows below name the deposit and the stay, and a third row also
+              called "Stay" would make one of the three read as a mistake. */}
           <ReceiptRow
-            label="Stay"
+            label="Dates"
             value={`${formatStayDates(created.checkIn, created.checkOut)} · ${nights} ${
               nights === 1 ? 'night' : 'nights'
             }`}
           />
-          <ReceiptRow
-            label={isTransfer ? 'To transfer' : 'Paid'}
-            value={`BND ${formatCents(created.total)}`}
-          />
-          {/* "Owed", not "collected": nothing has been taken yet, and since
-              prd.md §9.1 the deposit is what secures the booking rather than
-              something the door collects — so a receipt naming check-in was
-              telling a clerk to leave money uncollected. A waived booking says
-              so rather than printing 0.00 — a zero on a receipt invites a
-              second look at money that was never due. */}
+          {/* Two kinds of money, two lines, each saying what happened to it.
+              The deposit secures the booking and sits on its own ledger; the
+              stay is revenue and is either paid, awaited, or settled on
+              arrival. A waived booking says so rather than printing 0.00 — a
+              zero on a receipt invites a second look at money that was never
+              due. */}
           <ReceiptRow
             label="Security deposit"
             value={
-              created.depositWaived ? 'Waived' : `BND ${formatCents(created.securityDeposit)} owed`
+              created.depositWaived
+                ? 'Waived'
+                : !takesDeposit
+                  ? 'None quoted'
+                  : isTransfer
+                    ? `BND ${formatCents(created.securityDeposit)} awaited`
+                    : `BND ${formatCents(created.securityDeposit)} held`
+            }
+          />
+          <ReceiptRow
+            label="Stay"
+            value={
+              created.payStayNow
+                ? isTransfer
+                  ? `BND ${formatCents(created.total)} awaited`
+                  : `BND ${formatCents(created.total)} paid`
+                : `BND ${formatCents(created.total)} on arrival`
             }
           />
         </dl>
@@ -94,17 +112,16 @@ export function BookingCreated({ created }: { created: CreatedBooking }) {
         <Notice placement="page" className="mt-md">
           The unit is held for this booking now. It stays held until someone confirms the transfer
           landed, so this booking needs working off the verification queue.
+          {takesDeposit && created.payStayNow
+            ? ' The deposit and the stay are two rows there — confirm each at its own figure, from the one transfer.'
+            : ''}
         </Notice>
       ) : null}
 
-      {/* The deposit is not taken by this form, and saying nothing about it is
-          how it goes uncollected — which is the whole failure prd.md §9.1's
-          reversal created and the staff half of B16 closes. */}
-      {!created.depositWaived && created.securityDeposit > 0 ? (
+      {!created.payStayNow ? (
         <Notice placement="page" className="mt-md">
-          The BND {formatCents(created.securityDeposit)} security deposit has not been taken yet. It
-          secures the booking, so record it against this booking as soon as it is paid — in cash at
-          the desk, or as a transfer for the queue to verify.
+          The BND {formatCents(created.total)} for the stay is settled when the guest arrives.
+          Record it from the booking then — the deposit is already in.
         </Notice>
       ) : null}
 

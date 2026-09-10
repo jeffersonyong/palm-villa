@@ -325,6 +325,7 @@ export type VerifyPaymentErrorCode =
   | 'already_verified'
   | 'status_changed'
   | 'reason_required'
+  | 'deposit_not_secured'
   | 'illegal_transition'
   | 'terminal_state'
 
@@ -343,6 +344,12 @@ export type VerifyPaymentResult =
        * one confirmation email, not one per payment.
        */
       confirmedNow: boolean
+      /**
+       * The payment settled money against a booking that is still waiting on
+       * its security deposit, so it did not confirm it. The queue's toast
+       * says so, because "PV-4821 confirmed" would be untrue.
+       */
+      awaitingDeposit: boolean
     }
   | {
       ok: false
@@ -350,12 +357,69 @@ export type VerifyPaymentResult =
     }
 
 /**
- * Confirms a payment and moves its booking (capabilities B5 and B6).
+ * Whether a booking's security deposit is in hand — the same question
+ * `booking_deposit_is_secured()` answers in SQL, asked here first so the
+ * status pair offered to the function is the right one.
+ *
+ * True when the booking quotes no deposit, or a deposit row exists that has
+ * been collected: counted at the desk or verified in the queue. A promised
+ * transfer is not in hand.
+ */
+async function depositSecures(
+  propertyId: string,
+  bookingId: string,
+): Promise<{ quoted: Cents; secured: boolean }> {
+  const [booking, deposit] = await Promise.all([
+    dataClient()
+      .from('booking')
+      .select('security_deposit_cents')
+      .eq('property_id', propertyId)
+      .eq('id', bookingId)
+      .maybeSingle(),
+    dataClient()
+      .from('deposit')
+      .select('collected_at')
+      .eq('property_id', propertyId)
+      .eq('booking_id', bookingId)
+      .maybeSingle(),
+  ])
+
+  if (booking.error) {
+    throw new Error(`Could not read booking ${bookingId}: ${booking.error.message}`)
+  }
+
+  if (deposit.error) {
+    throw new Error(`Could not read the deposit on ${bookingId}: ${deposit.error.message}`)
+  }
+
+  const quoted = (booking.data as { security_deposit_cents: number } | null)?.security_deposit_cents
+  const collectedAt = (deposit.data as { collected_at: string | null } | null)?.collected_at
+
+  return {
+    quoted: quoted ?? 0,
+    secured: (quoted ?? 0) <= 0 || (collectedAt !== undefined && collectedAt !== null),
+  }
+}
+
+/**
+ * Confirms a payment and, where the deposit allows, moves its booking
+ * (capabilities B5 and B6).
  *
  * Mirrors `transitionBooking`: the booking's current status is read, legality
  * is decided by `transition()` in lib/domain, and the pair is handed to the
  * database function, which makes the payment write, the status write and the
  * audit events atomic under a row lock.
+ *
+ * ── The deposit decides whether the booking moves ─────────────────────────
+ *
+ * A booking quoting a security deposit is confirmed by that deposit and by
+ * nothing else (prd.md §9.1, §11). Money for the stay is verified whenever it
+ * arrives — it settles the balance — but while the deposit is still a promise
+ * in the queue the booking stays where it is, and the deposit's own
+ * verification is what confirms it. So a customer who chose "everything now"
+ * is confirmed once, on the deposit's row, whichever row the clerk works
+ * first; and a customer who sent the stay and forgot the BND 100 is not
+ * quietly confirmed on the wrong money.
  *
  * Every failure is returned rather than thrown, because none of them is a
  * fault in the system — a booking that moved underneath the caller, a payment
@@ -382,14 +446,18 @@ export async function verifyPayment(input: VerifyPaymentInput): Promise<VerifyPa
 
   // ── The booking may not move at all ──────────────────────────────────────
   //
-  // Verifying the transfer a booking is *waiting* on confirms it. Verifying a
-  // top-up raised against a booking that is already confirmed moves nothing —
-  // there is no legal event from `confirmed` that means "confirmed again", and
+  // Verifying the transfer a booking is *waiting* on confirms it — provided
+  // the deposit is in hand, or none is quoted. Verifying a top-up raised
+  // against a booking that is already confirmed moves nothing — there is no
+  // legal event from `confirmed` that means "confirmed again", and
   // `transition()` says so rather than being talked round. The pair is passed
-  // as nulls in that case, which is the arrangement `recordCashPayment`
-  // already had for cash taken against a booking that needed no move.
+  // as nulls in either case, which is the arrangement `recordCashPayment`
+  // already had for cash taken against a booking that needed no move. The
+  // function re-checks the deposit under the row lock.
   const isAwaiting = payment.bookingStatus === 'awaiting_payment_verification'
-  const next = isAwaiting ? transition(payment.bookingStatus, 'verify_payment') : null
+  const deposit = isAwaiting ? await depositSecures(propertyId, payment.bookingId) : null
+  const moves = isAwaiting && deposit !== null && deposit.secured
+  const next = moves ? transition(payment.bookingStatus, 'verify_payment') : null
 
   if (next && !next.ok) {
     return { ok: false, error: next.error }
@@ -398,7 +466,7 @@ export async function verifyPayment(input: VerifyPaymentInput): Promise<VerifyPa
   const { data, error } = await dataClient().rpc('verify_payment', {
     p_property_id: propertyId,
     p_payment_id: input.paymentId,
-    p_from_status: isAwaiting ? payment.bookingStatus : null,
+    p_from_status: moves ? payment.bookingStatus : null,
     p_to_status: next?.ok ? next.status : null,
     p_observed_amount_cents: input.observedAmount,
     p_match_kind: input.match,
@@ -429,7 +497,12 @@ export async function verifyPayment(input: VerifyPaymentInput): Promise<VerifyPa
     throw new Error(`Payment ${input.paymentId} was verified but could not be read back.`)
   }
 
-  return { ok: true, payment: confirmed, confirmedNow: isAwaiting }
+  return {
+    ok: true,
+    payment: confirmed,
+    confirmedNow: moves,
+    awaitingDeposit: isAwaiting && !moves,
+  }
 }
 
 function describeVerifyFailure(
@@ -449,6 +522,15 @@ function describeVerifyFailure(
         code,
         message:
           'Someone else changed this booking while you were working on it. Reload and retry.',
+      }
+    case 'deposit_not_secured':
+      // The function's own guard, reached only if the deposit was un-collected
+      // between the read above and the lock — which nothing does. Said plainly
+      // rather than swallowed.
+      return {
+        code,
+        message:
+          'This booking is still waiting on its security deposit, so the payment could not confirm it. Reload and try again.',
       }
     default:
       // `reason_required` reaching here means the booking was repriced after
@@ -482,11 +564,21 @@ export type RecordCashPaymentResult =
        * confirmed, where nothing moved.
        */
       confirmedNow: boolean
+      /**
+       * The cash settled the stay against a booking still waiting on its
+       * security deposit, so it did not confirm it — the deposit will.
+       */
+      awaitingDeposit: boolean
     }
   | {
       ok: false
       error: {
-        code: 'not_found' | 'booking_closed' | 'status_changed' | 'reason_required'
+        code:
+          | 'not_found'
+          | 'booking_closed'
+          | 'status_changed'
+          | 'reason_required'
+          | 'deposit_not_secured'
         message: string
         dueCents?: Cents
       }
@@ -497,10 +589,18 @@ export type RecordCashPaymentResult =
  *
  * prd.md §10.5: "record who collected, when, and against which booking."
  *
- * The booking's status moves only when it was waiting for money. Cash against
- * a booking already confirmed — the guest settling something at the desk — is
- * a fact worth recording that changes no state, and forcing a transition to
- * make the write feel symmetrical would invent one.
+ * The booking's status moves only when it was waiting for money **and the
+ * deposit allows it** — a booking quoting a security deposit is confirmed by
+ * that deposit alone (prd.md §9.1, §11), so cash for the stay against one
+ * still owed is recorded and settles the balance, and the deposit confirms
+ * the booking when it is taken. Cash against a booking already confirmed — the
+ * guest settling something at the desk — is a fact worth recording that
+ * changes no state, and forcing a transition to make the write feel
+ * symmetrical would invent one.
+ *
+ * This is never the way to take the deposit itself: that is
+ * `recordBookingDeposit`, which writes the other kind of money to the ledger
+ * it belongs on.
  */
 export async function recordCashPayment(
   input: RecordCashPaymentInput,
@@ -534,14 +634,18 @@ export async function recordCashPayment(
     }
   }
 
-  // Which move the cash implies, if any — decided by the machine rather than
-  // by a hand-written list of statuses.
+  // Which move the cash implies, if any. Only a booking still waiting can
+  // move, and only when its deposit is in hand or none is quoted — otherwise
+  // the cash is recorded and the deposit is what confirms the booking. The
+  // event itself is the machine's rather than a hand-written list of statuses.
+  const isWaiting = from === 'awaiting_payment_verification' || from === 'draft' || from === 'held'
+  const deposit = isWaiting ? await depositSecures(propertyId, input.bookingId) : null
   const event =
-    from === 'awaiting_payment_verification'
-      ? ('verify_payment' as const)
-      : from === 'draft' || from === 'held'
-        ? ('pay_in_full' as const)
-        : null
+    isWaiting && deposit !== null && deposit.secured
+      ? from === 'awaiting_payment_verification'
+        ? ('verify_payment' as const)
+        : ('pay_in_full' as const)
+      : null
 
   const next = event ? transition(from, event) : null
 
@@ -568,7 +672,7 @@ export async function recordCashPayment(
     | { ok: true; payment_id: string; status: BookingStatus }
     | {
         ok: false
-        error: 'booking_not_found' | 'status_changed' | 'reason_required'
+        error: 'booking_not_found' | 'status_changed' | 'reason_required' | 'deposit_not_secured'
         due_cents?: number
       }
 
@@ -584,6 +688,17 @@ export async function recordCashPayment(
           code: 'status_changed',
           message:
             'Someone else changed this booking while you were working on it. Reload and retry.',
+        },
+      }
+    }
+
+    if (result.error === 'deposit_not_secured') {
+      return {
+        ok: false,
+        error: {
+          code: 'deposit_not_secured',
+          message:
+            'This booking is still waiting on its security deposit, so the cash could not confirm it. Reload and try again.',
         },
       }
     }
@@ -609,6 +724,7 @@ export async function recordCashPayment(
     payment,
     bookingStatus: result.status,
     confirmedNow: next?.ok === true && next.status === 'confirmed',
+    awaitingDeposit: isWaiting && event === null,
   }
 }
 

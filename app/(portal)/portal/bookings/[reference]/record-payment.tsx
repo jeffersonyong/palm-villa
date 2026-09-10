@@ -47,6 +47,11 @@ import { recordPaymentAction, type RecordPaymentState } from './actions'
  * stays null until the bank has been looked at, so the figure is entered at
  * verification against the statement — asking here would invite the second
  * answer to disagree with the first.
+ *
+ * This is money for the stay and never the security deposit, which has its own
+ * control on the same card and its own ledger. A booking still waiting on its
+ * deposit is confirmed when the deposit is taken, not by this — the toast
+ * says so rather than claiming a confirmation that did not happen.
  */
 
 const initialState: RecordPaymentState = { status: 'idle' }
@@ -95,7 +100,9 @@ function RecordPaymentDialog({
           ? {
               tone: 'positive',
               title: `BND ${formatCents(state.recorded.amount ?? 0)} recorded`,
-              description: `Cash against ${reference}`,
+              description: state.recorded.awaitingDeposit
+                ? `Cash against ${reference} — it is confirmed once its deposit is`
+                : `Cash against ${reference}`,
             }
           : {
               tone: 'positive',
@@ -123,7 +130,8 @@ function RecordPaymentDialog({
         <DialogHeader>
           <DialogTitle>Record a payment</DialogTitle>
           <DialogDescription>
-            {reference} still owes BND {formatCents(outstanding)}.
+            {reference} still owes BND {formatCents(outstanding)} for the stay. The security deposit
+            is taken separately, from the panel below.
           </DialogDescription>
         </DialogHeader>
 

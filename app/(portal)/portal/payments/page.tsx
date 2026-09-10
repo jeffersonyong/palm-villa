@@ -46,8 +46,15 @@ export const metadata: Metadata = {
  * top — a queue is worked from the top, which is the opposite of every other
  * list in the portal — and the verified ones beneath, newest first. The
  * reasoning, and why the screen no longer opens on the waiting ones alone, is
- * in `views.ts`. The wait is made visible rather than handled: prd.md §18 N7
- * (hold duration) is open and no job expires a pending transfer yet.
+ * in `views.ts`. The wait is made visible rather than handled: N7 makes the
+ * hold indefinite by the client's own decision, and no job expires a pending
+ * transfer.
+ *
+ * Two kinds of row, and the difference matters to what a click does. A
+ * **deposit** row is what confirms a booking (prd.md §9.1); a **payment** row
+ * settles the stay, and confirms the booking only where no deposit is quoted
+ * or one is already in — otherwise it is recorded and the booking waits on
+ * its deposit's row, whichever order the clerk works them in.
  *
  * Bank transfers only. Cash has no verification to wait for and its own log;
  * a cash payment marked "verified" in this table would be a row with nothing
@@ -121,7 +128,7 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
     <>
       <PageHeader
         title="Payment verification"
-        description="Every bank transfer, the ones still waiting first. Check the amount in your bank app, then confirm — the longest wait is at the top."
+        description="Every bank transfer and every promised security deposit, the ones still waiting first. Check the amount in your bank app, then confirm — the longest wait is at the top. A guest who sent the deposit and the stay together is two rows here: confirm each at its own figure."
       />
 
       <div className="mt-xl flex flex-wrap items-center gap-md">
@@ -214,8 +221,9 @@ const EMPTY_TITLES: Readonly<Record<PaymentView, string>> = {
 }
 
 const EMPTY_DESCRIPTIONS: Readonly<Record<PaymentView, string>> = {
-  all: 'Bookings paid by bank transfer appear here — the ones still waiting first, then the ones confirmed.',
-  waiting: 'Bookings paid by bank transfer appear here until someone confirms the money landed.',
+  all: 'Deposits and stays paid by bank transfer appear here — the ones still waiting first, then the ones confirmed.',
+  waiting:
+    'Deposits and stays paid by bank transfer appear here until someone confirms the money landed. It is the deposit that confirms a booking.',
   verified: 'A payment appears here once someone has confirmed the money landed.',
 }
 

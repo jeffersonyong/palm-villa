@@ -4,6 +4,7 @@ import { DepositFigureTable, DepositMark, FigureRow } from '@/components/portal/
 import { DepositStageBadge } from '@/components/portal/deposit-stage-badge'
 import { Card } from '@/components/ui/card'
 import type { Deposit } from '@/lib/db/deposits'
+import type { BookingStatus } from '@/lib/domain/booking-state'
 import { formatTimestamp } from '@/lib/domain/dates'
 import type { Cents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
@@ -28,9 +29,9 @@ import { RecordDeposit } from './record-deposit'
  * **"On arrival" is gone entirely, and that is prd.md §9.1** (10 September
  * 2026). The deposit is what secures a booking, so it is taken when the
  * booking is made — at the counter, or by the transfer a customer promises
- * online — and the door is now only the last place it can be collected rather
- * than the only one. A quote with nothing against it is therefore *owed*, not
- * scheduled, and this card offers the way to take it.
+ * online — and the door collects nothing: check-in refuses a booking whose
+ * deposit is not in. A quote with nothing against it is therefore *owed*, not
+ * scheduled, and this card is the one place it is taken.
  *
  * The inset is one of four gray panels on this screen, so it wears the
  * deposit's mark and shows the deposit screen's own table — the reasoning is
@@ -41,6 +42,8 @@ import { RecordDeposit } from './record-deposit'
 interface SecurityDepositInsetProps {
   bookingId: string
   reference: string
+  /** Where the booking has got to, so a quote with nothing against it can say what that means. */
+  bookingStatus: BookingStatus
   /** What the booking quotes. Shown before anything has been collected. */
   quoted: Cents
   /** Why nothing is quoted, when the deposit was waived at creation (B15). */
@@ -56,6 +59,7 @@ interface SecurityDepositInsetProps {
 export function SecurityDepositInset({
   bookingId,
   reference,
+  bookingStatus,
   quoted,
   waiverReason,
   deposit,
@@ -88,7 +92,12 @@ export function SecurityDepositInset({
           <p className="mt-xs text-caption text-muted-foreground">
             {securesBooking
               ? 'Nothing has been taken yet. The deposit is what secures this booking.'
-              : 'Nothing has been taken yet. It is collected at the door if it arrives no sooner.'}
+              : bookingStatus === 'confirmed'
+                ? // A booking confirmed before the deposit moved to the booking,
+                  // or one moved by hand. The door will refuse it, so the way
+                  // out is named here, where the button is.
+                  'Nothing has been taken yet — this booking was confirmed without it. Record the deposit before the guest is checked in; the door takes nothing.'
+                : 'Nothing was taken against this stay.'}
           </p>
         )}
 
@@ -138,7 +147,9 @@ export function SecurityDepositInset({
       {/* A promise the guest has come in to settle in cash. Offered here
           because the alternative a clerk would otherwise reach for is
           verifying a transfer that never arrived, which is a false entry in
-          the ledger about money that changed hands a different way. */}
+          the ledger about money that changed hands a different way — and
+          because the door refuses a promise, so this is where an arriving
+          guest's abandoned transfer is put right. */}
       {mayRecordDeposit && deposit.collectedAt === null ? (
         <RecordDeposit
           bookingId={bookingId}

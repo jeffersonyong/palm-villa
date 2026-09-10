@@ -25,6 +25,7 @@ import { currentPropertyId } from './property'
 import {
   bookingInput,
   givenBooking,
+  givenBookingInState,
   givenDayPassBooking,
   givenCheckedInBooking,
   givenDepartedBooking,
@@ -71,19 +72,28 @@ async function depositRowCount(bookingId: string): Promise<number> {
 }
 
 describe('checkInBooking', () => {
-  test('moves the booking and records the deposit in one act', async () => {
-    // Arrange
+  test('moves the booking; the deposit was taken with the booking', async () => {
+    // Arrange — a cash walk-in, which took the BND 100 as it was made.
     const booking = await givenBooking({ unitRef: '3B-01', ...STAY })
+    const held = await getDepositByBookingId(booking.id)
+
+    expect(held).toMatchObject({ amount: DEPOSIT, method: 'cash', stage: 'secured' })
 
     // Act
-    const result = await checkInBooking({ bookingId: booking.id, method: 'cash', actorId: null })
+    const result = await checkInBooking({ bookingId: booking.id, actorId: null })
 
-    // Assert
-    expect(result).toMatchObject({ ok: true, status: 'checked_in', amount: DEPOSIT })
+    // Assert — the same row, now in house; nothing was taken at the door.
+    expect(result).toMatchObject({
+      ok: true,
+      status: 'checked_in',
+      depositId: held?.id,
+      amount: DEPOSIT,
+    })
 
     const deposit = await getDepositByBookingId(booking.id)
 
     expect(deposit).toMatchObject({
+      id: held?.id,
       amount: DEPOSIT,
       method: 'cash',
       stage: 'in_house',
@@ -92,14 +102,16 @@ describe('checkInBooking', () => {
     })
     expect(deposit?.stay?.unitRef).toBe('3B-01')
     expect(deposit?.figures.releasable).toBe(DEPOSIT)
+    expect(await depositRowCount(booking.id)).toBe(1)
   })
 
-  test('writes both events — the money and the move', async () => {
+  test('writes the move, and the deposit keeps the one event it already had', async () => {
     const { booking, depositId } = await givenCheckedInBooking({ unitRef: '3B-02', ...STAY })
 
-    // The deposit's own verb hangs off the deposit; the status move hangs off
-    // the booking, in the shape transition_booking() writes it, so the two
-    // histories each read one vocabulary.
+    // The deposit's own verb hangs off the deposit, written when the booking
+    // was made; the status move hangs off the booking, in the shape
+    // transition_booking() writes it, so the two histories each read one
+    // vocabulary — and check-in adds nothing to the deposit's.
     expect(await actionsFor('deposit', depositId!)).toEqual(['deposit.collected'])
     expect(await actionsFor('booking', booking.id)).toContain('booking.check_in')
   })
@@ -109,13 +121,17 @@ describe('checkInBooking', () => {
     const events = await listAuditEvents('booking', booking.id)
     const checkIn = events.find((event) => event.action === 'booking.check_in')
 
-    expect(checkIn?.after).toMatchObject({ status: 'checked_in', deposit_id: depositId })
+    expect(checkIn?.after).toMatchObject({
+      status: 'checked_in',
+      deposit_id: depositId,
+      deposit: 'already_held',
+    })
   })
 
   test('a second check-in is refused and leaves one deposit', async () => {
     const { booking } = await givenCheckedInBooking({ unitRef: '3B-04', ...STAY })
 
-    const again = await checkInBooking({ bookingId: booking.id, method: 'cash', actorId: null })
+    const again = await checkInBooking({ bookingId: booking.id, actorId: null })
 
     expect(again).toMatchObject({ ok: false })
     expect(await depositRowCount(booking.id)).toBe(1)
@@ -132,41 +148,55 @@ describe('checkInBooking', () => {
       throw new Error('Test setup could not create the booking.')
     }
 
-    const result = await checkInBooking({
-      bookingId: created.booking.id,
-      method: 'cash',
-      actorId: null,
-    })
+    const result = await checkInBooking({ bookingId: created.booking.id, actorId: null })
 
     expect(result).toMatchObject({ ok: true, status: 'checked_in', depositId: null, amount: 0 })
     expect(await depositRowCount(created.booking.id)).toBe(0)
   })
 
+  test('REFUSES a confirmed booking whose deposit was never taken, and moves nothing', async () => {
+    // The rule this slice exists for (prd.md §11, §12): the door is not a
+    // place money changes hands, and a guest checked in with no deposit
+    // recorded is the spreadsheet's gap. A booking confirmed with no deposit
+    // row is a shape the product no longer makes, so it is written directly.
+    const { id } = await givenBookingInState({ unitRef: '3B-06', ...STAY }, ['pay_in_full'])
+
+    const result = await checkInBooking({ bookingId: id, actorId: null })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+
+    expect(result.error.code).toBe('deposit_not_secured')
+    expect(result.error.message).toContain('Record it from the booking')
+
+    expect((await getBookingById(id))?.status).toBe('confirmed')
+    expect(await depositRowCount(id)).toBe(0)
+    expect(await actionsFor('booking', id)).not.toContain('booking.check_in')
+  })
+
   test('an unconfirmed booking is refused by the state machine, before the database', async () => {
-    const { booking } = await givenDepartedBooking({ unitRef: '3B-06', ...STAY })
+    const { booking } = await givenDepartedBooking({ unitRef: '3B-07', ...STAY })
 
     // `completed` is terminal, so this never reaches check_in_booking().
-    const result = await checkInBooking({ bookingId: booking.id, method: 'cash', actorId: null })
+    const result = await checkInBooking({ bookingId: booking.id, actorId: null })
 
     expect(result).toMatchObject({ ok: false, error: { code: 'terminal_state' } })
   })
 
-  test('four clerks checking in at once produce one deposit', async () => {
+  test('four clerks checking in at once move the booking once', async () => {
     // The ordinary case at a desk, not the exotic one. `for update` blocks the
     // losers, who then re-read the committed row and are told it moved.
-    const booking = await givenBooking({ unitRef: '3B-07', ...STAY })
+    const booking = await givenBooking({ unitRef: '3B-08', ...STAY })
 
     const results = await Promise.all(
-      Array.from({ length: 4 }, () =>
-        checkInBooking({ bookingId: booking.id, method: 'cash', actorId: null }),
-      ),
+      Array.from({ length: 4 }, () => checkInBooking({ bookingId: booking.id, actorId: null })),
     )
 
     expect(results.filter((result) => result.ok)).toHaveLength(1)
     expect(await depositRowCount(booking.id)).toBe(1)
-    expect(await actionsFor('booking', booking.id)).toEqual(
-      expect.arrayContaining(['booking.check_in']),
-    )
+    expect(
+      (await actionsFor('booking', booking.id)).filter((action) => action === 'booking.check_in'),
+    ).toHaveLength(1)
   })
 })
 
@@ -694,7 +724,10 @@ describe('the ledger reads', () => {
     // row is the N+1 web/performance.md names.
     const first = await givenCheckedInBooking({ unitRef: '3B-21', ...STAY })
     const second = await givenCheckedInBooking({ unitRef: '3B-22', ...STAY })
-    const none = await givenBooking({ unitRef: '3B-23', ...STAY })
+    // A booking that genuinely holds nothing quotes nothing — every other
+    // booking takes its deposit as it is made, so "no deposit" is a waiver or
+    // a stream that never carried one, not a booking nobody has checked in.
+    const none = await givenBooking({ unitRef: '3B-23', ...STAY, securityDeposit: 0 })
 
     const deposits = await listDepositsForBookings([first.booking.id, second.booking.id, none.id])
 
@@ -817,7 +850,9 @@ describe('verifying a promised deposit', () => {
 
     expect(deposit?.collectedAt).not.toBeNull()
     expect(deposit?.promisedAt).not.toBeNull()
-    expect(deposit?.stage).toBe('in_house')
+    // Held for a guest who has not arrived, which is where a deposit spends
+    // most of its life now that it is taken when the booking is made.
+    expect(deposit?.stage).toBe('secured')
     expect(deposit?.observed).toMatchObject({ reference: 'PV-4830', sender: 'AHMAD BIN ALI' })
 
     const booking = await getBookingById(bookingId)
@@ -909,22 +944,22 @@ describe('verifying a promised deposit', () => {
   })
 })
 
-describe('checking in a guest whose deposit is already held', () => {
-  test('takes nothing and says so', async () => {
+describe('checking in a guest who booked online', () => {
+  test('a verified deposit is recognised, and nothing is taken at the door', async () => {
     const { bookingId, depositId } = await givenPromisedDeposit()
 
     await verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null })
 
-    const checkedIn = await checkInBooking({ bookingId, method: 'cash', actorId: null })
+    const checkedIn = await checkInBooking({ bookingId, actorId: null })
 
     expect(checkedIn.ok).toBe(true)
 
     if (!checkedIn.ok) return
 
-    // prd.md §11: "Check-in recognises a deposit already held and takes
-    // nothing." The same row comes back rather than a second one.
-    expect(checkedIn.alreadyHeld).toBe(true)
+    // prd.md §11: check-in takes nothing. The same row comes back rather than
+    // a second one.
     expect(checkedIn.depositId).toBe(depositId)
+    expect(checkedIn.amount).toBe(bnd(100))
 
     const { count } = await dataClient()
       .from('deposit')
@@ -934,10 +969,12 @@ describe('checking in a guest whose deposit is already held', () => {
     expect(count).toBe(1)
   })
 
-  test('collects a promise the guest never actually sent, at the door', async () => {
-    // The judgement recorded in the migration: the guest is standing there, and
-    // refusing check-in over an abandoned transfer would send a paying customer
-    // away to fix a row. The promise is fulfilled rather than replaced.
+  test('a promise nobody has verified is refused at the door, and says what to do', async () => {
+    // The door is not a place money changes hands. A booking that reached
+    // `confirmed` with its deposit still a promise is a shape the product no
+    // longer makes — the deposit is what confirms it — so it is written
+    // directly; the refusal names the two honest ways out, both one click
+    // away on the booking's Money card.
     const { bookingId, depositId } = await givenPromisedDeposit()
 
     const { error } = await dataClient()
@@ -947,33 +984,47 @@ describe('checking in a guest whose deposit is already held', () => {
 
     expect(error).toBeNull()
 
-    const checkedIn = await checkInBooking({ bookingId, method: 'cash', actorId: null })
+    const checkedIn = await checkInBooking({ bookingId, actorId: null })
 
-    expect(checkedIn.ok).toBe(true)
+    expect(checkedIn.ok).toBe(false)
 
-    if (!checkedIn.ok) return
+    if (checkedIn.ok) return
 
-    expect(checkedIn.alreadyHeld).toBe(false)
-    expect(checkedIn.depositId).toBe(depositId)
+    expect(checkedIn.error.code).toBe('deposit_not_secured')
+    expect(checkedIn.error.message).toContain('payments queue')
+    expect(checkedIn.error.message).toContain('in cash')
+
+    // Nothing moved and nothing was written: the promise is still a promise.
+    expect((await getBookingById(bookingId))?.status).toBe('confirmed')
 
     const deposit = await getDepositByBookingId(bookingId)
 
-    expect(deposit?.collectedAt).not.toBeNull()
-    expect(deposit?.method).toBe('cash')
-    // The promise survives as the record that the customer said they had sent
-    // it, which is the question asked afterwards.
+    expect(deposit?.id).toBe(depositId)
+    expect(deposit?.collectedAt).toBeNull()
     expect(deposit?.promisedAt).not.toBeNull()
   })
 
-  test('a walk-in still has its deposit taken at the door', async () => {
-    // The path that existed before this slice, unchanged.
-    const { depositId } = await givenCheckedInBooking({
+  test('a walk-in has its deposit taken as the booking is made, not at the door', async () => {
+    const booking = await givenBooking({
       unitRef: '3B-30',
       checkIn: '2026-10-20',
       checkOut: '2026-10-23',
     })
 
+    const before = await getDepositByBookingId(booking.id)
+
+    expect(before).not.toBeNull()
+    expect(before?.collectedAt).not.toBeNull()
+    expect(before?.stage).toBe('secured')
+
+    const { depositId } = await givenCheckedInBooking({
+      unitRef: '3B-31',
+      checkIn: '2026-10-20',
+      checkOut: '2026-10-23',
+    })
+
     expect(depositId).not.toBeNull()
+    expect(await actionsFor('deposit', depositId!)).toEqual(['deposit.collected'])
   })
 })
 

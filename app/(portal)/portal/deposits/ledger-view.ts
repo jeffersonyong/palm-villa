@@ -70,7 +70,9 @@ export function isArchiveView(view: LedgerView): boolean {
 
 /**
  * The stages a held deposit can be in — which is every stage bar two, and the
- * two are excluded for opposite reasons.
+ * two are excluded for opposite reasons. `secured` is the first of them: the
+ * deposit is taken when the booking is made (prd.md §9.1), so the ledger's
+ * ordinary row is money held for a guest who has not arrived yet.
  *
  * `released` is not a stage of something held but the archive's whole subject:
  * it is a view (`?show=`), and a chip mixing "in house" with "released" would
@@ -154,14 +156,16 @@ export function filterHeld<T extends LedgerRow>(deposits: readonly T[], filter: 
  * needs attention most is the one that has been ready longest, and putting the
  * newest arrival at the top buries it. The stay's end date leads, because that
  * is when the clock started; a deposit whose booking occupies no unit falls
- * back to when it was taken.
+ * back to when it was taken. Held-before-arrival sits last among what is
+ * held: nothing can be done about it until the guest has been and gone.
  */
 const STAGE_ORDER: Readonly<Record<DepositStage, number>> = {
   ready_for_release: 0,
   awaiting_inspection: 1,
   in_house: 2,
-  awaiting_verification: 3,
-  released: 4,
+  secured: 3,
+  awaiting_verification: 4,
+  released: 5,
 }
 
 export function sortForLedger<T extends LedgerRow>(deposits: readonly T[]): T[] {

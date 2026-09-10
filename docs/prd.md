@@ -424,6 +424,8 @@ The figures are constants in `lib/domain/public-booking.ts` rather than settings
 
 **[A] The two paths differ only in what has been paid.** Same availability check, same pricing engine, same document capture, same unit held by the same occupancy row. A walk-in settles the stay at the desk; an advance booking settles it at check-in through the path §10.7 already built for a booking that owes money. Nothing new is minted to express the difference — the balance says it.
 
+**As built (15 September 2026).** The desk form takes the deposit as the booking is made, and asks which of the customer's two answers (§10.3) the guest is giving — *the deposit only*, or *the deposit and the stay*. That is this paragraph's distinction made into one control rather than left implicit: the walk-in at the counter pays everything, the regular ringing ahead pays the BND 100 and settles on arrival, and both are one form. The deposit alone is the **default**, for the reason it is the default on the customer's own page — it is the smaller commitment and the one the policy is written around, and a default that over-collects records cash nobody handed over. The figure crossing the counter is on the submit button either way.
+
 **[C] Booked-ahead, pay-on-arrival is explicitly excluded from v1.** ~~Staff cannot reserve a unit for a customer who intends to pay cash on the day. Advance bookings require payment, in line with stated policy.~~ **Reversed 10 September 2026 by the client** ([N29](open-questions.md)). It was excluded on the strength of §9.1's full-payment rule, which he has now reversed. What replaces it is not "reserve a unit for nothing": the deposit is real money taken before the unit is held, and a guest who does not turn up loses it (§9.5).
 
 **The adoption risk this section flagged is answered, and it was the right risk to flag.** It read: *if staff currently hold units informally for regular cash customers, v1 removes that ability, and this should be raised with the client before go-live rather than discovered by a front office staff member turning a regular away.* They do, it would have, and the owner said so himself before any staff member had to. The change is the additive one this paragraph predicted — no rework, and no `confirmed_payment_due` state either, because §10.7 made owing money a balance rather than a status.
@@ -609,7 +611,7 @@ All three of the bullets above are built. The public half landed first, for a cu
 
 **Verifying one is the same job as verifying a payment**, so it takes `payment.verify` and mints no new permission string — the position §10.7 and §13 already took. The amount is matched against what the booking **quoted**, not against what it owes, because no other payment moves that figure; a discrepancy needs a written reason exactly as §10.4 requires, and an overpayment is refused as firmly as a short one. It schedules no accounting pack: a pack is assembled when money is verified *against the booking*, and this settles nothing.
 
-**Check-in has three cases now, and the middle one is a judgement.** A deposit already collected means the door takes nothing and says so. **A deposit still only promised is collected at the door** rather than refused — the guest is standing there, an abandoned transfer is exactly when the desk needs the BND 100 in cash, and refusing would send a paying customer away to fix a row. The promise is fulfilled on its own row, so one-deposit-per-booking holds and `promised_at` survives as the record that the customer said they had sent it. **[A]**
+**Check-in has three cases now, and the middle one is a judgement.** A deposit already collected means the door takes nothing and says so. **A deposit still only promised is collected at the door** rather than refused — the guest is standing there, an abandoned transfer is exactly when the desk needs the BND 100 in cash, and refusing would send a paying customer away to fix a row. The promise is fulfilled on its own row, so one-deposit-per-booking holds and `promised_at` survives as the record that the customer said they had sent it. **[A]** *(Superseded 15 September 2026 — the door collects nothing at all; see the as-built block below. The judgement survives in substance: the abandoned transfer is still settled in cash at the desk, from the booking, one screen earlier.)*
 
 **The desk can now take the deposit, and until it could the gap was worse than a missing button.** A customer who transferred the BND 100 and never pressed the button on their own page left a clerk with no correct action: `record_transfer_payment()` raises a *payment* for the outstanding stay, which is both the wrong figure and the wrong kind of money, and recording cash would have put a deposit into the cash-up total §14 deliberately keeps it out of. The only honest workaround was to telephone a guest who had already paid and ask them to click something. `record_booking_deposit()` closes it: **cash is counted and secures the booking on the spot; a transfer is written as a promise and joins the same queue the customer's own button feeds**, verified by the same `verify_deposit()`. The amount is never passed in — it is the booking's quoted figure read under the row lock, exactly as check-in reads it. **[A]**
 
@@ -645,6 +647,24 @@ All three of the bullets above are built. The public half landed first, for a cu
 
 **The statement is a printable page rather than a generated file.** Every browser prints to PDF, staff already forward images over WhatsApp, and a document that is also a URL is one a colleague can open. It renders only once a release is approved, because before that the figures can still move and a statement whose numbers change after it was sent is worse than none.
 
+### As built (capability B16, 15 September 2026) — the deposit secures the booking, and nothing else does
+
+The two slices above built the deposit-secured booking one half at a time, and each left a door open the other did not know about. Three things were still true that §9.1 says are not, and all three are the same mistake seen from different screens: **the deposit was treated as one of several ways money could arrive, rather than as the thing that makes a booking a booking.**
+
+- **The desk form never took it.** It wrote a payment for the stay and left the BND 100 to a receipt saying "record it later", so a booking taken at the counter reached `confirmed` on the stay alone and the money that is supposed to secure it was an errand.
+- **Money for the stay confirmed a booking whose deposit was unverified.** A guest who chose "everything now" raised two rows; verifying the stay's row first confirmed the booking and emailed them while the deposit sat unchecked. A guest who sent the stay and forgot the deposit was confirmed on the wrong money.
+- **Check-in was still a place a deposit got collected**, which is the spreadsheet's habit the reversal of 10 September was meant to end.
+
+**The rule, stated once and enforced in the database.** A booking quoting a deposit is confirmed by that deposit — counted in cash, or verified in the queue — and by nothing else. A booking quoting none is confirmed by paying for it. The stay's money is recorded whenever it arrives and settles the balance, but it moves no booking to `confirmed` while the deposit is owed. `booking_deposit_is_secured()` answers that question under the row lock and `verify_payment()`, `record_cash_payment()` and `check_in_booking()` all ask it, so the rule cannot be got round by a screen — the position §10.4's amount rule already takes. **[A]**
+
+**The desk form takes the deposit as the booking is made**, in the same transaction as the booking, cash or promise — see §9.4's as-built note for the control and its default.
+
+**Check-in collects nothing, and refuses what it cannot check in.** A booking whose quoted deposit is not in hand is turned back with the two honest ways out named on screen: confirm the transfer in the queue, or take the BND 100 in cash from the booking. That reverses the middle case of the block above, and the reasoning that made it a judgement then is what makes this safe now — the cash is still taken at the desk without sending anybody away, one screen earlier and on the booking rather than at the door. What it buys is that "checked in" can no longer mean "we never got the deposit", which is the gap in the spreadsheet this product exists to close. **[A]**
+
+**The ledger gains a stage, because most deposits now belong to guests who have not arrived.** `secured` — *held before arrival* — sits between `awaiting_verification` and `in_house`. Reading a deposit taken at booking as "guest in stay" was the ledger assuming a deposit could only exist because somebody had checked in. A deposit against a booking that was cancelled or never turned up reads `secured` too: the least wrong stage available, because the forfeiture §9.5 describes is [N5](open-questions.md)/[N32](open-questions.md) and still unbuilt. **[A]**
+
+**Every screen that could imply the door takes money now says otherwise** — the walk-in receipt, the booking's Money card, the check-in dialog, the cash log, the verification queue, the deposits ledger and the dashboard's arrivals list. The cash screen in particular says plainly that a security deposit is not recorded there: it goes on its own ledger, from the booking, and putting it through the cash form would bank a liability as takings (§14, [N27](open-questions.md)).
+
 ---
 
 ## 12. Arrival and check-in
@@ -663,6 +683,12 @@ All three of the bullets above are built. The public half landed first, for a cu
 8. Render at minimum 200px with default quiet zone. Error correction level M for screen, H if ever printed.
 
 **[O]** Whether the guardhouse has reliable signal or wifi. If not, today's arrivals list must load once and function from cache.
+
+### As built (15 September 2026)
+
+**Check-in takes no money, and that is the whole of what it does to a booking.** It moves the stay to `checked_in` and nothing else. The security deposit arrived when the booking was made (§9.1, §11), so a guest at the door already has one held — and a booking whose quoted deposit is *not* held is refused rather than made an occasion to collect it, with the way out named on screen. **[A]**
+
+This sharpens requirement 6 rather than changing it. The guard's screen still shows payment status so an unpaid arrival is routed to the office; what is now also true is that an arrival with no deposit cannot be checked in at all, by anybody, until the office has recorded one. The stay's own balance is unaffected — a deposit-secured guest owes the whole stay on arrival and settles it at the desk (§10.7), which is a payment against the booking and not a condition of checking in.
 
 ---
 

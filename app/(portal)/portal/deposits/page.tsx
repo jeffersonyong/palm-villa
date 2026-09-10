@@ -219,7 +219,7 @@ export default async function DepositsPage({ searchParams }: PageProps) {
     <>
       <PageHeader
         title="Deposits"
-        description="Every security deposit the property is holding, what stands against it, and what has been given back."
+        description="Every security deposit the property is holding, what stands against it, and what has been given back. A deposit is taken when a booking is made, so most of what is here belongs to guests who have not arrived yet."
       />
 
       {/* The strip first, straight under the title: it is the screen's
@@ -236,9 +236,10 @@ export default async function DepositsPage({ searchParams }: PageProps) {
       />
 
       {/* The control line, directly above the table it narrows. No primary:
-          a ledger has nothing to create — a deposit is recorded when a guest
-          is checked in — so the right-hand slot holds the one action a ledger
-          does have, which is taking it away as a spreadsheet. */}
+          a ledger has nothing to create — a deposit is recorded when the
+          booking is made, from the booking — so the right-hand slot holds the
+          one action a ledger does have, which is taking it away as a
+          spreadsheet. */}
       <div className="mt-md flex flex-wrap items-center gap-md">
         <DepositsFilters
           stages={stages}
@@ -413,7 +414,7 @@ function LedgerEmptyState({ view, isFiltered }: { view: LedgerView; isFiltered: 
     return (
       <EmptyState
         title="No deposits held"
-        description="A security deposit is recorded when a guest is checked in, and appears here until it has been released."
+        description="A security deposit is recorded when a booking is made — counted at the desk, or verified from the payments queue — and appears here until it has been released."
       />
     )
   }

@@ -41,6 +41,9 @@ import { priceStay } from '@/lib/domain/pricing/stay'
 
 import type { WalkInBookingState } from './actions'
 
+/** What crosses the counter now: the customer's two answers (prd.md §10.3). */
+type PayingNow = 'deposit_only' | 'everything'
+
 /**
  * The walk-in booking form (capability B2).
  *
@@ -121,6 +124,12 @@ export function BookingForm({
   // prd.md §10.1 [C]'s two methods. Cash confirms outright; a transfer is paid
   // but not yet seen, so it goes to the verification queue (§10.3).
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  // The customer's two answers (prd.md §10.3), given here on their behalf.
+  // The deposit alone is the default for the reason it is on the public page:
+  // it is the smaller commitment and the one the policy is written around,
+  // and the button below states the figure either way, so the safer default
+  // is the one that cannot record cash nobody handed over.
+  const [payingNow, setPayingNow] = useState<PayingNow>('deposit_only')
   const [discount, setDiscount] = useState<DiscountValue>(NO_DISCOUNT)
   const [waiver, setWaiver] = useState<DepositWaiverValue>(NO_WAIVER)
 
@@ -142,6 +151,14 @@ export function BookingForm({
         config,
       )
     : null
+
+  // What crosses the counter now. A waived booking has nothing to secure it
+  // but the stay, so the choice collapses to the stay — the same rule the
+  // customer's page and the write path apply (prd.md §10.3).
+  const depositNow = quote?.ok && !waiver.waived ? quote.securityDeposit : 0
+  const takesDeposit = depositNow > 0
+  const paysStay = !takesDeposit || payingNow === 'everything'
+  const payingTotal = depositNow + (paysStay && quote?.ok ? quote.total : 0)
 
   return (
     <form
@@ -270,26 +287,74 @@ export function BookingForm({
         </FormSection>
 
         <FormSection title="Payment">
-          <div className="grid gap-sm">
-            <Label htmlFor="paymentMethod">Method</Label>
-            <Select
-              name="paymentMethod"
-              value={paymentMethod}
-              onValueChange={(next) => setPaymentMethod(next as PaymentMethod)}
-            >
-              <SelectTrigger id="paymentMethod" className="w-[280px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash — collected now</SelectItem>
-                <SelectItem value="bank_transfer">Bank transfer — verify later</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-caption text-muted-foreground">
-              {paymentMethod === 'cash'
-                ? 'The booking is confirmed as soon as it is created.'
-                : 'The guest quotes the booking reference in the transfer. The booking waits in the verification queue until someone checks the bank.'}
-            </p>
+          {/* Two answers, then the method — the order a clerk asks them in:
+              "just the deposit, or the whole stay?", then "cash or transfer?".
+              The figures sit in the options so the amount being taken is
+              chosen rather than worked out; the button on the price card
+              repeats it. */}
+          <div className="flex flex-wrap items-start gap-lg">
+            {/* Each column is its control's width, so the caption wraps under
+                the thing it explains rather than stretching the column and
+                pushing the second question onto its own row. */}
+            <div className="grid w-[300px] gap-sm">
+              <Label htmlFor="payingNow">Paying now</Label>
+              {takesDeposit ? (
+                <Select
+                  name="payingNow"
+                  value={payingNow}
+                  onValueChange={(next) => setPayingNow(next as PayingNow)}
+                >
+                  <SelectTrigger id="payingNow" className="w-[300px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="deposit_only">
+                      Deposit only — BND {formatCents(depositNow)}
+                    </SelectItem>
+                    <SelectItem value="everything">
+                      Deposit and the stay — BND{' '}
+                      {formatCents(depositNow + (quote?.ok ? quote.total : 0))}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <>
+                  <input type="hidden" name="payingNow" value="everything" />
+                  <p id="payingNow" className="text-body-sm text-foreground tabular-nums">
+                    The stay — BND {formatCents(quote?.ok ? quote.total : 0)}
+                  </p>
+                </>
+              )}
+              <p className="text-caption text-muted-foreground">
+                {takesDeposit
+                  ? payingNow === 'deposit_only'
+                    ? 'The deposit secures the booking. The stay is settled when the guest arrives.'
+                    : 'Nothing is owed on arrival.'
+                  : 'No deposit is quoted, so the stay is what secures the booking.'}
+              </p>
+            </div>
+
+            <div className="grid w-[280px] gap-sm">
+              <Label htmlFor="paymentMethod">Method</Label>
+              <Select
+                name="paymentMethod"
+                value={paymentMethod}
+                onValueChange={(next) => setPaymentMethod(next as PaymentMethod)}
+              >
+                <SelectTrigger id="paymentMethod" className="w-[280px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash — counted now</SelectItem>
+                  <SelectItem value="bank_transfer">Bank transfer — verify later</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-caption text-muted-foreground">
+                {paymentMethod === 'cash'
+                  ? 'Counted now, so the booking is confirmed as soon as it is created.'
+                  : 'The guest quotes the booking reference in the transfer. The booking waits in the verification queue until someone checks the bank.'}
+              </p>
+            </div>
           </div>
         </FormSection>
 
@@ -327,8 +392,10 @@ export function BookingForm({
 
             <Notice className="mt-lg">
               {waiver.waived
-                ? 'No security deposit — waived on this booking. Nothing is held against the stay.'
-                : `Plus BND ${formatCents(quote.securityDeposit)} refundable security deposit, which secures the booking. Record it from the booking once it is made.`}
+                ? 'No security deposit — waived on this booking. Nothing is held against the stay, so the stay is paid now.'
+                : paysStay
+                  ? `Plus BND ${formatCents(quote.securityDeposit)} refundable security deposit, taken now with the stay. Nothing is owed on arrival.`
+                  : `Plus BND ${formatCents(quote.securityDeposit)} refundable security deposit, which secures the booking and is taken now. The BND ${formatCents(quote.total)} for the stay is settled on arrival.`}
             </Notice>
           </>
         ) : (
@@ -337,12 +404,15 @@ export function BookingForm({
           </Callout>
         )}
 
+        {/* The figure crossing the counter is on the button, so a clerk who
+            left the choice above on its default is told what is about to be
+            recorded before it is. */}
         <Button type="submit" className="mt-lg w-full" disabled={isPending || !quote?.ok}>
           {isPending
             ? 'Creating…'
             : paymentMethod === 'cash'
-              ? 'Create & take payment'
-              : 'Create & await transfer'}
+              ? `Create & take BND ${formatCents(payingTotal)}`
+              : `Create & await BND ${formatCents(payingTotal)}`}
         </Button>
 
         {state.status === 'error' ? <FieldError className="mt-md" message={state.message} /> : null}

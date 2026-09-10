@@ -180,14 +180,17 @@ function RecordDepositDialog({
                 BND {formatCents(quoted)} goes on the deposit ledger as money the property holds and
                 owes back after the stay.{' '}
                 {securesBooking
-                  ? 'This confirms the booking — the stay itself is still settled on arrival.'
+                  ? 'This confirms the booking. What the stay owes is unchanged by it.'
                   : 'The booking is already confirmed, so nothing about it moves.'}
               </>
             ) : (
               <>
                 A BND {formatCents(quoted)} transfer will appear in the verification queue. Nothing
                 is held until someone checks the bank and confirms it
-                {securesBooking ? ', and the unit stays held until then' : ''}.
+                {securesBooking
+                  ? ' — the unit stays held until then, and the booking is confirmed by that'
+                  : ''}
+                .
               </>
             )}
           </Notice>

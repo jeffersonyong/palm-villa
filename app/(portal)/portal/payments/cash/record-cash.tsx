@@ -27,6 +27,13 @@ import { recordCashAction, type RecordCashState } from './actions'
 /**
  * Recording cash against a booking (capability B7).
  *
+ * Money for the **stay**, never the security deposit: that is taken from the
+ * booking itself, where it goes onto its own ledger rather than into the
+ * day's takings (prd.md §11, §14), and it is what confirms a booking. Said in
+ * the dialog rather than only here, because this screen's reference field
+ * accepts any booking and a clerk holding BND 100 has to be told where it
+ * goes.
+ *
  * One shot, no live lookup. Showing the booking's total once the reference
  * resolves would need a round trip on every keystroke, and the confirmation
  * toast names the booking and the amount — so a mistyped reference is caught
@@ -65,7 +72,9 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
       toast({
         tone: 'positive',
         title: `BND ${formatCents(state.recorded.amount)} recorded`,
-        description: `Cash against ${state.recorded.reference}`,
+        description: state.recorded.awaitingDeposit
+          ? `Cash against ${state.recorded.reference} — it is confirmed once its deposit is`
+          : `Cash against ${state.recorded.reference}`,
       })
       onClose()
       router.refresh()
@@ -84,8 +93,8 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
         <DialogHeader>
           <DialogTitle>Record cash</DialogTitle>
           <DialogDescription>
-            Recorded as collected now, by you. If the booking was waiting on a transfer, this
-            settles it.
+            Money for a stay, recorded as collected now, by you. The security deposit is not
+            recorded here — it is taken from the booking itself, and it is what confirms one.
           </DialogDescription>
         </DialogHeader>
 
@@ -150,8 +159,9 @@ function RecordCashDialog({ onClose }: { onClose: () => void }) {
           ) : null}
 
           <Notice>
-            This records the cash and settles that much of what the booking owes. It does not
-            reconcile against banked amounts — the daily cash-up is a separate screen.
+            This records the cash and settles that much of what the booking owes for its stay. A
+            booking still waiting on its security deposit stays waiting until that is taken. It does
+            not reconcile against banked amounts — the daily cash-up is a separate screen.
           </Notice>
 
           {state.status === 'error' && !needsReason ? <FieldError message={state.message} /> : null}

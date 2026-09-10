@@ -103,7 +103,7 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
     <>
       <PageHeader
         title="Cash payments"
-        description="Cash collected on site, recorded against a booking — who took it, when, and how much."
+        description="Cash collected on site for a stay, recorded against a booking — who took it, when, and how much. A security deposit taken in cash is not here: it goes on the deposit ledger, recorded from the booking."
       />
 
       <div className="mt-xl flex flex-wrap items-center gap-md">

@@ -82,7 +82,7 @@ export type StayPricingResult =
       nights: number
       lines: readonly BookingLine[]
       total: Cents
-      /** Refundable, collected on arrival. Not part of `total`. */
+      /** Refundable, collected when the booking is made. Not part of `total`. */
       securityDeposit: Cents
     }
   | { ok: false; error: StayPricingError }

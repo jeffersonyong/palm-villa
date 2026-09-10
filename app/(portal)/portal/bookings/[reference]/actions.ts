@@ -241,6 +241,11 @@ export interface RecordPaymentState {
     method: PaymentMethod
     /** Null for a transfer, which has been promised rather than counted. */
     amount: number | null
+    /**
+     * Cash settled the stay against a booking still waiting on its deposit,
+     * which is what confirms it — so the toast says the booking is not yet.
+     */
+    awaitingDeposit: boolean
   }
   /** Echoed back so a refusal does not empty the form. */
   submitted?: { amount: string; amountOverrideReason: string }
@@ -291,7 +296,10 @@ export async function recordPaymentAction(
 
     revalidateBooking(booking.reference)
 
-    return { status: 'done', recorded: { method: 'bank_transfer', amount: null } }
+    return {
+      status: 'done',
+      recorded: { method: 'bank_transfer', amount: null, awaitingDeposit: false },
+    }
   }
 
   const amount = centsFromInput(input.amount)
@@ -333,12 +341,16 @@ export async function recordPaymentAction(
   scheduleAccountingPack(booking.id)
 
   // And the same test for the confirmation email (capability A8): the guest
-  // hears once, when the booking actually becomes confirmed.
+  // hears once, when the booking actually becomes confirmed — which, for a
+  // booking quoting a deposit, is when the deposit is taken, not here.
   if (recorded.confirmedNow) {
     scheduleBookingConfirmedEmail(booking.id)
   }
 
-  return { status: 'done', recorded: { method: 'cash', amount } }
+  return {
+    status: 'done',
+    recorded: { method: 'cash', amount, awaitingDeposit: recorded.awaitingDeposit },
+  }
 }
 
 const recordDepositSchema = z.object({

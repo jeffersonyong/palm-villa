@@ -150,7 +150,8 @@ export interface PropertyConfig {
   // --- Deposit (prd.md §11) ------------------------------------------------
 
   /**
-   * [C] BND 100, refundable, collected on arrival (prd.md §11).
+   * [C] BND 100, refundable, collected when the booking is made — it is what
+   * secures the booking (prd.md §9.1, §11).
    *
    * Named `securityDeposit` deliberately and never just "deposit": prd.md §9.5
    * N5 flags that "the deposit is forfeited on cancellation" is ambiguous

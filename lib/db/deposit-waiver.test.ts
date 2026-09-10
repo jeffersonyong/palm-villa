@@ -76,7 +76,7 @@ describe('a booking with the security deposit waived', () => {
   test('checks in without writing a deposit row', async () => {
     const booking = await givenBooking({ unitRef: '3B-02', ...STAY, depositWaiverReason: REASON })
 
-    const result = await checkInBooking({ bookingId: booking.id, method: 'cash', actorId: null })
+    const result = await checkInBooking({ bookingId: booking.id, actorId: null })
 
     expect(result.ok).toBe(true)
 

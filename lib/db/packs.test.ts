@@ -20,7 +20,12 @@ import {
 import { verifyPayment } from './payments'
 import { currentPropertyId } from './property'
 import { auditEventsFor } from './test/inspect'
-import { TEST_PDF, givenDocument, givenTransferBooking } from './test/factory'
+import {
+  TEST_PDF,
+  givenConfirmedTransferBooking,
+  givenDocument,
+  givenTransferBooking,
+} from './test/factory'
 
 /**
  * Packs against the real stack (capability G5).
@@ -68,7 +73,9 @@ async function packObjectExists(storageKey: string): Promise<boolean> {
 }
 
 async function givenSettledBooking(unitRef = '3B-01') {
-  const { booking, payment } = await givenTransferBooking({
+  // The deposit verified first, which is what confirms the booking; the
+  // stay's transfer then settles it.
+  const { booking, payment } = await givenConfirmedTransferBooking({
     unitRef,
     checkIn: TOMORROW,
     checkOut: NEXT_WEEK,

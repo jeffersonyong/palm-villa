@@ -410,7 +410,9 @@ function InspectionSection({
           <p className="text-body-sm text-muted-foreground">
             {deposit.bookingStatus === 'completed'
               ? 'Nobody has inspected the unit yet. The deposit cannot be released until somebody has.'
-              : 'The guest is still in the unit. It is inspected after they check out.'}
+              : deposit.bookingStatus === 'checked_in'
+                ? 'The guest is still in the unit. It is inspected after they check out.'
+                : 'The guest has not arrived yet. The unit is inspected after they check out.'}
           </p>
 
           {mayInspect ? (
@@ -585,7 +587,9 @@ function OwedSection({
  * A booking exists but nothing has been collected against it.
  *
  * Not a 404: the URL is right and the reader followed a real link. What is
- * missing is a check-in, and saying so is more use than "not found".
+ * missing is the deposit itself, and saying where it is taken is more use
+ * than "not found" — it is taken from the booking, and until it is, that
+ * booking cannot be checked in (prd.md §11, §12).
  */
 async function NoDepositYet({ reference }: { reference: string }) {
   const booking = await getBookingByReference(reference)
@@ -602,7 +606,7 @@ async function NoDepositYet({ reference }: { reference: string }) {
         title="No deposit has been collected yet"
         description={
           booking.securityDeposit > 0
-            ? `The BND ${formatCents(booking.securityDeposit)} security deposit on this booking has not been taken yet. It secures the booking, and is recorded from the booking itself — or at the door if it arrives no sooner.`
+            ? `The BND ${formatCents(booking.securityDeposit)} security deposit on this booking has not been taken yet. It is what secures the booking, and it is recorded from the booking itself — in cash, or as a transfer for the queue to verify. Nothing is collected at check-in.`
             : 'This booking quotes no security deposit, so nothing is collected against it.'
         }
         action={
