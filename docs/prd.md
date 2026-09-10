@@ -149,6 +149,10 @@ Availability, pricing, booking, payment instructions, slip upload, booking looku
 
 **As built (capabilities A1–A4, 13 September 2026).** Three screens, and they are the first writes in the product with no staff member behind them. `/stay` shows what is free on every night for the advance window with that unit type’s rate on each night, prices the stay as the customer builds it, and holds a unit. `/day-pass` sells a pass for a day. `/booking/{token}` is the customer’s way back to their own booking, carrying the reference, the amount and the bank accounts.
 
+**As built (capabilities A9 and A10, 16 September 2026).** Two more screens, and between them they close the customer surface's self-service loop. `/find-booking` takes the reference from a transfer and the phone number a booking was made with, and opens that booking — **including a booking taken at the desk, which is given a link the first time somebody asks for one.** Until the confirmation email is switched on (register N42) this is the only route back to a booking whose link has been lost, and it is the only route at all for a walk-in guest. `/faq` answers what guests ask before they book, with every rate, time, facility and bank account read live from Property settings rather than written into the copy — the drift the landing page's own day-pass line already has is the thing that rule exists to prevent.
+
+**The FAQ marks what it cannot answer rather than omitting it.** Eight questions a guest would obviously ask are open items in the register, and each carries a visible "to confirm" marker beside the part of the answer that is confirmed. Writing the page is what raised **N44** (whether a stay includes facility use), **N45** (whether cancelling early costs less) and **N46** (house rules), none of which any document answered. **[A]**
+
 **The customer chooses a type; the system assigns the door.** §7.1 records that units of one type are not interchangeable because bed configurations differ, and N9 assumes staff assign. A public form offering a choice of door would give away a decision nobody has agreed to give away, so `create_public_stay_booking()` walks the free units of the type in reference order and takes the first the exclusion constraint accepts. The desk moves it with an ordinary amendment. **[A]**
 
 **A unit type with no units is not offered.** The 2-bedroom has none until N1 is answered, and a customer shown sixty-two nights of "Full" would read that as a property with nothing free rather than a type nobody has counted. **[A]**
@@ -502,6 +506,8 @@ Every booking generates a unique, human-readable payment reference (for example 
 
 This is the highest-leverage detail in the payment design. It turns verification from name-matching into a direct lookup, and it is the prerequisite for automated statement matching later.
 
+**Since 16 September 2026 it is also a lookup key for the customer** (capability A9): the reference plus the phone number a booking was made with opens that booking. That gives the format's one weakness a consequence it did not have before — a reference short enough to type into a transfer description is short enough to enumerate, and they are issued in sequence. It is not a secret and was never treated as one (architecture.md §3 keeps it out of every URL for exactly this reason); what protects a booking is the phone number beside it, and a limit on how many attempts one device or one reference gets. The figures are unagreed and sit in the register as **N47**.
+
 ### 10.3 Transfer flow
 
 1. Customer completes booking and selects bank transfer.
@@ -701,6 +707,8 @@ This sharpens requirement 6 rather than changing it. The guard's screen still sh
 **[C] Two emails are sent to that address, and never a third** (14 September 2026, capability A8's email half — see [architecture.md §9](architecture.md)). One when the booking is made, carrying the reference, the amounts and the bank accounts; one when the money is verified. The field's own hint on the form says *"For your confirmation. We will not email you anything else"*, which makes this a **standing constraint on every later slice** rather than a preference: a reminder, a receipt per payment or anything marketing would break a promise the customer was shown as they typed. It is also why the optionality above still holds — a booking with no address is confirmed by phone, as it is today, and the desk is told which bookings those are.
 
 Nothing is actually delivered until a sending domain is verified, which is [N42](open-questions.md) and architecture.md §13 item 1.
+
+**[A] The phone number is now compared as well as rung, and it is never rewritten** (16 September 2026, capability A9). It has always been stored exactly as typed, and it stays that way — a number the desk dials is a number a person wrote down, and normalising on the way in would rewrite the record of what the guest actually gave. What changed is that it is now half of a credential, so `lib/domain/phone.ts` compares both sides after collapsing the spellings that genuinely appear in one dataset: spacing, punctuation, leading zeros and the local `673`. Nothing else — no partial matching, no other country code assumed — because a match that is merely close opens somebody else's booking. See [architecture.md §5.1](architecture.md).
 
 **[A] A booking records every vehicle arriving on it, and the guest with no car says so explicitly.** §6.2 already sketches vehicle registrations as a list, and §12.5 makes plate lookup the guard's primary path — a family arriving in two cars has one of them unfindable at the gate if only one plate is stored. Two assumptions sit on top of the [C] above, neither confirmed with Jason:
 

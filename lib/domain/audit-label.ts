@@ -44,6 +44,7 @@ export interface AuditEventLike {
 export const KNOWN_AUDIT_ACTIONS = [
   'booking.created_walk_in',
   'booking.created_public',
+  'booking.link_issued',
   'booking.amended',
   'booking.discounted',
   'booking.hold',
@@ -188,6 +189,11 @@ const ACTION_LABELS: Readonly<Record<string, string>> = {
   // difference that is not there.
   'booking.secure_with_deposit': 'Booking confirmed',
   'booking.submit_payment': 'Sent for verification',
+  // The clause after the dash is doing work the actor column cannot. This
+  // event has no actor — the customer did it — and `EventHistory` renders a
+  // null actor as "System", which would read as the property issuing itself a
+  // link. Naming how it was found is what says a person asked for it.
+  'booking.link_issued': 'Booking link issued — found by reference and phone',
   'booking.expire': 'Hold expired',
   'booking.mark_no_show': 'Marked no-show',
   'booking.hold': 'Held',

@@ -119,26 +119,31 @@ export { contact } from '@/lib/domain/contact'
  * the page surfaces the questions instead of hiding them. Each entry is
  * deleted once the answer lands in the PRD.
  */
-export const pendingDayPassDetails = [
-  'Child and adult age bands',
-  'What the family bundles cover',
-  'Opening hours',
-]
+export const pendingDayPassDetails = ['What the family bundles cover', 'Opening hours']
 
 /**
  * The last three were per-unit markers on the landing grid until 2026-08-27.
- * They read as missing facts, but each is a policy question (PRD §18 N2, N9,
- * N1) rather than a per-unit unknown — max pax and bed configurations are
- * confirmed in PRD §7.1 — so they belong on the stay detail, asked once, not
- * repeated on four marketing cards.
+ * They read as missing facts, but each is a policy question (N2, N9, N1)
+ * rather than a per-unit unknown — max pax and bed configurations are
+ * confirmed in prd.md §7.1 — so they belong on the stay detail, asked once,
+ * not repeated on four marketing cards.
+ *
+ * **Three markers were removed on 2026-09-16, a week after their answers
+ * landed.** Check-in and check-out times (N6) and whether the deposit comes
+ * back on a cancellation (N5) were both answered on 10 September, and the
+ * day-pass age bands (N3, part) on 5 September — and all three are now stated
+ * plainly on the FAQ from live settings. A marker outliving its answer is not
+ * a harmless leftover: it puts two contradictory claims on one site, where
+ * one page says a thing is unknown and another quotes the figure.
+ *
+ * `app/(public)/_content/faq.ts` is now the other renderer of these same open
+ * items. When one is answered, both lists lose it.
  */
 export const pendingStayDetails = [
-  'Check-in and check-out times',
-  'Cancellation policy',
-  'Whether the BND 100 deposit is refunded on cancellation',
-  'Whether stated guest limits are a hard cap or a surcharge threshold',
-  'Whether guests can request a bed configuration',
-  'How many 2-bedroom units there are',
+  'Cancellation notice period',
+  'Guest limit — cap or surcharge',
+  'Bed setup requests',
+  'How many 2-bedroom units',
 ]
 
 /** Display strings shared by the landing sections and the stub routes. */

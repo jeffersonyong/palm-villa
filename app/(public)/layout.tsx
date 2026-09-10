@@ -109,6 +109,12 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                   <Link href="/#long-term">Long-term enquiry</Link>
                 </li>
                 <li>
+                  <Link href="/find-booking">Find your booking</Link>
+                </li>
+                <li>
+                  <Link href="/faq">Questions</Link>
+                </li>
+                <li>
                   <a href={contact.whatsappUrl} target="_blank" rel="noreferrer">
                     WhatsApp
                   </a>

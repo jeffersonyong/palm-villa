@@ -1,14 +1,16 @@
 import { newAccessToken } from '@/lib/auth/access-token'
 import type { DateRange } from '@/lib/domain/availability'
+import { normalisePublicReference } from '@/lib/domain/booking-reference'
 import { transition } from '@/lib/domain/booking-state'
 import type { StayDate } from '@/lib/domain/dates'
 import type { DayPassPartyLine } from '@/lib/domain/day-pass-capacity'
 import type { BookingLine } from '@/lib/domain/lines'
 import type { Cents } from '@/lib/domain/money'
+import { phonesMatch } from '@/lib/domain/phone'
 import { isAccessToken, PUBLIC_LIMITS, type TransferChoice } from '@/lib/domain/public-booking'
 import { dataClient } from '@/lib/supabase/data'
 
-import { getBookingById, type Booking } from './bookings'
+import { getBookingById, getBookingByReference, type Booking } from './bookings'
 import { currentPropertyId } from './property'
 
 /**
@@ -395,4 +397,113 @@ export async function submitPublicTransfer(
       amount: result.amount_cents,
     },
   }
+}
+
+export interface PublicBookingLink {
+  /** The token that opens `/booking/{token}` — existing, or minted just now. */
+  token: string
+  /** The reference as it is stored, for the caller's own logging. */
+  reference: string
+}
+
+/**
+ * A customer's own booking, by the reference on their transfer and the number
+ * they booked with (capability A9).
+ *
+ * The one read on this surface with no token behind it, and the reason the
+ * screen exists: the confirmation email is switched off until N42 answers, so
+ * a customer who closes the tab has no link, and a customer who booked at the
+ * counter never had one.
+ *
+ * **Reference first, then the phone compared in TypeScript.** The phone rule
+ * cannot go into SQL without becoming a second copy of `lib/domain/phone.ts`,
+ * which is the argument architecture.md §5 already makes for `unit.status` and
+ * the reporting reads. There is nothing to gain by pushing it down either:
+ * `reference` is unique per property, so this reads exactly one row, and
+ * `SUMMARY_COLUMNS` already carries both `guest_phone` and `access_token`.
+ *
+ * **Every refusal is the same refusal.** A malformed reference, an unknown
+ * one and a wrong number all return `not_found`, and the action above renders
+ * one sentence for the three — architecture.md §3's rule for the token page
+ * ("a malformed token and an unknown one render the same 404 so a guesser
+ * learns nothing from the difference") applied one rung out. A message naming
+ * *which* half was wrong would confirm that a booking exists, which is the
+ * only thing worth learning from this endpoint.
+ *
+ * The unknown-reference branch does return sooner than the wrong-phone one,
+ * so the two differ by a string compare. That is deliberate rather than
+ * overlooked: the defence against a guesser here is the counters in the action
+ * and the identical message, not a constant-time compare, which would buy
+ * nothing against an attacker who can already see the network.
+ *
+ * A **closed** booking is found like any other and gets its link. `/booking/
+ * {token}` renders `CLOSED_REASONS`, and somebody looking up a booking that
+ * was cancelled is exactly who needs to read why.
+ */
+export async function findBookingLink(input: {
+  reference: string
+  phone: string
+}): Promise<PublicWriteResult<PublicBookingLink>> {
+  const reference = normalisePublicReference(input.reference)
+
+  if (reference === null) {
+    return refuse('not_found')
+  }
+
+  const booking = await getBookingByReference(reference)
+
+  if (!booking || !phonesMatch(input.phone, booking.guestPhone)) {
+    return refuse('not_found')
+  }
+
+  if (booking.accessToken) {
+    return { ok: true, data: { token: booking.accessToken, reference: booking.reference } }
+  }
+
+  return issueAccessToken(booking.id, booking.reference)
+}
+
+/**
+ * Gives a booking that has no link one, and records that it happened.
+ *
+ * Only ever reached for a booking taken at the desk, or one created before
+ * tokens existed. The SQL function is idempotent — it hands back a token
+ * already on the row and writes nothing — so the race between two customers
+ * looking up the same booking resolves to one token and one history row
+ * rather than two of each.
+ *
+ * The retry is for `token_collision`, which at 128 bits means the generator
+ * repeated itself. Once: a second collision is not a coincidence, and a loop
+ * that keeps trying against a broken generator is a worse failure than a
+ * message asking the customer to try again.
+ */
+async function issueAccessToken(
+  bookingId: string,
+  reference: string,
+): Promise<PublicWriteResult<PublicBookingLink>> {
+  const propertyId = await currentPropertyId()
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { data, error } = await dataClient().rpc('issue_booking_access_token', {
+      p_property_id: propertyId,
+      p_booking_id: bookingId,
+      p_token: newAccessToken(),
+    })
+
+    if (error) {
+      throw new Error(`Could not issue a link for that booking: ${error.message}`)
+    }
+
+    const result = data as { ok: boolean; error?: PublicWriteErrorCode; access_token?: string }
+
+    if (result.ok && result.access_token) {
+      return { ok: true, data: { token: result.access_token, reference } }
+    }
+
+    if (result.error !== 'token_collision') {
+      return refuse(result.error ?? 'not_found')
+    }
+  }
+
+  return refuse('token_collision')
 }

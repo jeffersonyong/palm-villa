@@ -34,8 +34,8 @@ Everyone works from the same live data, so availability, payments, and booking s
 | A6 | Upload their transfer slip directly, instead of sending it over WhatsApp |
 | A7 | Provide guest details and identity document as part of the booking, replacing the paper/WhatsApp collection step |
 | A8 | Receive booking confirmation and an entry QR code by email — delivered as a forwardable image so staff can also send it in an existing WhatsApp conversation — **email half delivered 14 September 2026; the QR travels with the security screen (D3), see the notes below** |
-| A9 | Look up their own booking any time using booking reference + phone number |
-| A10 | Get answers to common questions from a self-serve FAQ page |
+| A9 | Look up their own booking any time using booking reference + phone number — **delivered 16 September 2026** |
+| A10 | Get answers to common questions from a self-serve FAQ page — **delivered 16 September 2026, see the notes below on what it cannot yet answer** |
 | A11 | Browse a public landing page presenting the day-pass facilities, the unit types and "from" rates, with an enquiry route for long-term lets — **(proposed 27 August 2026, pending client agreement — not yet part of the quoted delivery)** |
 
 > **A4 is now secured by the deposit, like B16.** The owner confirmed on 10 September 2026 that a booking is held by the BND 100 security deposit with the stay paid on arrival, which is how the business already works. The public flow asks a customer for the deposit rather than the whole stay; everything else about A4 is unchanged.
@@ -54,7 +54,16 @@ Everyone works from the same live data, so availability, payments, and booking s
 > - **The public site is defended without a CAPTCHA.** A hidden field, a request counter, and a cap on how many unpaid bookings one phone number may hold at once. The last is the one that protects rooms; the numbers behind all three are in the register.
 > - **The 2-bedroom is not on sale.** It has no units until the count is agreed, so it is not offered rather than shown as full on every night.
 >
-> **Still to come on this surface:** the customer uploading their transfer slip (A6) and identity document (A7), the entry QR code (A8's other half), looking a booking up by reference and phone (A9), and the FAQ (A10).
+> **Still to come on this surface:** the customer uploading their transfer slip (A6) and identity document (A7), and the entry QR code (A8's other half).
+
+> **A9 and A10 delivered 16 September 2026.** A customer who has lost the link to their booking types the reference from their transfer and the phone number they booked with, and lands on their booking. A visitor who has not booked yet reads the answers to the questions guests actually ask, with every rate and time on the page read live from Property settings.
+>
+> Four things worth saying plainly:
+>
+> - **A9 matters more than its one line suggests, because the email is off.** The confirmation email is built and switched off until the sending domain is agreed (register N42), so until then a customer who closes the tab has *no* route back to their booking. A9 is that route.
+> - **A booking taken at the desk gets a link the first time somebody looks it up.** Walk-in bookings have never had one and never needed one; a guest who rings up asking to see their booking is the case that changes that. The link is created on the spot, the same link every time afterwards, and the booking's history records that it was issued and how it was found.
+> - **Somebody who knows a reference and the number it was booked with can open that booking.** That is the capability, stated plainly. A reference is short and sequential because it has to be typed into a bank transfer, so the phone number is what actually protects the booking, backed by a limit on how many attempts one device or one reference gets. **The figures are in the register (N47) and nobody has agreed them.**
+> - **The FAQ answers only what has been confirmed, and says so where it has not.** Eight questions a guest would obviously ask are open items — what a stay includes at the facilities, whether cancelling early costs less, house rules, opening hours, and four more — and each is on the page as a visible "to confirm" marker rather than an invented answer. **The count of those markers is the count of questions still with the client**, and four new ones (N44–N47) were raised by writing the page. It also deliberately does not repeat the booking page's promise of a confirmation email and an entry QR code, because neither exists yet and a search-indexed page saying so is a phone call to the desk.
 
 ---
 
