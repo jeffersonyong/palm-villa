@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/portal/page-header'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { DateField } from '@/components/ui/date-field'
+import { StayRangeField } from '@/components/ui/stay-range-field'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -33,12 +33,15 @@ export const metadata: Metadata = {
  * can keep a set of dates open in a tab, or share the link. Everything up to
  * the price panel is a server component; only the form island is interactive.
  *
- * Check-in and check-out stay two fields rather than one range control: the
- * range picker's ends are inclusive, and these two are the half-open occupancy
- * pair the database is asked about, so collapsing them would either change what
- * the form means or need a conversion sitting invisibly inside it. Both are
- * `DateField`, so they open this system's calendar rather than the browser's,
- * and the booking window is enforced on the grid instead of after the fact.
+ * Check-in and check-out are **one control**, not two fields. They were two
+ * because the filter's range picker has inclusive ends and these are the
+ * half-open occupancy pair the database is asked about, so collapsing them onto
+ * that control would have meant a conversion sitting invisibly inside the form.
+ * `StayRangeField` is the answer to that rather than a way around it: its
+ * second click *is* the check-out morning, so the range it emits is the pair
+ * the query wants, and the trigger says the nights out loud. What the two
+ * fields could express and this cannot is the whole point — a check-out before
+ * a check-in, or one half filled in.
  */
 
 /** The "no unit type filter" option's value. See the select below. */
@@ -153,24 +156,30 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
         ) : null}
 
         <form method="get" className="flex flex-wrap items-end gap-lg">
-          <div className="grid w-[164px] gap-sm">
-            <Label htmlFor="from">Check-in</Label>
-            <DateField
-              id="from"
-              name="from"
-              defaultValue={checkIn || today}
+          {/* One control, two params. The window is the booking window from
+              the property config, and the extra day on `max` is the check-out
+              morning of a stay whose last bookable night is the last day of
+              it — a departure is not a night, so it may sit one day past. */}
+          {/* Wide enough for the longest thing it can say — a stay crossing a
+              month boundary, with its nights — because truncating the count is
+              worse than the field being a little roomy on a short one. */}
+          <div className="grid w-[300px] gap-sm">
+            <Label htmlFor="stay">Stay</Label>
+            <StayRangeField
+              id="stay"
+              nameFrom="from"
+              nameTo="to"
+              // Tonight, as the two fields opened. The walk-in at the counter
+              // is the case this screen is for, and the empty state above says
+              // what to do, so the default is a starting point rather than a
+              // claim: pressing Check availability without touching it asks
+              // the question a walk-in is asking.
+              defaultValue={
+                hasDates
+                  ? { start: checkIn, end: checkOut }
+                  : { start: today, end: addDays(today, 1) }
+              }
               min={today}
-              max={addDays(today, config.maxAdvanceBookingDays)}
-            />
-          </div>
-
-          <div className="grid w-[164px] gap-sm">
-            <Label htmlFor="to">Check-out</Label>
-            <DateField
-              id="to"
-              name="to"
-              defaultValue={checkOut || addDays(today, 1)}
-              min={addDays(today, 1)}
               max={addDays(today, config.maxAdvanceBookingDays + 1)}
             />
           </div>
