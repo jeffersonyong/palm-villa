@@ -42,6 +42,7 @@ import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
 
 import { AttachDocument } from '../../documents/attach-document'
 import { DocumentRow } from '../../documents/document-row'
+import { DepositActions } from '../../payments/payment-actions'
 
 import { AddCharge, WaiveCharge } from './charge-actions'
 import { ApproveRelease, SettleOwed } from './deposit-actions'
@@ -229,7 +230,11 @@ export default async function DepositPage({ params, searchParams }: PageProps) {
       {/* `lg`, one step under the sections' `xl`: a title sits closer to its
           content than two cards sit to each other. */}
       <div className="mt-lg grid gap-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <DepositFigures deposit={deposit} actorNames={actorNames} />
+        <DepositFigures
+          deposit={deposit}
+          actorNames={actorNames}
+          mayVerify={hasPermission(actor.permissions, 'payment.verify')}
+        />
         <InspectionSection
           deposit={deposit}
           actorNames={actorNames}
@@ -270,9 +275,12 @@ export default async function DepositPage({ params, searchParams }: PageProps) {
 function DepositFigures({
   deposit,
   actorNames,
+  mayVerify,
 }: {
   deposit: Deposit
   actorNames: ReadonlyMap<string, string>
+  /** Whether this viewer may say what the bank showed, while a transfer is awaited. */
+  mayVerify: boolean
 }) {
   const { figures, release } = deposit
 
@@ -315,6 +323,24 @@ function DepositFigures({
 
       {release?.note ? (
         <p className="mt-lg text-body-sm text-copy">&ldquo;{release.note}&rdquo;</p>
+      ) : null}
+
+      {/* The screen that states the wait is a screen that can end it. The
+          field above says "Transfer awaited" and this is the answer to it —
+          the same dialog the payments queue opens, because it is the same act
+          against the same row. Taking it in cash instead is not offered here:
+          that is money crossing a counter, which belongs on the booking where
+          the rest of the desk's work is. */}
+      {mayVerify && deposit.collectedAt === null ? (
+        <div className="mt-lg">
+          <DepositActions
+            depositId={deposit.id}
+            bookingReference={deposit.bookingReference}
+            guestName={deposit.guestName}
+            due={deposit.amount}
+            placement="section"
+          />
+        </div>
       ) : null}
     </SectionCard>
   )

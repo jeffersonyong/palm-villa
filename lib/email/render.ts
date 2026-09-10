@@ -303,12 +303,24 @@ function footer(model: BookingEmailModel): string {
     )
     .join('')
 
+  // Underlined ink on the muted line, not a button: the email already has one
+  // action, and a second block would read as a competing instruction on a
+  // confirmation that asks nothing. It is a link for the day the rest of the
+  // email is gone.
+  const lookup = model.footer.lookup
+    ? `<p style="margin:4px 0 0 0;font-size:12px;line-height:16px;color:${MUTE}">${escape(model.footer.lookup.label)} — ` +
+      `<a href="${escape(model.footer.lookup.url)}" style="color:${INK};text-decoration:underline">${escape(FIND_BOOKING_ANCHOR)}</a></p>`
+    : ''
+
   return (
     `<div style="margin-top:28px;padding-top:20px;border-top:1px solid ${HAIRLINE}">` +
     `<p style="margin:0;font-size:12px;line-height:16px;color:${MUTE}">${escape(model.footer.propertyName)} · Call or WhatsApp us on ${phones}</p>` +
-    `${notes}</div>`
+    `${lookup}${notes}</div>`
   )
 }
+
+/** The clickable words. The sentence around them carries the explanation. */
+const FIND_BOOKING_ANCHOR = 'Find your booking'
 
 /**
  * The plain-text alternative.
@@ -376,8 +388,13 @@ function renderText(model: BookingEmailModel): string {
     '',
     '—',
     `${model.footer.propertyName} · Call or WhatsApp us on ${model.footer.phones.join(' · ')}`,
-    ...model.footer.notes,
   )
+
+  if (model.footer.lookup) {
+    parts.push(`${model.footer.lookup.label}: ${model.footer.lookup.url}`)
+  }
+
+  parts.push(...model.footer.notes)
 
   return parts.join('\n')
 }

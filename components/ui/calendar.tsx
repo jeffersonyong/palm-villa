@@ -3,10 +3,12 @@
 import { useState } from 'react'
 
 import {
+  isMonthOutOfBounds,
   MonthGrid,
   MonthHeader,
   orderRange,
   useCalendarFocus,
+  type DayBounds,
   type StayDateRange,
 } from '@/components/ui/calendar-grid'
 import { todayInBrunei, type StayDate } from '@/lib/domain/dates'
@@ -27,6 +29,11 @@ export type { StayDateRange }
  * Both ends are **inclusive**: the days you point at are the days you get.
  * Callers that need the half-open occupancy convention convert at their own
  * boundary, which is the honest place for it — see the bookings list.
+ *
+ * `selection="stay"` is the exception, and it is not a different look: the
+ * grid, the band and the ends are drawn identically. What changes is what the
+ * two days *mean*. A span's ends are the same kind of thing, so they sort; a
+ * stay's are an arrival and a departure, so they cannot.
  *
  * Everything visual lives in `calendar-grid.tsx`, shared with the single-day
  * picker: the band between the ends is `canvas-soft`, the same faint gray as a
@@ -50,6 +57,28 @@ interface RangeCalendarProps {
   onDraftChange?: (anchor: StayDate | null) => void
   /** How many months to show side by side. The second is hidden below `md`. */
   months?: number
+  /**
+   * What the two ends are, which is the whole of the difference.
+   *
+   * `span` is the filter's pair — two days of the same kind, taken in either
+   * order and sorted, and one day clicked twice is a one-day range.
+   *
+   * `stay` is an arrival and a departure, and design.md §Components (the
+   * booking calendar) settles how those behave: a second click that is not
+   * after the first **re-anchors** rather than swapping the ends, because a
+   * day before the arrival is not a check-out morning anybody meant to name.
+   * A second click on the anchor itself is zero nights, which is not a stay —
+   * it is left as a half-made selection, so a mis-click costs one click
+   * rather than two. The range it emits is half-open: `end` is the departure
+   * morning, the day the guest leaves and the night nobody sleeps in.
+   */
+  selection?: 'span' | 'stay'
+  /**
+   * The days on offer. A filter is never bounded — staff look backwards as
+   * often as forwards — so this is open at both ends by default. A stay is
+   * bounded, by the booking window.
+   */
+  bounds?: DayBounds
   className?: string
 }
 
@@ -58,8 +87,11 @@ export function RangeCalendar({
   onSelect,
   onDraftChange,
   months = 2,
+  selection = 'span',
+  bounds = {},
   className,
 }: RangeCalendarProps) {
+  const isStay = selection === 'stay'
   const [today] = useState(() => todayInBrunei())
 
   // The left-hand month. Opens on the committed range, otherwise on today.
@@ -75,8 +107,7 @@ export function RangeCalendar({
     months,
     leadMonth,
     setLeadMonth,
-    // A filter is never bounded: staff look backwards as often as forwards.
-    bounds: {},
+    bounds,
     onFocusedDayChange: (day) => {
       if (provisional) {
         setHovered(day)
@@ -91,7 +122,14 @@ export function RangeCalendar({
    * selection is in progress — the anchor stretched to whichever day the
    * pointer or keyboard is on.
    */
-  const active: StayDateRange | null = provisional ? orderRange(anchor, hovered ?? anchor) : value
+  const active: StayDateRange | null = provisional
+    ? // A stay paints nothing backwards. Pointing before the arrival is a
+      // re-anchor about to happen, and a band running the wrong way says the
+      // opposite — that those days are about to be booked.
+      isStay && hovered !== null && hovered < anchor
+      ? { start: anchor, end: anchor }
+      : orderRange(anchor, hovered ?? anchor)
+    : value
 
   function pick(day: StayDate, shouldReveal = false) {
     if (shouldReveal) {
@@ -107,10 +145,26 @@ export function RangeCalendar({
       return
     }
 
+    if (isStay && day <= anchor) {
+      // Not a departure. The click becomes a new arrival rather than being
+      // ignored: a clerk who clicks an earlier day has almost always changed
+      // their mind about where the stay starts.
+      const isSameDay = day === anchor
+
+      setAnchor(day)
+      setHovered(day)
+
+      if (!isSameDay) {
+        onDraftChange?.(day)
+      }
+
+      return
+    }
+
     setAnchor(null)
     setHovered(null)
     onDraftChange?.(null)
-    onSelect(orderRange(anchor, day))
+    onSelect(isStay ? { start: anchor, end: day } : orderRange(anchor, day))
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -152,12 +206,20 @@ export function RangeCalendar({
             showPrevious={index === 0}
             showNext={index === months - 1 || index === 0}
             nextClassName={index === 0 && months > 1 ? 'md:hidden' : undefined}
+            // Both arrows step the *lead* month — the trailing month's Next is
+            // the lead's — so both ask about the month the lead is about to
+            // become, never about the far edge of the window. Asking about the
+            // trailing month would strand the last bookable month below `md`,
+            // where only the lead is on screen.
+            disablePrevious={isMonthOutOfBounds(shiftMonth(leadMonth, -1), bounds)}
+            disableNext={isMonthOutOfBounds(shiftMonth(leadMonth, 1), bounds)}
             onPrevious={() => setLeadMonth(shiftMonth(leadMonth, -1))}
             onNext={() => setLeadMonth(shiftMonth(leadMonth, 1))}
           />
           <MonthGrid
             month={month}
             today={today}
+            bounds={bounds}
             active={active}
             provisional={provisional}
             anchor={anchor}

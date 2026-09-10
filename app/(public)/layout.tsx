@@ -22,15 +22,19 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           aria-label="Main navigation"
           className="mx-auto flex w-full max-w-[1120px] items-center justify-between gap-lg px-xl py-md"
         >
-          <Link href="/" className="flex items-center gap-sm text-body-md-strong text-foreground">
-            {/* The logo moment — the one place raw brand aqua appears as a
-                graphic on this surface (design.md §Color). */}
-            <span aria-hidden className="size-2 rounded-full bg-brand" />
-            Palm Villa
-          </Link>
-          <div className="flex items-center gap-lg">
+          {/* Destinations left, actions right. The links describe the place
+              and belong beside its name; the two buttons are what you came to
+              do, and they read as a pair only when nothing sits between them
+              and the edge. */}
+          <div className="flex items-center gap-xl">
+            <Link href="/" className="flex items-center gap-sm text-body-md-strong text-foreground">
+              {/* The logo moment — the one place raw brand aqua appears as a
+                  graphic on this surface (design.md §Color). */}
+              <span aria-hidden className="size-2 rounded-full bg-brand" />
+              Palm Villa
+            </Link>
             {/* Hidden below 640px: the links do not fit beside the brand, the
-                button and the toggle, and every destination is reachable from
+                buttons and the toggle, and every destination is reachable from
                 the page itself. */}
             <ul className="hidden items-center gap-lg text-body-sm text-muted-foreground sm:flex">
               <li>
@@ -49,7 +53,17 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                 </Link>
               </li>
             </ul>
+          </div>
+          <div className="flex items-center gap-sm">
             <ThemeToggle />
+            {/* `tertiary`, and it has to be: design.md gives the customer
+                surface one lagoon fill per screen region, and that one is
+                "Book a stay". A returning guest looking for their own booking
+                is not competing with somebody about to make one, so this is
+                the hairline button beside it rather than a second solid. */}
+            <Button asChild variant="tertiary" className="ml-sm hidden sm:inline-flex">
+              <Link href="/find-booking">Find booking</Link>
+            </Button>
             <Button asChild className="hidden sm:inline-flex">
               <Link href="/stay">Book a stay</Link>
             </Button>

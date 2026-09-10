@@ -9,6 +9,7 @@ import { formatTimestamp } from '@/lib/domain/dates'
 import type { Cents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
 
+import { DepositActions } from '../../payments/payment-actions'
 import { RecordDeposit } from './record-deposit'
 
 /**
@@ -52,6 +53,8 @@ interface SecurityDepositInsetProps {
   deposit: Deposit | null
   /** Whether this viewer may take money at the desk. */
   mayRecordDeposit: boolean
+  /** Whether this viewer may say what the bank showed. */
+  mayVerifyDeposit: boolean
   /** True while the booking is still waiting to be secured by it. */
   securesBooking: boolean
 }
@@ -64,6 +67,7 @@ export function SecurityDepositInset({
   waiverReason,
   deposit,
   mayRecordDeposit,
+  mayVerifyDeposit,
   securesBooking,
 }: SecurityDepositInsetProps) {
   if (!deposit) {
@@ -144,20 +148,43 @@ export function SecurityDepositInset({
         </Link>
       </p>
 
-      {/* A promise the guest has come in to settle in cash. Offered here
+      {/* The two ways an awaited deposit ends, in the order they happen.
+          Both are here because the wait is displayed here: sending a clerk to
+          the payments queue to answer a question this panel just asked them is
+          how a transfer sits unverified for a week, and the queue is not
+          where somebody looking at one booking thinks to go.
+
+          Confirming leads, because a clerk reading "transfer awaited" has
+          usually just seen it land. Cash follows as the exception — the guest
+          who never sent it and arrived with notes — and it stays offered
           because the alternative a clerk would otherwise reach for is
           verifying a transfer that never arrived, which is a false entry in
-          the ledger about money that changed hands a different way — and
-          because the door refuses a promise, so this is where an arriving
-          guest's abandoned transfer is put right. */}
-      {mayRecordDeposit && deposit.collectedAt === null ? (
-        <RecordDeposit
-          bookingId={bookingId}
-          reference={reference}
-          quoted={deposit.amount}
-          securesBooking={securesBooking}
-          fulfilsPromise
-        />
+          the ledger about money that changed hands a different way. The door
+          refuses a promise either way, so this is where an arriving guest's
+          abandoned transfer is put right. */}
+      {deposit.collectedAt === null ? (
+        <>
+          {mayVerifyDeposit ? (
+            <DepositActions
+              depositId={deposit.id}
+              bookingReference={reference}
+              guestName={deposit.guestName}
+              due={deposit.amount}
+              placement="panel"
+            />
+          ) : null}
+
+          {mayRecordDeposit ? (
+            <RecordDeposit
+              bookingId={bookingId}
+              reference={reference}
+              quoted={deposit.amount}
+              securesBooking={securesBooking}
+              fulfilsPromise
+              isAlternative={mayVerifyDeposit}
+            />
+          ) : null}
+        </>
       ) : null}
     </DepositFigureTable>
   )

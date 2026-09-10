@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { initials } from '@/components/ui/avatar-identity'
 import { DateField } from '@/components/ui/date-field'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { StayRangeField } from '@/components/ui/stay-range-field'
 import {
   Dialog,
   DialogClose,
@@ -256,6 +257,10 @@ export function DropdownDemos() {
   const [statuses, setStatuses] = useState<readonly string[]>([])
   const [range, setRange] = useState<StayDateRange | null>(null)
   const [day, setDay] = useState<string | null>('2026-09-12')
+  const [stay, setStay] = useState<StayDateRange | null>({
+    start: '2026-09-12',
+    end: '2026-09-15',
+  })
 
   return (
     <div className="space-y-xl">
@@ -317,6 +322,22 @@ export function DropdownDemos() {
             min="2026-09-01"
             max="2026-10-31"
             clearable
+          />
+        </div>
+      </Row>
+
+      <Row
+        title="Stay range — two days, in the form dress"
+        note="The filter chip's grid and the date field's trigger, for the one span this product asks for on a form. The second click is the check-out morning, so 12–15 September is three nights and the 15th stays sellable; the ends are an arrival and a departure rather than two of a kind, so they do not sort — clicking before the arrival re-anchors. The nights are on the closed control, because that is the difference between this and a filter range that reads identically."
+      >
+        <div className="grid w-[300px] gap-sm">
+          <Label htmlFor="demo-stay">Stay</Label>
+          <StayRangeField
+            id="demo-stay"
+            value={stay}
+            onChange={setStay}
+            min="2026-09-01"
+            max="2026-10-31"
           />
         </div>
       </Row>

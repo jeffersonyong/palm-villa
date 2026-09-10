@@ -56,6 +56,7 @@ const contact: PropertyContact = {
 
 const TOKEN = 'Ab3xY9-_ZqRs7TuVwX2Kd0'
 const URL = `https://palmvilla.bn/booking/${TOKEN}`
+const LOOKUP_URL = 'https://palmvilla.bn/find-booking'
 
 const TWO_ACCOUNTS: readonly BankAccountSettings[] = [
   { id: 'a', bankName: 'BIBD', accountNumber: '0011223344', sortOrder: 1 },
@@ -103,6 +104,7 @@ function model(
     },
     contact,
     bookingUrl: URL,
+    findBookingUrl: LOOKUP_URL,
   })
 
   if (!result.ok) {
@@ -245,6 +247,52 @@ describe('the link', () => {
   })
 })
 
+/**
+ * Capability A9's half of the email. The private link above it only works
+ * while the guest still has this message; this is the route that survives
+ * losing it, and the only one a desk booking ever had.
+ */
+describe('the way back into a booking', () => {
+  test('the footer links the lookup page on both emails', () => {
+    for (const kind of ['booking_created', 'booking_confirmed'] as const) {
+      const { html } = renderBookingEmail(model({ kind }))
+
+      expect(html, kind).toContain(`href="${LOOKUP_URL}"`)
+      expect(html, kind).toContain('Find your booking')
+      expect(html, kind).toContain('reference and phone number')
+    }
+  })
+
+  /**
+   * The booking with no `action` block at all — taken at the desk, no token,
+   * no private link. The footer line is the whole of its way back, so it has
+   * to be there when the link above it is not.
+   */
+  test('is present even when there is no private link to lose', () => {
+    const withoutLink = renderBookingEmail({
+      ...model(),
+      action: null,
+      footer: { ...model().footer, lookup: { label: 'Lost this email?', url: LOOKUP_URL } },
+    })
+
+    expect(withoutLink.html).toContain(LOOKUP_URL)
+    expect(withoutLink.text).toContain(LOOKUP_URL)
+  })
+
+  test('is dropped rather than half-written when the origin is unreadable', () => {
+    const built = model()
+    const { html, text } = renderBookingEmail({
+      ...built,
+      footer: { ...built.footer, lookup: null },
+    })
+
+    expect(html).not.toContain('find-booking')
+    expect(text).not.toContain('find-booking')
+    // The rest of the footer is untouched.
+    expect(html).toContain('Call or WhatsApp us on')
+  })
+})
+
 describe('the plain-text alternative', () => {
   test('carries every figure the markup carries', () => {
     const { text } = renderBookingEmail(model())
@@ -264,5 +312,11 @@ describe('the plain-text alternative', () => {
 
   test('is text, not markup', () => {
     expect(renderBookingEmail(model()).text).not.toContain('<')
+  })
+
+  test('carries the lookup page as a URL somebody can type', () => {
+    const { text } = renderBookingEmail(model())
+
+    expect(text).toContain(`reference and phone number: ${LOOKUP_URL}`)
   })
 })

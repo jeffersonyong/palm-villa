@@ -92,6 +92,7 @@ const build = (
     property: property(),
     contact,
     bookingUrl: booking.accessToken === null ? null : `https://palmvilla.bn/booking/${TOKEN}`,
+    findBookingUrl: 'https://palmvilla.bn/find-booking',
     ...overrides,
   })
 

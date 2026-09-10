@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
 
-import { HoneypotField, PublicField } from '../_components/booking/booking-fields'
+import { HoneypotField, PublicField, PublicPhoneField } from '../_components/booking/booking-fields'
 import { findBookingAction, type LookupState } from './actions'
 
 /**
@@ -52,16 +52,13 @@ export function LookupForm() {
             autoComplete="off"
             inputClassName="font-mono"
           />
-          <PublicField
+          <PublicPhoneField
             id="lookup-phone"
             name="phone"
-            label="The number you booked with"
-            placeholder="8007000"
+            label="Your phone number in the booking"
+            placeholder="712 3456"
             required
             defaultValue={state.submitted?.phone}
-            type="tel"
-            autoComplete="tel"
-            inputMode="tel"
           />
           <HoneypotField />
         </div>

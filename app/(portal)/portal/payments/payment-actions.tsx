@@ -120,7 +120,14 @@ function useCompletion(
               }
             : {
                 tone: 'positive',
-                title: `Payment verified · ${bookingReference}`,
+                // A deposit reaches this branch too — a booking confirmed by
+                // some other route with its transfer still awaited, which is
+                // the case the booking screen's own copy warns about. Saying
+                // "Payment verified" there names the wrong ledger.
+                title:
+                  done.kind === 'deposit'
+                    ? `Security deposit verified · ${bookingReference}`
+                    : `Payment verified · ${bookingReference}`,
                 description: `${guestName} — the booking was already confirmed.`,
               },
       )
@@ -438,16 +445,37 @@ export function DepositActions(props: {
   guestName: string
   /** What the booking quotes, which is what the deposit is matched against. */
   due: Cents
+  /**
+   * Which screen the control is standing on, which decides its shape and its
+   * label. The dialog behind it never changes.
+   *
+   * `queue` is the payments row's action cell — right-aligned, and named with
+   * the noun because the row beside it is one of two kinds. The other two are
+   * screens about this deposit and nothing else, so there the noun is already
+   * said by everything around the button and the open question is the
+   * transfer: `panel` is the booking's deposit inset, where it is full width
+   * and the primary of two stacked actions; `section` is the deposit's own
+   * page, where actions sit at their natural width under the content.
+   */
+  placement?: 'queue' | 'panel' | 'section'
 }) {
+  const { placement = 'queue', ...dialog } = props
   const [open, setOpen] = useState(false)
+
+  const trigger = (
+    <Button
+      className={placement === 'panel' ? 'mt-lg w-full' : undefined}
+      onClick={() => setOpen(true)}
+    >
+      {placement === 'queue' ? 'Confirm deposit' : 'Confirm the transfer'}
+    </Button>
+  )
 
   return (
     <>
-      <div className="flex justify-end">
-        <Button onClick={() => setOpen(true)}>Confirm deposit</Button>
-      </div>
+      {placement === 'queue' ? <div className="flex justify-end">{trigger}</div> : trigger}
 
-      {open ? <ConfirmDepositDialog {...props} onClose={() => setOpen(false)} /> : null}
+      {open ? <ConfirmDepositDialog {...dialog} onClose={() => setOpen(false)} /> : null}
     </>
   )
 }

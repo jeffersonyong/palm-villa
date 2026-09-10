@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 import { bookingSteps, pricingCopy } from '../_content/landing'
 
 /**
@@ -35,6 +37,21 @@ export function HowBookingWorks() {
 
         <p className="mt-2xl text-caption text-muted-foreground">
           {pricingCopy.stayFinePrint} {pricingCopy.paymentMethods}
+        </p>
+
+        {/* The way back in (capability A9), in the fine print rather than as a
+            button: somebody who has already booked is not who this section is
+            selling to, and a second call to action here would compete with the
+            page's own. Underlined ink, not the lagoon — the hue is text-first
+            on this surface and never marks a secondary route. */}
+        <p className="mt-sm text-caption text-muted-foreground">
+          {pricingCopy.alreadyBooked}{' '}
+          <Link
+            href="/find-booking"
+            className="text-foreground underline underline-offset-2 transition-colors hover:text-copy"
+          >
+            {pricingCopy.alreadyBookedLink}
+          </Link>
         </p>
       </div>
     </section>

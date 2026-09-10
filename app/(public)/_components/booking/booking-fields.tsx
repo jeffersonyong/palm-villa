@@ -2,6 +2,7 @@
 
 import { Input } from '@/components/ui/input'
 import { FieldError } from '@/components/ui/field-error'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { cn } from '@/lib/utils'
 
 /**
@@ -67,6 +68,63 @@ export function PublicField({
         className={inputClassName}
         aria-invalid={error ? true : undefined}
         aria-describedby={[hintId, errorId].filter(Boolean).join(' ') || undefined}
+      />
+      {hint ? (
+        <p id={hintId} className="text-caption text-muted-foreground">
+          {hint}
+        </p>
+      ) : null}
+      <FieldError id={errorId} message={error} />
+    </div>
+  )
+}
+
+/**
+ * The mobile number, at the customer surface.
+ *
+ * `PublicField`'s dress exactly — same label, same hint, same error line —
+ * around the split control instead of a plain input, so a phone field and the
+ * name field above it still belong to one form. The label points at the number
+ * half, because that is the part somebody clicking the label meant to type in.
+ */
+export function PublicPhoneField({
+  id,
+  name,
+  label,
+  hint,
+  required,
+  defaultValue,
+  error,
+  placeholder,
+  className,
+}: {
+  id: string
+  name: string
+  label: string
+  hint?: string
+  required?: boolean
+  defaultValue?: string
+  error?: string
+  placeholder?: string
+  className?: string
+}) {
+  const hintId = hint ? `${id}-hint` : undefined
+  const errorId = error ? `${id}-error` : undefined
+
+  return (
+    <div className={cn('flex flex-col gap-xs', className)}>
+      <label htmlFor={id} className="text-body-sm-strong text-foreground">
+        {label}
+        {required ? null : <span className="ml-xs text-muted-foreground">(optional)</span>}
+      </label>
+      <PhoneInput
+        id={id}
+        name={name}
+        required={required}
+        defaultValue={defaultValue}
+        placeholder={placeholder}
+        invalid={Boolean(error)}
+        describedBy={[hintId, errorId].filter(Boolean).join(' ') || undefined}
       />
       {hint ? (
         <p id={hintId} className="text-caption text-muted-foreground">
