@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react'
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { Badge } from '@/components/ui/badge'
@@ -179,7 +180,11 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
 
         <p className="mt-lg text-caption text-muted-foreground">
           Keep this page — it is the link to your booking. Anyone with it can see this booking, so
-          do not post it publicly.
+          do not post it publicly. If you lose it, you can{' '}
+          <Link className="underline hover:no-underline" href="/find-booking">
+            find it again
+          </Link>{' '}
+          with your reference and the number you booked with.
         </p>
       </div>
     </section>

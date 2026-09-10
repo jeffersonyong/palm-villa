@@ -3,45 +3,35 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
 import { contact } from '../_content/landing'
+import { ClosingBand, closingBandSecondaryClassName } from './closing-band'
 
 /**
- * The page's closing band — the second of its two sanctioned dark moments
- * (design.md §Layout). The primary action takes the `inverted` variant —
- * vivid aqua on the ink ground;
- * the secondary is a quiet outline drawn on the dark ground.
+ * The landing page's closing band — the second of its two sanctioned dark
+ * moments (design.md §Layout). The construction itself lives in
+ * `ClosingBand`, which the FAQ also ends with; this is the landing page's
+ * words and actions.
  *
  * Copy describes the product as delivered, not the build: booking is live by
- * the time this page is public, so nothing here says "coming soon". The
- * interim message lives on the /day-pass and /stay stubs, which the real
- * flows replace wholesale.
+ * the time this page is public, so nothing here says "coming soon".
  */
 export function FinalCta() {
   return (
-    <section
-      aria-labelledby="final-cta-heading"
-      className="bg-invert-surface px-xl py-3xl text-invert-foreground"
-    >
-      <div className="mx-auto flex w-full max-w-[1120px] flex-col items-start gap-lg">
-        <h2 id="final-cta-heading" className="font-display text-display-md sm:text-display-lg">
-          Ready when you are
-        </h2>
-        <p className="max-w-[52ch] text-body-lg opacity-75">
-          Check what’s free, see the full price before you commit, and book in a few minutes. Or
-          message us if you’d rather ask first.
-        </p>
-        <div className="flex w-full flex-col gap-sm sm:w-auto sm:flex-row">
-          <Button asChild variant="inverted" className="w-full sm:w-auto">
-            <Link href="/stay">Check availability</Link>
-          </Button>
-          <Button
-            asChild
-            variant="ghost"
-            className="w-full border border-invert-foreground/25 text-invert-foreground hover:bg-invert-foreground/10 hover:text-invert-foreground sm:w-auto"
-          >
-            <a href={contact.whatsappUrl}>Message us on WhatsApp</a>
-          </Button>
-        </div>
-      </div>
-    </section>
+    <ClosingBand id="final-cta-heading" title="Ready when you are" actions={<FinalCtaActions />}>
+      Check what’s free, see the full price before you commit, and book in a few minutes. Or message
+      us if you’d rather ask first.
+    </ClosingBand>
+  )
+}
+
+function FinalCtaActions() {
+  return (
+    <>
+      <Button asChild variant="inverted" className="w-full sm:w-auto">
+        <Link href="/stay">Check availability</Link>
+      </Button>
+      <Button asChild variant="ghost" className={closingBandSecondaryClassName}>
+        <a href={contact.whatsappUrl}>Message us on WhatsApp</a>
+      </Button>
+    </>
   )
 }

@@ -26,7 +26,9 @@ export function PublicField({
   error,
   autoComplete,
   inputMode,
+  placeholder,
   className,
+  inputClassName,
 }: {
   id: string
   name: string
@@ -38,7 +40,11 @@ export function PublicField({
   error?: string
   autoComplete?: string
   inputMode?: 'text' | 'tel' | 'email' | 'numeric'
+  /** The shape of the answer, where the shape is not obvious from the label. */
+  placeholder?: string
   className?: string
+  /** For a field whose *value* has a face of its own — a reference in mono. */
+  inputClassName?: string
 }) {
   const hintId = hint ? `${id}-hint` : undefined
   const errorId = error ? `${id}-error` : undefined
@@ -57,6 +63,8 @@ export function PublicField({
         defaultValue={defaultValue}
         autoComplete={autoComplete}
         inputMode={inputMode}
+        placeholder={placeholder}
+        className={inputClassName}
         aria-invalid={error ? true : undefined}
         aria-describedby={[hintId, errorId].filter(Boolean).join(' ') || undefined}
       />

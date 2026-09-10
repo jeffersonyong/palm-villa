@@ -97,6 +97,35 @@ export const PUBLIC_LIMITS = {
   /** "I've made the transfer" presses from one address in an hour. */
   submitsPerIpPerHour: 30,
   /**
+   * Lookup attempts from one address in an hour (capability A9).
+   *
+   * The first counter here that guards a **read**, and it guards a different
+   * shape of attack from the rest. `PV-` references are sequential by design
+   * (architecture.md §6.1 — short enough to type into a transfer), so the
+   * reference half of a lookup is a sweep rather than a guess, and the only
+   * thing between a sweep and a permanent link to somebody's booking is this
+   * number and the phone match.
+   *
+   * Ten, because a customer who has lost their link tries two or three times
+   * and a family on one office connection might reach five.
+   */
+  lookupsPerIpPerHour: 10,
+  /**
+   * Lookup attempts against one reference in a day.
+   *
+   * What the address counter cannot answer: a reference read off a transfer
+   * slip and guessed against from many addresses. Ten tries a day at a
+   * seven-digit number is not a strategy.
+   *
+   * It has a cost, and it is the honest one to state — somebody who knows a
+   * reference can burn its allowance and push its owner to the phone for the
+   * rest of the day. The alternatives are worse: counting only failures needs
+   * two counter calls per request against architecture.md §4a's instruction
+   * that the whole gate be readable at once, and keying on reference *and*
+   * address defeats the distributed case this exists for.
+   */
+  lookupsPerReferencePerDay: 10,
+  /**
    * Emails sent to one address in a day (capability A8).
    *
    * The only limit here that protects somebody other than the property. Every
