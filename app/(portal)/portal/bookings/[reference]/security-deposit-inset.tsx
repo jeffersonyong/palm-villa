@@ -5,12 +5,15 @@ import { DepositStageBadge } from '@/components/portal/deposit-stage-badge'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import type { Deposit } from '@/lib/db/deposits'
+import type { Document } from '@/lib/db/documents'
 import type { BookingStatus } from '@/lib/domain/booking-state'
 import { formatTimestamp } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 import type { Cents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
 
+import { AttachDocument } from '../../documents/attach-document'
+import { DocumentRow } from '../../documents/document-row'
 import { DepositActions } from '../../payments/payment-actions'
 import { RecordDeposit } from './record-deposit'
 import { TopUpDeposit } from './top-up-deposit'
@@ -60,6 +63,14 @@ interface SecurityDepositInsetProps {
   mayVerifyDeposit: boolean
   /** True while the booking is still waiting to be secured by it. */
   securesBooking: boolean
+  /** The transfer slip on file for the deposit, or null (N39, capability A6). */
+  slip: Document | null
+  /** Whether this viewer may attach or remove that slip — `payment.verify`. */
+  mayAttachSlip: boolean
+  /** Whether this viewer may open it. Every working role may (`booking.view`). */
+  maySeeSlip: boolean
+  /** Who attached it, already resolved to a name. */
+  slipAttachedBy: string
 }
 
 export function SecurityDepositInset({
@@ -72,6 +83,10 @@ export function SecurityDepositInset({
   mayRecordDeposit,
   mayVerifyDeposit,
   securesBooking,
+  slip,
+  mayAttachSlip,
+  maySeeSlip,
+  slipAttachedBy,
 }: SecurityDepositInsetProps) {
   if (!deposit) {
     return (
@@ -234,6 +249,80 @@ export function SecurityDepositInset({
           securesBooking={securesBooking}
         />
       ) : null}
+
+      {/* The slip, which had nowhere to live until A6 (N39). Offered only for
+          a transfer: cash was counted at the desk and has no slip to send,
+          which is the rule `attach_document` refuses on. */}
+      {deposit.method === 'bank_transfer' ? (
+        <DepositSlip
+          bookingId={bookingId}
+          depositId={deposit.id}
+          slip={slip}
+          mayAttach={mayAttachSlip}
+          maySee={maySeeSlip}
+          attachedBy={slipAttachedBy}
+        />
+      ) : null}
     </DepositFigureTable>
+  )
+}
+
+/**
+ * The transfer slip against the security deposit.
+ *
+ * The same construction the payment's slip and the identity document both use —
+ * an inset, the absence on the left, the control that ends it on the right — so
+ * a file on a record looks like one thing wherever it appears on this screen.
+ *
+ * It is usually the guest's own upload rather than a clerk's. Every online stay
+ * is secured by the deposit and nothing else (prd.md §9.1), so the one transfer
+ * a customer is asked to make is this one, and A6 is them sending the
+ * screenshot of it. The desk keeps its own control for the guest who sends it
+ * over WhatsApp anyway, which is what §2 describes them doing today.
+ */
+function DepositSlip({
+  bookingId,
+  depositId,
+  slip,
+  mayAttach,
+  maySee,
+  attachedBy,
+}: {
+  bookingId: string
+  depositId: string
+  slip: Document | null
+  mayAttach: boolean
+  maySee: boolean
+  attachedBy: string
+}) {
+  return (
+    <Card surface="inset" className="mt-md">
+      <span className="text-micro text-muted-foreground">Transfer slip</span>
+
+      {slip ? (
+        <div className="mt-xs divide-y divide-border">
+          <DocumentRow
+            document={slip}
+            mayOpen={maySee}
+            mayRemove={mayAttach}
+            attachedBy={attachedBy}
+          />
+        </div>
+      ) : (
+        <div className="mt-sm flex items-end justify-between gap-md">
+          <p className="text-body-sm text-muted-foreground">No slip on file.</p>
+          {mayAttach ? (
+            <AttachDocument
+              kind="payment_slip"
+              bookingId={bookingId}
+              depositId={depositId}
+              label="Attach slip"
+              title="Attach the deposit transfer slip"
+              description="The bank app is still the check — a slip is evidence, not verification. Kept privately as an accounting record."
+            />
+          ) : null}
+        </div>
+      )}
+    </Card>
   )
 }

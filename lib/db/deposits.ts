@@ -89,6 +89,15 @@ export interface Deposit {
    * liability, and the reason every "what do we hold" read excludes it.
    */
   collectedAt: string | null
+  /**
+   * The transfer slip on file for this deposit, or null (N39, capability A6).
+   *
+   * A deposit is not a payment (prd.md §11), so until A6 landed there was
+   * nowhere to hang the screenshot a guest sends of the one transfer they were
+   * asked to make. It is the same `payment_slip` kind as a payment'''s, on the
+   * same seven-year clock — what differs is only the row it points at.
+   */
+  slipDocumentId: string | null
   /** When the customer said they had transferred it, or null at the desk. */
   promisedAt: string | null
   /** What the verifier read off the bank, for a deposit promised online. */
@@ -139,6 +148,7 @@ interface DepositSummaryRow {
   method: string
   collected_by: string | null
   collected_at: string | null
+  slip_document_id: string | null
   promised_at: string | null
   observed_reference: string | null
   observed_sender: string | null
@@ -180,6 +190,7 @@ const SUMMARY_COLUMNS = [
   'method',
   'collected_by',
   'collected_at',
+  'slip_document_id',
   'inspection_id',
   'inspection_outcome',
   'inspection_notes',
@@ -242,6 +253,7 @@ function toDeposit(row: DepositSummaryRow): Deposit {
     method: row.method as PaymentMethod,
     collectedBy: row.collected_by,
     collectedAt: row.collected_at,
+    slipDocumentId: row.slip_document_id,
     promisedAt: row.promised_at,
     observed:
       row.observed_reference === null && row.observed_sender === null && row.observed_on === null

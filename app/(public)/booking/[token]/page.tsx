@@ -8,6 +8,7 @@ import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
 import { QuoteLines } from '@/components/quote-lines'
 import { getDepositByBookingId } from '@/lib/db/deposits'
+import { listDocumentsForBooking } from '@/lib/db/documents'
 import { getBookingByAccessToken } from '@/lib/db/public-bookings'
 import { readPropertySettings } from '@/lib/db/settings'
 import { balanceOf } from '@/lib/domain/balance'
@@ -20,6 +21,7 @@ import {
   type PublicStage,
 } from '@/lib/domain/public-booking'
 
+import { SendAFile } from './send-a-file'
 import { TransferInstructions } from './transfer-instructions'
 
 export const metadata: Metadata = {
@@ -60,9 +62,11 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
 
   const stage = publicStageOf(booking.status)
   const plan = transferPlanFor(booking)
-  const [settings, deposit] = await Promise.all([
+  const [settings, deposit, slips, identityDocuments] = await Promise.all([
     readPropertySettings(),
     getDepositByBookingId(booking.id),
+    listDocumentsForBooking(booking.id, 'payment_slip'),
+    listDocumentsForBooking(booking.id, 'identity'),
   ])
   const chip = chipFor(stage)
 
@@ -72,6 +76,23 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
   // surface that would now be false — and the customer is the only person who
   // can put it right.
   const shortfall = deposit !== null && deposit.collectedAt !== null ? deposit.shortfall : 0
+
+  // What the guest may send, and what we already hold (capabilities A6, A7).
+  //
+  // A slip is asked for once the guest has said they transferred — before
+  // that there is no payment or deposit row to file it against, and asking
+  // for evidence of something they have not done yet reads as a muddle. An IC
+  // is asked for from the moment the booking exists and until the stay is
+  // over: prd.md §13 requires it for registration, and a guest who provides
+  // it here is a guest the desk does not have to chase at the door.
+  //
+  // `listDocumentsForBooking` excludes what has expired as well as what was
+  // removed, so a file past its retention date stops being reported as held —
+  // which is the honest answer, because it is gone.
+  const slipOnFileSince = slips[0]?.uploadedAt ?? null
+  const identityOnFileSince = identityDocuments[0]?.uploadedAt ?? null
+  const maySendSlip = stage === 'checking'
+  const maySendIdentity = stage === 'checking' || stage === 'confirmed'
 
   return (
     <section aria-labelledby="booking-heading" className="bg-card px-xl py-3xl">
@@ -139,6 +160,26 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
               something has gone wrong.
             </span>
           </Callout>
+        ) : null}
+
+        {maySendSlip ? (
+          <SendAFile
+            token={token}
+            kind="payment_slip"
+            title="Send us your transfer slip"
+            description="Not required — we check the bank either way. It helps us find your transfer faster, and it is what we would look at if anything is ever queried."
+            onFileSince={slipOnFileSince}
+          />
+        ) : null}
+
+        {maySendIdentity ? (
+          <SendAFile
+            token={token}
+            kind="identity"
+            title="Send us your IC"
+            description="We need a copy of the lead guest's IC to register the stay. Sending it now saves doing it at the desk when you arrive."
+            onFileSince={identityOnFileSince}
+          />
         ) : null}
 
         {stage === 'confirmed' ? (

@@ -501,3 +501,96 @@ export const ATTACH_PERMISSION: Readonly<Record<DocumentKind, Permission | null>
   inspection_photo: 'inspection.record',
   accounting_pack: null,
 }
+
+/* ── The customer, who holds no permission at all ─────────────────────────── */
+
+/**
+ * What a customer may send us (capabilities A6, A7).
+ *
+ * The table above answers "who may do this" with a permission string, and for a
+ * customer there is no such string to hold: the booking's 128-bit access token
+ * is the whole of the credential (architecture.md §4a), and `requirePermission`
+ * cannot express an anonymous caller — `Actor.userId` is `string`, not
+ * `string | null`, and it should not be made to.
+ *
+ * So the customer's half of the table is a kind allowlist rather than a
+ * permission mapping, and it lives here beside the staff one for the reason
+ * this module's header gives: the answer has to be reachable from one place, or
+ * the page offering an upload and the action accepting one disagree.
+ *
+ * - `payment_slip` — the screenshot of the transfer they were asked to make
+ *   (A6). It hangs off whichever money row the transfer covered: a `payment`
+ *   for a day pass or a stay paid in full, a `deposit` for the ordinary online
+ *   stay (N39).
+ * - `identity` — their IC, which prd.md §13 requires for registration and which
+ *   the desk otherwise collects at the door (A7).
+ *
+ * The two refusals are not omissions. An **inspection photograph** is
+ * Housekeeping's record of what they found in the unit after the guest left, so
+ * a guest supplying one would be supplying the evidence against themselves. An
+ * **accounting pack** is assembled by the system and by nobody by hand (G5).
+ * Mirrored by `attach_document()`, which refuses `not_a_customer_kind`.
+ */
+export const CUSTOMER_ATTACHABLE_KINDS = ['payment_slip', 'identity'] as const
+
+export type CustomerAttachableKind = (typeof CUSTOMER_ATTACHABLE_KINDS)[number]
+
+export function mayCustomerAttach(kind: DocumentKind): kind is CustomerAttachableKind {
+  return (CUSTOMER_ATTACHABLE_KINDS as readonly DocumentKind[]).includes(kind)
+}
+
+/*
+ * There is deliberately no `mayCustomerOpen` and no `mayCustomerRemove`, and
+ * their absence is the decision.
+ *
+ * A customer sees *that* their file is on file — the kind, and when it arrived —
+ * and never its content. That is the same "existence is not content" rule the
+ * portal runs on (prd.md §13), applied to the one reader who authenticates with
+ * a link rather than a login: an access token travels in forwarded WhatsApp
+ * messages and in browser history on a shared phone, and a URL that handed back
+ * a photograph of somebody's IC would be a data breach one forward away.
+ *
+ * The filename is not shown to them either, for the reason §13 records: an IC
+ * arrives named by whoever scanned it, and often carries the IC number.
+ *
+ * Removing is refused on the same reasoning from the other end: a customer
+ * replaces their own file by sending a better one, which supersedes it, and a
+ * leaked token therefore cannot destroy a record the business is required to
+ * keep. `attach_document(p_uploaded_by_customer)` is where that happens.
+ *
+ * If this is ever revisited, the thing to change is not this comment but
+ * `app/(portal)/portal/documents/[id]/route.ts`, which issues every signed URL
+ * in the product after a permission check. Nothing else can.
+ */
+
+/**
+ * Who put a document on file, for the line under its name.
+ *
+ * A null `uploaded_by` used to mean one thing — the system, which assembles
+ * accounting packs and expires files on their retention clock. Since A6 and A7
+ * it means two, because a customer has no user id either, and a screen that
+ * told a clerk a guest's IC was "attached by the system" would be naming the
+ * wrong party for the one kind of document where who handed it over is the
+ * whole point.
+ *
+ * The kind is what separates them, and it separates them completely: a pack is
+ * the only thing the system uploads and nothing else can be, while an IC and a
+ * slip are the only two a customer may send (`CUSTOMER_ATTACHABLE_KINDS`). An
+ * inspection photograph has neither path, so a null there is a fault rather
+ * than a case, and it reads as the system's because that is the honest answer
+ * to "we do not know".
+ *
+ * Returned as a fragment — "the guest", "Ana" — so a caller can put it in
+ * whichever sentence it is building.
+ */
+export function uploaderFor(input: {
+  kind: DocumentKind
+  uploadedBy: string | null
+  actorName: string | null
+}): string {
+  if (input.uploadedBy === null) {
+    return mayCustomerAttach(input.kind) ? 'the guest' : 'the system'
+  }
+
+  return input.actorName ?? 'a former colleague'
+}

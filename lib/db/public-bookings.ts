@@ -7,10 +7,19 @@ import type { DayPassPartyLine } from '@/lib/domain/day-pass-capacity'
 import type { BookingLine } from '@/lib/domain/lines'
 import type { Cents } from '@/lib/domain/money'
 import { phonesMatch } from '@/lib/domain/phone'
-import { isAccessToken, PUBLIC_LIMITS, type TransferChoice } from '@/lib/domain/public-booking'
+import type { CustomerAttachableKind } from '@/lib/domain/document'
+import {
+  isAccessToken,
+  PUBLIC_LIMITS,
+  publicStageOf,
+  type TransferChoice,
+} from '@/lib/domain/public-booking'
 import { dataClient } from '@/lib/supabase/data'
 
 import { getBookingById, getBookingByReference, type Booking } from './bookings'
+import { getDepositByBookingId } from './deposits'
+import { attachDocument, purge } from './documents'
+import { listPaymentsForBooking } from './payments'
 import { currentPropertyId } from './property'
 
 /**
@@ -48,6 +57,9 @@ export type PublicWriteErrorCode =
   | 'not_found'
   | 'already_submitted'
   | 'status_changed'
+  | 'booking_closed'
+  | 'nothing_to_evidence'
+  | 'upload_refused'
 
 export interface PublicWriteError {
   code: PublicWriteErrorCode
@@ -67,6 +79,10 @@ export interface PublicBookingCreated {
 }
 
 const MESSAGES: Readonly<Record<PublicWriteErrorCode, string>> = {
+  booking_closed: 'This booking is closed, so there is nothing to add to it.',
+  nothing_to_evidence:
+    'There is no transfer on this booking yet. Tell us you have made it first, then send the slip.',
+  upload_refused: 'That file could not be saved. Try again, or send it to us on WhatsApp.',
   unit_unavailable:
     'Those dates have just been taken. Please pick other dates, or another type of unit.',
   capacity_exceeded: 'There are not enough places left for that date.',
@@ -506,4 +522,152 @@ async function issueAccessToken(
   }
 
   return refuse('token_collision')
+}
+
+/* ── What a customer sends us (capabilities A6, A7) ───────────────────────── */
+
+/**
+ * A file the guest uploaded through their own booking link.
+ *
+ * The fourth public write and the first that stores anything. Everything about
+ * *what* may be stored is already decided elsewhere and is not restated here:
+ * `checkUpload` inside `attachDocument` sniffs the real header, bounds the size
+ * and refuses a kind that does not match, and the bucket and the CHECK
+ * constraints refuse last. What this module adds is the two questions only it
+ * can answer — **whose booking is this** and **which row is the money on**.
+ *
+ * ── Whose booking ──────────────────────────────────────────────────────────
+ *
+ * The access token, re-resolved here rather than trusted from the form beyond
+ * its shape. It is the whole of the credential (architecture.md §4a): 128 bits,
+ * unguessable, and the same thing that lets the guest read the page they are
+ * uploading from. A booking that has closed refuses — a cancelled booking is
+ * not a place to file new records, and a link that outlives its booking should
+ * stop doing anything.
+ *
+ * ── Which row ──────────────────────────────────────────────────────────────
+ *
+ * An identity document hangs off the booking and is done. A slip has to find
+ * the money it evidences, and prd.md §10.3 is explicit that there may be two:
+ *
+ *   > Two rows for one transfer, and they stay two. The customer sends BND 700
+ *   > once; the queue shows BND 100 against the deposit and BND 600 against the
+ *   > stay, because §11 makes one a liability the property owes back and the
+ *   > other revenue it has earned.
+ *
+ * One screenshot is therefore the evidence for both, and it is filed against
+ * each: **one upload, one file chosen, one document row per money row.** The
+ * alternative — filing it once and cross-referencing — would leave the
+ * accounting pack of one of them missing its slip, and each row carries its own
+ * seven-year clock, so they cannot share one.
+ *
+ * The customer is never asked which. They chose "the deposit" or "everything"
+ * when they told us they had transferred, and the rows that exist are the
+ * answer.
+ *
+ * A partial failure is reported as success where at least one row took it. The
+ * queue shows the slip against whichever it reached, which is strictly better
+ * than telling a guest their upload failed and having them send it again.
+ */
+export async function attachPublicDocument(input: {
+  token: string
+  kind: CustomerAttachableKind
+  bytes: Uint8Array
+  filename: string
+}): Promise<PublicWriteResult<{ documentId: string; kind: CustomerAttachableKind }>> {
+  const booking = await getBookingByAccessToken(input.token)
+
+  if (!booking) {
+    return refuse('not_found')
+  }
+
+  if (publicStageOf(booking.status) === 'closed') {
+    return refuse('booking_closed')
+  }
+
+  const targets = await slipTargets(booking, input.kind)
+
+  if (targets === null) {
+    return refuse('nothing_to_evidence')
+  }
+
+  const attached: string[] = []
+  let lastError: string | null = null
+
+  for (const target of targets) {
+    const result = await attachDocument({
+      kind: input.kind,
+      bookingId: booking.id,
+      paymentId: target.paymentId,
+      depositId: target.depositId,
+      bytes: input.bytes,
+      filename: input.filename,
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    if (result.ok) {
+      attached.push(result.documentId)
+
+      // A superseded file is the guest'''s own previous upload. Its row is
+      // already tombstoned in the same transaction that wrote the new one, so
+      // the file is filed either way; deleting the object is best effort, and
+      // whatever fails stays in purgeTombstoned()'''s queue for the nightly job.
+      for (const old of result.superseded) {
+        await purge(old.id, old.bucketId, old.storageKey).catch(() => false)
+      }
+    } else {
+      lastError = result.error.message
+    }
+  }
+
+  if (attached.length === 0) {
+    return {
+      ok: false,
+      error: { code: 'upload_refused', message: lastError ?? MESSAGES.upload_refused },
+    }
+  }
+
+  return { ok: true, data: { documentId: attached[0]!, kind: input.kind } }
+}
+
+/**
+ * The rows one uploaded file should be filed against.
+ *
+ * `null` where a slip has arrived before the transfer it evidences — the guest
+ * has not pressed "I have made the transfer" yet, so no deposit and no payment
+ * row exists. That is a sequence to explain rather than an error to log.
+ *
+ * An identity document points at neither, which is one target carrying two
+ * nulls rather than a second code path.
+ */
+async function slipTargets(
+  booking: Booking,
+  kind: CustomerAttachableKind,
+): Promise<readonly { paymentId: string | null; depositId: string | null }[] | null> {
+  if (kind === 'identity') {
+    return [{ paymentId: null, depositId: null }]
+  }
+
+  const [deposit, payments] = await Promise.all([
+    getDepositByBookingId(booking.id),
+    listPaymentsForBooking(booking.id),
+  ])
+
+  const targets: { paymentId: string | null; depositId: string | null }[] = []
+
+  // A deposit paid in cash at the desk has no slip to send, and neither has a
+  // cash payment — `attach_document` refuses both with `not_a_transfer`, so
+  // they are filtered here rather than attempted and reported as a failure.
+  if (deposit && deposit.method === 'bank_transfer') {
+    targets.push({ paymentId: null, depositId: deposit.id })
+  }
+
+  for (const payment of payments) {
+    if (payment.method === 'bank_transfer') {
+      targets.push({ paymentId: payment.id, depositId: null })
+    }
+  }
+
+  return targets.length === 0 ? null : targets
 }

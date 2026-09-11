@@ -11,7 +11,7 @@ import { HISTORY_PAGE_SIZE, historyPage } from '@/components/portal/history-page
 import { PageHeader } from '@/components/portal/page-header'
 import { SectionCard } from '@/components/portal/section-card'
 import { Button } from '@/components/ui/button'
-import { hasPermission } from '@/lib/auth/permissions'
+import { hasPermission, type Permission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listAuditEventPage } from '@/lib/db/audit'
 import { getBookingByReference, type Booking } from '@/lib/db/bookings'
@@ -31,7 +31,7 @@ import { balanceOf, canSettle } from '@/lib/domain/balance'
 import { describeDiscount } from '@/lib/domain/discount'
 import { formatCents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
-import { mayAttach, mayOpen } from '@/lib/domain/document'
+import { mayAttach, mayOpen, uploaderFor } from '@/lib/domain/document'
 import { formatVehicles } from '@/lib/domain/vehicle'
 import { cn } from '@/lib/utils'
 
@@ -279,6 +279,17 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
           deposit={deposit}
           mayRecordPayment={hasPermission(actor.permissions, 'payment.record_cash')}
           mayVerify={mayVerify}
+          // The slip on the deposit (N39, capability A6). Found the same way
+          // the payments' slips are, one filter down: a deposit slip is the
+          // same `payment_slip` kind, pointing at a different row.
+          depositSlip={
+            documents.find(
+              (document) =>
+                document.kind === 'payment_slip' && document.depositId === deposit?.id,
+            ) ?? null
+          }
+          actorNames={actorNames}
+          permissions={actor.permissions}
         />
       </div>
 
@@ -496,11 +507,11 @@ function SlipLine({
             document={slip}
             mayOpen={maySee}
             mayRemove={mayAttach}
-            attachedBy={
-              slip.uploadedBy
-                ? (actorNames.get(slip.uploadedBy) ?? 'a former colleague')
-                : 'the system'
-            }
+            attachedBy={uploaderFor({
+              kind: 'payment_slip',
+              uploadedBy: slip.uploadedBy,
+              actorName: slip.uploadedBy ? (actorNames.get(slip.uploadedBy) ?? null) : null,
+            })}
           />
         </div>
       ) : (
@@ -553,6 +564,9 @@ function MoneySummary({
   deposit,
   mayRecordPayment,
   mayVerify,
+  depositSlip,
+  actorNames,
+  permissions,
 }: {
   booking: Booking
   payments: readonly Payment[]
@@ -561,6 +575,10 @@ function MoneySummary({
   mayRecordPayment: boolean
   /** Whether this viewer may say what the bank showed — for an awaited deposit. */
   mayVerify: boolean
+  /** The transfer slip against the deposit, or null (N39). */
+  depositSlip: Document | null
+  actorNames: Map<string, string>
+  permissions: ReadonlySet<Permission>
 }) {
   // The balance, at last. This card used to state what had been taken and
   // deliberately never what was owed — the payment slice was not a ledger, and
@@ -671,6 +689,19 @@ function MoneySummary({
         // deposit and a payment are one job to whoever opens the bank app,
         // which is the position payments/actions.ts already took.
         mayVerifyDeposit={mayVerify}
+        // The slip on the deposit (N39). Attaching is `payment.verify` wherever
+        // a slip hangs, and opening is `booking.view` — neither is a new rule,
+        // which is the whole point of it not being a fifth kind.
+        slip={depositSlip}
+        mayAttachSlip={mayAttach('payment_slip', permissions)}
+        maySeeSlip={mayOpen('payment_slip', permissions)}
+        slipAttachedBy={uploaderFor({
+          kind: 'payment_slip',
+          uploadedBy: depositSlip?.uploadedBy ?? null,
+          actorName: depositSlip?.uploadedBy
+            ? (actorNames.get(depositSlip.uploadedBy) ?? null)
+            : null,
+        })}
         // Whether the deposit still has a booking to secure — true wherever
         // the booking is still waiting, including on a transfer for the stay.
         // Once a booking is confirmed the money is a catch-up rather than the

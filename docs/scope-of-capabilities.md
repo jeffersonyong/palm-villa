@@ -31,8 +31,8 @@ Everyone works from the same live data, so availability, payments, and booking s
 | A3 | Book a facility day pass online, with per-person rates and family bundles applied automatically — the system always charges the cheapest applicable combination — **delivered 13 September 2026** |
 | A4 | Book a short stay online; the unit is held while payment completes — **reworded 10 September 2026, see the notes below; delivered 13 September 2026** |
 | A5 | Receive bank transfer instructions (BIBD / Baiduri) with a unique payment reference to include in the transfer |
-| A6 | Upload their transfer slip directly, instead of sending it over WhatsApp |
-| A7 | Provide guest details and identity document as part of the booking, replacing the paper/WhatsApp collection step |
+| A6 | Upload their transfer slip directly, instead of sending it over WhatsApp — **delivered 18 September 2026** |
+| A7 | Provide guest details and identity document as part of the booking, replacing the paper/WhatsApp collection step — **delivered 18 September 2026, see the notes below** |
 | A8 | Receive booking confirmation and an entry QR code by email — delivered as a forwardable image so staff can also send it in an existing WhatsApp conversation — **email half delivered 14 September 2026; the QR travels with the security screen (D3), see the notes below** |
 | A9 | Look up their own booking any time using booking reference + phone number — **delivered 16 September 2026** |
 | A10 | Get answers to common questions from a self-serve FAQ page — **delivered 16 September 2026, see the notes below on what it cannot yet answer** |
@@ -54,7 +54,16 @@ Everyone works from the same live data, so availability, payments, and booking s
 > - **The public site is defended without a CAPTCHA.** A hidden field, a request counter, and a cap on how many unpaid bookings one phone number may hold at once. The last is the one that protects rooms; the numbers behind all three are in the register.
 > - **The 2-bedroom is not on sale.** It has no units until the count is agreed, so it is not offered rather than shown as full on every night.
 >
-> **Still to come on this surface:** the customer uploading their transfer slip (A6) and identity document (A7), and the entry QR code (A8's other half).
+> **Still to come on this surface:** the entry QR code (A8's other half).
+
+> **A6 and A7 delivered 18 September 2026.** A customer who has transferred sends the screenshot from the same page that told them where to transfer, and sends their IC from it too — so the desk stops asking for either over WhatsApp. Four things worth saying plainly:
+>
+> - **They can replace what they sent, and can never open it again.** A dark photograph is fixed by sending a better one, which supersedes it. Nothing hands the file back: a booking link gets forwarded, and a link that returned a photograph of somebody's IC would be a leak one forward away. The page says a file is on file and when it arrived, and that is all.
+> - **A guest's upload never disturbs one your staff filed.** Where the desk has already attached the slip, the guest is told it is on file rather than quietly replacing it; and an IC photographed at the counter stays exactly where it is.
+> - **Neither is compulsory.** A booking is never refused for want of a file, and a guest who sends nothing is registered at the door as they are today. What A7 changes is how often that is necessary.
+> - **The transfer slip now works for the deposit.** This was the one real obstacle: the system filed a slip against a *payment*, and a security deposit is deliberately not a payment — so the one transfer an online booking actually asks for had nowhere to put a screenshot. It has now, and it appears on the payments queue beside the deposit like any other.
+>
+> **One question for you, and it is not blocking:** when a guest has sent their IC ahead of arriving, does the desk still need to see the physical card at check-in, or is the copy on file enough? The document is kept either way; the answer only decides what the arrival screen asks of your staff.
 
 > **A9 and A10 delivered 16 September 2026.** A customer who has lost the link to their booking types the reference from their transfer and the phone number they booked with, and lands on their booking. A visitor who has not booked yet reads the answers to the questions guests actually ask, with every rate and time on the page read live from Property settings.
 >
@@ -218,7 +227,7 @@ Four things worth saying plainly, because they are what the guarantees actually 
 - **The IC is referenced in the pack, not copied into it.** The pack records that the IC was collected, when and by whom. It does not carry the image, because the pack is kept seven years and can be opened by every role that can view a booking, while the IC itself is kept twelve months and opened only by Admin and Front Office. Copying it in would quietly undo both of those promises. Confirmed with the client on 10 September 2026: the accountant does **not** need the image in the pack, so this stands as built.
 - **An earlier version of a pack is never lost.** When a pack is rebuilt, the previous one is recorded as replaced on the booking's history, so what was sent to the accountant last month remains answerable.
 
-**Still to come in this area:** **A7** — customers uploading their own IC and slip during booking — remains phase two; today staff attach what a guest sends them, which is what they do now anyway.
+**A6 and A7 landed on 18 September 2026**, so customers upload their own IC and slip from their booking link. Staff keep the control they have, for the guest who sends it over WhatsApp anyway. Everything in the G-series is unchanged by it: the same private storage, the same permission to open an identity document, the same access log, the same retention clock. What changed is who may put a file *in*, never who may take one out.
 
 **One question this raised for you:** what should happen to a guest's identity document when their booking is **cancelled**? It currently follows the same twelve-month clock counted from the stay they never took. You may want it destroyed sooner. See the register.
 

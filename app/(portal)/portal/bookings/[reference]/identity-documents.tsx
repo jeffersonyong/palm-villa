@@ -1,5 +1,6 @@
 import { Card } from '@/components/ui/card'
 import type { Document } from '@/lib/db/documents'
+import { uploaderFor } from '@/lib/domain/document'
 
 import { AttachDocument } from '../../documents/attach-document'
 import { DocumentRow } from '../../documents/document-row'
@@ -117,10 +118,13 @@ function AttachIdentity({
   )
 }
 
+/**
+ * Capitalised for the start of a line. The rule itself is `uploaderFor`, which
+ * knows that a null actor on an IC is the guest who sent it (A7) rather than
+ * the system — this only puts a capital on the front of the answer.
+ */
 function nameOf(actorId: string | null, actorNames: Map<string, string>): string {
-  if (!actorId) {
-    return 'Attached by the system'
-  }
+  const who = uploaderFor({ kind: 'identity', uploadedBy: actorId, actorName: actorId ? (actorNames.get(actorId) ?? null) : null })
 
-  return actorNames.get(actorId) ?? 'A former colleague'
+  return `Attached by ${who}`
 }

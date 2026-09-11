@@ -44,7 +44,7 @@ export interface QueueEntry {
   /** When the wait began. */
   createdAt: string
   verifiedAt: string | null
-  /** A slip lives on a payment. A deposit has none — see below. */
+  /** The transfer slip on file, on whichever row the money is (N39). */
   slipDocumentId: string | null
 }
 
@@ -74,10 +74,13 @@ export function paymentEntry(payment: Payment): QueueEntry {
  * verified *payment* stays, because the queue's second half is a log of what
  * was confirmed and there is no other screen for it.
  *
- * **No slip.** Attaching one is `payment.verify` against a `payment_id`
- * (architecture.md §8.1), and a deposit is not a payment, so there is nothing
- * to hang a document on. The cell says so rather than showing an empty space
- * that reads as a slip somebody forgot.
+ * **A slip, since A6.** It used to have none: attaching one meant a
+ * `payment_id` (architecture.md §8.1) and a deposit is not a payment, so the
+ * cell carried a sentence saying so. [N39](../../../../docs/open-questions.md)
+ * answered that with a second pointer rather than a second kind, so a deposit
+ * now reads *On file* exactly as a payment does — and since every online stay
+ * pays the deposit and nothing else, this is the row the customer'''s screenshot
+ * usually lands on.
  *
  * The wait starts at `promised_at` — the moment the customer pressed the
  * button — falling back to when the row was written, which is the same instant
@@ -100,7 +103,7 @@ export function depositEntry(deposit: Deposit): QueueEntry {
     amount: null,
     createdAt: deposit.promisedAt ?? deposit.collectedAt ?? '',
     verifiedAt: null,
-    slipDocumentId: null,
+    slipDocumentId: deposit.slipDocumentId,
   }
 }
 

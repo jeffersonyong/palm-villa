@@ -6,6 +6,7 @@ import {
   ACCEPTED_MIME_TYPES,
   ATTACH_PERMISSION,
   BUCKET_FOR_KIND,
+  CUSTOMER_ATTACHABLE_KINDS,
   DOCUMENT_KIND_LABELS,
   DOCUMENT_KINDS,
   MAX_BYTES_FOR_KIND,
@@ -18,6 +19,8 @@ import {
   formatByteSize,
   isDocumentKind,
   isExpired,
+  mayCustomerAttach,
+  uploaderFor,
   mayAttach,
   mayOpen,
   mayRemove,
@@ -466,5 +469,88 @@ describe('oversizedFiles', () => {
 
   test('nothing chosen is nothing refused', () => {
     expect(oversizedFiles([])).toEqual([])
+  })
+})
+
+/* ── The customer (capabilities A6, A7) ───────────────────────────────────── */
+
+describe('mayCustomerAttach', () => {
+  test('accepts the two things a guest actually holds', () => {
+    expect(mayCustomerAttach('payment_slip')).toBe(true)
+    expect(mayCustomerAttach('identity')).toBe(true)
+  })
+
+  test('refuses an inspection photograph', () => {
+    // Housekeeping's record of what they found after the guest left. A guest
+    // supplying it would be supplying the evidence against themselves.
+    expect(mayCustomerAttach('inspection_photo')).toBe(false)
+  })
+
+  test('refuses an accounting pack', () => {
+    // Assembled by the system and by nobody by hand (capability G5).
+    expect(mayCustomerAttach('accounting_pack')).toBe(false)
+  })
+
+  test('every kind has an answer, so a fifth cannot be added silently', () => {
+    for (const kind of DOCUMENT_KINDS) {
+      expect(typeof mayCustomerAttach(kind)).toBe('boolean')
+    }
+  })
+
+  test('the allowlist and the predicate cannot drift apart', () => {
+    const allowed = DOCUMENT_KINDS.filter(mayCustomerAttach)
+
+    expect([...allowed].sort()).toEqual([...CUSTOMER_ATTACHABLE_KINDS].sort())
+  })
+
+  test('a customer may never attach what nobody may attach by hand', () => {
+    // The two tables answer different questions and must not contradict each
+    // other on the one kind where the answer is "nobody".
+    for (const kind of CUSTOMER_ATTACHABLE_KINDS) {
+      expect(ATTACH_PERMISSION[kind]).not.toBeNull()
+    }
+  })
+})
+
+describe('uploaderFor', () => {
+  test('names the guest where a customer-attachable kind has no actor', () => {
+    // Arrange
+    const slip = { kind: 'payment_slip', uploadedBy: null, actorName: null } as const
+
+    // Act
+    const who = uploaderFor(slip)
+
+    // Assert
+    expect(who).toBe('the guest')
+  })
+
+  test('names the guest for an identity document with no actor', () => {
+    expect(uploaderFor({ kind: 'identity', uploadedBy: null, actorName: null })).toBe('the guest')
+  })
+
+  test('names the system for a pack, which a customer can never send', () => {
+    expect(uploaderFor({ kind: 'accounting_pack', uploadedBy: null, actorName: null })).toBe(
+      'the system',
+    )
+  })
+
+  test('names the system for a photograph, where a null actor is a fault', () => {
+    expect(uploaderFor({ kind: 'inspection_photo', uploadedBy: null, actorName: null })).toBe(
+      'the system',
+    )
+  })
+
+  test('names the staff member where there is one', () => {
+    expect(uploaderFor({ kind: 'identity', uploadedBy: 'user-1', actorName: 'Aisyah' })).toBe(
+      'Aisyah',
+    )
+  })
+
+  test('falls back where the account is gone, and never to the guest', () => {
+    // An actor id with no name is somebody who has left, not a customer —
+    // getting this wrong would attribute a clerk's upload to the guest.
+    expect(uploaderFor({ kind: 'identity', uploadedBy: 'user-9', actorName: null })).toBe(
+      'a former colleague',
+    )
   })
 })

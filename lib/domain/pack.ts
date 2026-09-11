@@ -102,7 +102,10 @@ export interface PackDocumentFacts {
   mimeType: string
   uploadedBy: string | null
   uploadedAt: string
+  /** Set on a slip evidencing a booking payment. */
   paymentId: string | null
+  /** Set on a slip evidencing the security deposit instead (N39). */
+  depositId: string | null
 }
 
 export interface BuildPackInput {
@@ -183,8 +186,13 @@ export function buildPackModel(input: BuildPackInput): PackModel {
   const { booking, assembledAt } = input
   const printer = new Printer()
   const attachments = attachmentsOf(input, printer)
+  // Only the slips that belong to a payment. A deposit slip is in the same
+  // list and is copied in like any other, but no payment section points at it —
+  // prd.md §11 keeps the deposit a liability beside the money, not a line in it.
   const attachmentIndexByPayment = new Map(
-    input.slips.map((slip, index) => [slip.paymentId, index] as const),
+    input.slips.flatMap((slip, index) =>
+      slip.paymentId === null ? [] : [[slip.paymentId, index] as const],
+    ),
   )
 
   const payments = [...input.payments]
@@ -397,10 +405,18 @@ function attachmentsOf(input: BuildPackInput, printer: Printer): PackAttachment[
   return input.slips.map((slip, index) => {
     const payment = slip.paymentId ? paymentsById.get(slip.paymentId) : undefined
     const embedding = embeddingFor(slip.mimeType)
+
+    // A slip evidences one transfer of one sum, and since A6 that sum may be
+    // the security deposit rather than a booking payment (N39). Naming it is
+    // the difference between an accountant reading a BND 100 screenshot as a
+    // part payment of a BND 400 stay and reading it as the liability it is —
+    // which is the confusion prd.md §9.1 spends a paragraph refusing.
     const money =
-      payment?.amount === null || payment?.amount === undefined
-        ? 'payment awaiting verification'
-        : `payment of BND ${formatCents(payment.amount)}`
+      slip.depositId !== null
+        ? 'the security deposit'
+        : payment?.amount === null || payment?.amount === undefined
+          ? 'payment awaiting verification'
+          : `payment of BND ${formatCents(payment.amount)}`
 
     return {
       documentId: slip.id,
