@@ -279,6 +279,11 @@ function NightCell({
   const isFilled = isStart || isEnd
   const isSoftEnd = provisional && isEnd && anchor !== date
   const isFull = free < 1
+  // Sold out, as against merely having nothing free. A night before the
+  // booking window has nothing free either, and it did not sell out — it was
+  // never on sale. The two were one flag, so the label said "full" about a day
+  // in August and the strikethrough drew a line through it.
+  const soldOut = isFull && !outOfBounds
   const selectable = !outOfBounds && (!isFull || provisional)
 
   return (
@@ -287,7 +292,7 @@ function NightCell({
         type="button"
         disabled={!selectable}
         tabIndex={focused && selectable ? 0 : -1}
-        aria-label={`${formatDayLabel(date)}${isFull ? ', full' : ''}`}
+        aria-label={`${formatDayLabel(date)}${soldOut ? ', full' : ''}`}
         aria-pressed={isFilled}
         onClick={() => onPick(date, !inMonth)}
         onPointerEnter={() => {
@@ -316,8 +321,8 @@ function NightCell({
           // underneath, so the only thing separating a sold-out Saturday from a
           // bookable one was a caption — the grid read as available by default
           // and the customer had to check each cell rather than scan the block.
-          !isFilled && inMonth && (!isFull || outOfBounds) && 'text-foreground',
-          !isFilled && inMonth && isFull && !outOfBounds && 'text-muted-foreground',
+          !isFilled && inMonth && !soldOut && 'text-foreground',
+          !isFilled && inMonth && soldOut && 'text-muted-foreground',
           !isFilled && !inMonth && 'text-muted-foreground',
           outOfBounds && 'opacity-40',
           selectable ? 'cursor-pointer' : 'cursor-default',
@@ -341,7 +346,7 @@ function NightCell({
             // faded and carry no rate, and a line through them would say
             // "sold out" about a night that was never on sale — which is a
             // different fact, and a noisier one at the top of the grid.
-            isFull && !isFilled && !outOfBounds && 'line-through decoration-from-font',
+            soldOut && !isFilled && 'line-through decoration-from-font',
           )}
         >
           {Number(date.slice(8, 10))}
@@ -350,14 +355,20 @@ function NightCell({
         {/* The rate, or the fact there is nothing to sell. Hidden on an
             out-of-window day, where a price would be an offer. */}
         {outOfBounds ? null : isFull ? (
-          // The rate's own size and register, not `micro-label`'s. A micro
-          // label is 11px uppercase with tracking, so against a 10px rate it
-          // was both wider and a line taller — which pushed the numeral up and
-          // left a sold-out night sitting a pixel or two off the row it is in.
-          // Whatever occupies this line, it is the same line.
+          // Caps, because this is a label rather than a figure — but at the
+          // rate's 10px rather than `micro-label`'s 11px. That utility is the
+          // right voice and the wrong size here: against a 10px rate it was
+          // wider and a line taller, which pushed the numeral up and left a
+          // sold-out night sitting a pixel or two off the row it is in. So the
+          // tracking is borrowed at the ratio the utility uses — 0.55px on
+          // 11px, so 0.5px on 10px — and the line box is left alone.
+          //
+          // `uppercase` rather than the word typed in capitals, so the text
+          // node stays "Full": a screen reader that spells out all-caps words
+          // reads F-U-L-L from the markup and "full" from this.
           <span
             className={cn(
-              'text-[10px]',
+              'text-[10px] tracking-[0.5px] uppercase',
               isFilled && !isSoftEnd ? 'text-primary-foreground/80' : 'text-muted-foreground',
             )}
           >
