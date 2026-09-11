@@ -68,6 +68,16 @@ import { uploadDocumentAction, type UploadState } from './actions'
 interface SendAFileProps {
   token: string
   kind: CustomerAttachableKind
+  /**
+   * Which numbered step this is, matching the list at the top of the page.
+   *
+   * Numbered rather than left as two headings, because two upload sections
+   * look alike and a guest who has done one has no way to tell whether the
+   * other is the same thing again. The numbers come from the page so the
+   * heading and the list cannot disagree — and they start at 2 because step
+   * one is the transfer, which is already behind them.
+   */
+  step: number
   /** The heading. */
   title: string
   /** Why we are asking, in the guest's terms. */
@@ -76,7 +86,7 @@ interface SendAFileProps {
   onFileSince: string | null
 }
 
-export function SendAFile({ token, kind, title, description, onFileSince }: SendAFileProps) {
+export function SendAFile({ token, kind, step, title, description, onFileSince }: SendAFileProps) {
   const [state, action, pending] = useActionState<UploadState, FormData>(uploadDocumentAction, {
     status: 'idle',
   })
@@ -126,7 +136,9 @@ export function SendAFile({ token, kind, title, description, onFileSince }: Send
 
   return (
     <section className="mt-xl border-t border-border pt-xl">
-      <h2 className="text-body-lg-strong text-foreground">{title}</h2>
+      <h2 className="text-body-lg-strong text-foreground">
+        <span className="text-muted-foreground tabular-nums">{step}.</span> {title}
+      </h2>
       <p className="text-body mt-xs text-copy">{description}</p>
 
       <form ref={formRef} action={action} className="mt-md grid gap-md">
