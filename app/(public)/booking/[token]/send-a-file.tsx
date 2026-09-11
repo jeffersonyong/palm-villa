@@ -1,9 +1,8 @@
 'use client'
 
 import { Check } from 'lucide-react'
-import { useActionState, useState } from 'react'
+import { useActionState, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/ui/callout'
 import {
   acceptAttributeFor,
@@ -19,27 +18,44 @@ import { uploadDocumentAction, type UploadState } from './actions'
  * The guest sends us a file (capabilities A6 and A7).
  *
  * One component for both, because from the customer's side they are the same
- * act — choose a photograph, press send — and the only thing that differs is
+ * act — choose a photograph, and it is with us. The only thing that differs is
  * what the surrounding sentence asks for. A6 is the transfer slip they would
  * otherwise send over WhatsApp; A7 is the IC the desk would otherwise ask for
  * at the door.
  *
- * ── Why this is not the portal's `AttachDocument` ──────────────────────────
+ * ── Choosing the file sends it, and there is no Send ───────────────────────
  *
- * That component calls a server action gated by `requirePermission`, which a
- * customer can never satisfy. The *rules* are shared and are not restated here
- * — `acceptAttributeFor`, `oversizedFiles` and the 4 MiB ceiling all come from
- * `lib/domain/document.ts`, so the limit cannot be raised in one place and not
- * the other. What is not shared is the chrome: `FileField` is built at the
- * operations register's 32px, and this is a customer on a phone.
+ * There used to be one, and it was a trap. Two of these sit on the page, so a
+ * guest picks an IC, picks a slip below it, sees both filenames on screen and
+ * reasonably concludes both have arrived — the second pick looks like the
+ * confirmation of the first. Nothing on the page contradicts them until they
+ * get to the desk and are asked for an IC they believe they sent.
+ *
+ * That failure is silent, and it is expensive in exactly the way A7 exists to
+ * avoid: an upload nobody completes is an upload the desk chases anyway.
+ *
+ * So the picker submits. Three things make that safe here, and they would not
+ * all hold elsewhere:
+ *
+ *   - **Nothing is destroyed.** A second file supersedes the guest's own first
+ *     one, so a mis-tap costs one more tap rather than a lost record.
+ *   - **There is nothing to review.** The file is a photograph of a document;
+ *     holding it back for a confirmation step buys the guest no decision they
+ *     could not make by looking at their own camera roll.
+ *   - **It is not a claim.** "I have made the transfer" keeps its button,
+ *     because pressing that asserts something about the world and puts a row
+ *     in front of a clerk. Attaching a photograph asserts nothing.
+ *
+ * The size check still runs before anything is sent, so an oversized file is
+ * refused where it is chosen rather than after a round trip.
  *
  * ── What it shows once a file is on file ───────────────────────────────────
  *
  * That there is one, and when it arrived. Never the filename, and never a way
  * to open it — this link travels in forwarded WhatsApp messages, and
  * `lib/domain/document.ts` carries the argument at length. A guest who sends a
- * second file replaces their own; the copy says so, because otherwise "send a
- * different one" reads as though we will end up with two.
+ * second file replaces their own; the copy says so, because otherwise "choose a
+ * different file" reads as though we will end up with two.
  *
  * ── The retention period is not stated, deliberately ───────────────────────
  *
@@ -64,46 +80,56 @@ export function SendAFile({ token, kind, title, description, onFileSince }: Send
   const [state, action, pending] = useActionState<UploadState, FormData>(uploadDocumentAction, {
     status: 'idle',
   })
-  const [files, setFiles] = useState<readonly File[]>([])
+  const [refused, setRefused] = useState<File | null>(null)
   const [seen, setSeen] = useState(state)
+  const formRef = useRef<HTMLFormElement>(null)
   const inputId = `send-${kind}`
 
-  // A completed send forgets the file that was chosen, so the control returns
-  // to its resting state rather than sitting there naming one that has already
-  // gone. React 19 resets the `<input>` itself once a form action settles, so
-  // the only thing left to clear is what we remembered about it.
+  // A completed send forgets the file that was refused before it, so the
+  // section returns to its resting state. React 19 resets the `<input>` itself
+  // once a form action settles, so this is only what we remembered about it.
   //
   // Adjusted during render rather than in an effect — the pattern React
-  // documents for "state that depends on a prop changing", and the reason is
-  // the ordinary one: an effect would render the stale filename once, then
-  // render again without it.
+  // documents for state that depends on something changing, and the reason is
+  // the ordinary one: an effect would render the stale line once, then render
+  // again without it.
   if (seen !== state) {
     setSeen(state)
-
-    if (state.status === 'done') {
-      setFiles([])
-    }
+    setRefused(null)
   }
 
-  const chosen = files[0] ?? null
-  const oversized = oversizedFiles(files).length > 0
+  /**
+   * Picking the file is the whole interaction.
+   *
+   * The size guard runs first and stops the submit, because an oversized file
+   * refused here costs nothing while one refused by the server costs a round
+   * trip on a phone signal this product is explicitly built for (prd.md §15).
+   */
+  function handlePick(event: React.ChangeEvent<HTMLInputElement>) {
+    const [chosen] = Array.from(event.target.files ?? [])
+
+    if (!chosen) {
+      return
+    }
+
+    if (oversizedFiles([chosen]).length > 0) {
+      setRefused(chosen)
+
+      return
+    }
+
+    setRefused(null)
+    formRef.current?.requestSubmit()
+  }
+
   const held = state.status === 'done' || onFileSince !== null
 
   return (
     <section className="mt-xl border-t border-border pt-xl">
       <h2 className="text-body-lg-strong text-foreground">{title}</h2>
-      <p className="mt-xs text-body text-copy">{description}</p>
+      <p className="text-body mt-xs text-copy">{description}</p>
 
-      {held ? (
-        <p className="mt-md inline-flex items-center gap-xs text-body-sm text-copy">
-          <Check aria-hidden className="size-4 text-positive-deep" />
-          {state.status === 'done'
-            ? 'Received, thank you.'
-            : `Received ${formatArrival(onFileSince!)}.`}
-        </p>
-      ) : null}
-
-      <form action={action} className="mt-md grid gap-md">
+      <form ref={formRef} action={action} className="mt-md grid gap-md">
         <input type="hidden" name="token" value={token} />
         <input type="hidden" name="kind" value={kind} />
 
@@ -119,21 +145,34 @@ export function SendAFile({ token, kind, title, description, onFileSince }: Send
             type="file"
             name="file"
             accept={acceptAttributeFor(kind)}
+            disabled={pending}
             className="sr-only"
-            onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+            onChange={handlePick}
           />
 
-          {chosen ? (
-            <span className="text-body-sm text-copy">
-              {chosen.name} · {formatByteSize(chosen.size)}
-            </span>
-          ) : null}
+          {/* Said out loud as it changes, because the thing that changes is
+              whether we have their document and they are no longer pressing a
+              button to find out. */}
+          <p aria-live="polite" className="text-body-sm text-copy">
+            {pending ? (
+              'Sending…'
+            ) : held ? (
+              <span className="inline-flex items-center gap-xs">
+                <Check aria-hidden className="size-4 text-positive-deep" />
+                {state.status === 'done'
+                  ? 'Received, thank you.'
+                  : `Received ${formatArrival(onFileSince!)}.`}
+              </span>
+            ) : (
+              ''
+            )}
+          </p>
         </div>
 
-        {oversized ? (
+        {refused ? (
           <p className="text-body-sm text-destructive">
-            That file is larger than {megabytes()} MB. A photograph taken on a phone is usually well
-            under it.
+            {refused.name} is {formatByteSize(refused.size)}, which is larger than {megabytes()} MB.
+            A photograph taken on a phone is usually well under it.
           </p>
         ) : (
           <p className="text-caption text-muted-foreground">
@@ -148,12 +187,6 @@ export function SendAFile({ token, kind, title, description, onFileSince }: Send
             {state.message}
           </Callout>
         ) : null}
-
-        <div>
-          <Button type="submit" disabled={pending || chosen === null || oversized}>
-            {pending ? 'Sending…' : 'Send'}
-          </Button>
-        </div>
       </form>
     </section>
   )
