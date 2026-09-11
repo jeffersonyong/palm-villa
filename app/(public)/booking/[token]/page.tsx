@@ -79,12 +79,18 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
 
   // What the guest may send, and what we already hold (capabilities A6, A7).
   //
-  // A slip is asked for once the guest has said they transferred — before
-  // that there is no payment or deposit row to file it against, and asking
-  // for evidence of something they have not done yet reads as a muddle. An IC
-  // is asked for from the moment the booking exists and until the stay is
-  // over: prd.md §13 requires it for registration, and a guest who provides
-  // it here is a guest the desk does not have to chase at the door.
+  // Neither is offered until the guest has said they transferred, and the two
+  // reasons are different. A **slip** cannot be filed before then because there
+  // is no deposit or payment row to be evidence of — asking for proof of
+  // something they have not done yet reads as a muddle. An **IC** could be
+  // asked for earlier and deliberately is not: the screen before this one has
+  // one job, which is to get the transfer made, and a second upload box beside
+  // the bank details competes with it. Once they are waiting on us, they have a
+  // moment, and that is where the asking goes.
+  //
+  // The IC then stays available through `confirmed`, because prd.md §13 wants
+  // it for registration and a guest who sends it before arriving is a guest the
+  // desk does not have to chase at the door.
   //
   // `listDocumentsForBooking` excludes what has expired as well as what was
   // removed, so a file past its retention date stops being reported as held —
