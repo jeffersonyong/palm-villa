@@ -134,7 +134,7 @@ export function StayBooking({
                         // basis is the wrap threshold, not the width — a phone
                         // stacks them, and a fourth type (N1'''s 2-bedroom) joins
                         // the row rather than forcing a new layout.
-                        'flex grow basis-48 flex-col items-start gap-xxs rounded-md border px-lg py-md text-left transition-colors',
+                        'flex grow basis-48 cursor-pointer flex-col items-start gap-xxs rounded-md border px-lg py-md text-left transition-colors',
                         type.id === unitTypeSlug
                           ? 'border-primary bg-accent text-accent-foreground'
                           : 'border-border bg-card text-foreground hover:bg-muted',
