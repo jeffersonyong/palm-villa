@@ -1,7 +1,9 @@
 import {
   depositFiguresOf,
+  depositShortfallOf,
   depositStageOf,
   describeReleaseFailure,
+  describeTopUpFailure,
   type DepositFigures,
   type DepositStage,
 } from '@/lib/domain/deposit'
@@ -107,6 +109,18 @@ export interface Deposit {
    * signed rather than a recomputation.
    */
   figures: DepositFigures
+  /**
+   * What the booking quotes, beside `amount` which is what was taken.
+   *
+   * prd.md §11 keeps the two apart on purpose and reads the quote live, so an
+   * amendment that reprices the booking moves this and never `amount`.
+   */
+  quoted: Cents
+  /**
+   * What is still owed against the quote — zero for a whole deposit, and zero
+   * for a promise, which is awaited rather than short.
+   */
+  shortfall: Cents
 }
 
 interface DepositSummaryRow {
@@ -146,6 +160,7 @@ interface DepositSummaryRow {
   owed_settled_at: string | null
   owed_settled_by: string | null
   owed_settled_method: string | null
+  quoted_cents: number
 }
 
 /** Hand-maintained, like SUMMARY_COLUMNS in ./bookings.ts — there is no codegen. */
@@ -186,6 +201,7 @@ const SUMMARY_COLUMNS = [
   'observed_sender',
   'observed_on',
   'amount_override_reason',
+  'quoted_cents',
 ].join(', ')
 
 function toDeposit(row: DepositSummaryRow): Deposit {
@@ -270,6 +286,8 @@ function toDeposit(row: DepositSummaryRow): Deposit {
       row.amount_cents,
       release ? release.chargesTotal : row.charges_total_cents,
     ),
+    quoted: row.quoted_cents,
+    shortfall: depositShortfallOf(row.quoted_cents, row.amount_cents, row.collected_at !== null),
   }
 }
 
@@ -340,6 +358,133 @@ export async function listDepositsCollectedBetween(
   }
 
   return (data as unknown as DepositSummaryRow[]).map(toDeposit)
+}
+
+/** Cash that crossed the counter for a security deposit, and the moment it did. */
+export interface DepositCashArrival {
+  collectedAt: string
+  amount: Cents
+}
+
+/**
+ * The cash security deposits that actually arrived inside a window
+ * (capability E4).
+ *
+ * The cash-up's informational line used to be `listDepositsCollectedBetween`
+ * summed straight, and a top-up broke that in two ways at once. A deposit row
+ * carries one `method` and one `collected_at` — how and when it was *first*
+ * seen — but `amount_cents` grows when the desk tops it up, so:
+ *
+ *   - BND 50 topped up in cash against a deposit that first arrived by
+ *     transfer went into the drawer and into no figure on this screen. A
+ *     clerk counting the notes found 50 they could not explain.
+ *   - BND 50 topped up today against a deposit collected on Monday moved
+ *     **Monday's** figure, which somebody may already have counted, printed
+ *     and signed.
+ *
+ * Both are the same mistake — reading a running total as a day's takings — and
+ * the fix is to ask what arrived, which the trail records exactly. A deposit
+ * reports what was collected on its own day (its total, less everything added
+ * since), and every cash top-up reports on the day it was taken. Subtracting
+ * *all* of a deposit's top-ups is exact rather than approximate, because a
+ * top-up can only follow a collection.
+ *
+ * prd.md §14 is unchanged by this: deposits stay out of the takings total.
+ * What changes is that the line beside the total is now true.
+ */
+export async function listDepositCashArrivals(
+  bounds: DayBounds,
+): Promise<readonly DepositCashArrival[]> {
+  const propertyId = await currentPropertyId()
+  const collected = await listDepositsCollectedBetween(bounds, 'cash')
+
+  const [addedSince, toppedUpInWindow] = await Promise.all([
+    topUpTotalsFor(
+      propertyId,
+      collected.map((deposit) => deposit.id),
+    ),
+    cashTopUpsBetween(propertyId, bounds),
+  ])
+
+  const firstArrivals = collected.flatMap((deposit) =>
+    deposit.collectedAt === null
+      ? []
+      : [
+          {
+            collectedAt: deposit.collectedAt,
+            amount: deposit.amount - (addedSince.get(deposit.id) ?? 0),
+          },
+        ],
+  )
+
+  // A deposit whose every cent arrived later contributes nothing to its own
+  // day rather than a zero row, which would read as a deposit of nothing.
+  return [...firstArrivals.filter((arrival) => arrival.amount > 0), ...toppedUpInWindow]
+}
+
+/** What has been added to each of these deposits since it was collected, all time. */
+async function topUpTotalsFor(
+  propertyId: string,
+  depositIds: readonly string[],
+): Promise<ReadonlyMap<string, Cents>> {
+  if (depositIds.length === 0) {
+    return new Map()
+  }
+
+  const { data, error } = await dataClient()
+    .from('audit_event')
+    .select('entity_id, after')
+    .eq('property_id', propertyId)
+    .eq('action', 'deposit.topped_up')
+    .in('entity_id', depositIds)
+
+  if (error) {
+    throw new Error(`Could not read the deposit top-ups: ${error.message}`)
+  }
+
+  const totals = new Map<string, Cents>()
+
+  for (const row of data as unknown as TopUpEventRow[]) {
+    const added = row.after?.added_cents ?? 0
+
+    totals.set(row.entity_id, (totals.get(row.entity_id) ?? 0) + added)
+  }
+
+  return totals
+}
+
+/** Every top-up taken in cash inside the window, whatever its deposit first was. */
+async function cashTopUpsBetween(
+  propertyId: string,
+  bounds: DayBounds,
+): Promise<readonly DepositCashArrival[]> {
+  const { data, error } = await dataClient()
+    .from('audit_event')
+    .select('at, after')
+    .eq('property_id', propertyId)
+    .eq('action', 'deposit.topped_up')
+    .gte('at', bounds.start)
+    .lt('at', bounds.end)
+    .order('at', { ascending: true })
+
+  if (error) {
+    throw new Error(`Could not read the deposit top-ups: ${error.message}`)
+  }
+
+  return (data as unknown as TopUpEventRow[]).flatMap((row) =>
+    // Filtered here rather than in the query: the method lives inside the
+    // event's `after` document, and a jsonb path in a filter is a string
+    // comparison nobody reading this file would see was load-bearing.
+    row.after?.method === 'cash' && (row.after.added_cents ?? 0) > 0
+      ? [{ collectedAt: row.at, amount: row.after.added_cents ?? 0 }]
+      : [],
+  )
+}
+
+interface TopUpEventRow {
+  entity_id: string
+  at: string
+  after: { added_cents?: number; method?: string } | null
 }
 
 export interface DepositPage {
@@ -851,6 +996,20 @@ function describeCheckInFailure(result: RpcRefusal): {
       const amount =
         typeof result.amount_cents === 'number' ? `BND ${formatCents(result.amount_cents)} ` : ''
 
+      // Three ways to fail one gate, and each names the action that works.
+      // `short` is the one this cannot get wrong: sending a clerk to the
+      // payments queue for a deposit that was already verified is how the
+      // shortfall goes uncollected a second time.
+      if (result.short === true) {
+        const held =
+          typeof result.held_cents === 'number' ? `BND ${formatCents(result.held_cents)}` : 'Less'
+
+        return {
+          code: result.error,
+          message: `Only ${held} of the ${amount}security deposit is held. Top it up from the booking, then check the guest in.`,
+        }
+      }
+
       return {
         code: result.error,
         message:
@@ -928,9 +1087,15 @@ export interface VerifyDepositInput {
  * deposit is not money against the booking, it settles nothing, and the pack
  * arrives when the stay itself is paid on arrival (capability G5).
  */
-export async function verifyDeposit(
-  input: VerifyDepositInput,
-): Promise<DepositWriteResult<{ amount: Cents; bookingId: string; confirmedNow: boolean }>> {
+export async function verifyDeposit(input: VerifyDepositInput): Promise<
+  DepositWriteResult<{
+    amount: Cents
+    bookingId: string
+    confirmedNow: boolean
+    /** What the deposit is still short of the quote. Non-zero means it secured nothing. */
+    shortfall: Cents
+  }>
+> {
   const propertyId = await currentPropertyId()
 
   const { data: row, error: readError } = await dataClient()
@@ -968,7 +1133,15 @@ export async function verifyDeposit(
     throw new Error(`Could not verify the deposit: ${error.message}`)
   }
 
-  const result = data as { ok: true; amount_cents: number; booking_id: string } | RpcRefusal
+  const result = data as
+    | {
+        ok: true
+        amount_cents: number
+        booking_id: string
+        shortfall_cents: number
+        moved: boolean
+      }
+    | RpcRefusal
 
   if (!result.ok) {
     return { ok: false, error: describeVerifyDepositFailure(result) }
@@ -978,8 +1151,165 @@ export async function verifyDeposit(
     ok: true,
     amount: result.amount_cents,
     bookingId: result.booking_id,
-    confirmedNow: next.ok,
+    shortfall: result.shortfall_cents,
+    // From the function, not from `next.ok`. A transfer that arrived short is
+    // collected and moves nothing (prd.md §11), and the pair this offered was
+    // only ever an offer — reading it back as fact is how a guest gets a
+    // confirmation email for a booking still sitting in `held`.
+    confirmedNow: result.moved,
   }
+}
+
+export interface TopUpDepositInput {
+  bookingId: string
+  /** What was counted or seen now — never the new total. */
+  amount: Cents
+  /** How this money arrived, which need not be how the deposit was first taken. */
+  method: PaymentMethod
+  actorId: string | null
+}
+
+/**
+ * The rest of a deposit that arrived short (capability B16; prd.md §11).
+ *
+ * `recordBookingDeposit`'s shape, and the three differences are the design.
+ *
+ * **It takes an amount.** Recording a deposit never does — it is the booking's
+ * quoted figure and there is nothing to type. What is missing off a short one
+ * is whatever the guest has just handed over, and only the person holding it
+ * knows.
+ *
+ * **It is money already seen.** Cash counted at the desk, or a transfer the
+ * clerk has just read in the bank app. Nothing here joins the verification
+ * queue: a queue row is a promise, and this row stopped being a promise when
+ * somebody collected it. That is why `method` is the top-up's own and not the
+ * row's — the row keeps how the deposit first arrived.
+ *
+ * **It confirms the booking only when the deposit comes whole.** The pair is
+ * derived here because architecture.md §5.3 keeps the machine in one module,
+ * but the function re-derives the shortfall under the row lock and applies the
+ * pair only if nothing is left owing. This read picks which pair to offer; the
+ * database is what settles a race.
+ *
+ * `secure_with_deposit` is the event, not a new one. It already means exactly
+ * this — the deposit is in and it is what confirms the booking, with the stay
+ * still owed in full — and a synonym would fragment "every booking confirmed
+ * by its deposit" into two lookups.
+ *
+ * **No accounting pack**, for `verifyDeposit`'s reason: a deposit is not money
+ * against the booking, it settles nothing, and the pack arrives when the stay
+ * is paid on arrival (capability G5).
+ */
+export async function topUpBookingDeposit(input: TopUpDepositInput): Promise<
+  DepositWriteResult<{
+    depositId: string
+    /** The deposit's new total. */
+    amount: Cents
+    /** What is still owed against the quote, zero once it is whole. */
+    shortfall: Cents
+    status: BookingStatus
+    /** True when this call is what confirmed the booking, for capability A8. */
+    confirmedNow: boolean
+  }>
+> {
+  const propertyId = await currentPropertyId()
+
+  const { data: row, error: readError } = await dataClient()
+    .from('booking')
+    .select('status')
+    .eq('property_id', propertyId)
+    .eq('id', input.bookingId)
+    .maybeSingle()
+
+  if (readError) {
+    throw new Error(`Could not read booking ${input.bookingId}: ${readError.message}`)
+  }
+
+  if (!row) {
+    return { ok: false, error: { code: 'not_found', message: 'That booking no longer exists.' } }
+  }
+
+  const current = (row as { status: BookingStatus }).status
+
+  // Whether this top-up completes the deposit decides whether there is a move
+  // to offer at all. Read here, re-derived under the row lock there.
+  const standing = await getDepositByBookingId(input.bookingId)
+  const completes = standing !== null && standing.amount + input.amount >= standing.quoted
+  const next = completes ? transition(current, 'secure_with_deposit') : null
+
+  const { data, error } = await dataClient().rpc('top_up_booking_deposit', {
+    p_property_id: propertyId,
+    p_booking_id: input.bookingId,
+    p_amount_cents: input.amount,
+    p_method: input.method,
+    p_from_status: next?.ok ? current : null,
+    p_to_status: next?.ok ? next.status : null,
+    p_actor_id: input.actorId,
+  })
+
+  if (error) {
+    throw new Error(`Could not top up the deposit: ${error.message}`)
+  }
+
+  const result = data as
+    | {
+        ok: true
+        deposit_id: string
+        amount_cents: number
+        shortfall_cents: number
+        confirmed_now: boolean
+        status: BookingStatus
+      }
+    | RpcRefusal
+
+  if (!result.ok) {
+    return { ok: false, error: describeTopUpRefusal(result) }
+  }
+
+  return {
+    ok: true,
+    depositId: result.deposit_id,
+    amount: result.amount_cents,
+    shortfall: result.shortfall_cents,
+    status: result.status,
+    confirmedNow: result.confirmed_now,
+  }
+}
+
+function describeTopUpRefusal(result: RpcRefusal): DepositWriteError {
+  if (result.error === 'exceeds_shortfall') {
+    const shortfall =
+      typeof result.shortfall_cents === 'number' ? formatCents(result.shortfall_cents) : null
+
+    return {
+      code: result.error,
+      message: shortfall
+        ? `This deposit is only BND ${shortfall} short. Enter that or less.`
+        : describeTopUpFailure(result.error).message,
+    }
+  }
+
+  if (result.error === 'status_changed') {
+    return {
+      code: result.error,
+      message:
+        'Someone else moved this booking while you were working on it. Reload and try again.',
+    }
+  }
+
+  if (result.error === 'booking_not_found' || result.error === 'invalid_method') {
+    return { code: result.error, message: 'That booking no longer exists.' }
+  }
+
+  if (result.error === 'invalid_amount') {
+    return { code: result.error, message: 'Enter the amount that arrived.' }
+  }
+
+  // The four state refusals share their sentences with `canTopUp`, so a clerk
+  // reads the same words whether the screen caught it or the database did.
+  const refusal = describeTopUpFailure(result.error)
+
+  return { code: refusal.code, message: refusal.message }
 }
 
 function describeVerifyDepositFailure(result: RpcRefusal): DepositWriteError {
@@ -995,7 +1325,11 @@ function describeVerifyDepositFailure(result: RpcRefusal): DepositWriteError {
       }
     }
     case 'already_collected':
-      return { code: result.error, message: 'This deposit has already been verified.' }
+      return {
+        code: result.error,
+        message:
+          'This deposit has already been verified. If it came up short, top it up from the booking.',
+      }
     case 'status_changed':
       return {
         code: result.error,

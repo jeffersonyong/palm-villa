@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
 import { QuoteLines } from '@/components/quote-lines'
+import { getDepositByBookingId } from '@/lib/db/deposits'
 import { getBookingByAccessToken } from '@/lib/db/public-bookings'
 import { readPropertySettings } from '@/lib/db/settings'
 import { balanceOf } from '@/lib/domain/balance'
@@ -59,8 +60,18 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
 
   const stage = publicStageOf(booking.status)
   const plan = transferPlanFor(booking)
-  const settings = await readPropertySettings()
+  const [settings, deposit] = await Promise.all([
+    readPropertySettings(),
+    getDepositByBookingId(booking.id),
+  ])
   const chip = chipFor(stage)
+
+  // Somebody has looked at the bank and what arrived was less than the
+  // deposit. Without this the page keeps saying "we are checking for the
+  // transfer" after it has been checked, which is the one sentence on this
+  // surface that would now be false — and the customer is the only person who
+  // can put it right.
+  const shortfall = deposit !== null && deposit.collectedAt !== null ? deposit.shortfall : 0
 
   return (
     <section aria-labelledby="booking-heading" className="bg-card px-xl py-3xl">
@@ -111,10 +122,22 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
           />
         ) : null}
 
-        {stage === 'checking' ? (
+        {stage === 'checking' && shortfall === 0 ? (
           <Callout tone="positive" className="mt-xl">
             We have your booking and are checking for the transfer. Once we verify it, we will send
             you an email confirmation and a QR code for entry.
+          </Callout>
+        ) : null}
+
+        {stage === 'checking' && shortfall > 0 && deposit ? (
+          <Callout tone="negative" placement="page" className="mt-xl">
+            <span>
+              We have received BND {formatCents(deposit.amount)} of the BND{' '}
+              {formatCents(deposit.quoted)} security deposit, so BND {formatCents(shortfall)} is
+              still outstanding. Your unit is held, and the booking is confirmed once the rest
+              arrives — send it to the same account, quoting {booking.reference}, or call us if
+              something has gone wrong.
+            </span>
           </Callout>
         ) : null}
 

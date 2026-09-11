@@ -24,7 +24,7 @@ import {
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { cashOnHandBefore, listCashBankings } from '@/lib/db/cash-banking'
-import { listDepositsCollectedBetween } from '@/lib/db/deposits'
+import { listDepositCashArrivals } from '@/lib/db/deposits'
 import { listPayments } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
 import {
@@ -122,7 +122,7 @@ export default async function CashUpDayPage({ params }: PageProps) {
       collectedBefore: bounds.end,
       newestFirst: true,
     }),
-    listDepositsCollectedBetween(bounds, 'cash'),
+    listDepositCashArrivals(bounds),
     listCashBankings(window),
     listStaff(),
     cashOnHandBefore(date),
@@ -132,7 +132,9 @@ export default async function CashUpDayPage({ params }: PageProps) {
 
   const recorded = sumCents(payments.map((payment) => payment.amount ?? 0))
   const banked = sumCents(bankings.map((banking) => banking.amount))
-  const depositCash = sumCents(deposits.map((deposit) => deposit.amount))
+  // Arrivals, not rows: a deposit topped up in cash a week after it was
+  // collected is cash in today's drawer and belongs to today.
+  const depositCash = sumCents(deposits.map((arrival) => arrival.amount))
   // The running balance this day closes on: what was already unbanked before
   // it, plus what it took, less what went to the bank. The figure somebody can
   // check by opening the safe.
@@ -263,8 +265,8 @@ export default async function CashUpDayPage({ params }: PageProps) {
           >
             <p className="text-body-sm text-copy">
               <span className="mr-sm micro-label text-muted-foreground">Also in the drawer</span>
-              {deposits.length} cash security {deposits.length === 1 ? 'deposit' : 'deposits'} taken
-              this day, held as a liability rather than as takings —{' '}
+              Cash taken this day for security {deposits.length === 1 ? 'deposit' : 'deposits'},
+              held as a liability rather than as takings —{' '}
               <Link href="/portal/deposits" className="underline underline-offset-2">
                 the deposits ledger
               </Link>{' '}

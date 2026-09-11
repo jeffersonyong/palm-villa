@@ -188,6 +188,15 @@ export default async function StatementPage({ params }: PageProps) {
           Totals
         </h2>
 
+        {/* Drawn only where the two differ, which is a deposit that arrived
+            short of the quote. This is the guest's own document and the line
+            is why less came back than the booking named. Unlike every figure
+            below it the quote is read live rather than frozen at approval, so
+            an amendment after a release would move it — accepted rather than
+            solved, because a completed booking cannot be amended. */}
+        {deposit.quoted > deposit.amount ? (
+          <Total label="Deposit quoted" value={deposit.quoted} />
+        ) : null}
         <Total label="Deposit held" value={deposit.amount} />
         <Total label="Less charges" value={release.chargesTotal} />
         <div className="mt-sm border-t border-divider pt-sm">

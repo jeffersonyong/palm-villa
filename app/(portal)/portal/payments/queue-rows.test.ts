@@ -76,6 +76,8 @@ function deposit(overrides: Partial<Deposit> = {}): Deposit {
     settlement: null,
     stage: 'awaiting_verification',
     figures: { held: bnd(100), charges: 0, returned: bnd(100), owed: 0 },
+    quoted: bnd(100),
+    shortfall: 0,
     ...overrides,
   } as Deposit
 }
@@ -111,6 +113,16 @@ describe('flattening a promised deposit', () => {
     expect(entry.expected).toBe(bnd(100))
     // Nobody has looked yet, which is the whole reason it is in this queue.
     expect(entry.amount).toBeNull()
+  })
+
+  test('follows the quote when an amendment repriced it, not the row', () => {
+    // `verify_deposit()` matches against `booking.security_deposit_cents` read
+    // live under the row lock, so a dialog pre-filled from the deposit's own
+    // figure would be refused for a discrepancy nobody could see.
+    const entry = depositEntry(deposit({ amount: bnd(100), quoted: bnd(150) }))
+
+    expect(entry.due).toBe(bnd(150))
+    expect(entry.expected).toBe(bnd(150))
   })
 
   test('carries no slip, because a document hangs off a payment', () => {

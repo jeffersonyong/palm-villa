@@ -2,15 +2,18 @@ import Link from 'next/link'
 
 import { DepositFigureTable, DepositMark, FigureRow } from '@/components/portal/deposit-figures'
 import { DepositStageBadge } from '@/components/portal/deposit-stage-badge'
+import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import type { Deposit } from '@/lib/db/deposits'
 import type { BookingStatus } from '@/lib/domain/booking-state'
 import { formatTimestamp } from '@/lib/domain/dates'
+import { formatCents } from '@/lib/domain/money'
 import type { Cents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
 
 import { DepositActions } from '../../payments/payment-actions'
 import { RecordDeposit } from './record-deposit'
+import { TopUpDeposit } from './top-up-deposit'
 
 /**
  * The security deposit, on the booking's Money card.
@@ -117,12 +120,32 @@ export function SecurityDepositInset({
     )
   }
 
+  // A deposit is short when less of it arrived than the booking quotes — after
+  // a verification accepted a discrepancy, or after an amendment repriced the
+  // booking over what is already held. Once released the question has closed,
+  // so the flag goes with it; the statement keeps the quoted line.
+  const isShort = deposit.shortfall > 0 && deposit.release === null
+
   return (
     <DepositFigureTable
       figures={deposit.figures}
       release={deposit.release}
+      shortfall={isShort ? deposit.shortfall : 0}
+      quoted={deposit.quoted}
       className="mt-lg"
-      header={<DepositMark badge={<DepositStageBadge stage={deposit.stage} />} />}
+      header={
+        <DepositMark
+          badge={
+            <span className="flex items-center gap-xs">
+              {/* Warning at badge scale, beside the stage rather than instead
+                  of it: short cuts across the pipeline, so a deposit can be
+                  short and `in_house` at once and both need saying. */}
+              {isShort ? <Badge tone="warning">Short</Badge> : null}
+              <DepositStageBadge stage={deposit.stage} />
+            </span>
+          }
+        />
+      }
     >
       <p className="mt-md text-caption text-muted-foreground">
         {deposit.collectedAt === null ? (
@@ -139,6 +162,16 @@ export function SecurityDepositInset({
           </>
         )}
       </p>
+      {isShort ? (
+        <p className="mt-xs text-caption text-muted-foreground">
+          BND {formatCents(deposit.shortfall)} short of the BND {formatCents(deposit.quoted)} this
+          booking quotes.{' '}
+          {securesBooking
+            ? 'The deposit is what secures this booking, so it is not secured until the rest is in.'
+            : 'The guest cannot be checked in until the rest is in.'}
+        </p>
+      ) : null}
+
       <p className="mt-xs text-caption">
         <Link
           href={`/portal/deposits/${reference}`}
@@ -169,7 +202,7 @@ export function SecurityDepositInset({
               depositId={deposit.id}
               bookingReference={reference}
               guestName={deposit.guestName}
-              due={deposit.amount}
+              due={deposit.quoted}
               placement="panel"
             />
           ) : null}
@@ -178,13 +211,28 @@ export function SecurityDepositInset({
             <RecordDeposit
               bookingId={bookingId}
               reference={reference}
-              quoted={deposit.amount}
+              quoted={deposit.quoted}
               securesBooking={securesBooking}
               fulfilsPromise
               isAlternative={mayVerifyDeposit}
             />
           ) : null}
         </>
+      ) : null}
+
+      {/* The reason the actions no longer all sit behind an uncollected
+          deposit. A short one is collected — confirming it again is refused
+          and recording it again is refused — so before this there was no
+          correct button on the screen for the one case that needed one. */}
+      {isShort && mayRecordDeposit ? (
+        <TopUpDeposit
+          bookingId={bookingId}
+          reference={reference}
+          quoted={deposit.quoted}
+          held={deposit.amount}
+          shortfall={deposit.shortfall}
+          securesBooking={securesBooking}
+        />
       ) : null}
     </DepositFigureTable>
   )

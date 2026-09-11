@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { requirePermission } from '@/lib/auth/require-permission'
 import { getBookingById, transitionBooking } from '@/lib/db/bookings'
 import { listDocumentsForBooking } from '@/lib/db/documents'
-import { recordBookingDeposit } from '@/lib/db/deposits'
+import { recordBookingDeposit, topUpBookingDeposit } from '@/lib/db/deposits'
 import { addBookingNote } from '@/lib/db/notes'
 import { assembleAccountingPack } from '@/lib/db/packs'
 import { recordCashPayment, recordTransferPayment } from '@/lib/db/payments'
@@ -432,6 +432,101 @@ export async function recordDepositAction(
     recorded: {
       method: parsed.data.method,
       amount: result.amount,
+      confirmed: result.confirmedNow,
+    },
+  }
+}
+
+const topUpDepositSchema = z.object({
+  bookingId: z.string().min(1),
+  amount: z
+    .string()
+    .trim()
+    .min(1, 'Enter the amount that arrived.')
+    .refine((value) => centsFromInput(value) !== null, 'Enter an amount like 50.00.'),
+  method: z.enum(['cash', 'bank_transfer']),
+})
+
+export interface TopUpDepositState {
+  status: 'idle' | 'error' | 'done'
+  message?: string
+  fieldErrors?: Record<string, string>
+  toppedUp?: { added: number; amount: number; shortfall: number; confirmed: boolean }
+}
+
+/**
+ * The rest of a deposit that arrived short (capability B16; prd.md §11).
+ *
+ * `payment.record_cash`, the same string as recording the deposit in the first
+ * place and for the reason that one gives: taking money at the counter is one
+ * job, and a second string for the second half of the same deposit would be a
+ * row in the permission matrix nobody could explain to the client.
+ *
+ * **The email is scheduled only where this is what confirmed the booking**,
+ * which is `confirmedNow` from the function rather than anything computed
+ * here: a top-up that leaves the deposit still short moves nothing and the
+ * guest hears nothing. That keeps prd.md §11's promise that a customer hears
+ * about a booking exactly twice.
+ *
+ * **No accounting pack**, the position every deposit action takes: a deposit
+ * settles nothing and the stay is still owed in full on arrival.
+ */
+export async function topUpDepositAction(
+  _previous: TopUpDepositState,
+  formData: FormData,
+): Promise<TopUpDepositState> {
+  const actor = await requirePermission('payment.record_cash')
+  const parsed = topUpDepositSchema.safeParse(Object.fromEntries(formData))
+
+  if (!parsed.success) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: { amount: parsed.error.issues[0]?.message ?? 'Enter the amount that arrived.' },
+    }
+  }
+
+  const booking = await getBookingById(parsed.data.bookingId)
+
+  if (!booking) {
+    return { status: 'error', message: 'That booking no longer exists.' }
+  }
+
+  const result = await topUpBookingDeposit({
+    bookingId: parsed.data.bookingId,
+    amount: centsFromInput(parsed.data.amount)!,
+    method: parsed.data.method,
+    actorId: actor.userId,
+  })
+
+  if (!result.ok) {
+    return {
+      status: 'error',
+      message: result.error.message,
+      fieldErrors:
+        result.error.code === 'exceeds_shortfall' || result.error.code === 'invalid_amount'
+          ? { amount: result.error.message }
+          : undefined,
+    }
+  }
+
+  revalidateBooking(booking.reference)
+  // The ledger's held total and the deposit's own screen both move, and a
+  // completed deposit changes what the cash-up says about the drawer.
+  revalidatePath('/portal/deposits')
+  revalidatePath(`/portal/deposits/${booking.reference}`)
+  revalidatePath('/portal/reports/cash-up')
+
+  if (result.confirmedNow) {
+    scheduleBookingConfirmedEmail(booking.id)
+  }
+
+  return {
+    status: 'done',
+    toppedUp: {
+      added: centsFromInput(parsed.data.amount)!,
+      amount: result.amount,
+      shortfall: result.shortfall,
       confirmed: result.confirmedNow,
     },
   }

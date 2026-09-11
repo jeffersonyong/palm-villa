@@ -183,6 +183,9 @@ export default async function DepositPage({ params, searchParams }: PageProps) {
         title={deposit.bookingReference}
         meta={
           <>
+            {deposit.shortfall > 0 && deposit.release === null ? (
+              <Badge tone="warning">Short</Badge>
+            ) : null}
             <DepositStageBadge stage={deposit.stage} />
             <span className="text-body-md text-copy">{deposit.guestName}</span>
           </>
@@ -283,6 +286,7 @@ function DepositFigures({
   mayVerify: boolean
 }) {
   const { figures, release } = deposit
+  const isShort = deposit.shortfall > 0 && release === null
 
   return (
     <SectionCard
@@ -297,7 +301,27 @@ function DepositFigures({
       hint="Held as a liability, never counted as revenue. Released after the unit has been inspected and somebody has approved it; the approval is a record of who authorised what, and handing the money back happens outside the system."
     >
       {/* The deposit's own table — the one the Money card shows too. */}
-      <DepositFigureTable figures={figures} release={release} />
+      <DepositFigureTable
+        figures={figures}
+        release={release}
+        shortfall={isShort ? deposit.shortfall : 0}
+        quoted={deposit.quoted}
+      />
+
+      {isShort ? (
+        <p className="mt-md text-body-sm text-copy">
+          BND {formatCents(deposit.shortfall)} short of the BND {formatCents(deposit.quoted)} this
+          booking quotes. Until it is topped up the booking is not secured and the guest cannot be
+          checked in —{' '}
+          <Link
+            href={`/portal/bookings/${encodeURIComponent(deposit.bookingReference)}`}
+            className="text-foreground underline underline-offset-2"
+          >
+            top it up from the booking
+          </Link>
+          , where the rest of the desk&rsquo;s money work is.
+        </p>
+      ) : null}
 
       <dl className="mt-lg grid gap-md sm:grid-cols-2">
         <Field
@@ -337,7 +361,7 @@ function DepositFigures({
             depositId={deposit.id}
             bookingReference={deposit.bookingReference}
             guestName={deposit.guestName}
-            due={deposit.amount}
+            due={deposit.quoted}
             placement="section"
           />
         </div>

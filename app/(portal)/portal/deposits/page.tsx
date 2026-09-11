@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/portal/empty-state'
 import { ExportCsvButton } from '@/components/portal/export-csv'
 import { overlapRangeOf, readSearch, readStayWindow } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
 import {
@@ -331,8 +332,16 @@ function DepositRow({ deposit }: { deposit: Deposit }) {
         <DepositStageBadge stage={deposit.stage} />
       </TableCell>
 
+      {/* The figure, and under it the gap where there is one — the shape the
+          payments queue uses for a repriced booking. Only while unreleased:
+          once the release is signed, what was held is the whole story. */}
       <TableCell className="text-right whitespace-nowrap tabular-nums">
         {formatCents(deposit.amount)}
+        {deposit.shortfall > 0 && release === null ? (
+          <span className="mt-xxs flex justify-end">
+            <Badge tone="warning">Short {formatCents(deposit.shortfall)}</Badge>
+          </span>
+        ) : null}
       </TableCell>
 
       {/* A zero here would be a column of noughts down the whole table: most
