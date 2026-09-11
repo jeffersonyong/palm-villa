@@ -207,6 +207,7 @@ describe('what a confirmed booking is told it owes', () => {
     const verified = await verifyDeposit({
       depositId: deposit.id,
       observedAmount: DEPOSIT,
+      match: 'reference',
       actorId: null,
     })
 

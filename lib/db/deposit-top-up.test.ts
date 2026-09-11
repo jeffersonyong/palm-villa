@@ -119,6 +119,7 @@ async function givenShortDeposit(
   const verified = await verifyDeposit({
     depositId: promised.depositId,
     observedAmount: bnd(50),
+    match: 'reference',
     overrideReason: 'Guest is sending the other BND 50 on Friday.',
     actorId: null,
   })

@@ -217,6 +217,7 @@ describe('verifying a payment', () => {
     const secured = await verifyDeposit({
       depositId: deposit!.id,
       observedAmount: deposit!.amount,
+      match: 'reference',
       actorId: null,
     })
 
@@ -230,6 +231,7 @@ describe('verifying a payment', () => {
     const secured = await verifyDeposit({
       depositId: deposit!.id,
       observedAmount: deposit!.amount,
+      match: 'reference',
       actorId: null,
     })
 
@@ -638,7 +640,12 @@ describe('recording cash (B7)', () => {
     expect((await getBookingById(booking.id))?.paid).toBe(booking.total)
 
     // The deposit's own verification then confirms it.
-    await verifyDeposit({ depositId: deposit!.id, observedAmount: deposit!.amount, actorId: null })
+    await verifyDeposit({
+      depositId: deposit!.id,
+      observedAmount: deposit!.amount,
+      match: 'reference',
+      actorId: null,
+    })
 
     expect((await getBookingById(booking.id))?.status).toBe('confirmed')
   })

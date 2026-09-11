@@ -838,6 +838,7 @@ describe('verifying a promised deposit', () => {
     const verified = await verifyDeposit({
       depositId,
       observedAmount: bnd(100),
+      match: 'reference',
       observedReference: 'PV-4830',
       observedSender: 'AHMAD BIN ALI',
       observedOn: '2026-10-01',
@@ -864,13 +865,95 @@ describe('verifying a promised deposit', () => {
     expect(booking?.paid).toBe(0)
   })
 
+  test('records a deposit the bank quoted no reference for, with its reason', async () => {
+    // Arrange: the guest transferred the BND 100 and forgot to quote PV-…,
+    // which is the case prd.md §10.4's escape hatch exists for. It reached
+    // deposits on 19 September 2026; before that a deposit had no hatch at all.
+    const { bookingId, depositId } = await givenPromisedDeposit()
+
+    // Act
+    const verified = await verifyDeposit({
+      depositId,
+      observedAmount: bnd(100),
+      match: 'manual',
+      observedReference: null,
+      matchReason: 'Sender is the guest, and the amount is exact.',
+      actorId: null,
+    })
+
+    // Assert
+    expect(verified.ok).toBe(true)
+
+    const deposit = await getDepositByBookingId(bookingId)
+
+    expect(deposit?.collectedAt).not.toBeNull()
+
+    const booking = await getBookingById(bookingId)
+
+    // A hand match is still a match: the deposit is whole, so it secures.
+    expect(booking?.status).toBe('confirmed')
+
+    // Its own verb, as `payment.matched_manually` is — architecture.md §4
+    // lists tying money to a booking without the bank agreeing as an approval
+    // act, and an approval act is read on its own rather than found inside
+    // the collection event.
+    expect(await actionsFor('deposit', depositId)).toContain('deposit.matched_manually')
+
+    const matched = (await listAuditEvents('deposit', depositId)).find(
+      (event) => event.action === 'deposit.matched_manually',
+    )
+
+    expect(matched?.after).toMatchObject({
+      reason: 'Sender is the guest, and the amount is exact.',
+    })
+  })
+
+  test('refuses a hand match with no reason, because nothing else identifies it', async () => {
+    const { depositId } = await givenPromisedDeposit()
+
+    const refused = await verifyDeposit({
+      depositId,
+      observedAmount: bnd(100),
+      match: 'manual',
+      observedReference: null,
+      matchReason: null,
+      actorId: null,
+    })
+
+    expect(refused.ok).toBe(false)
+    if (refused.ok) return
+
+    expect(refused.error.code).toBe('match_reason_required')
+    expect(refused.error.message.length).toBeGreaterThan(0)
+
+    // And it refused before writing anything — a plpgsql `return` does not
+    // roll back, so a guard that fired after the update would have collected
+    // the deposit and left it unexplained.
+    expect(await listPendingDeposits()).toHaveLength(1)
+    expect(await listHeldDeposits()).toHaveLength(0)
+  })
+
+  test('a reason of spaces is no reason', async () => {
+    const { depositId } = await givenPromisedDeposit()
+
+    const refused = await verifyDeposit({
+      depositId,
+      observedAmount: bnd(100),
+      match: 'manual',
+      matchReason: '   ',
+      actorId: null,
+    })
+
+    expect(refused).toMatchObject({ ok: false, error: { code: 'match_reason_required' } })
+  })
+
   test('moves the deposit from the queue onto the ledger', async () => {
     const { depositId } = await givenPromisedDeposit()
 
     expect(await listPendingDeposits()).toHaveLength(1)
     expect(await listHeldDeposits()).toHaveLength(0)
 
-    await verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null })
+    await verifyDeposit({ depositId, observedAmount: bnd(100), match: 'reference', actorId: null })
 
     expect(await listPendingDeposits()).toHaveLength(0)
     expect(await listHeldDeposits()).toHaveLength(1)
@@ -879,7 +962,12 @@ describe('verifying a promised deposit', () => {
   test('refuses a figure that disagrees with the quote unless somebody says why', async () => {
     const { depositId } = await givenPromisedDeposit()
 
-    const short = await verifyDeposit({ depositId, observedAmount: bnd(50), actorId: null })
+    const short = await verifyDeposit({
+      depositId,
+      observedAmount: bnd(50),
+      match: 'reference',
+      actorId: null,
+    })
 
     expect(short.ok).toBe(false)
 
@@ -889,7 +977,12 @@ describe('verifying a promised deposit', () => {
     expect(short.error.message).toContain('100.00')
 
     // An overpayment is refused as firmly, because a refund is still N5.
-    const over = await verifyDeposit({ depositId, observedAmount: bnd(150), actorId: null })
+    const over = await verifyDeposit({
+      depositId,
+      observedAmount: bnd(150),
+      match: 'reference',
+      actorId: null,
+    })
 
     expect(over.ok).toBe(false)
   })
@@ -900,6 +993,7 @@ describe('verifying a promised deposit', () => {
     const verified = await verifyDeposit({
       depositId,
       observedAmount: bnd(90),
+      match: 'reference',
       overrideReason: 'Bank charged a BND 10 transfer fee; guest paid the rest in cash.',
       actorId: null,
     })
@@ -933,9 +1027,14 @@ describe('verifying a promised deposit', () => {
   test('refuses to verify the same deposit twice', async () => {
     const { depositId } = await givenPromisedDeposit()
 
-    await verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null })
+    await verifyDeposit({ depositId, observedAmount: bnd(100), match: 'reference', actorId: null })
 
-    const again = await verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null })
+    const again = await verifyDeposit({
+      depositId,
+      observedAmount: bnd(100),
+      match: 'reference',
+      actorId: null,
+    })
 
     expect(again.ok).toBe(false)
 
@@ -948,8 +1047,8 @@ describe('verifying a promised deposit', () => {
     const { depositId } = await givenPromisedDeposit()
 
     const [first, second] = await Promise.all([
-      verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null }),
-      verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null }),
+      verifyDeposit({ depositId, observedAmount: bnd(100), match: 'reference', actorId: null }),
+      verifyDeposit({ depositId, observedAmount: bnd(100), match: 'reference', actorId: null }),
     ])
 
     expect([first.ok, second.ok].filter(Boolean)).toHaveLength(1)
@@ -960,7 +1059,7 @@ describe('checking in a guest who booked online', () => {
   test('a verified deposit is recognised, and nothing is taken at the door', async () => {
     const { bookingId, depositId } = await givenPromisedDeposit()
 
-    await verifyDeposit({ depositId, observedAmount: bnd(100), actorId: null })
+    await verifyDeposit({ depositId, observedAmount: bnd(100), match: 'reference', actorId: null })
 
     const checkedIn = await checkInBooking({ bookingId, actorId: null })
 

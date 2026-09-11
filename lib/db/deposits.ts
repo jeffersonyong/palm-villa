@@ -11,7 +11,7 @@ import { transition, type BookingStatus } from '@/lib/domain/booking-state'
 import type { DateRange } from '@/lib/domain/availability'
 import type { DayBounds, StayDate } from '@/lib/domain/dates'
 import { formatCents, type Cents } from '@/lib/domain/money'
-import type { PaymentMethod } from '@/lib/domain/payment'
+import type { PaymentMatchKind, PaymentMethod } from '@/lib/domain/payment'
 import { dataClient } from '@/lib/supabase/data'
 
 import { isRangeNotSatisfiable, type PageRequest } from './bookings'
@@ -1065,11 +1065,18 @@ export interface VerifyDepositInput {
   depositId: string
   /** What the verifier actually saw in the bank app. */
   observedAmount: Cents
+  /**
+   * How the money was tied to this booking. Derived by `matchKindFor` from
+   * whether the bank showed a reference — never chosen by whoever is calling.
+   */
+  match: PaymentMatchKind
   observedReference?: string | null
   observedSender?: string | null
   observedOn?: StayDate | null
   /** Required when the figure disagrees with what the booking quoted. */
   overrideReason?: string | null
+  /** Required when `match` is `manual`; otherwise the optional note. */
+  matchReason?: string | null
   actorId: string | null
 }
 
@@ -1134,10 +1141,12 @@ export async function verifyDeposit(input: VerifyDepositInput): Promise<
     p_from_status: next.ok ? current : null,
     p_to_status: next.ok ? next.status : null,
     p_observed_amount_cents: input.observedAmount,
+    p_match_kind: input.match,
     p_observed_reference: input.observedReference ?? null,
     p_observed_sender: input.observedSender ?? null,
     p_observed_on: input.observedOn ?? null,
     p_amount_override_reason: input.overrideReason ?? null,
+    p_match_reason: input.matchReason ?? null,
     p_actor_id: input.actorId,
   })
 
@@ -1350,6 +1359,21 @@ function describeVerifyDepositFailure(result: RpcRefusal): DepositWriteError {
       }
     case 'invalid_amount':
       return { code: result.error, message: 'Enter the amount that arrived.' }
+    // Both are the database refusing what the dialog already refuses, so the
+    // wording matches `checkPaymentMatch`'s. Reaching either means a form was
+    // submitted past the screen's own check — the position architecture.md §6.2
+    // takes on the amount rule, applied to the match.
+    case 'match_reason_required':
+      return {
+        code: result.error,
+        message:
+          'No reference was quoted, so the note is the only thing identifying this transfer. Say what the bank showed.',
+      }
+    case 'invalid_match_kind':
+      return {
+        code: result.error,
+        message: 'Could not tell how this deposit was matched. Reload and try again.',
+      }
     default:
       return { code: result.error, message: 'That deposit no longer exists.' }
   }

@@ -3,8 +3,10 @@ import { describe, expect, test } from 'vitest'
 import { bnd } from './money'
 import {
   amountVariance,
+  checkMatchReason,
   checkPaymentMatch,
   describeVariance,
+  matchKindFor,
   requiresReasons,
   type PaymentMatchInput,
 } from './payment-match'
@@ -240,5 +242,69 @@ describe('checkPaymentMatch', () => {
 
       expect(result.error.message.length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('matchKindFor', () => {
+  test('a reference the bank showed is a reference match', () => {
+    // Arrange / Act
+    const kind = matchKindFor('PV-4821')
+
+    // Assert
+    expect(kind).toBe('reference')
+  })
+
+  test.each([
+    ['nothing quoted', null],
+    ['an emptied field', ''],
+    ['a field of spaces', '   '],
+  ])('%s is a manual match', (_label, reference) => {
+    expect(matchKindFor(reference)).toBe('manual')
+  })
+
+  test('whitespace is not a reference, so it cannot buy past the note rule', () => {
+    // The form submits '' for a cleared field and '   ' for one a clerk
+    // spacebarred. Treating either as a quoted reference would confirm a
+    // transfer nobody can identify, without the note that identifies it.
+    const kind = matchKindFor('   ')
+
+    expect(checkMatchReason(kind, null)).not.toBeNull()
+  })
+})
+
+describe('checkMatchReason', () => {
+  test('a reference match needs no note', () => {
+    expect(checkMatchReason('reference', null)).toBeNull()
+  })
+
+  test('a manual match with a note is allowed', () => {
+    expect(checkMatchReason('manual', 'Sender is the guest’s mother.')).toBeNull()
+  })
+
+  test.each([
+    ['no note', null],
+    ['an empty note', ''],
+    ['a note of spaces', '  '],
+  ])('a manual match with %s is refused against the note field', (_label, note) => {
+    // Arrange / Act
+    const error = checkMatchReason('manual', note)
+
+    // Assert
+    expect(error).not.toBeNull()
+    expect(error?.field).toBe('matchReason')
+    expect(error?.message.length).toBeGreaterThan(0)
+  })
+
+  test('agrees with checkPaymentMatch, which is the rule the write path runs', () => {
+    // The dialog reveals the field with one and the action refuses with the
+    // other. Two copies of a rule is exactly what drifts, so this pins them
+    // to the same answer.
+    const viaWhole = checkPaymentMatch(input({ match: 'manual', matchReason: null }))
+    const viaPart = checkMatchReason('manual', null)
+
+    expect(viaWhole.ok).toBe(false)
+    if (viaWhole.ok) return
+
+    expect(viaWhole.error).toEqual(viaPart)
   })
 })

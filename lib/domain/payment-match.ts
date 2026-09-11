@@ -57,11 +57,33 @@ export interface PaymentMatchInput {
   matchReason: string | null
 }
 
+/**
+ * How the money was tied to this booking, decided by what the bank showed.
+ *
+ * **Derived, never chosen.** Until 19 September 2026 the queue asked a clerk
+ * to pick this up front — *Confirm* or *Match manually* — which is the failure
+ * the amount override already refuses to repeat: somebody who has not yet
+ * opened their bank app cannot know which door they need, and the lenient door
+ * is the one that gets picked by default. A reference was either there or it
+ * was not, and that is a fact about the statement rather than a question for
+ * the person reading it.
+ *
+ * The consequence is the rule below: no reference means the note is the only
+ * thing identifying the transfer, so it is required. With one, it is optional
+ * and holds whatever was worth keeping.
+ */
+export function matchKindFor(observedReference: string | null): PaymentMatchKind {
+  return isGiven(observedReference) ? 'reference' : 'manual'
+}
+
 /** Which justifications this confirmation cannot proceed without. */
 export interface RequiredReasons {
   /** The amount disagrees with what is due (architecture.md §6.2). */
   amount: boolean
-  /** The payment was tied to this booking by hand (prd.md §10.4). */
+  /**
+   * The bank showed no reference, so a person tied the two together and the
+   * note carrying that judgement is required (prd.md §10.4).
+   */
   match: boolean
 }
 
@@ -89,6 +111,35 @@ export interface PaymentMatchError {
 export type PaymentMatchResult =
   | { ok: true; variance: Cents; kind: VarianceKind; overridden: boolean }
   | { ok: false; error: PaymentMatchError }
+
+/**
+ * The match half of the rule, on its own.
+ *
+ * Extracted because a **deposit** needs exactly this and none of the amount
+ * half: its amount rule is enforced under the row lock in `verify_deposit()`,
+ * against the quote read fresh, so checking the figure again here would be a
+ * second opinion about a number this side has not read. Calling
+ * `checkPaymentMatch` with the observed amount as its own due — which is what
+ * "skip the amount half" looks like when the two are welded together — passes
+ * an assertion nobody made.
+ *
+ * Returns null when there is nothing to refuse.
+ */
+export function checkMatchReason(
+  match: PaymentMatchKind,
+  matchReason: string | null,
+): PaymentMatchError | null {
+  if (match !== 'manual' || isGiven(matchReason)) {
+    return null
+  }
+
+  return {
+    code: 'reason_required',
+    field: 'matchReason',
+    message:
+      'No reference was quoted, so the note is the only thing identifying this transfer. Say what the bank showed.',
+  }
+}
 
 /**
  * Decides whether this confirmation may proceed.
@@ -122,15 +173,10 @@ export function checkPaymentMatch(input: PaymentMatchInput): PaymentMatchResult 
     }
   }
 
-  if (required.match && !isGiven(input.matchReason)) {
-    return {
-      ok: false,
-      error: {
-        code: 'reason_required',
-        field: 'matchReason',
-        message: 'Say why this payment belongs to this booking.',
-      },
-    }
+  const matchError = checkMatchReason(input.match, input.matchReason)
+
+  if (matchError) {
+    return { ok: false, error: matchError }
   }
 
   return { ok: true, variance, kind, overridden: required.amount }

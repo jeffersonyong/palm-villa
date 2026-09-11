@@ -36,11 +36,19 @@ export const metadata: Metadata = {
 }
 
 /**
- * The payment verification queue (capabilities B4, B5, B6).
+ * The payment verification queue (capabilities B4, B5, B6, B16).
+ *
+ * **One action per row, since 19 September 2026.** The escape hatch B6 asks
+ * for is inside the confirm dialog now rather than beside it — see
+ * payment-actions.tsx for why a second button was the wrong shape for it.
  *
  * prd.md §10.4 fixes what a row shows: "reference, guest name, amount
  * expected, time waiting, and the uploaded slip". Those are the columns, in
- * that order.
+ * that order, plus one the PRD could not have asked for: **what the money is
+ * for**. §10.4 was written before a booking was secured by its deposit (N29,
+ * 10 September 2026), so the queue it describes held one kind of row. It holds
+ * two now, and which one a row is decides what confirming it does to the
+ * booking — so the distinction is a column rather than a caption.
  *
  * Every bank transfer, the waiting ones first and the longest wait at the
  * top — a queue is worked from the top, which is the opposite of every other
@@ -167,6 +175,12 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
               <TableHeaderRow>
                 <TableHead>Reference</TableHead>
                 <TableHead>Guest</TableHead>
+                {/* Which of the two kinds of money this row is. It was a gray
+                    caption under the guest's name, which is where a scanning
+                    eye does not go — and the difference decides what
+                    confirming the row does to the booking, so it belongs in a
+                    column that can be read down. */}
+                <TableHead>For</TableHead>
                 <TableHead>Arriving</TableHead>
                 {/* prd.md §10.4 names this column "amount expected", and that
                     is exactly what it is while a payment is waiting. Once one
@@ -241,14 +255,15 @@ function QueueRow({ payment, mayVerify }: { payment: QueueEntry; mayVerify: bool
           {payment.bookingReference}
         </TableRowLink>
       </TableCell>
-      <TableCell className="text-foreground">
-        {payment.guestName}
-        {payment.kind === 'deposit' ? (
-          // Said on the row, because the figure alone would read as a short
-          // payment against the booking's total — which is the confusion
-          // prd.md §9.1 spends a paragraph refusing.
-          <span className="mt-xxs block text-caption text-muted-foreground">Security deposit</span>
-        ) : null}
+      <TableCell className="text-foreground">{payment.guestName}</TableCell>
+      {/* Said on every row, because the figure alone would read as a short
+          payment against the booking's total — which is the confusion prd.md
+          §9.1 spends a paragraph refusing. `neutral` on both: this is a kind,
+          not a status, and design.md reserves the semantic tones for status.
+          Two badges rather than one and a blank, so the column reads as a
+          column. */}
+      <TableCell>
+        <Badge tone="neutral">{payment.kind === 'deposit' ? 'Security deposit' : 'Stay'}</Badge>
       </TableCell>
       <TableCell>{payment.arriving ? formatStayDate(payment.arriving) : '—'}</TableCell>
       <TableCell className="text-right tabular-nums">
