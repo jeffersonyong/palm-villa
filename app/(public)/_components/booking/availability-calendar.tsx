@@ -158,7 +158,14 @@ export function AvailabilityCalendar({
           <div
             key={month}
             className={cn(
-              'min-w-0 shrink-0',
+              // `flex-1` rather than `shrink-0`: the two months share the row
+              // and each fills its half, instead of both sitting at the width
+              // seven 44px cells happen to add up to and leaving the remainder
+              // as dead space on the right. On a phone the second month is
+              // `hidden`, so the first takes the row on its own — which also
+              // ends an overflow, because seven fixed cells were wider than a
+              // 320px screen has room for.
+              'min-w-0 flex-1',
               index > 0 && 'ml-xl hidden border-l border-divider pl-xl md:block',
             )}
           >
@@ -171,7 +178,7 @@ export function AvailabilityCalendar({
               onNext={() => setLeadMonth(shiftMonth(leadMonth, 1))}
             />
 
-            <table className="mt-xs border-separate border-spacing-x-0 border-spacing-y-[3px]">
+            <table className="mt-xs w-full table-fixed border-separate border-spacing-x-0 border-spacing-y-[3px]">
               <thead>
                 <tr>
                   {WEEKDAYS.map((weekday) => (
@@ -289,7 +296,11 @@ function NightCell({
           }
         }}
         className={cn(
-          'flex h-12 w-11 flex-col items-center justify-center gap-[1px] text-body-sm transition-colors outline-none',
+          // Height fixed, width from the column: `table-fixed` gives every
+          // column a seventh of the month, so a cell is as wide as the card
+          // allows rather than a number chosen in isolation. The band below
+          // still reads as one strip, because the cells still abut.
+          'flex h-12 w-full flex-col items-center justify-center gap-[1px] text-body-sm transition-colors outline-none',
           // The band, drawn on the cell rather than around it so a week reads
           // as one strip (§Components — Date range).
           isBetween && 'bg-muted',
