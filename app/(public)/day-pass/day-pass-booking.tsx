@@ -173,6 +173,7 @@ export function DayPassBooking({
                     name="guestName"
                     label="Your name"
                     required
+                    placeholder="John Doe"
                     autoComplete="name"
                     defaultValue={state.submitted?.guestName}
                     error={state.fieldErrors?.guestName}
@@ -193,6 +194,7 @@ export function DayPassBooking({
                     hint="For your confirmation."
                     type="email"
                     inputMode="email"
+                    placeholder="john@email.com"
                     autoComplete="email"
                     defaultValue={state.submitted?.guestEmail}
                     error={state.fieldErrors?.guestEmail}
