@@ -69,15 +69,17 @@ interface SendAFileProps {
   token: string
   kind: CustomerAttachableKind
   /**
-   * Which numbered step this is, matching the list at the top of the page.
+   * Which of the two uploads this is — "A" or "B".
    *
-   * Numbered rather than left as two headings, because two upload sections
-   * look alike and a guest who has done one has no way to tell whether the
-   * other is the same thing again. The numbers come from the page so the
-   * heading and the list cannot disagree — and they start at 2 because step
-   * one is the transfer, which is already behind them.
+   * Lettered, because two upload sections look alike and a guest who has done
+   * one has no way to tell whether the other is the same thing again or a
+   * second job. What it must not do is compete with the numbered list at the
+   * top of the page: that list is the flow — make the transfer, then send us
+   * your IC — and the letters are the two boxes inside the second half of it.
+   * Two numbered systems on one screen would disagree about what step two is;
+   * a letter beside a number cannot be mistaken for one.
    */
-  step: number
+  marker: string
   /** The heading. */
   title: string
   /** Why we are asking, in the guest's terms. */
@@ -86,7 +88,14 @@ interface SendAFileProps {
   onFileSince: string | null
 }
 
-export function SendAFile({ token, kind, step, title, description, onFileSince }: SendAFileProps) {
+export function SendAFile({
+  token,
+  kind,
+  marker,
+  title,
+  description,
+  onFileSince,
+}: SendAFileProps) {
   const [state, action, pending] = useActionState<UploadState, FormData>(uploadDocumentAction, {
     status: 'idle',
   })
@@ -137,7 +146,7 @@ export function SendAFile({ token, kind, step, title, description, onFileSince }
   return (
     <section className="mt-xl border-t border-border pt-xl">
       <h2 className="text-body-lg-strong text-foreground">
-        <span className="text-muted-foreground tabular-nums">{step}.</span> {title}
+        <span className="text-muted-foreground">{marker}.</span> {title}
       </h2>
       <p className="text-body mt-xs text-copy">{description}</p>
 

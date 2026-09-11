@@ -101,7 +101,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
   const maySendIdentity = stage === 'checking' || stage === 'confirmed'
 
   /**
-   * The steps, and which one the customer is on.
+   * The two steps, and which one the customer is on.
    *
    * This page has always been a two-step flow — the stage is derived from the
    * booking's own state, which is why it survives the customer closing the tab,
@@ -120,25 +120,16 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
    * step that names the smaller of the two amounts would be wrong for them.
    */
   const identityHeld = identityOnFileSince !== null
-  const slipHeld = slipOnFileSince !== null
   const steps: readonly Step[] | null =
     stage === 'awaiting_transfer'
       ? [
           { label: 'Make the transfer', state: 'current' },
           { label: 'Send us your IC', state: 'todo' },
-          { label: 'Send us your transfer slip', state: 'todo' },
         ]
       : stage === 'checking'
         ? [
             { label: 'Make the transfer', state: 'done' },
             { label: 'Send us your IC', state: identityHeld ? 'done' : 'current' },
-            {
-              label: 'Send us your transfer slip',
-              // Current only once the one above it is done, so exactly one line
-              // is ever the thing being asked for. A page with two "do this
-              // now" markers is a page that has not decided.
-              state: slipHeld ? 'done' : identityHeld ? 'current' : 'todo',
-            },
           ]
         : null
 
@@ -219,7 +210,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
           <SendAFile
             token={token}
             kind="identity"
-            step={2}
+            marker="A"
             title="Send us your IC"
             description="We need a copy of the lead guest's IC to register the stay. Sending it now saves doing it at the desk when you arrive."
             onFileSince={identityOnFileSince}
@@ -230,9 +221,9 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
           <SendAFile
             token={token}
             kind="payment_slip"
-            step={3}
+            marker="B"
             title="Send us your transfer slip"
-            description="A screenshot of your bank transfer slip will help us verify your transfer faster."
+            description="Your bank transfer slip will help us verify your transfer faster."
             onFileSince={slipOnFileSince}
           />
         ) : null}
