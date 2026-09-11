@@ -916,6 +916,18 @@ describe('verifying a promised deposit', () => {
 
     expect(actions).toContain('deposit.collected')
     expect(actions).toContain('deposit.amount_overridden')
+
+    // The money is recorded and the booking is not secured by it (prd.md §11).
+    // Before this rule the same call confirmed the booking, emailed the guest,
+    // and left BND 10 of the deposit uncollected with nothing on any screen
+    // saying so.
+    expect(deposit?.shortfall).toBe(bnd(10))
+    expect(verified.ok && verified.confirmedNow).toBe(false)
+
+    const booking = await getBookingById(bookingId)
+
+    expect(booking?.status).toBe('awaiting_payment_verification')
+    expect(actions).not.toContain('booking.verify_payment')
   })
 
   test('refuses to verify the same deposit twice', async () => {

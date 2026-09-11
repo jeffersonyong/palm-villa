@@ -57,6 +57,17 @@ export function DepositMark({
 interface DepositFigureTableProps {
   figures: Deposit['figures']
   release: Deposit['release']
+  /**
+   * What the deposit is short of the booking's quote, where it is short.
+   *
+   * Drawn as two rows — the quote it is measured against, and the gap — which
+   * is the one place this table shows a figure that is not on the deposit's
+   * own row. Without the quote beside it "Short BND 50.00" is a number with
+   * nothing to check it against.
+   */
+  shortfall?: Cents
+  /** What the booking quotes. Only read when `shortfall` is non-zero. */
+  quoted?: Cents
   /** Heads the inset — the mark, where the section title does not already carry it. */
   header?: React.ReactNode
   /** Follows the figures: captions, the link through to the record. */
@@ -71,22 +82,32 @@ interface DepositFigureTableProps {
  * different things: before release it is a forecast (*To return*, *Would be
  * owed*), after it a fact (*Returned*, *Owed by guest*). "Less charges" is
  * drawn only when there are any — a zero on a money screen invites a second
- * look, and there is nothing there to find.
+ * look, and there is nothing there to find. *Quoted* and *Short* follow the
+ * same rule, and appear together or not at all.
+ *
+ * The shortfall rows carry no tint. A gap in a deposit is a status, and the
+ * portal says status in a badge at badge scale — this table stays the
+ * monochrome arithmetic it has always been.
  */
 export function DepositFigureTable({
   figures,
   release,
+  shortfall = 0,
+  quoted = 0,
   header,
   children,
   className,
 }: DepositFigureTableProps) {
   const owes = figures.owed > 0
+  const short = shortfall > 0
 
   return (
     <Card surface="inset" className={className}>
       {header ? <div className="mb-sm">{header}</div> : null}
       <div className="grid gap-xs">
+        {short ? <FigureRow label="Quoted" value={quoted} /> : null}
         <FigureRow label="Held" value={figures.amount} />
+        {short ? <FigureRow label="Short" value={shortfall} /> : null}
         {figures.chargesTotal > 0 ? (
           <FigureRow label="Less charges" value={figures.chargesTotal} />
         ) : null}

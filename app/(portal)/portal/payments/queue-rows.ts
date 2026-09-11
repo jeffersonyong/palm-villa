@@ -91,8 +91,12 @@ export function depositEntry(deposit: Deposit): QueueEntry {
     bookingReference: deposit.bookingReference,
     guestName: deposit.guestName,
     arriving: deposit.stay?.range.start ?? null,
-    due: deposit.amount,
-    expected: deposit.amount,
+    // The booking's quote, not the row's figure. `verify_deposit()` matches
+    // against the quote read live under the row lock, so an amendment that
+    // repriced the deposit after the promise was raised would otherwise
+    // pre-fill this dialog with a figure SQL refuses without a reason.
+    due: deposit.quoted,
+    expected: deposit.quoted,
     amount: null,
     createdAt: deposit.promisedAt ?? deposit.collectedAt ?? '',
     verifiedAt: null,

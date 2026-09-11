@@ -39,12 +39,13 @@ import { checkInAction, checkOutAction, type StayActionState } from './stay-acti
  * ── Check-in collects nothing ─────────────────────────────────────────────
  *
  * The security deposit is taken when the booking is made (prd.md §9.1,
- * capability B16), so by the time a guest is at the door it is either held,
- * promised and not yet verified, or was never taken — and only the first of
- * those can check in. This dialog used to ask how the deposit was being
- * taken, which was the screen assuming the door was where it happened. It now
- * states which of the three the booking is in and, for the two that cannot
- * proceed, names the way out rather than offering a button that would refuse.
+ * capability B16), so by the time a guest is at the door it is either held in
+ * full, held short of what the booking quotes, promised and not yet verified,
+ * or was never taken — and only the first of those can check in. This dialog
+ * used to ask how the deposit was being taken, which was the screen assuming
+ * the door was where it happened. It now states which of the four the booking
+ * is in and, for the three that cannot proceed, names the way out rather than
+ * offering a button that would refuse.
  * The database refuses last, with the same sentence, for the clerk whose
  * colleague verified the transfer a second after this dialog opened.
  *
@@ -111,16 +112,20 @@ export function StayButtons({ canCheckIn, canCheckOut, ...stay }: StayButtonsPro
 
 type DialogProps = Omit<StayButtonsProps, 'canCheckIn' | 'canCheckOut'> & { onClose: () => void }
 
-/** Which of the three doors the guest is standing at. */
-type DepositState = 'none_quoted' | 'held' | 'promised' | 'not_taken'
+/** Which of the four doors the guest is standing at. */
+type DepositState = 'none_quoted' | 'held' | 'short' | 'promised' | 'not_taken'
 
 function depositStateOf(deposit: CheckInDepositFacts): DepositState {
   if (deposit.quoted === 0 && deposit.held === null) {
     return 'none_quoted'
   }
 
+  // Held is held *in full*. A deposit that came up short — verified at less
+  // than the quote, or overtaken by an amendment that repriced it — is money
+  // on the ledger and a booking still unsecured (prd.md §11), which is a
+  // different sentence and a different way out.
   if (deposit.held) {
-    return 'held'
+    return deposit.held.amount >= deposit.quoted ? 'held' : 'short'
   }
 
   return deposit.promised ? 'promised' : 'not_taken'
@@ -170,7 +175,9 @@ function CheckInDialog({
                 ? deposit.waiverReason
                   ? `The stay begins now. The security deposit was waived when this booking was made — “${deposit.waiverReason}” — so nothing is held.`
                   : 'The stay begins now. This booking quotes no security deposit, so nothing is held.'
-                : `The BND ${formatCents(deposit.quoted)} security deposit secures this booking, and it is not in yet.`}
+                : depositState === 'short' && deposit.held
+                  ? `Only BND ${formatCents(deposit.held.amount)} of the BND ${formatCents(deposit.quoted)} security deposit is held, and it is what secures this booking.`
+                  : `The BND ${formatCents(deposit.quoted)} security deposit secures this booking, and it is not in yet.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -196,6 +203,16 @@ function CheckInDialog({
             <Notice>
               Nothing has been recorded against it. Record the deposit from the Money card below —
               in cash, or as a transfer for the queue — then check the guest in.
+            </Notice>
+          ) : null}
+
+          {/* Never the payments queue. This transfer was verified, so sending
+              a clerk there would send them looking for a promise nobody made
+              — which is how the shortfall goes uncollected a second time. */}
+          {depositState === 'short' && deposit.held ? (
+            <Notice>
+              Top up the remaining BND {formatCents(deposit.quoted - deposit.held.amount)} from the
+              Money card below — in cash, or a transfer you have checked — then check the guest in.
             </Notice>
           ) : null}
 

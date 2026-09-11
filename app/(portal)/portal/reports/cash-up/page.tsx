@@ -26,7 +26,7 @@ import { readChoices } from '@/components/portal/list-params'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { cashOnHandBefore, listCashBankings } from '@/lib/db/cash-banking'
-import { listDepositsCollectedBetween } from '@/lib/db/deposits'
+import { listDepositCashArrivals } from '@/lib/db/deposits'
 import { exportGroup } from '@/lib/db/export'
 import { listPayments } from '@/lib/db/payments'
 import {
@@ -149,7 +149,7 @@ export default async function CashUpPage({ searchParams }: PageProps) {
       collectedBefore: bounds.end,
       newestFirst: true,
     }),
-    listDepositsCollectedBetween(bounds, 'cash'),
+    listDepositCashArrivals(bounds),
     listCashBankings(window),
     // What the safe was already holding when the period opened. Without it a
     // window starting on the 1st would report the balance light by whatever
@@ -166,11 +166,13 @@ export default async function CashUpPage({ searchParams }: PageProps) {
           : [],
       ),
       // A promised transfer is not in the drawer and not in the bank, so it
-      // is in neither figure here. The same flatMap the payments above use,
-      // and for the same reason: money nobody has seen is not money.
-      deposits: deposits.flatMap((deposit) =>
-        deposit.collectedAt ? [{ collectedAt: deposit.collectedAt, amount: deposit.amount }] : [],
-      ),
+      // is in neither figure here: money nobody has seen is not money. The
+      // reader also splits a topped-up deposit across the days its cash
+      // actually arrived, so a day that has been counted stays counted.
+      deposits: deposits.map((arrival) => ({
+        collectedAt: arrival.collectedAt,
+        amount: arrival.amount,
+      })),
       bankings: bankings.map((banking) => ({
         businessDate: banking.businessDate,
         amount: banking.amount,

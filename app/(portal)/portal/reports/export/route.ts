@@ -4,7 +4,7 @@ import { overlapRangeOf, readChoices } from '@/components/portal/list-params'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { cashOnHandBefore, listCashBankings } from '@/lib/db/cash-banking'
-import { listDepositsCollectedBetween } from '@/lib/db/deposits'
+import { listDepositCashArrivals } from '@/lib/db/deposits'
 import { getUnitTypes, getUnits } from '@/lib/db/inventory'
 import { listPayments } from '@/lib/db/payments'
 import { listOccupanciesOverlapping, listRevenuePayments } from '@/lib/db/reports'
@@ -210,7 +210,7 @@ async function buildCashUp(window: StayWindow, params: URLSearchParams): Promise
   const bounds = bruneiWindowBounds(window)
   const [payments, deposits, bankings, opening] = await Promise.all([
     listPayments({ methods: ['cash'], collectedFrom: bounds.start, collectedBefore: bounds.end }),
-    listDepositsCollectedBetween(bounds, 'cash'),
+    listDepositCashArrivals(bounds),
     listCashBankings(window),
     cashOnHandBefore(window.from),
   ])
@@ -223,12 +223,13 @@ async function buildCashUp(window: StayWindow, params: URLSearchParams): Promise
           ? [{ collectedAt: payment.collectedAt, amount: payment.amount ?? 0 }]
           : [],
       ),
-      // A promised transfer is money nobody has seen, so it is in neither
-      // figure — the rule the cash-up screen applies, said the same way here
-      // so the download and the screen cannot disagree.
-      deposits: deposits.flatMap((deposit) =>
-        deposit.collectedAt ? [{ collectedAt: deposit.collectedAt, amount: deposit.amount }] : [],
-      ),
+      // One reader for the screen and the download, so the two cannot
+      // disagree: it drops promised transfers, which are money nobody has
+      // seen, and reports a topped-up deposit on the days its cash arrived.
+      deposits: deposits.map((arrival) => ({
+        collectedAt: arrival.collectedAt,
+        amount: arrival.amount,
+      })),
       bankings: bankings.map((banking) => ({
         businessDate: banking.businessDate,
         amount: banking.amount,

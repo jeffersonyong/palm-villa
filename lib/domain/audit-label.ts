@@ -65,6 +65,7 @@ export const KNOWN_AUDIT_ACTIONS = [
   'deposit.waived',
   'deposit.collected',
   'deposit.promised',
+  'deposit.topped_up',
   'deposit.amount_overridden',
   'deposit.release_approved',
   'deposit.owed_settled',
@@ -408,6 +409,18 @@ function describeDeposit(event: AuditEventLike): string | null {
       // as money, because that is what it is until somebody looks — the same
       // distinction `payment.recorded` draws with "awaited".
       return `Security deposit transfer awaited${amount ? ` — BND ${amount}` : ''}`
+    }
+    case 'deposit.topped_up': {
+      // The added figure leads, because that is the act; the running total
+      // follows so a reader can see whether it closed the gap without holding
+      // two lines in their head.
+      const added = cents(event.after?.added_cents)
+      const quoted = cents(event.after?.quoted_cents)
+      const method = methodLabel(event.after?.method)
+
+      return `Security deposit topped up${added ? ` — BND ${added}` : ''}${
+        method ? `, in ${method}` : ''
+      }${amount && quoted ? ` — BND ${amount} held of BND ${quoted}` : ''}`
     }
     case 'deposit.amount_overridden': {
       const quoted = cents(event.before?.quoted_cents)

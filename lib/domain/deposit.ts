@@ -199,6 +199,45 @@ export function depositFiguresOf(amount: Cents, chargesTotal: Cents): DepositFig
   }
 }
 
+/**
+ * What is still owed against the booking's quoted deposit.
+ *
+ * Deliberately not one of `DepositFigures`. Those four are the release
+ * arithmetic — what is held, what is charged, what goes back — and the database
+ * repeats them as a CHECK constraint on the approved row. This is a different
+ * question asked at the other end of the deposit's life: did all of it arrive?
+ *
+ * **A promise is never short.** A transfer nobody has checked is worth nothing
+ * yet, so the gap between it and the quote is not money missing, it is money
+ * unverified — which the `awaiting_verification` stage already says. Reading
+ * one as the other would put "Short BND 100" on every deposit the moment a
+ * customer pressed the button on their own page.
+ *
+ * The quote is read live rather than frozen at collection, so an amendment
+ * that reprices a booking upward makes a deposit that was whole read as short
+ * (prd.md §11). That is the honest answer: the money genuinely is not all
+ * there, and the desk has the same one way to put it right.
+ */
+export function depositShortfallOf(quoted: Cents, held: Cents, collected: boolean): Cents {
+  return collected ? Math.max(quoted - held, 0) : 0
+}
+
+/**
+ * Whether a deposit secures its booking — `booking_deposit_is_secured()` in
+ * SQL, said once here so the server layer does not keep a third copy.
+ *
+ * `collected` is separate from `held` on purpose: a promised transfer carries
+ * the full quoted figure on its row and holds nothing, so the figures alone
+ * would call it secured.
+ */
+export function depositSecuresBooking(facts: {
+  quoted: Cents
+  held: Cents
+  collected: boolean
+}): boolean {
+  return facts.quoted <= 0 || (facts.collected && facts.held >= facts.quoted)
+}
+
 /** One charge, as this module needs to see it. */
 export interface ChargeAmount {
   amount: Cents
@@ -294,6 +333,90 @@ export function canAddCharge(facts: DepositStageFacts): boolean {
   // A promised deposit answers for nothing yet: a charge raised against one
   // could be deducted from money that never arrives.
   return facts.collected && !facts.released
+}
+
+/** What `canTopUp` needs to know. `recorded` is false where no deposit row exists at all. */
+export interface TopUpFacts {
+  recorded: boolean
+  collected: boolean
+  released: boolean
+  shortfall: Cents
+}
+
+export type TopUpRefusalCode =
+  'not_recorded' | 'not_collected' | 'already_released' | 'nothing_short' | 'exceeds_shortfall'
+
+export interface TopUpRefusal {
+  code: TopUpRefusalCode
+  message: string
+}
+
+export type TopUpCheck = { ok: true } | { ok: false; error: TopUpRefusal }
+
+/**
+ * The sentence each refusal is reported with, in the arrangement
+ * `RELEASE_REFUSALS` uses: one table, so the screen and the database function
+ * refuse in the same words.
+ *
+ * Each one names the action that *would* work, because every state below has
+ * one — which is the whole difference between this slice and the gap it
+ * closes, where a clerk looking at a short deposit had no correct next move.
+ */
+const TOP_UP_REFUSALS: Readonly<Record<TopUpRefusalCode, string>> = {
+  not_recorded: 'Nothing has been taken against this booking yet. Record the deposit instead.',
+  not_collected:
+    'This deposit is still an unverified transfer. Confirm it in the payments queue first.',
+  already_released: 'This deposit has already been released.',
+  nothing_short: 'This deposit is already the full quoted figure.',
+  exceeds_shortfall: 'That is more than this deposit is short of the quoted figure.',
+}
+
+/**
+ * Whether money may still be added to this deposit.
+ *
+ * The screen asks it so a clerk is never offered a button that will refuse;
+ * `top_up_booking_deposit()` asks the same questions again under the row lock,
+ * because a release approved or a charge added while the dialog sat open must
+ * not be topped up past.
+ *
+ * Order matters, and it runs oldest fact first: a released deposit says so
+ * rather than complaining about a shortfall that stopped being collectable
+ * when somebody signed the release.
+ */
+export function canTopUp(facts: TopUpFacts): TopUpCheck {
+  if (!facts.recorded) {
+    return refuseTopUp('not_recorded')
+  }
+
+  if (!facts.collected) {
+    return refuseTopUp('not_collected')
+  }
+
+  if (facts.released) {
+    return refuseTopUp('already_released')
+  }
+
+  if (facts.shortfall <= 0) {
+    return refuseTopUp('nothing_short')
+  }
+
+  return { ok: true }
+}
+
+/** A refusal code from `top_up_booking_deposit()`, in the words the screen uses. */
+export function describeTopUpFailure(code: string): TopUpRefusal {
+  if (code in TOP_UP_REFUSALS) {
+    return { code: code as TopUpRefusalCode, message: TOP_UP_REFUSALS[code as TopUpRefusalCode] }
+  }
+
+  return {
+    code: 'nothing_short',
+    message: 'The top-up could not be recorded. Reload the screen and try again.',
+  }
+}
+
+function refuseTopUp(code: TopUpRefusalCode): TopUpCheck {
+  return { ok: false, error: { code, message: TOP_UP_REFUSALS[code] } }
 }
 
 /** Whether the guest owes anything beyond the deposit, and whether they have paid it. */

@@ -4,7 +4,10 @@ import {
   activeChargesTotal,
   canAddCharge,
   canApproveRelease,
+  canTopUp,
   depositFiguresOf,
+  depositSecuresBooking,
+  depositShortfallOf,
   depositStageOf,
   describeReleaseFailure,
   isDepositStage,
@@ -296,5 +299,122 @@ describe('describeReleaseFailure', () => {
     // A guard nobody mapped is a bug to find, and a blank dialog is how it
     // stays unfound.
     expect(describeReleaseFailure('something_new').message).toContain('Reload')
+  })
+})
+
+describe('depositShortfallOf', () => {
+  test('a deposit held for the quoted figure is short of nothing', () => {
+    expect(depositShortfallOf(DEPOSIT, DEPOSIT, true)).toBe(0)
+  })
+
+  test('a deposit held for less is short of the difference', () => {
+    // The case this exists for: a guest who sent BND 50 of the BND 100 now
+    // and meant to send the rest on Friday.
+    expect(depositShortfallOf(DEPOSIT, bnd(50), true)).toBe(bnd(50))
+  })
+
+  test('an over-held deposit is short of nothing rather than negative', () => {
+    expect(depositShortfallOf(DEPOSIT, bnd(150), true)).toBe(0)
+  })
+
+  test('a promise is never short, whatever it carries', () => {
+    // A transfer nobody has checked is worth nothing yet, so the gap between
+    // it and the quote is money unverified rather than money missing — which
+    // the `awaiting_verification` stage already says. Reading one as the other
+    // would flag every deposit the moment a customer pressed their own button.
+    expect(depositShortfallOf(DEPOSIT, bnd(50), false)).toBe(0)
+    expect(depositShortfallOf(DEPOSIT, DEPOSIT, false)).toBe(0)
+  })
+
+  test('a booking quoting nothing is short of nothing', () => {
+    expect(depositShortfallOf(0, 0, true)).toBe(0)
+  })
+})
+
+describe('depositSecuresBooking', () => {
+  test('a booking quoting no deposit is secured whatever is held', () => {
+    expect(depositSecuresBooking({ quoted: 0, held: 0, collected: false })).toBe(true)
+  })
+
+  test('the quoted figure held in full secures it, and so does more', () => {
+    expect(depositSecuresBooking({ quoted: DEPOSIT, held: DEPOSIT, collected: true })).toBe(true)
+    expect(depositSecuresBooking({ quoted: DEPOSIT, held: bnd(150), collected: true })).toBe(true)
+  })
+
+  test('a deposit that arrived short secures nothing', () => {
+    expect(depositSecuresBooking({ quoted: DEPOSIT, held: bnd(50), collected: true })).toBe(false)
+  })
+
+  test('a promise carrying the whole figure still secures nothing', () => {
+    // The reason `collected` is a separate fact from `held`: a promised row
+    // carries the full quoted figure and the property is holding none of it.
+    expect(depositSecuresBooking({ quoted: DEPOSIT, held: DEPOSIT, collected: false })).toBe(false)
+  })
+})
+
+describe('canTopUp', () => {
+  const short = { recorded: true, collected: true, released: false, shortfall: bnd(50) }
+
+  test('a collected deposit short of its quote may be topped up', () => {
+    expect(canTopUp(short)).toEqual({ ok: true })
+  })
+
+  test('a booking with no deposit row is sent to record one instead', () => {
+    const check = canTopUp({ ...short, recorded: false })
+
+    expect(check.ok).toBe(false)
+    expect(check.ok || check.error.code).toBe('not_recorded')
+    expect(check.ok || check.error.message).toContain('Record the deposit')
+  })
+
+  test('an unverified promise is sent to the queue instead', () => {
+    const check = canTopUp({ ...short, collected: false })
+
+    expect(check.ok || check.error.code).toBe('not_collected')
+  })
+
+  test('a released deposit says so rather than naming the shortfall', () => {
+    // Order matters: once somebody has signed the release the shortfall
+    // stopped being collectable, and complaining about it would name the
+    // wrong problem.
+    const check = canTopUp({ ...short, released: true })
+
+    expect(check.ok || check.error.code).toBe('already_released')
+  })
+
+  test('a whole deposit has nothing to top up', () => {
+    const check = canTopUp({ ...short, shortfall: 0 })
+
+    expect(check.ok || check.error.code).toBe('nothing_short')
+  })
+})
+
+describe('a short deposit is not a stage', () => {
+  test('it keeps whichever stage the pipeline gives it', () => {
+    // The decision this pins: short cuts across all six stages rather than
+    // being a seventh, so a deposit can be short and `in_house` at once.
+    const collected: DepositStageFacts = {
+      collected: true,
+      released: false,
+      inspected: false,
+      bookingStatus: 'confirmed',
+    }
+
+    expect(depositStageOf(collected)).toBe('secured')
+    expect(depositStageOf({ ...collected, bookingStatus: 'checked_in' })).toBe('in_house')
+    expect(depositStageOf({ ...collected, bookingStatus: 'completed' })).toBe('awaiting_inspection')
+  })
+
+  test('a short deposit may still be released', () => {
+    // You give back what you actually hold, less charges. Refusing the release
+    // because the deposit came up short would trap the guest's money forever.
+    expect(
+      canApproveRelease({
+        collected: true,
+        released: false,
+        inspected: true,
+        bookingStatus: 'completed',
+      }),
+    ).toEqual({ ok: true })
   })
 })

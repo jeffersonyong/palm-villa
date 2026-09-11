@@ -1,5 +1,6 @@
 import { transition, type BookingStatus, isTerminal } from '@/lib/domain/booking-state'
 import type { DayBounds, StayDate } from '@/lib/domain/dates'
+import { depositSecuresBooking } from '@/lib/domain/deposit'
 import type { Cents } from '@/lib/domain/money'
 import type { PaymentMatchKind, PaymentMethod, PaymentStatus } from '@/lib/domain/payment'
 import type { BookingStream } from '@/lib/domain/stream'
@@ -362,8 +363,12 @@ export type VerifyPaymentResult =
  * status pair offered to the function is the right one.
  *
  * True when the booking quotes no deposit, or a deposit row exists that has
- * been collected: counted at the desk or verified in the queue. A promised
- * transfer is not in hand.
+ * been collected **for at least the quoted figure**: counted at the desk or
+ * verified in the queue. A promised transfer is not in hand, and neither is a
+ * deposit that arrived short (prd.md §11).
+ *
+ * The predicate itself is `depositSecuresBooking` in lib/domain, so this reads
+ * the rows and the rule lives in one place.
  */
 async function depositSecures(
   propertyId: string,
@@ -378,7 +383,7 @@ async function depositSecures(
       .maybeSingle(),
     dataClient()
       .from('deposit')
-      .select('collected_at')
+      .select('collected_at, amount_cents')
       .eq('property_id', propertyId)
       .eq('booking_id', bookingId)
       .maybeSingle(),
@@ -393,11 +398,15 @@ async function depositSecures(
   }
 
   const quoted = (booking.data as { security_deposit_cents: number } | null)?.security_deposit_cents
-  const collectedAt = (deposit.data as { collected_at: string | null } | null)?.collected_at
+  const row = deposit.data as { collected_at: string | null; amount_cents: number } | null
 
   return {
     quoted: quoted ?? 0,
-    secured: (quoted ?? 0) <= 0 || (collectedAt !== undefined && collectedAt !== null),
+    secured: depositSecuresBooking({
+      quoted: quoted ?? 0,
+      held: row?.amount_cents ?? 0,
+      collected: row?.collected_at != null,
+    }),
   }
 }
 
