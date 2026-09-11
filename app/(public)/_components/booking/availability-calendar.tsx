@@ -311,7 +311,13 @@ function NightCell({
           // drawn chip, so provisional and committed never look alike.
           isSoftEnd && 'rounded-md border border-border bg-card text-foreground',
           !isFilled && !isBetween && selectable && 'rounded-md hover:bg-muted',
-          !isFilled && inMonth && 'text-foreground',
+          // A night with nothing left recedes to the same mute as a day from
+          // the neighbouring month. It used to sit at full ink with one word
+          // underneath, so the only thing separating a sold-out Saturday from a
+          // bookable one was a caption — the grid read as available by default
+          // and the customer had to check each cell rather than scan the block.
+          !isFilled && inMonth && (!isFull || outOfBounds) && 'text-foreground',
+          !isFilled && inMonth && isFull && !outOfBounds && 'text-muted-foreground',
           !isFilled && !inMonth && 'text-muted-foreground',
           outOfBounds && 'opacity-40',
           selectable ? 'cursor-pointer' : 'cursor-default',
@@ -321,16 +327,37 @@ function NightCell({
         {/* Today is a weight rather than the dot the other calendars use: the
             cell below the numeral is spoken for by the rate, and a mark under
             that would be a third line in a 48px cell. */}
-        <span className={cn('tabular-nums', date === today && !isFilled && 'font-medium')}>
+        <span
+          className={cn(
+            'tabular-nums',
+            date === today && !isFilled && 'font-medium',
+            // The mark that separates "sold out" from "belongs to the month
+            // next door", which mute alone cannot: both are quiet, and only one
+            // of them is a night the customer might otherwise keep trying to
+            // click. It also means the state does not rest on colour, so it
+            // survives a screen in sunlight and a reader who cannot tell the
+            // two greys apart.
+            // Not on a day outside the booking window: those are already
+            // faded and carry no rate, and a line through them would say
+            // "sold out" about a night that was never on sale — which is a
+            // different fact, and a noisier one at the top of the grid.
+            isFull && !isFilled && !outOfBounds && 'line-through decoration-from-font',
+          )}
+        >
           {Number(date.slice(8, 10))}
         </span>
 
         {/* The rate, or the fact there is nothing to sell. Hidden on an
             out-of-window day, where a price would be an offer. */}
         {outOfBounds ? null : isFull ? (
+          // The rate's own size and register, not `micro-label`'s. A micro
+          // label is 11px uppercase with tracking, so against a 10px rate it
+          // was both wider and a line taller — which pushed the numeral up and
+          // left a sold-out night sitting a pixel or two off the row it is in.
+          // Whatever occupies this line, it is the same line.
           <span
             className={cn(
-              'micro-label',
+              'text-[10px]',
               isFilled && !isSoftEnd ? 'text-primary-foreground/80' : 'text-muted-foreground',
             )}
           >
