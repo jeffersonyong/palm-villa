@@ -38,12 +38,25 @@ import { submitTransferAction, type SubmitTransferState } from './actions'
  *
  * **A stay offers two amounts, and both are the client's own words.** Asked
  * what a guest transfers when booking, he named the deposit only or the full
- * amount with the deposit (N29), and the second was recorded and never built.
- * The deposit is the default because it is the smaller commitment and the one
- * the policy is written around; paying everything is one radio away for the
- * guests who would rather be done with it. It is not a part payment — that is
- * still [N16](../../../docs/open-questions.md) and still out — because the
- * stay is settled in full either way, only sooner.
+ * amount with the deposit (N29), and both are offered. It is not a part
+ * payment — that is still [N16](../../../docs/open-questions.md) and still out
+ * — because the stay is settled in full either way, only sooner.
+ *
+ * **Paying in full is the default, and that is the property's call** (Jeff, 18
+ * September 2026). It was the deposit, on the reasoning that the smaller
+ * commitment is the kinder default. The business reads it the other way: a
+ * booking settled at the point of booking is one the desk never has to collect
+ * on arrival, and leaving only the deposit should be something a guest chooses
+ * rather than something the form chooses for them. So the fuller option leads
+ * and is selected, and the smaller one sits under it, stated just as plainly.
+ *
+ * **What it costs, so it is not discovered later.** A guest who takes the
+ * default and then transfers only the deposit anyway leaves a payment row for
+ * the stay that nobody will pay — the deposit verifies, the booking confirms,
+ * and a pending payment sits in the queue until somebody cancels it. That is
+ * [N38](../../../docs/open-questions.md)'s abandoned transfer, which is already
+ * the desk's job, but this default will produce more of them than the other one
+ * did. The queue sorts oldest first, which is where they will surface.
  */
 
 const initialState: SubmitTransferState = { status: 'idle' }
@@ -64,7 +77,7 @@ export function TransferInstructions({
   accounts: readonly BankAccountSettings[]
 }) {
   const [state, formAction, isPending] = useActionState(submitTransferAction, initialState)
-  const [choice, setChoice] = useState<TransferChoice>('deposit_only')
+  const [choice, setChoice] = useState<TransferChoice>('everything')
 
   const plan = choice === 'everything' ? everything : depositOnly
 
@@ -81,18 +94,18 @@ export function TransferInstructions({
       {depositOnly.choosable ? (
         <div className="mt-md grid gap-sm">
           <TransferOption
-            id="deposit_only"
-            checked={choice === 'deposit_only'}
-            onSelect={() => setChoice('deposit_only')}
-            title={`Just the deposit — BND ${formatCents(depositOnly.total)}`}
-            detail={`Secures your unit. The BND ${formatCents(depositOnly.stay || everything.stay)} for the stay is paid when you arrive.`}
-          />
-          <TransferOption
             id="everything"
             checked={choice === 'everything'}
             onSelect={() => setChoice('everything')}
             title={`Everything now — BND ${formatCents(everything.total)}`}
             detail={`The BND ${formatCents(everything.deposit)} deposit and the BND ${formatCents(everything.stay)} for the stay together, so there is nothing to settle on arrival.`}
+          />
+          <TransferOption
+            id="deposit_only"
+            checked={choice === 'deposit_only'}
+            onSelect={() => setChoice('deposit_only')}
+            title={`Just the deposit — BND ${formatCents(depositOnly.total)}`}
+            detail={`Secures your unit. The BND ${formatCents(depositOnly.stay || everything.stay)} for the stay is paid when you arrive.`}
           />
         </div>
       ) : (
