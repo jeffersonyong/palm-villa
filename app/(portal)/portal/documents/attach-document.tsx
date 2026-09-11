@@ -43,8 +43,10 @@ import { attachDocumentAction } from './actions'
 interface AttachDocumentProps {
   kind: DocumentKind
   bookingId: string
-  /** Set for a slip. */
+  /** Set for a slip evidencing a booking payment. */
   paymentId?: string
+  /** Set for a slip evidencing the security deposit instead (N39). */
+  depositId?: string
   /** Set for an inspection photograph. */
   inspectionId?: string
   /** The trigger's label — "Attach ID", "Attach slip", "Add photographs". */
@@ -77,6 +79,7 @@ function AttachDialog({
   kind,
   bookingId,
   paymentId,
+  depositId,
   inspectionId,
   title,
   description,
@@ -105,6 +108,10 @@ function AttachDialog({
 
         if (paymentId) {
           data.set('paymentId', paymentId)
+        }
+
+        if (depositId) {
+          data.set('depositId', depositId)
         }
 
         if (inspectionId) {

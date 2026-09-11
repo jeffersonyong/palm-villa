@@ -57,8 +57,10 @@ export interface Document {
   id: string
   kind: DocumentKind
   bookingId: string
-  /** Set only on a slip. */
+  /** Set on a slip evidencing a booking payment. Exclusive with `depositId`. */
   paymentId: string | null
+  /** Set on a slip evidencing the security deposit instead (N39). */
+  depositId: string | null
   /** Set only on an inspection photograph. */
   inspectionId: string | null
   /** Display text. Never part of the storage key — see `storageKeyFor`. */
@@ -88,6 +90,7 @@ interface DocumentRow {
   kind: string
   booking_id: string
   payment_id: string | null
+  deposit_id: string | null
   inspection_id: string | null
   bucket_id: string
   storage_key: string
@@ -102,7 +105,7 @@ interface DocumentRow {
 }
 
 const DOCUMENT_COLUMNS =
-  'id, kind, booking_id, payment_id, inspection_id, bucket_id, storage_key, original_filename, mime_type, byte_size, uploaded_by, uploaded_at, retain_until, assembled_from, deleted_at'
+  'id, kind, booking_id, payment_id, deposit_id, inspection_id, bucket_id, storage_key, original_filename, mime_type, byte_size, uploaded_by, uploaded_at, retain_until, assembled_from, deleted_at'
 
 function toDocument(row: DocumentRow, now: Date): Document {
   return {
@@ -110,6 +113,7 @@ function toDocument(row: DocumentRow, now: Date): Document {
     kind: row.kind as DocumentKind,
     bookingId: row.booking_id,
     paymentId: row.payment_id,
+    depositId: row.deposit_id,
     inspectionId: row.inspection_id,
     filename: row.original_filename,
     mimeType: row.mime_type,
@@ -236,14 +240,29 @@ async function readRow(documentId: string): Promise<DocumentRow | null> {
 export interface AttachDocumentInput {
   kind: DocumentKind
   bookingId: string
-  /** Required for a slip, refused otherwise. */
+  /** One of two pointers a slip may take. Exactly one, refused otherwise. */
   paymentId?: string | null
+  /**
+   * The slip's other pointer, where the money was the security deposit rather
+   * than a booking payment (N39). A deposit is deliberately not a payment
+   * (prd.md §11), and an online stay pays the deposit and nothing else, so this
+   * is the ordinary case on the public surface rather than the exotic one.
+   */
+  depositId?: string | null
   /** Required for a photograph, refused otherwise. */
   inspectionId?: string | null
   bytes: Uint8Array
   /** Whatever the browser called it. Sanitised here. */
   filename: string
   actorId: string | null
+  /**
+   * Whether the guest sent this themselves, through their booking's access
+   * token (capabilities A6, A7). Not a permission — there is none to hold —
+   * but the thing that decides whether this upload may REPLACE the last one:
+   * a customer'''s file supersedes their own and never a staff member'''s.
+   * See `CUSTOMER_ATTACHABLE_KINDS` in lib/domain/document.ts.
+   */
+  uploadedByCustomer?: boolean
   /**
    * For an accounting pack only: the instant its facts were read, as an ISO
    * string. Refused on every other kind. See `assembleAccountingPack` in
@@ -316,6 +335,8 @@ export async function attachDocument(
     p_byte_size: input.bytes.length,
     p_actor_id: input.actorId,
     p_assembled_from: input.assembledFrom ?? null,
+    p_deposit_id: input.depositId ?? null,
+    p_uploaded_by_customer: input.uploadedByCustomer ?? false,
   })
 
   if (error) {
@@ -379,7 +400,13 @@ function describeAttachFailure(result: RpcRefusal): DocumentWriteError {
     case 'not_on_this_booking':
       return {
         code: result.error,
-        message: 'That payment or inspection belongs to a different booking.',
+        message: 'That payment, deposit or inspection belongs to a different booking.',
+      }
+    case 'not_a_customer_kind':
+    case 'customer_has_no_actor':
+      return {
+        code: result.error,
+        message: 'That file cannot be attached this way.',
       }
     case 'not_a_transfer':
       return {
@@ -389,7 +416,7 @@ function describeAttachFailure(result: RpcRefusal): DocumentWriteError {
     case 'slip_already_attached':
       return {
         code: result.error,
-        message: 'This payment already has a slip on file. Remove it before attaching another.',
+        message: 'There is already a slip on file for this. Remove it before attaching another.',
       }
     case 'pointer_missing':
       return { code: result.error, message: 'There is nothing to attach this to.' }

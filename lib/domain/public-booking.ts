@@ -97,6 +97,29 @@ export const PUBLIC_LIMITS = {
   /** "I've made the transfer" presses from one address in an hour. */
   submitsPerIpPerHour: 30,
   /**
+   * Files sent from one address in an hour (capabilities A6, A7).
+   *
+   * The first counter here guarding something that costs storage rather than
+   * inventory or bandwidth, and the looser of the pair for that reason: an
+   * address is a household or an office, and a family sending a slip and two
+   * sides of an IC from one hotel wifi is three uploads before anybody has
+   * retaken a dark photograph.
+   */
+  uploadsPerIpPerHour: 20,
+  /**
+   * Files sent against one booking in a day.
+   *
+   * The one that actually bounds the cost, because it keys on the credential
+   * rather than the caller: an upload needs a valid access token, so a script
+   * with one token can only ever fill one booking'''s allowance.
+   *
+   * Ten, because a guest whose first photograph came out dark retakes it once
+   * or twice, and each retake supersedes rather than accumulates — the storage
+   * a booking can hold is bounded by the superseding, not by this. What this
+   * bounds is the *writing*.
+   */
+  uploadsPerBookingPerDay: 10,
+  /**
    * Lookup attempts from one address in an hour (capability A9).
    *
    * The first counter here that guards a **read**, and it guards a different

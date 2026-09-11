@@ -9,7 +9,9 @@ import { createWalkInBooking, getBookingById } from './bookings'
 import { listDayPassHeadroom } from './day-passes'
 import { listPendingDeposits } from './deposits'
 import { currentPropertyId } from './property'
+import { listDocumentsForBooking } from './documents'
 import {
+  attachPublicDocument,
   createPublicDayPassBooking,
   createPublicStayBooking,
   getBookingByAccessToken,
@@ -18,7 +20,7 @@ import {
   type CreatePublicDayPassInput,
   type CreatePublicStayInput,
 } from './public-bookings'
-import { bookingInput } from './test/factory'
+import { TEST_PNG, bookingInput } from './test/factory'
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -675,5 +677,205 @@ describe('the attempt counter', () => {
     expect(
       await notePublicAttempt({ kind: 'booking:ip', keyHash, windowSeconds: 1, limit: 1 }),
     ).toBe(true)
+  })
+})
+
+/* ── What the customer sends us (capabilities A6, A7) ─────────────────────── */
+
+/**
+ * The upload path, from the token inwards.
+ *
+ * What these prove is the half `documents.test.ts` cannot: that the right rows
+ * are found from a token alone. The filing rule is the interesting one, and it
+ * is prd.md §10.3's — a customer who settles everything up front makes ONE
+ * transfer against TWO rows, so one screenshot has to reach both or one of the
+ * two accounting packs is assembled without its evidence.
+ */
+describe('a file the customer sends through their own link', () => {
+  test('files an identity document against the booking', async () => {
+    // Arrange
+    const created = await createPublicStayBooking(stayInput({ unitTypeSlug: 'three-bedroom' }))
+
+    expect(created.ok).toBe(true)
+
+    if (!created.ok) return
+
+    // Act
+    const result = await attachPublicDocument({
+      token: created.data.accessToken,
+      kind: 'identity',
+      bytes: TEST_PNG,
+      filename: 'ic.png',
+    })
+
+    // Assert
+    expect(result.ok).toBe(true)
+
+    const held = await listDocumentsForBooking(created.data.bookingId, 'identity')
+
+    expect(held).toHaveLength(1)
+    // Nobody performed it, which is what every public write records.
+    expect(held[0]?.uploadedBy).toBeNull()
+  })
+
+  test('files one slip against the deposit for the ordinary online stay', async () => {
+    const created = await createPublicStayBooking(stayInput({ unitTypeSlug: 'three-bedroom' }))
+
+    expect(created.ok).toBe(true)
+
+    if (!created.ok) return
+
+    await submitPublicTransfer(created.data.accessToken)
+
+    const result = await attachPublicDocument({
+      token: created.data.accessToken,
+      kind: 'payment_slip',
+      bytes: TEST_PNG,
+      filename: 'transfer.png',
+    })
+
+    expect(result.ok).toBe(true)
+
+    const slips = await listDocumentsForBooking(created.data.bookingId, 'payment_slip')
+
+    expect(slips).toHaveLength(1)
+    expect(slips[0]?.depositId).not.toBeNull()
+    expect(slips[0]?.paymentId).toBeNull()
+  })
+
+  test('files the same slip against both rows when the stay was settled up front', async () => {
+    // One transfer, two rows, and they stay two (prd.md §10.3). Each carries
+    // its own seven-year clock and its own pack, so they cannot share one row.
+    const created = await createPublicStayBooking(stayInput({ unitTypeSlug: 'three-bedroom' }))
+
+    expect(created.ok).toBe(true)
+
+    if (!created.ok) return
+
+    await submitPublicTransfer(created.data.accessToken, 'everything')
+
+    const result = await attachPublicDocument({
+      token: created.data.accessToken,
+      kind: 'payment_slip',
+      bytes: TEST_PNG,
+      filename: 'transfer.png',
+    })
+
+    expect(result.ok).toBe(true)
+
+    const slips = await listDocumentsForBooking(created.data.bookingId, 'payment_slip')
+
+    expect(slips).toHaveLength(2)
+    expect(slips.filter((slip) => slip.depositId !== null)).toHaveLength(1)
+    expect(slips.filter((slip) => slip.paymentId !== null)).toHaveLength(1)
+  })
+
+  test('files one slip against the payment for a day pass, which has no deposit', async () => {
+    const created = await createPublicDayPassBooking(dayPassInput())
+
+    expect(created.ok).toBe(true)
+
+    if (!created.ok) return
+
+    await submitPublicTransfer(created.data.accessToken)
+
+    const result = await attachPublicDocument({
+      token: created.data.accessToken,
+      kind: 'payment_slip',
+      bytes: TEST_PNG,
+      filename: 'transfer.png',
+    })
+
+    expect(result.ok).toBe(true)
+
+    const slips = await listDocumentsForBooking(created.data.bookingId, 'payment_slip')
+
+    expect(slips).toHaveLength(1)
+    expect(slips[0]?.paymentId).not.toBeNull()
+    expect(slips[0]?.depositId).toBeNull()
+  })
+
+  test('refuses a slip before the customer has said they transferred', async () => {
+    // There is no deposit and no payment row yet, so there is nothing for the
+    // slip to be evidence OF. A sequence to explain, not an error to log.
+    const created = await createPublicStayBooking(stayInput({ unitTypeSlug: 'three-bedroom' }))
+
+    expect(created.ok).toBe(true)
+
+    if (!created.ok) return
+
+    const result = await attachPublicDocument({
+      token: created.data.accessToken,
+      kind: 'payment_slip',
+      bytes: TEST_PNG,
+      filename: 'early.png',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.error.code).toBe('nothing_to_evidence')
+  })
+
+  test('refuses a token nobody holds', async () => {
+    const result = await attachPublicDocument({
+      token: 'AAAAAAAAAAAAAAAAAAAAAA',
+      kind: 'identity',
+      bytes: TEST_PNG,
+      filename: 'ic.png',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.error.code).toBe('not_found')
+  })
+
+  test('refuses once the booking is closed', async () => {
+    // A cancelled booking is not a place to file new records, and a link that
+    // outlives its booking should stop doing anything.
+    const created = await createPublicStayBooking(stayInput({ unitTypeSlug: 'three-bedroom' }))
+
+    expect(created.ok).toBe(true)
+
+    if (!created.ok) return
+
+    await dataClient()
+      .from('booking')
+      .update({ status: 'cancelled' })
+      .eq('id', created.data.bookingId)
+
+    const result = await attachPublicDocument({
+      token: created.data.accessToken,
+      kind: 'identity',
+      bytes: TEST_PNG,
+      filename: 'ic.png',
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.error.code).toBe('booking_closed')
+  })
+
+  test('a second identity document replaces the first, rather than piling up', async () => {
+    const created = await createPublicStayBooking(stayInput({ unitTypeSlug: 'three-bedroom' }))
+
+    expect(created.ok).toBe(true)
+
+    if (!created.ok) return
+
+    await attachPublicDocument({
+      token: created.data.accessToken,
+      kind: 'identity',
+      bytes: TEST_PNG,
+      filename: 'dark.png',
+    })
+
+    await attachPublicDocument({
+      token: created.data.accessToken,
+      kind: 'identity',
+      bytes: TEST_PNG,
+      filename: 'better.png',
+    })
+
+    const held = await listDocumentsForBooking(created.data.bookingId, 'identity')
+
+    expect(held).toHaveLength(1)
+    expect(held[0]?.filename).toBe('better.png')
   })
 })

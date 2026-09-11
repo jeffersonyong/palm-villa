@@ -66,6 +66,7 @@ function deposit(overrides: Partial<Deposit> = {}): Deposit {
     method: 'bank_transfer',
     collectedBy: null,
     collectedAt: null,
+    slipDocumentId: null,
     promisedAt: '2026-09-10T01:00:00Z',
     observed: null,
     overrideReason: null,
@@ -125,7 +126,16 @@ describe('flattening a promised deposit', () => {
     expect(entry.expected).toBe(bnd(150))
   })
 
-  test('carries no slip, because a document hangs off a payment', () => {
+  // N39, answered by capability A6: a slip used to need a `payment_id` and a
+  // deposit is not a payment, so the cell carried a sentence saying there was
+  // nowhere to hang one. It hangs off the deposit now.
+  test('carries the slip on file, since a deposit has somewhere to hang one', () => {
+    const entry = depositEntry(deposit({ slipDocumentId: 'doc-9' }))
+
+    expect(entry.slipDocumentId).toBe('doc-9')
+  })
+
+  test('carries none where the guest has not sent one', () => {
     expect(depositEntry(deposit()).slipDocumentId).toBeNull()
   })
 })

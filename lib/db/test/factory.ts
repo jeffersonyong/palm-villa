@@ -565,3 +565,41 @@ export async function givenInspectedDeposit(
     inspectionId: result.inspectionId,
   }
 }
+
+/**
+ * A real `auth.users` row, for the handful of tests that turn on who acted.
+ *
+ * Almost everything here passes `actorId: null`, because almost nothing cares
+ * — the integration suite is about what the database enforces, not about whose
+ * name is on it. Two rules do care, and both arrived with capabilities A6 and
+ * A7: `uploaded_by is null` is exactly what separates a file the guest sent
+ * from one a clerk attached, so a test proving a guest cannot replace the
+ * desk's file needs a desk file that a real user owns.
+ *
+ * Created through the admin API rather than inserted, because `uploaded_by`
+ * carries a foreign key to `auth.users` and a hand-written uuid would fail it.
+ * Memoised per run and given a unique address, so parallel files do not race
+ * each other for one email.
+ */
+let staffId: Promise<string> | null = null
+
+export function givenStaffAccount(): Promise<string> {
+  staffId ??= createStaffUser()
+
+  return staffId
+}
+
+async function createStaffUser(): Promise<string> {
+  const { data, error } = await dataClient().auth.admin.createUser({
+    email: `desk-${crypto.randomUUID()}@example.test`,
+    password: crypto.randomUUID(),
+    email_confirm: true,
+    user_metadata: { display_name: 'The desk' },
+  })
+
+  if (error || !data.user) {
+    throw new Error(`Test setup could not create a staff account: ${error?.message}`)
+  }
+
+  return data.user.id
+}

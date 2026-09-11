@@ -17,6 +17,7 @@ import {
   runRetention,
   sweepOrphanObjects,
 } from './documents'
+import { getDepositByBookingId } from './deposits'
 import { listPaymentsForBooking, verifyPayment } from './payments'
 import { currentPropertyId } from './property'
 import { auditEventsFor } from './test/inspect'
@@ -26,6 +27,7 @@ import {
   givenBooking,
   givenDocument,
   givenInspectedDeposit,
+  givenStaffAccount,
   givenTransferBooking,
 } from './test/factory'
 
@@ -761,3 +763,363 @@ async function expireByHand(documentId: string): Promise<void> {
     throw new Error(`Test setup could not expire a document: ${error.message}`)
   }
 }
+
+/* ── A slip on a deposit (N39, capability A6) ─────────────────────────────── */
+
+/**
+ * The obstacle A6 had to clear, tested from both ends.
+ *
+ * A slip used to need a `payment_id`, and a deposit is deliberately not a
+ * payment (prd.md §11), so the one transfer an online stay actually asks a
+ * customer to make had no slip. These prove the second pointer works exactly
+ * as the first does — and, more importantly, that the two cannot be confused:
+ * `document_pointer_matches_kind` takes exactly one of them.
+ */
+describe('a slip against the security deposit', () => {
+  test('is stored against the deposit and found on the booking', async () => {
+    // Arrange
+    const { booking, deposit } = await givenTransferBooking({
+      checkIn: TOMORROW,
+      checkOut: NEXT_WEEK,
+    })
+
+    // Act
+    const result = await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      depositId: deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'deposit.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    // Assert
+    expect(result.ok).toBe(true)
+
+    const [slip] = await listDocumentsForBooking(booking.id, 'payment_slip')
+
+    expect(slip?.depositId).toBe(deposit!.id)
+    expect(slip?.paymentId).toBeNull()
+  })
+
+  test('is mirrored onto the deposit, the way a payment mirrors its own', async () => {
+    // What the verification queue reads, so it can answer "is there a slip"
+    // without a join per row.
+    const { booking, deposit } = await givenTransferBooking({
+      checkIn: TOMORROW,
+      checkOut: NEXT_WEEK,
+    })
+
+    const result = await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      depositId: deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'deposit.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    const after = await getDepositByBookingId(booking.id)
+
+    expect(after?.slipDocumentId).toBe(result.ok ? result.documentId : null)
+  })
+
+  test('a second slip on one deposit is refused, as it is on a payment', async () => {
+    const { booking, deposit } = await givenTransferBooking({
+      checkIn: TOMORROW,
+      checkOut: NEXT_WEEK,
+    })
+
+    await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      depositId: deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'first.png',
+      actorId: null,
+      uploadedByCustomer: false,
+    })
+
+    const second = await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      depositId: deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'second.png',
+      actorId: null,
+      uploadedByCustomer: false,
+    })
+
+    expect(second.ok).toBe(false)
+    expect(second.ok === false && second.error.code).toBe('slip_already_attached')
+  })
+
+  test("removing it clears the deposit's pointer", async () => {
+    const { booking, deposit } = await givenTransferBooking({
+      checkIn: TOMORROW,
+      checkOut: NEXT_WEEK,
+    })
+
+    const attached = await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      depositId: deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'deposit.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    await removeDocument({
+      documentId: attached.ok ? attached.documentId : '',
+      actorId: null,
+    })
+
+    const after = await getDepositByBookingId(booking.id)
+
+    expect(after?.slipDocumentId).toBeNull()
+  })
+
+  test('a slip claiming both a payment and a deposit is refused', async () => {
+    // The constraint is "exactly one", not "at least one": a row carrying both
+    // would be evidence for two different sums, which is precisely the mistake
+    // available on a booking whose one transfer covers a deposit and a stay.
+    const { booking, payment, deposit } = await givenTransferBooking({
+      checkIn: TOMORROW,
+      checkOut: NEXT_WEEK,
+    })
+
+    const result = await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      paymentId: payment.id,
+      depositId: deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'both.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.error.code).toBe('pointer_missing')
+  })
+
+  test("a slip pointing at a deposit on somebody else's booking is refused", async () => {
+    // Different nights, or the two bookings collide on the same unit — which
+    // is the exclusion constraint doing its job, not a fault worth working
+    // around with a second unit.
+    const mine = await givenTransferBooking({ checkIn: TOMORROW, checkOut: NEXT_WEEK })
+    const theirs = await givenTransferBooking({
+      checkIn: addDays(NEXT_WEEK, 1),
+      checkOut: addDays(NEXT_WEEK, 4),
+    })
+
+    const result = await attachDocument({
+      kind: 'payment_slip',
+      bookingId: mine.booking.id,
+      depositId: theirs.deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'wrong.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.error.code).toBe('not_on_this_booking')
+  })
+})
+
+/* ── What a customer may replace (capabilities A6, A7) ────────────────────── */
+
+describe('a file the guest sent themselves', () => {
+  test('their second identity document supersedes their first', async () => {
+    // Arrange — a guest whose first photograph came out dark.
+    const booking = await givenBooking({ checkIn: TOMORROW, checkOut: NEXT_WEEK })
+
+    const first = await attachDocument({
+      kind: 'identity',
+      bookingId: booking.id,
+      bytes: TEST_PNG,
+      filename: 'dark.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    // Act
+    const second = await attachDocument({
+      kind: 'identity',
+      bookingId: booking.id,
+      bytes: TEST_PNG,
+      filename: 'better.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    // Assert — one live file, and the old one handed back to be deleted.
+    const live = await listDocumentsForBooking(booking.id, 'identity')
+
+    expect(live).toHaveLength(1)
+    expect(live[0]?.filename).toBe('better.png')
+    expect(second.ok && second.superseded.map((row) => row.id)).toEqual([
+      first.ok ? first.documentId : null,
+    ])
+  })
+
+  test('their upload never supersedes one a staff member attached', async () => {
+    // The desk photographs the front and the back, and a family arriving
+    // together is more than one person — so a staff IC is never replaced by a
+    // guest's, and the two sit side by side.
+    const booking = await givenBooking({ checkIn: TOMORROW, checkOut: NEXT_WEEK })
+    const staff = await givenStaffAccount()
+
+    await attachDocument({
+      kind: 'identity',
+      bookingId: booking.id,
+      bytes: TEST_PNG,
+      filename: 'taken-at-the-desk.png',
+      actorId: staff,
+      uploadedByCustomer: false,
+    })
+
+    await attachDocument({
+      kind: 'identity',
+      bookingId: booking.id,
+      bytes: TEST_PNG,
+      filename: 'sent-by-the-guest.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    const live = await listDocumentsForBooking(booking.id, 'identity')
+
+    expect(live.map((document) => document.filename).sort()).toEqual([
+      'sent-by-the-guest.png',
+      'taken-at-the-desk.png',
+    ])
+  })
+
+  test('their slip replaces their own, rather than being refused', async () => {
+    const { booking, deposit } = await givenTransferBooking({
+      checkIn: TOMORROW,
+      checkOut: NEXT_WEEK,
+    })
+
+    await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      depositId: deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'blurred.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    const second = await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      depositId: deposit!.id,
+      bytes: TEST_PDF,
+      filename: 'receipt.pdf',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    expect(second.ok).toBe(true)
+
+    const live = await listDocumentsForBooking(booking.id, 'payment_slip')
+
+    expect(live).toHaveLength(1)
+    expect(live[0]?.filename).toBe('receipt.pdf')
+  })
+
+  test('their slip is refused where the desk has already filed one', async () => {
+    // The honest answer, and what the page tells them: it is already on file.
+    const { booking, deposit } = await givenTransferBooking({
+      checkIn: TOMORROW,
+      checkOut: NEXT_WEEK,
+    })
+    const staff = await givenStaffAccount()
+
+    await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      depositId: deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'from-whatsapp.png',
+      actorId: staff,
+      uploadedByCustomer: false,
+    })
+
+    const theirs = await attachDocument({
+      kind: 'payment_slip',
+      bookingId: booking.id,
+      depositId: deposit!.id,
+      bytes: TEST_PNG,
+      filename: 'mine.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    expect(theirs.ok).toBe(false)
+    expect(theirs.ok === false && theirs.error.code).toBe('slip_already_attached')
+  })
+
+  test('an inspection photograph is refused, whatever else is passed', async () => {
+    const booking = await givenBooking({ checkIn: TOMORROW, checkOut: NEXT_WEEK })
+
+    const result = await attachDocument({
+      kind: 'inspection_photo',
+      bookingId: booking.id,
+      bytes: TEST_PNG,
+      filename: 'damage.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.error.code).toBe('not_a_customer_kind')
+  })
+
+  test('a customer upload carrying an actor is refused', async () => {
+    // Both at once would be a caller claiming one upload was made by a member
+    // of staff and by a guest, and `uploaded_by is null` is what the supersede
+    // rule reads to tell them apart.
+    const booking = await givenBooking({ checkIn: TOMORROW, checkOut: NEXT_WEEK })
+    const staff = await givenStaffAccount()
+
+    const result = await attachDocument({
+      kind: 'identity',
+      bookingId: booking.id,
+      bytes: TEST_PNG,
+      filename: 'ic.png',
+      actorId: staff,
+      uploadedByCustomer: true,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.error.code).toBe('customer_has_no_actor')
+  })
+
+  test("is recorded as the guest's on the booking history", async () => {
+    // The history panel reads this to say "the guest" rather than naming
+    // nobody — see `uploaderFor` in lib/domain/document.ts.
+    const booking = await givenBooking({ checkIn: TOMORROW, checkOut: NEXT_WEEK })
+
+    const result = await attachDocument({
+      kind: 'identity',
+      bookingId: booking.id,
+      bytes: TEST_PNG,
+      filename: 'ic.png',
+      actorId: null,
+      uploadedByCustomer: true,
+    })
+
+    const events = await auditEventsFor(result.ok ? result.documentId : '')
+    const attached = events.find((event) => event.action === 'document.attached')
+
+    expect(attached?.actorId).toBeNull()
+    expect((attached?.after as { by?: string })?.by).toBe('customer')
+  })
+})

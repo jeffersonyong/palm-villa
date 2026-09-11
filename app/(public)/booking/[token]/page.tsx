@@ -8,6 +8,7 @@ import { Callout } from '@/components/ui/callout'
 import { Card } from '@/components/ui/card'
 import { QuoteLines } from '@/components/quote-lines'
 import { getDepositByBookingId } from '@/lib/db/deposits'
+import { listDocumentsForBooking } from '@/lib/db/documents'
 import { getBookingByAccessToken } from '@/lib/db/public-bookings'
 import { readPropertySettings } from '@/lib/db/settings'
 import { balanceOf } from '@/lib/domain/balance'
@@ -20,6 +21,7 @@ import {
   type PublicStage,
 } from '@/lib/domain/public-booking'
 
+import { SendAFile } from './send-a-file'
 import { TransferInstructions } from './transfer-instructions'
 
 export const metadata: Metadata = {
@@ -60,9 +62,11 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
 
   const stage = publicStageOf(booking.status)
   const plan = transferPlanFor(booking)
-  const [settings, deposit] = await Promise.all([
+  const [settings, deposit, slips, identityDocuments] = await Promise.all([
     readPropertySettings(),
     getDepositByBookingId(booking.id),
+    listDocumentsForBooking(booking.id, 'payment_slip'),
+    listDocumentsForBooking(booking.id, 'identity'),
   ])
   const chip = chipFor(stage)
 
@@ -72,6 +76,62 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
   // surface that would now be false — and the customer is the only person who
   // can put it right.
   const shortfall = deposit !== null && deposit.collectedAt !== null ? deposit.shortfall : 0
+
+  // What the guest may send, and what we already hold (capabilities A6, A7).
+  //
+  // Neither is offered until the guest has said they transferred, and the two
+  // reasons are different. A **slip** cannot be filed before then because there
+  // is no deposit or payment row to be evidence of — asking for proof of
+  // something they have not done yet reads as a muddle. An **IC** could be
+  // asked for earlier and deliberately is not: the screen before this one has
+  // one job, which is to get the transfer made, and a second upload box beside
+  // the bank details competes with it. Once they are waiting on us, they have a
+  // moment, and that is where the asking goes.
+  //
+  // The IC then stays available through `confirmed`, because prd.md §13 wants
+  // it for registration and a guest who sends it before arriving is a guest the
+  // desk does not have to chase at the door.
+  //
+  // `listDocumentsForBooking` excludes what has expired as well as what was
+  // removed, so a file past its retention date stops being reported as held —
+  // which is the honest answer, because it is gone.
+  const slipOnFileSince = slips[0]?.uploadedAt ?? null
+  const identityOnFileSince = identityDocuments[0]?.uploadedAt ?? null
+  const maySendSlip = stage === 'checking'
+  const maySendIdentity = stage === 'checking' || stage === 'confirmed'
+
+  /**
+   * The two steps, and which one the customer is on.
+   *
+   * This page has always been a two-step flow — the stage is derived from the
+   * booking's own state, which is why it survives the customer closing the tab,
+   * transferring in their banking app and coming back through the emailed link
+   * an hour later. What it did not do was *look* like one, and the cost of that
+   * was concentrated in one word: step two opened with "Thank you", which reads
+   * as a full stop, so the ask below it arrived after the page had already told
+   * them to relax.
+   *
+   * So the steps are named up front, before the transfer is made, and ticked
+   * off as they are done. Nothing new is stored: this is a reading of `stage`
+   * and what is already on file.
+   *
+   * **"Make the transfer" rather than "Transfer the deposit"** because a guest
+   * who chose to settle the stay up front is sending both (prd.md §10.3), and a
+   * step that names the smaller of the two amounts would be wrong for them.
+   */
+  const identityHeld = identityOnFileSince !== null
+  const steps: readonly Step[] | null =
+    stage === 'awaiting_transfer'
+      ? [
+          { label: 'Make the transfer', state: 'current' },
+          { label: 'Send us your IC', state: 'todo' },
+        ]
+      : stage === 'checking'
+        ? [
+            { label: 'Make the transfer', state: 'done' },
+            { label: 'Send us your IC', state: identityHeld ? 'done' : 'current' },
+          ]
+        : null
 
   return (
     <section aria-labelledby="booking-heading" className="bg-card px-xl py-3xl">
@@ -84,7 +144,12 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
           {stage === 'awaiting_transfer'
             ? 'Almost done'
             : stage === 'checking'
-              ? 'Thank you'
+              ? // "Thank you" is the right word only once there is nothing left
+                // to ask for. While the IC is still wanted it is the wrong one:
+                // it closes the page while the useful thing is still below it.
+                identityHeld
+                ? 'Thank you'
+                : 'One more thing'
               : stage === 'confirmed'
                 ? 'You are booked'
                 : 'This booking is closed'}
@@ -112,6 +177,8 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
           Reference <span className="font-mono text-foreground">{booking.reference}</span>
         </p>
 
+        {steps ? <NextSteps steps={steps} /> : null}
+
         {stage === 'awaiting_transfer' ? (
           <TransferInstructions
             token={token}
@@ -120,13 +187,6 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
             everything={transferPlanFor(booking, 'everything')}
             accounts={settings.bankAccounts}
           />
-        ) : null}
-
-        {stage === 'checking' && shortfall === 0 ? (
-          <Callout tone="positive" className="mt-xl">
-            We have your booking and are checking for the transfer. Once we verify it, we will send
-            you an email confirmation and a QR code for entry.
-          </Callout>
         ) : null}
 
         {stage === 'checking' && shortfall > 0 && deposit ? (
@@ -139,6 +199,44 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
               something has gone wrong.
             </span>
           </Callout>
+        ) : null}
+
+        {/* The IC leads, and the slip follows it. They used to be the other
+            way round, which put the optional one first: the slip is a
+            convenience — the bank app is the check either way (prd.md §10.4) —
+            while the IC is the thing that saves the guest a wait at the desk
+            and the desk a chase. The one being asked for goes at the top. */}
+        {maySendIdentity ? (
+          <SendAFile
+            token={token}
+            kind="identity"
+            marker="A"
+            title="Send us your IC"
+            description="We need a copy of the lead guest's IC to register the stay. Sending it now saves doing it at the desk when you arrive."
+            onFileSince={identityOnFileSince}
+          />
+        ) : null}
+
+        {maySendSlip ? (
+          <SendAFile
+            token={token}
+            kind="payment_slip"
+            marker="B"
+            title="Send us your transfer slip"
+            description="Your bank transfer slip will help us verify your transfer faster."
+            onFileSince={slipOnFileSince}
+          />
+        ) : null}
+
+        {/* Demoted, and moved below the asks. It is reassurance rather than an
+            instruction — a positive callout above the uploads announced the
+            page was finished with them, which is exactly the reading that made
+            the IC easy to miss. */}
+        {stage === 'checking' && shortfall === 0 ? (
+          <p className="mt-xl text-body-sm text-muted-foreground">
+            We have your booking and are checking for the transfer. Once we verify it, we will email
+            your confirmation and a QR code for entry.
+          </p>
         ) : null}
 
         {stage === 'confirmed' ? (
@@ -249,6 +347,64 @@ function Detail({ label, value }: { label: string; value: string }) {
     <div>
       <dt className="micro-label text-muted-foreground">{label}</dt>
       <dd className="mt-xxs text-body-md text-foreground">{value}</dd>
+    </div>
+  )
+}
+
+/** One line of the two-step list: what it is, and whether it is behind them. */
+interface Step {
+  label: string
+  state: 'done' | 'current' | 'todo'
+}
+
+/**
+ * What happens next, in two lines.
+ *
+ * Presentational only — every step's state is read from the booking, so there
+ * is no wizard state to get out of step with the database and nothing breaks
+ * when the customer comes back to this link tomorrow.
+ *
+ * **No numbered circles.** design.md reserves `full` for avatars and status
+ * dots, so the marker is a monospace numeral that gives way to a tick once the
+ * step is behind them — which also means the two states differ by more than
+ * colour, for a reader who cannot see the difference in hue.
+ *
+ * The text ladder is design.md's: ink for the step being asked for, mute for
+ * one not reached yet and for one already done. Only one line on the page is at
+ * full strength, and it is the one with something to do.
+ */
+function NextSteps({ steps }: { steps: readonly Step[] }) {
+  return (
+    <div className="mt-lg">
+      <p className="micro-label text-muted-foreground">What happens next</p>
+
+      <ol className="mt-sm grid gap-xs">
+        {steps.map((step, index) => (
+          <li
+            key={step.label}
+            aria-current={step.state === 'current' ? 'step' : undefined}
+            className="flex items-center gap-sm"
+          >
+            <span aria-hidden className="flex w-4 shrink-0 justify-center">
+              {step.state === 'done' ? (
+                <Check className="size-3.5 text-positive-deep" />
+              ) : (
+                <span className="text-caption text-muted-foreground tabular-nums">{index + 1}</span>
+              )}
+            </span>
+
+            <span
+              className={
+                step.state === 'current'
+                  ? 'text-body-sm-strong text-foreground'
+                  : 'text-body-sm text-muted-foreground'
+              }
+            >
+              {step.label}
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

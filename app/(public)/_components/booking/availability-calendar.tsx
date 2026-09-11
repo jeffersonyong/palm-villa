@@ -158,7 +158,14 @@ export function AvailabilityCalendar({
           <div
             key={month}
             className={cn(
-              'min-w-0 shrink-0',
+              // `flex-1` rather than `shrink-0`: the two months share the row
+              // and each fills its half, instead of both sitting at the width
+              // seven 44px cells happen to add up to and leaving the remainder
+              // as dead space on the right. On a phone the second month is
+              // `hidden`, so the first takes the row on its own — which also
+              // ends an overflow, because seven fixed cells were wider than a
+              // 320px screen has room for.
+              'min-w-0 flex-1',
               index > 0 && 'ml-xl hidden border-l border-divider pl-xl md:block',
             )}
           >
@@ -171,7 +178,7 @@ export function AvailabilityCalendar({
               onNext={() => setLeadMonth(shiftMonth(leadMonth, 1))}
             />
 
-            <table className="mt-xs border-separate border-spacing-x-0 border-spacing-y-[3px]">
+            <table className="mt-xs w-full table-fixed border-separate border-spacing-x-0 border-spacing-y-[3px]">
               <thead>
                 <tr>
                   {WEEKDAYS.map((weekday) => (
@@ -272,6 +279,11 @@ function NightCell({
   const isFilled = isStart || isEnd
   const isSoftEnd = provisional && isEnd && anchor !== date
   const isFull = free < 1
+  // Sold out, as against merely having nothing free. A night before the
+  // booking window has nothing free either, and it did not sell out — it was
+  // never on sale. The two were one flag, so the label said "full" about a day
+  // in August and the strikethrough drew a line through it.
+  const soldOut = isFull && !outOfBounds
   const selectable = !outOfBounds && (!isFull || provisional)
 
   return (
@@ -280,7 +292,7 @@ function NightCell({
         type="button"
         disabled={!selectable}
         tabIndex={focused && selectable ? 0 : -1}
-        aria-label={`${formatDayLabel(date)}${isFull ? ', full' : ''}`}
+        aria-label={`${formatDayLabel(date)}${soldOut ? ', full' : ''}`}
         aria-pressed={isFilled}
         onClick={() => onPick(date, !inMonth)}
         onPointerEnter={() => {
@@ -289,7 +301,11 @@ function NightCell({
           }
         }}
         className={cn(
-          'flex h-12 w-11 flex-col items-center justify-center gap-[1px] text-body-sm transition-colors outline-none',
+          // Height fixed, width from the column: `table-fixed` gives every
+          // column a seventh of the month, so a cell is as wide as the card
+          // allows rather than a number chosen in isolation. The band below
+          // still reads as one strip, because the cells still abut.
+          'flex h-12 w-full flex-col items-center justify-center gap-[1px] text-body-sm transition-colors outline-none',
           // The band, drawn on the cell rather than around it so a week reads
           // as one strip (§Components — Date range).
           isBetween && 'bg-muted',
@@ -300,7 +316,13 @@ function NightCell({
           // drawn chip, so provisional and committed never look alike.
           isSoftEnd && 'rounded-md border border-border bg-card text-foreground',
           !isFilled && !isBetween && selectable && 'rounded-md hover:bg-muted',
-          !isFilled && inMonth && 'text-foreground',
+          // A night with nothing left recedes to the same mute as a day from
+          // the neighbouring month. It used to sit at full ink with one word
+          // underneath, so the only thing separating a sold-out Saturday from a
+          // bookable one was a caption — the grid read as available by default
+          // and the customer had to check each cell rather than scan the block.
+          !isFilled && inMonth && !soldOut && 'text-foreground',
+          !isFilled && inMonth && soldOut && 'text-muted-foreground',
           !isFilled && !inMonth && 'text-muted-foreground',
           outOfBounds && 'opacity-40',
           selectable ? 'cursor-pointer' : 'cursor-default',
@@ -310,16 +332,43 @@ function NightCell({
         {/* Today is a weight rather than the dot the other calendars use: the
             cell below the numeral is spoken for by the rate, and a mark under
             that would be a third line in a 48px cell. */}
-        <span className={cn('tabular-nums', date === today && !isFilled && 'font-medium')}>
+        <span
+          className={cn(
+            'tabular-nums',
+            date === today && !isFilled && 'font-medium',
+            // The mark that separates "sold out" from "belongs to the month
+            // next door", which mute alone cannot: both are quiet, and only one
+            // of them is a night the customer might otherwise keep trying to
+            // click. It also means the state does not rest on colour, so it
+            // survives a screen in sunlight and a reader who cannot tell the
+            // two greys apart.
+            // Not on a day outside the booking window: those are already
+            // faded and carry no rate, and a line through them would say
+            // "sold out" about a night that was never on sale — which is a
+            // different fact, and a noisier one at the top of the grid.
+            soldOut && !isFilled && 'line-through decoration-from-font',
+          )}
+        >
           {Number(date.slice(8, 10))}
         </span>
 
         {/* The rate, or the fact there is nothing to sell. Hidden on an
             out-of-window day, where a price would be an offer. */}
         {outOfBounds ? null : isFull ? (
+          // Caps, because this is a label rather than a figure — but at the
+          // rate's 10px rather than `micro-label`'s 11px. That utility is the
+          // right voice and the wrong size here: against a 10px rate it was
+          // wider and a line taller, which pushed the numeral up and left a
+          // sold-out night sitting a pixel or two off the row it is in. So the
+          // tracking is borrowed at the ratio the utility uses — 0.55px on
+          // 11px, so 0.5px on 10px — and the line box is left alone.
+          //
+          // `uppercase` rather than the word typed in capitals, so the text
+          // node stays "Full": a screen reader that spells out all-caps words
+          // reads F-U-L-L from the markup and "full" from this.
           <span
             className={cn(
-              'micro-label',
+              'text-[10px] tracking-[0.5px] uppercase',
               isFilled && !isSoftEnd ? 'text-primary-foreground/80' : 'text-muted-foreground',
             )}
           >

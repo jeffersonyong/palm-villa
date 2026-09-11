@@ -14,9 +14,15 @@ import { cn } from '@/lib/utils'
  *   32px on the operations portal via the `--spacing-control` override
  *   (globals.css); the `touch` size carries the field surface's 48px
  * - focus is a 2px ring in the action colour
+ * - the pointer cursor is set here rather than left to the browser, which
+ *   gives a `<button>` the same arrow it gives static text. It belongs on the
+ *   base and not on the handful of buttons somebody noticed: a control that
+ *   does not look clickable under the pointer is the same fault wherever it
+ *   appears. `disabled:pointer-events-none` above means a disabled button has
+ *   no hover state to carry it, so nothing has to opt out.
  */
 const buttonVariants = cva(
-  'inline-flex h-control shrink-0 items-center justify-center gap-sm rounded-md text-button-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex h-control shrink-0 cursor-pointer items-center justify-center gap-sm rounded-md text-button-md outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {

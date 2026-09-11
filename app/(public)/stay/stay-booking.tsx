@@ -127,7 +127,14 @@ export function StayBooking({
                       onClick={() => setUnitTypeSlug(type.id)}
                       aria-pressed={type.id === unitTypeSlug}
                       className={cn(
-                        'flex flex-col items-start gap-xxs rounded-md border px-lg py-md text-left transition-colors',
+                        // `grow basis-48` rather than intrinsic width: the row
+                        // reads as a set of equal choices filling the card, and
+                        // a ragged right edge on three cards of different name
+                        // lengths was the only uneven seam on the form. The
+                        // basis is the wrap threshold, not the width — a phone
+                        // stacks them, and a fourth type (N1'''s 2-bedroom) joins
+                        // the row rather than forcing a new layout.
+                        'flex grow basis-48 cursor-pointer flex-col items-start gap-xxs rounded-md border px-lg py-md text-left transition-colors',
                         type.id === unitTypeSlug
                           ? 'border-primary bg-accent text-accent-foreground'
                           : 'border-border bg-card text-foreground hover:bg-muted',
@@ -229,6 +236,7 @@ export function StayBooking({
                     name="guestName"
                     label="Your name"
                     required
+                    placeholder="John Doe"
                     autoComplete="name"
                     defaultValue={state.submitted?.guestName}
                     error={state.fieldErrors?.guestName}
@@ -249,6 +257,7 @@ export function StayBooking({
                     hint="For your confirmation. We will not email you anything else."
                     type="email"
                     inputMode="email"
+                    placeholder="john@email.com"
                     autoComplete="email"
                     defaultValue={state.submitted?.guestEmail}
                     error={state.fieldErrors?.guestEmail}

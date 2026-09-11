@@ -311,8 +311,8 @@ function DepositFigures({
       {isShort ? (
         <p className="mt-md text-body-sm text-copy">
           BND {formatCents(deposit.shortfall)} short of the BND {formatCents(deposit.quoted)} this
-          booking quotes. Until it is topped up the booking is not secured and the guest cannot be
-          checked in —{' '}
+          booking quotes. It needs to be topped up before the booking is secured and the guest can
+          be checked in —{' '}
           <Link
             href={`/portal/bookings/${encodeURIComponent(deposit.bookingReference)}`}
             className="text-foreground underline underline-offset-2"

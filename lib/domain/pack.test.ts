@@ -80,6 +80,7 @@ function document(overrides: Partial<PackDocumentFacts> = {}): PackDocumentFacts
     mimeType: 'image/jpeg',
     uploadedBy: AISYAH,
     uploadedAt: '2026-09-07T03:30:00Z',
+    depositId: null,
     paymentId: 'pay-1',
     ...overrides,
   }

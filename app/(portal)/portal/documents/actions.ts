@@ -50,6 +50,7 @@ const attachSchema = z.object({
   kind: z.string().refine(isDocumentKind, 'That is not a kind of document.'),
   bookingId: z.string().uuid(),
   paymentId: z.string().uuid().optional(),
+  depositId: z.string().uuid().optional(),
   inspectionId: z.string().uuid().optional(),
 })
 
@@ -68,6 +69,7 @@ export async function attachDocumentAction(
     // An empty string is what an unset hidden input submits, and `uuid()`
     // refuses one — so absence has to be expressed as absence.
     paymentId: raw.paymentId || undefined,
+    depositId: raw.depositId || undefined,
     inspectionId: raw.inspectionId || undefined,
   })
 
@@ -111,6 +113,9 @@ export async function attachDocumentAction(
     kind,
     bookingId: parsed.data.bookingId,
     paymentId: parsed.data.paymentId ?? null,
+    // A slip against the security deposit rather than a booking payment (N39).
+    // The permission is unchanged: a slip is `payment.verify` wherever it hangs.
+    depositId: parsed.data.depositId ?? null,
     inspectionId: parsed.data.inspectionId ?? null,
     bytes: new Uint8Array(await file.arrayBuffer()),
     filename: file.name,
