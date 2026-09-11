@@ -221,7 +221,7 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
             token={token}
             kind="payment_slip"
             title="Send us your transfer slip"
-            description="Not required — we check the bank either way. It helps us find your transfer faster, and it is what we would look at if anything is ever queried."
+            description="A screenshot of your bank transfer slip will help us verify your transfer faster."
             onFileSince={slipOnFileSince}
           />
         ) : null}
