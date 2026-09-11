@@ -1,5 +1,7 @@
 'use client'
 
+import { ArrowRight } from 'lucide-react'
+
 import { Fragment, useActionState, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -157,8 +159,22 @@ export function TransferInstructions({
       <form action={formAction} className="mt-lg">
         <input type="hidden" name="token" value={token} />
         <input type="hidden" name="choice" value={choice} />
+        {/* The arrow is a promise the button keeps: pressing it moves the page
+            to step two, so a mark of forward motion is describing what happens
+            rather than decorating the label. It travels with the text instead
+            of being pinned to the right edge — on a full-width button that gap
+            reads as a list row, and the arrow stops belonging to the words.
+            Hidden while the action is in flight, when the sentence is about
+            what is happening rather than where it goes. */}
         <Button type="submit" className="w-full" disabled={isPending}>
-          {isPending ? 'Telling the team…' : 'I have made the transfer'}
+          {isPending ? (
+            'Telling the team…'
+          ) : (
+            <>
+              I have made the transfer
+              <ArrowRight aria-hidden />
+            </>
+          )}
         </Button>
       </form>
     </Card>
