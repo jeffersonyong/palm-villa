@@ -114,6 +114,14 @@ describe('EXPORT_TABLES', () => {
     expect(document.headers.join(' ').toLowerCase()).not.toContain('storage')
   })
 
+  test('never exports where a website photo is stored or served from', async () => {
+    const document = await exportTableById('website-photos')!.document()
+    const headers = document.headers.join(' ').toLowerCase()
+
+    expect(headers).not.toContain('storage')
+    expect(headers).not.toContain('url')
+  })
+
   test('states the settings as one row per figure', async () => {
     const document = await exportTableById('settings')!.document()
 
