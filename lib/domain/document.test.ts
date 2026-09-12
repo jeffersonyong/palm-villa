@@ -424,6 +424,15 @@ describe('oversizedFiles', () => {
   test('nothing chosen is nothing refused', () => {
     expect(oversizedFiles([])).toEqual([])
   })
+
+  test('takes another ceiling where the caller names one', () => {
+    // A site photograph is chosen at camera size and shrunk before it is sent
+    // (capability F7), so its picker refuses only what cannot be shrunk.
+    const camera = { name: 'IMG_0001.jpg', size: 12 * 1024 * 1024 }
+
+    expect(oversizedFiles([camera])).toEqual([camera])
+    expect(oversizedFiles([camera], 25 * 1024 * 1024)).toEqual([])
+  })
 })
 
 /* ── The customer (capabilities A6, A7) ───────────────────────────────────── */

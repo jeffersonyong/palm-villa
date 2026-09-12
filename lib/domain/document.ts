@@ -145,9 +145,16 @@ export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
  *
  * Structurally typed on `size` alone so the unit suite can check it without a
  * DOM `File`.
+ *
+ * The ceiling is a document's unless the caller names another. A site
+ * photograph is chosen at camera size and shrunk in the browser before it is
+ * sent (capability F7), so its picker refuses only what no browser could open.
  */
-export function oversizedFiles<T extends { size: number }>(files: readonly T[]): readonly T[] {
-  return files.filter((file) => file.size > MAX_DOCUMENT_BYTES)
+export function oversizedFiles<T extends { size: number }>(
+  files: readonly T[],
+  ceiling: number = MAX_DOCUMENT_BYTES,
+): readonly T[] {
+  return files.filter((file) => file.size > ceiling)
 }
 
 /**
