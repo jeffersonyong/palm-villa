@@ -934,14 +934,17 @@ export type TransitionBookingResult =
  * underneath the caller are all two staff members working at once, which is a
  * sentence on screen.
  *
- * `reason` lands in the audit event's `after` payload. It is required by the
- * cancel screen and unused by everything else: prd.md §9.5 forfeits a payment
- * on cancellation, and the first question in a dispute about that is what the
- * booking was cancelled for.
+ * `reason` lands in the audit event's `after` payload.
+ *
+ * **Not cancel, and not no-show.** Both close a booking without a stay and
+ * settle its security deposit as they do (prd.md §9.5), so both go through
+ * `cancelBooking` and `markBookingNoShow` in ./close-booking.ts — and
+ * `transition_booking()` refuses them, so the type here is the first of two
+ * places saying so rather than the only one.
  */
 export async function transitionBooking(
   bookingId: string,
-  event: BookingEvent,
+  event: Exclude<BookingEvent, 'cancel' | 'mark_no_show'>,
   actorId: string | null = null,
   reason: string | null = null,
 ): Promise<TransitionBookingResult> {

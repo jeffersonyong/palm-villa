@@ -83,12 +83,27 @@ export function isArchiveView(view: LedgerView): boolean {
  * nobody has checked (prd.md §9.1), so `listHeldDeposits` excludes it and a
  * tile counting them here would sit at zero for the life of the building while
  * the payments queue carried the actual work.
+ *
+ * `forfeited` and `lapsed` are the two ways a booking closes without a stay
+ * (prd.md §9.5), and neither is held: a kept deposit is the business's money
+ * now, and a promise that lapsed was never money at all. `listHeldDeposits`
+ * excludes both.
  */
+const NOT_HELD: readonly DepositStage[] = [
+  'released',
+  'awaiting_verification',
+  'forfeited',
+  'lapsed',
+]
+
 export const HELD_STAGES = DEPOSIT_STAGES.filter(
-  (stage): stage is HeldStage => stage !== 'released' && stage !== 'awaiting_verification',
+  (stage): stage is HeldStage => !NOT_HELD.includes(stage),
 )
 
-export type HeldStage = Exclude<DepositStage, 'released' | 'awaiting_verification'>
+export type HeldStage = Exclude<
+  DepositStage,
+  'released' | 'awaiting_verification' | 'forfeited' | 'lapsed'
+>
 
 export function isHeldStage(value: string): value is HeldStage {
   return (HELD_STAGES as readonly string[]).includes(value)
@@ -166,6 +181,10 @@ const STAGE_ORDER: Readonly<Record<DepositStage, number>> = {
   secured: 3,
   awaiting_verification: 4,
   released: 5,
+  // Neither is ever on the held ledger (`listHeldDeposits`), so their place is
+  // only a total ordering for the type's sake: last, after what was given back.
+  forfeited: 6,
+  lapsed: 7,
 }
 
 export function sortForLedger<T extends LedgerRow>(deposits: readonly T[]): T[] {

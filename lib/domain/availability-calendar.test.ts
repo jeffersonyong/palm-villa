@@ -52,11 +52,12 @@ describe('which statuses hold a unit', () => {
     ['confirmed', true],
     ['checked_in', true],
     ['completed', true],
-    ['no_show', true],
     ['leased', true],
     ['draft', true],
     ['expired', false],
     ['cancelled', false],
+    // A guest who never came releases the rest of their nights (prd.md §9.5).
+    ['no_show', false],
   ])('%s occupies the unit: %s', (status, expected) => {
     expect(occupiesUnit(status)).toBe(expected)
   })

@@ -12,6 +12,7 @@ import {
   listBookings,
   transitionBooking,
 } from './bookings'
+import { cancelBooking } from './close-booking'
 import {
   bookingInput,
   givenBooking,
@@ -48,7 +49,12 @@ describe('listBookings', () => {
     })
     const doomed = await givenBooking({ unitRef: '3B-02', checkIn: TODAY, checkOut: '2026-08-30' })
 
-    await transitionBooking(doomed.id, 'cancel')
+    await cancelBooking({
+      bookingId: doomed.id,
+      actorId: null,
+      reason: null,
+      depositOutcome: 'keep',
+    })
 
     const { bookings: cancelled } = await listBookings({ statuses: ['cancelled'] })
 
@@ -65,7 +71,12 @@ describe('listBookings', () => {
     const doomed = await givenBooking({ unitRef: '3B-02', checkIn: TODAY, checkOut: '2026-08-30' })
     const arrived = await givenBooking({ unitRef: '3B-03', checkIn: TODAY, checkOut: '2026-08-30' })
 
-    await transitionBooking(doomed.id, 'cancel')
+    await cancelBooking({
+      bookingId: doomed.id,
+      actorId: null,
+      reason: null,
+      depositOutcome: 'keep',
+    })
     await transitionBooking(arrived.id, 'check_in')
 
     const { bookings: listed } = await listBookings({ statuses: ['cancelled', 'checked_in'] })
@@ -365,7 +376,12 @@ describe('transitionBooking', () => {
   test('refuses to move a terminal booking', async () => {
     const booking = await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
 
-    await transitionBooking(booking.id, 'cancel')
+    await cancelBooking({
+      bookingId: booking.id,
+      actorId: null,
+      reason: null,
+      depositOutcome: 'keep',
+    })
 
     const result = await transitionBooking(booking.id, 'check_in')
 
@@ -436,7 +452,12 @@ describe('countBookingsByStream', () => {
     await givenBooking({ unitRef: '3B-01', checkIn: TODAY, checkOut: '2026-08-30' })
     const doomed = await givenBooking({ unitRef: '3B-02', checkIn: TODAY, checkOut: '2026-08-30' })
 
-    await transitionBooking(doomed.id, 'cancel')
+    await cancelBooking({
+      bookingId: doomed.id,
+      actorId: null,
+      reason: null,
+      depositOutcome: 'keep',
+    })
 
     const filter = { statuses: ['confirmed'] } as const
 
@@ -617,7 +638,12 @@ describe('listBookings pagination', () => {
     await givenFiveBookings()
     const doomed = await givenBooking({ unitRef: '3B-06', checkIn: TODAY, checkOut: '2026-08-30' })
 
-    await transitionBooking(doomed.id, 'cancel')
+    await cancelBooking({
+      bookingId: doomed.id,
+      actorId: null,
+      reason: null,
+      depositOutcome: 'keep',
+    })
 
     const page = await listBookings({ statuses: ['cancelled'] }, { page: 1, pageSize: 2 })
 

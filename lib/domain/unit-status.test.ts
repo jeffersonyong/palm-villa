@@ -86,19 +86,22 @@ describe('deriveUnitStatus', () => {
 
   // ── The documented gap ────────────────────────────────────────────────────
   //
-  // These two assert a divergence rather than a behaviour, so that closing it
-  // is a deliberate act. An occupancy in either state whose end date has not
-  // passed still blocks availability, but the board calls the unit available:
-  // that is prd.md §6.4's `awaiting_inspection`, which capabilities C2–C3 will
-  // write. Changing these lines should mean the inspection slice has landed.
-  test.each<OccupancyStatus>(['completed', 'no_show'])(
+  // This asserts a divergence rather than a behaviour, so that closing it is a
+  // deliberate act. A completed occupancy whose end date has not passed still
+  // blocks availability, but the board calls the unit available: that is
+  // prd.md §6.4's `awaiting_inspection`, which capabilities C2–C3 will write.
+  // Changing this line should mean the inspection slice has landed.
+  //
+  // `no_show` used to sit beside it and left on 22 September 2026: a no-show
+  // now releases its unit (prd.md §9.5), so it joined the two below.
+  test.each<OccupancyStatus>(['completed'])(
     'a %s occupancy reads as available — the awaiting-inspection gap, until C2–C3',
     (status) => {
       expect(deriveUnitStatus(covering(status))).toBe('available')
     },
   )
 
-  test.each<OccupancyStatus>(['expired', 'cancelled'])(
+  test.each<OccupancyStatus>(['expired', 'cancelled', 'no_show'])(
     'a %s occupancy never reaches here, and reads as available if it does',
     (status) => {
       // unit_state() filters these out with the same predicate the exclusion

@@ -403,17 +403,20 @@ interface DepositRow {
   owed_cents: number | null
   owed_settled_at: string | null
   owed_settled_method: string | null
+  forfeited_at: string | null
+  forfeited_amount_cents: number | null
 }
 
 const deposits: ExportTable = {
   id: 'deposits',
   label: 'Deposits',
-  description: 'What was held per booking, what was charged against it, and what was returned.',
+  description:
+    'What was held per booking, what was charged against it, and what was returned or kept.',
   count: () => countOf('deposit'),
   document: async () => {
     const rows = await allOf<DepositRow>(
       'deposit_summary',
-      'id, booking_reference, unit_ref, amount_cents, method, collected_at, inspection_outcome, inspected_at, charges_total_cents, approved_charges_total_cents, released_at, released_amount_cents, release_note, owed_cents, owed_settled_at, owed_settled_method',
+      'id, booking_reference, unit_ref, amount_cents, method, collected_at, inspection_outcome, inspected_at, charges_total_cents, approved_charges_total_cents, released_at, released_amount_cents, release_note, owed_cents, owed_settled_at, owed_settled_method, forfeited_at, forfeited_amount_cents',
       'collected_at',
     )
 
@@ -434,6 +437,8 @@ const deposits: ExportTable = {
         'Owed (BND)',
         'Owed settled',
         'Owed settled as',
+        'Kept',
+        'Kept (BND)',
       ],
       rows: rows.map((row) => [
         row.booking_reference,
@@ -451,6 +456,8 @@ const deposits: ExportTable = {
         money(row.owed_cents),
         text(row.owed_settled_at),
         text(row.owed_settled_method),
+        text(row.forfeited_at),
+        money(row.forfeited_amount_cents),
       ]),
     }
   },

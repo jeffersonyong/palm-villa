@@ -25,9 +25,10 @@ import { listBookingNotes } from '@/lib/db/notes'
 import { accountingPackChangedAt } from '@/lib/db/packs'
 import { listPaymentsForBooking, type Payment } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
-import { allowedEvents, canAmend } from '@/lib/domain/booking-state'
+import { allowedEvents, canAmend, canMarkNoShow } from '@/lib/domain/booking-state'
 import { formatStayDate, formatTimestamp, nightsBetween, todayInBrunei } from '@/lib/domain/dates'
 import { balanceOf, canSettle } from '@/lib/domain/balance'
+import { depositAtClose } from '@/lib/domain/deposit'
 import { describeDiscount } from '@/lib/domain/discount'
 import { formatCents } from '@/lib/domain/money'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/payment'
@@ -195,6 +196,16 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
   const mayCancel =
     allowedEvents(booking.status).includes('cancel') &&
     hasPermission(actor.permissions, 'booking.cancel')
+  // `booking.cancel` gates a no-show too: it closes a booking and keeps its
+  // deposit exactly as a cancellation does (close-actions.ts). Not before the
+  // arrival day — a guest due on Friday has not failed to arrive on Thursday.
+  const mayMarkNoShow =
+    hasPermission(actor.permissions, 'booking.cancel') &&
+    canMarkNoShow({
+      status: booking.status,
+      arrival: booking.stay?.range.start ?? booking.dayPass?.date ?? null,
+      today: todayInBrunei(),
+    })
 
   return (
     <div className="max-w-[1120px]">
@@ -248,11 +259,27 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
                 </Link>
               </Button>
             ) : null}
-            {mayCancel ? (
+            {mayCancel || mayMarkNoShow ? (
               <BookingActions
                 bookingId={booking.id}
                 reference={booking.reference}
                 guestName={booking.guestName}
+                mayCancel={mayCancel}
+                mayMarkNoShow={mayMarkNoShow}
+                // What closing it would do to the deposit, so both dialogs can
+                // say it before the click (prd.md §9.5).
+                deposit={depositAtClose({
+                  quoted: booking.securityDeposit,
+                  waiverReason: booking.depositWaiverReason,
+                  deposit: deposit
+                    ? {
+                        amount: deposit.amount,
+                        collected: deposit.collectedAt !== null,
+                        released: deposit.release !== null,
+                        forfeited: deposit.forfeiture !== null,
+                      }
+                    : null,
+                })}
               />
             ) : null}
           </>
@@ -288,8 +315,7 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
           // same `payment_slip` kind, pointing at a different row.
           depositSlip={
             documents.find(
-              (document) =>
-                document.kind === 'payment_slip' && document.depositId === deposit?.id,
+              (document) => document.kind === 'payment_slip' && document.depositId === deposit?.id,
             ) ?? null
           }
           actorNames={actorNames}
@@ -660,8 +686,9 @@ function MoneySummary({
       ) : null}
 
       {/* An overpayment is not settled here either. prd.md §9.6 keeps money
-          movement out of this system and N5 is open, so the card names the
-          figure and stops. */}
+          movement out of this system, and a refund is an instruction a person
+          carries out (architecture.md §6.4), so the card names the figure and
+          stops. */}
       {balance.state === 'overpaid' ? (
         <p className="mt-xs text-caption text-muted-foreground">
           More has been taken than this booking is worth. Refunds are settled outside the system.

@@ -16,6 +16,8 @@
  * Coverage here is mandatory (architecture.md §2).
  */
 
+import type { StayDate } from './dates'
+
 export type BookingStatus =
   | 'draft'
   | 'held'
@@ -216,6 +218,48 @@ const AMENDABLE: readonly BookingStatus[] = [
 /** True when the booking's details can still be changed. */
 export function canAmend(status: BookingStatus): boolean {
   return AMENDABLE.includes(status)
+}
+
+/**
+ * The closed states in which the guest never stayed.
+ *
+ * Three of the four terminal states, and the fourth is left out on purpose:
+ * `completed` is a stay that happened, so its deposit waits on an inspection
+ * and a release (prd.md §11). These three settle the deposit as they close —
+ * kept or given back, prd.md §9.5 — and a promised transfer still unverified
+ * when one of them lands is no longer awaited by anybody.
+ */
+const ENDED_WITHOUT_STAY: readonly BookingStatus[] = ['cancelled', 'no_show', 'expired']
+
+/** True when the booking closed without the guest ever staying. */
+export function endedWithoutStay(status: BookingStatus): boolean {
+  return ENDED_WITHOUT_STAY.includes(status)
+}
+
+/**
+ * Whether a booking may be marked a no-show today.
+ *
+ * The machine allows `mark_no_show` from `confirmed` and nowhere else; what it
+ * cannot see is the calendar. **[A]** Not before the arrival day: a guest due
+ * on Friday has not failed to arrive on Thursday, and marking them keeps their
+ * deposit and releases their unit — neither of which a clerk should be able to
+ * do early by mistake. From the arrival day on it is the desk's judgement,
+ * because a guest can turn up at 23:00. `close_booking()` refuses the same
+ * thing in SQL, reading today in the property's own timezone.
+ *
+ * `arrival` is the stay's first night or a day pass's date, and null for a
+ * booking that has neither — which has nothing to be absent from.
+ */
+export function canMarkNoShow(booking: {
+  status: BookingStatus
+  arrival: StayDate | null
+  today: StayDate
+}): boolean {
+  return (
+    allowedEvents(booking.status).includes('mark_no_show') &&
+    booking.arrival !== null &&
+    booking.arrival <= booking.today
+  )
 }
 
 /**

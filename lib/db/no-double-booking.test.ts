@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
-import { createWalkInBooking, transitionBooking } from './bookings'
+import { createWalkInBooking } from './bookings'
+import { cancelBooking } from './close-booking'
 import { bookingInput, givenBooking, unitIdByRef } from './test/factory'
 import { givenGuestNames } from './test/inspect'
 
@@ -132,8 +133,13 @@ describe('releasing a unit', () => {
 
     // Status moves through the state machine, and the trigger carries it to the
     // occupancy row — which is what drops it out of the constraint's `where`
-    // clause. Cancelled and expired are the only statuses that release a unit.
-    const cancelled = await transitionBooking(booking.id, 'cancel')
+    // clause. Cancelled, expired and no-show are the statuses that release a unit.
+    const cancelled = await cancelBooking({
+      bookingId: booking.id,
+      actorId: null,
+      reason: null,
+      depositOutcome: 'keep',
+    })
 
     expect(cancelled.ok).toBe(true)
 

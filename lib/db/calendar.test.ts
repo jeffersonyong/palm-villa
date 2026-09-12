@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { transitionBooking } from './bookings'
+import { cancelBooking } from './close-booking'
 import { listOccupanciesInWindow } from './calendar'
 import { givenBooking, givenBookingInState, givenLease, unitIdByRef } from './test/factory'
 import { endUnitLease } from './units'
@@ -111,7 +111,12 @@ describe('listOccupanciesInWindow', () => {
       checkIn: '2026-11-10',
       checkOut: '2026-11-12',
     })
-    await transitionBooking(cancelled.id, 'cancel')
+    await cancelBooking({
+      bookingId: cancelled.id,
+      actorId: null,
+      reason: null,
+      depositOutcome: 'keep',
+    })
 
     await givenBookingInState({ unitRef: '3B-11', checkIn: '2026-11-10', checkOut: '2026-11-12' }, [
       'hold',

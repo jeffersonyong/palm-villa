@@ -11,15 +11,16 @@
  *
  * ── Why the stage is derived, not stored ──────────────────────────────────
  *
- * A deposit passes through six stages, and every one of them is already a
+ * A deposit passes through eight stages, and every one of them is already a
  * consequence of facts recorded elsewhere: whether it has been collected at
  * all (`collected_at`), whether a release has been approved (a column pair on
- * the deposit), whether an inspection exists (a row), and where the booking
- * has got to (its status). Storing a seventh copy as a `stage`
- * column would be storing a second copy of a fact, and the copy would drift —
- * the same argument architecture.md §5.1 makes for `unit.status` and §6.2a
- * makes for the booking balance. `deposit_summary` returns the facts; this
- * turns them into a stage, in one place.
+ * the deposit), whether it was kept when its booking closed (a column trio),
+ * whether an inspection exists (a row), and where the booking has got to (its
+ * status). Storing another copy as a `stage` column would be storing a second
+ * copy of a fact, and the copy would drift — the same argument
+ * architecture.md §5.1 makes for `unit.status` and §6.2a makes for the booking
+ * balance. `deposit_summary` returns the facts; this turns them into a stage,
+ * in one place.
  *
  * ── What this does not do ─────────────────────────────────────────────────
  *
@@ -28,8 +29,9 @@
  * is a recorded event, not a status flag. The audit trail is the point of an
  * approval step." Handing the notes back, or transferring them, happens in the
  * world and is recorded here rather than performed. That is the position
- * architecture.md §6.4 already takes on refunds, and it is what keeps this
- * slice independent of N5 in the open-questions register, which is open.
+ * architecture.md §6.4 already takes on refunds. Keeping a deposit (prd.md
+ * §9.5, N5 answered 10 September 2026) is the same kind of fact: the money is
+ * already in the safe, and what changes is whose it is.
  *
  * **It does not cap liability.** prd.md §11 [C] is explicit: "The deposit is
  * not a cap on liability." Charges above the deposit are not clipped to it —
@@ -39,23 +41,32 @@
  * figures decide what a guest is given back.
  */
 
-import type { BookingStatus } from './booking-state'
+import { endedWithoutStay, type BookingStatus } from './booking-state'
 import type { Cents } from './money'
 
 /**
  * Where a deposit has got to.
  *
- * Six stages, and they are a pipeline rather than a state machine: nothing
+ * Eight stages, and they are a pipeline rather than a state machine: nothing
  * here moves backwards, because each step is a fact that has happened. The
  * names are the questions Finance actually asks — what is promised and not
  * yet seen, what is in the safe for a guest who has not arrived, whose stay
  * is still running, what is waiting on Housekeeping, what can be signed off
- * now, and what is done.
+ * now, what is done, what was kept, and what never came.
  *
  * `secured` arrived when the deposit moved from the door to the booking
  * (prd.md §9.1, capability B16): most deposits now spend days on the ledger
  * before the guest does, and calling that "guest in stay" was the ledger
  * assuming a deposit could only exist because somebody had checked in.
+ *
+ * `forfeited` and `lapsed` arrived on 22 September 2026, and they are the two
+ * ends of the pipeline a booking reaches when it closes without a stay
+ * (prd.md §9.5). **Kept** is a deposit the guest forfeited by cancelling or
+ * never arriving: the business's money now, off the ledger and into revenue.
+ * **Never received** is a transfer the customer promised and nobody verified
+ * before the booking closed, which nobody is waiting on any more. A deposit
+ * the desk chose to give back on a cancellation is `released`, because that
+ * is what it is.
  */
 export type DepositStage =
   | 'awaiting_verification'
@@ -64,6 +75,8 @@ export type DepositStage =
   | 'awaiting_inspection'
   | 'ready_for_release'
   | 'released'
+  | 'forfeited'
+  | 'lapsed'
 
 /** The stages in pipeline order. Filters and stat tiles render them in this order. */
 export const DEPOSIT_STAGES = [
@@ -73,6 +86,8 @@ export const DEPOSIT_STAGES = [
   'awaiting_inspection',
   'ready_for_release',
   'released',
+  'forfeited',
+  'lapsed',
 ] as const satisfies readonly DepositStage[]
 
 /** How each stage is named on screen. Singular: a badge labels one deposit. */
@@ -83,6 +98,8 @@ export const DEPOSIT_STAGE_LABELS: Readonly<Record<DepositStage, string>> = {
   awaiting_inspection: 'Awaiting inspection',
   ready_for_release: 'Ready to release',
   released: 'Released',
+  forfeited: 'Kept',
+  lapsed: 'Never received',
 }
 
 /**
@@ -112,6 +129,14 @@ export interface DepositStageFacts {
   collected: boolean
   /** A release has been approved. */
   released: boolean
+  /**
+   * Kept when the booking closed without a stay — the guest cancelled, or
+   * never arrived (prd.md §9.5). Stored on the deposit rather than read off
+   * the booking's status, because the desk may give a cancelled guest's
+   * deposit back instead, and because the moment it was kept is the date
+   * revenue counts it on.
+   */
+  forfeited: boolean
   /** An inspection has been recorded against this stay. */
   inspected: boolean
   /** Where the booking itself has got to. `completed` means the guest has left. */
@@ -121,32 +146,37 @@ export interface DepositStageFacts {
 /**
  * What the deposit is doing, first match wins.
  *
- * Released outranks everything, and an inspection outranks the booking's
- * status: both are facts that have happened, and reading them in that order is
- * what makes the pipeline one-way. After those the booking's status says
- * where the guest is: gone (`completed`), in the unit (`checked_in`), or not
- * yet arrived — which is the fall-through, because a deposit is taken when
- * the booking is made and the ordinary deposit spends days there.
+ * Released and kept outrank everything, and an inspection outranks the
+ * booking's status: all three are facts that have happened, and reading them
+ * in that order is what makes the pipeline one-way. After those the booking's
+ * status says where the guest is: gone (`completed`), in the unit
+ * (`checked_in`), or not yet arrived — which is the fall-through, because a
+ * deposit is taken when the booking is made and the ordinary deposit spends
+ * days there.
  *
- * A deposit held against a booking that was cancelled, expired or marked a
- * no-show also falls through to `secured`. That is the least wrong of the
- * stages available rather than the right one: prd.md §9.5 says the deposit is
- * kept, and a `forfeited` outcome is the rule not yet built (N5, N32 in the
- * register). Until it is, the money is in the safe and the guest never
- * arrived, which is what the label says.
+ * A deposit collected against a booking that closed without a stay, and
+ * neither kept nor released, also falls through to `secured`. Closing a
+ * booking settles its deposit in the same transaction (`close_booking()`), so
+ * only a row written before that existed can be here — and for it the money is
+ * still in the safe and the guest never arrived, which is what the label says.
  */
 export function depositStageOf(facts: DepositStageFacts): DepositStage {
   // Ahead of everything, because it is the one stage where the property is
   // holding nothing. Every stage below describes money already in the safe;
   // reading a promise as held would put an unverified BND 100 on the ledger's
   // "what do we owe back right now", which is the one figure E1 exists to
-  // answer.
+  // answer. A promise on a booking that closed without a stay is not awaited
+  // by anybody — the queue has dropped it — so it says it never arrived.
   if (!facts.collected) {
-    return 'awaiting_verification'
+    return endedWithoutStay(facts.bookingStatus) ? 'lapsed' : 'awaiting_verification'
   }
 
   if (facts.released) {
     return 'released'
+  }
+
+  if (facts.forfeited) {
+    return 'forfeited'
   }
 
   if (facts.inspected) {
@@ -238,6 +268,73 @@ export function depositSecuresBooking(facts: {
   return facts.quoted <= 0 || (facts.collected && facts.held >= facts.quoted)
 }
 
+/**
+ * What a cancellation may do with a deposit still held: keep it, or give it
+ * back. A no-show takes neither — it always keeps (prd.md §9.5).
+ */
+export const DEPOSIT_OUTCOMES = ['keep', 'return'] as const
+
+export type DepositOutcome = (typeof DEPOSIT_OUTCOMES)[number]
+
+/** True when the value is one of the two — for reading a form. */
+export function isDepositOutcome(value: unknown): value is DepositOutcome {
+  return typeof value === 'string' && (DEPOSIT_OUTCOMES as readonly string[]).includes(value)
+}
+
+/** What closing a booking without a stay would find where its deposit should be. */
+export type DepositAtClose =
+  | { kind: 'held'; amount: Cents; shortfall: Cents }
+  | { kind: 'promised' }
+  | { kind: 'not_taken' }
+  | { kind: 'waived'; reason: string }
+  | { kind: 'not_quoted' }
+  | { kind: 'settled' }
+
+export interface DepositAtCloseFacts {
+  /** What the booking quotes. */
+  quoted: Cents
+  /** Why nothing is quoted, where the deposit was waived at creation (B15). */
+  waiverReason: string | null
+  /** The deposit row, or null where none was ever recorded. */
+  deposit: { amount: Cents; collected: boolean; released: boolean; forfeited: boolean } | null
+}
+
+/**
+ * What cancelling a booking, or marking it a no-show, would do to its deposit
+ * (prd.md §9.5) — asked before the click, so the dialog can say it.
+ *
+ * Only `held` is a decision: money in the safe, kept, or given back on a
+ * cancellation the desk chooses to refund. Everything else keeps nothing, and
+ * each says why, because "nothing is kept" means something different on a
+ * waived booking than on one whose transfer never arrived. `close_booking()`
+ * reads the same row under its lock and decides last.
+ */
+export function depositAtClose(facts: DepositAtCloseFacts): DepositAtClose {
+  const { deposit } = facts
+
+  if (deposit && (deposit.released || deposit.forfeited)) {
+    return { kind: 'settled' }
+  }
+
+  if (deposit && deposit.collected) {
+    return {
+      kind: 'held',
+      amount: deposit.amount,
+      shortfall: depositShortfallOf(facts.quoted, deposit.amount, true),
+    }
+  }
+
+  if (deposit) {
+    return { kind: 'promised' }
+  }
+
+  if (facts.waiverReason !== null) {
+    return { kind: 'waived', reason: facts.waiverReason }
+  }
+
+  return facts.quoted > 0 ? { kind: 'not_taken' } : { kind: 'not_quoted' }
+}
+
 /** One charge, as this module needs to see it. */
 export interface ChargeAmount {
   amount: Cents
@@ -257,7 +354,12 @@ export function activeChargesTotal(charges: readonly ChargeAmount[]): Cents {
 }
 
 export type ReleaseRefusalCode =
-  'already_released' | 'inspection_missing' | 'booking_not_completed' | 'not_collected'
+  | 'already_released'
+  | 'already_forfeited'
+  | 'booking_closed'
+  | 'inspection_missing'
+  | 'booking_not_completed'
+  | 'not_collected'
 
 export interface ReleaseRefusal {
   code: ReleaseRefusalCode
@@ -275,6 +377,10 @@ export type ReleaseCheck = { ok: true } | { ok: false; error: ReleaseRefusal }
  */
 const RELEASE_REFUSALS: Readonly<Record<ReleaseRefusalCode, string>> = {
   already_released: 'This deposit has already been released.',
+  already_forfeited:
+    'This deposit was kept when the booking closed without a stay, so there is nothing to release.',
+  booking_closed:
+    'This booking closed without a stay, so there is no check-out or inspection for a release to follow.',
   not_collected:
     'The deposit transfer has not been verified yet. Confirm it in the payments queue first.',
   booking_not_completed:
@@ -299,6 +405,19 @@ const RELEASE_REFUSALS: Readonly<Record<ReleaseRefusalCode, string>> = {
 export function canApproveRelease(facts: DepositStageFacts): ReleaseCheck {
   if (facts.released) {
     return refuse('already_released')
+  }
+
+  if (facts.forfeited) {
+    return refuse('already_forfeited')
+  }
+
+  // Ahead of the collection and check-out refusals, both of which would name
+  // a next step on a booking that has none: a promise that lapsed is not
+  // waiting for the queue, and a guest who is never coming will not check
+  // out. Only a deposit held on a booking closed before `close_booking()`
+  // settled deposits reaches this with money in it.
+  if (endedWithoutStay(facts.bookingStatus)) {
+    return refuse('booking_closed')
   }
 
   // Nothing is given back that was never taken. Said here as well as by
@@ -331,12 +450,21 @@ export function canApproveRelease(facts: DepositStageFacts): ReleaseCheck {
  */
 export function canAddCharge(facts: DepositStageFacts): boolean {
   // A promised deposit answers for nothing yet: a charge raised against one
-  // could be deducted from money that never arrives.
-  return facts.collected && !facts.released
+  // could be deducted from money that never arrives. A kept one is the
+  // business's money now, so there is nothing left to deduct from. And a
+  // booking that closed without a stay has nothing a charge could be for, and
+  // no release that could ever settle one — which matters for a deposit left
+  // held on a booking cancelled before `close_booking()` existed, where the
+  // release is refused and a charge would stand against it for good.
+  return (
+    facts.collected && !facts.released && !facts.forfeited && !endedWithoutStay(facts.bookingStatus)
+  )
 }
 
 /** What `canTopUp` needs to know. `recorded` is false where no deposit row exists at all. */
 export interface TopUpFacts {
+  /** The booking closed without a stay — `endedWithoutStay`. */
+  closed: boolean
   recorded: boolean
   collected: boolean
   released: boolean
@@ -344,7 +472,12 @@ export interface TopUpFacts {
 }
 
 export type TopUpRefusalCode =
-  'not_recorded' | 'not_collected' | 'already_released' | 'nothing_short' | 'exceeds_shortfall'
+  | 'booking_closed'
+  | 'not_recorded'
+  | 'not_collected'
+  | 'already_released'
+  | 'nothing_short'
+  | 'exceeds_shortfall'
 
 export interface TopUpRefusal {
   code: TopUpRefusalCode
@@ -361,8 +494,11 @@ export type TopUpCheck = { ok: true } | { ok: false; error: TopUpRefusal }
  * Each one names the action that *would* work, because every state below has
  * one — which is the whole difference between this slice and the gap it
  * closes, where a clerk looking at a short deposit had no correct next move.
+ * The exception is a closed booking, which has none, and says so.
  */
 const TOP_UP_REFUSALS: Readonly<Record<TopUpRefusalCode, string>> = {
+  booking_closed:
+    'This booking closed without a stay, so nothing more is taken against its deposit.',
   not_recorded: 'Nothing has been taken against this booking yet. Record the deposit instead.',
   not_collected:
     'This deposit is still an unverified transfer. Confirm it in the payments queue first.',
@@ -384,6 +520,13 @@ const TOP_UP_REFUSALS: Readonly<Record<TopUpRefusalCode, string>> = {
  * when somebody signed the release.
  */
 export function canTopUp(facts: TopUpFacts): TopUpCheck {
+  // First, because every refusal below names a way to take money, and a
+  // booking that closed without a stay has none: what was held was settled
+  // as it closed (prd.md §9.5).
+  if (facts.closed) {
+    return refuseTopUp('booking_closed')
+  }
+
   if (!facts.recorded) {
     return refuseTopUp('not_recorded')
   }

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import type { Deposit } from '@/lib/db/deposits'
 import type { Document } from '@/lib/db/documents'
-import type { BookingStatus } from '@/lib/domain/booking-state'
+import { endedWithoutStay, isTerminal, type BookingStatus } from '@/lib/domain/booking-state'
 import { formatTimestamp } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
 import type { Cents } from '@/lib/domain/money'
@@ -39,6 +39,11 @@ import { TopUpDeposit } from './top-up-deposit'
  * online — and the door collects nothing: check-in refuses a booking whose
  * deposit is not in. A quote with nothing against it is therefore *owed*, not
  * scheduled, and this card is the one place it is taken.
+ *
+ * **A booking that closed without a stay takes nothing more** (prd.md §9.5, 22
+ * September 2026). Closing it settled the deposit — kept, or given back — and
+ * a promise still unverified lapsed with it, so none of the ways to take money
+ * are offered here any more, and the card says what happened instead.
  *
  * The inset is one of four gray panels on this screen, so it wears the
  * deposit's mark and shows the deposit screen's own table — the reasoning is
@@ -95,8 +100,12 @@ export function SecurityDepositInset({
         {/* "Owed", not "Due at check-in". The deposit secures the booking, so
             a quote with nothing against it is money the property should
             already have — and a label naming the door was how it went
-            uncollected until the guest arrived. */}
-        <FigureRow label={quoted === 0 ? 'Quoted' : 'Owed'} value={quoted} />
+            uncollected until the guest arrived. On a closed booking it is
+            neither: nothing was taken, and nothing will be. */}
+        <FigureRow
+          label={quoted === 0 || isTerminal(bookingStatus) ? 'Quoted' : 'Owed'}
+          value={quoted}
+        />
         {/* How a deposit is held is the Money card's hint; only the exception
             is worth a sentence here. */}
         {quoted === 0 ? (
@@ -119,11 +128,12 @@ export function SecurityDepositInset({
                   // or one moved by hand. The door will refuse it, so the way
                   // out is named here, where the button is.
                   'Nothing has been taken yet — this booking was confirmed without it. Record the deposit before the guest is checked in; the door takes nothing.'
-                : 'Nothing was taken against this stay.'}
+                : 'Nothing was taken against this stay, so nothing was kept.'}
           </p>
         )}
 
-        {mayRecordDeposit && quoted > 0 ? (
+        {/* A closed booking is not somewhere money can still arrive. */}
+        {mayRecordDeposit && quoted > 0 && !isTerminal(bookingStatus) ? (
           <RecordDeposit
             bookingId={bookingId}
             reference={reference}
@@ -135,16 +145,36 @@ export function SecurityDepositInset({
     )
   }
 
+  const closed = endedWithoutStay(bookingStatus)
+
+  // A promise that lapsed when the booking closed. Nothing was ever held, so
+  // the figure table's "To return" would be a forecast about money that does
+  // not exist; this says what was promised and that it went nowhere.
+  if (deposit.collectedAt === null && closed) {
+    return (
+      <Card surface="inset" className="mt-lg">
+        <DepositMark className="mb-sm" badge={<DepositStageBadge stage={deposit.stage} />} />
+        <FigureRow label="Promised" value={deposit.amount} />
+        <p className="mt-xs text-caption text-muted-foreground">
+          The transfer was never verified before the booking closed, so nothing was held and nothing
+          was kept. If the money does arrive, it is given back outside the system.
+        </p>
+      </Card>
+    )
+  }
+
   // A deposit is short when less of it arrived than the booking quotes — after
   // a verification accepted a discrepancy, or after an amendment repriced the
-  // booking over what is already held. Once released the question has closed,
-  // so the flag goes with it; the statement keeps the quoted line.
-  const isShort = deposit.shortfall > 0 && deposit.release === null
+  // booking over what is already held. Once it is released or kept the
+  // question has closed, so the flag goes with it; the statement keeps the
+  // quoted line.
+  const isShort = deposit.shortfall > 0 && deposit.release === null && deposit.forfeiture === null
 
   return (
     <DepositFigureTable
       figures={deposit.figures}
       release={deposit.release}
+      forfeiture={deposit.forfeiture}
       shortfall={isShort ? deposit.shortfall : 0}
       quoted={deposit.quoted}
       className="mt-lg"
@@ -177,6 +207,23 @@ export function SecurityDepositInset({
           </>
         )}
       </p>
+
+      {/* How the close settled it, in the words the dialog used. A kept deposit
+          is the business's money — revenue, not a liability — and one given
+          back on a cancellation is a release that needed no inspection. */}
+      {deposit.forfeiture ? (
+        <p className="mt-xs text-caption text-muted-foreground">
+          Kept on {formatTimestamp(deposit.forfeiture.at)} —{' '}
+          {bookingStatus === 'no_show' ? 'the guest did not arrive' : 'the booking was cancelled'}.
+          It counts as revenue, not as money owed back.
+        </p>
+      ) : deposit.release && closed ? (
+        <p className="mt-xs text-caption text-muted-foreground">
+          Recorded as returned when the booking was cancelled, on{' '}
+          {formatTimestamp(deposit.release.at)}. Handing it back happens outside the system.
+        </p>
+      ) : null}
+
       {isShort ? (
         <p className="mt-xs text-caption text-muted-foreground">
           BND {formatCents(deposit.shortfall)} short of the BND {formatCents(deposit.quoted)} this
@@ -239,7 +286,7 @@ export function SecurityDepositInset({
           deposit. A short one is collected — confirming it again is refused
           and recording it again is refused — so before this there was no
           correct button on the screen for the one case that needed one. */}
-      {isShort && mayRecordDeposit ? (
+      {isShort && mayRecordDeposit && !closed ? (
         <TopUpDeposit
           bookingId={bookingId}
           reference={reference}

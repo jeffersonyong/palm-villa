@@ -22,8 +22,8 @@ import { addDays, nightsBetween, type StayDate } from './dates'
  * What this owes the constraint is agreement at the edges, so a night drawn as
  * free is a night the database will actually sell:
  *
- *   - the same status rule — everything except `expired` and `cancelled`
- *     occupies a unit, a `held` night included;
+ *   - the same status rule — everything except `expired`, `cancelled` and
+ *     `no_show` occupies a unit, a `held` night included;
  *   - the same half-open nights, so a stay `[14, 16)` takes the 14th and the
  *     15th and leaves the 16th free for the next guest;
  *   - the same treatment of a lease with no end date (N19), which occupies
@@ -53,8 +53,15 @@ export interface CalendarOccupancyRange {
   status: string
 }
 
-/** The statuses that release a unit. Everything else holds it. */
-const RELEASING_STATUSES: readonly string[] = ['expired', 'cancelled']
+/**
+ * The statuses that release a unit. Everything else holds it.
+ *
+ * The same list the exclusion constraint's `where` carries, and every SQL
+ * reader that repeats it (supabase/migrations/20260922000100). `no_show`
+ * joined on 22 September 2026: a guest who never came releases the rest of
+ * their nights, so tonight can be sold again (prd.md §9.5).
+ */
+const RELEASING_STATUSES: readonly string[] = ['expired', 'cancelled', 'no_show']
 
 export function occupiesUnit(status: string): boolean {
   return !RELEASING_STATUSES.includes(status)

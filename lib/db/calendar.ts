@@ -25,7 +25,7 @@ import { currentPropertyId } from './property'
  * sold, so it does not count (prd.md §14 [A]). The calendar answers a
  * different question — "what stops me putting a guest here" — and the
  * authority on that is the exclusion constraint itself, which blocks every
- * status except `expired` and `cancelled` (architecture.md §5.2). So a hold is
+ * status except `expired`, `cancelled` and `no_show` (architecture.md §5.2). So a hold is
  * drawn, and so is a completed stay whose last night has not arrived yet; the
  * board calls that unit available and the calendar does not, and the calendar
  * is the honest one (the divergence recorded in `lib/domain/unit-status.ts`).
@@ -80,7 +80,9 @@ export async function listOccupanciesInWindow(
       'id, unit_id, status, start_date, end_date, occupant_name, booking(reference, stream, guest(name))',
     )
     .eq('property_id', propertyId)
-    .not('status', 'in', '(expired,cancelled)')
+    // The constraint's own list (20260922000100): a no-show released its unit,
+    // so drawing it would put a bar under whoever was sold the night after.
+    .not('status', 'in', '(expired,cancelled,no_show)')
     .lt('start_date', window.end)
     .or(`end_date.is.null,end_date.gt.${window.start}`)
     .order('start_date')

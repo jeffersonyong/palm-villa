@@ -3,7 +3,8 @@ import { describe, expect, test } from 'vitest'
 import { bnd } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
 
-import { amendBooking, getBookingById, transitionBooking } from './bookings'
+import { amendBooking, getBookingById } from './bookings'
+import { cancelBooking } from './close-booking'
 import { getDepositByBookingId, verifyDeposit } from './deposits'
 import {
   listPaymentPage,
@@ -589,7 +590,12 @@ describe('two people working the same queue row', () => {
         match: 'reference',
         actorId: null,
       }),
-      transitionBooking(booking.id, 'cancel', null, 'Guest changed their mind.'),
+      cancelBooking({
+        bookingId: booking.id,
+        actorId: null,
+        reason: 'Guest changed their mind.',
+        depositOutcome: 'keep',
+      }),
     ])
 
     expect([verified.ok, cancelled.ok].filter(Boolean)).toHaveLength(1)
@@ -681,7 +687,12 @@ describe('recording cash (B7)', () => {
     // Creation already recorded the cash this walk-in paid with; the refusal
     // below must leave that one row alone rather than add a second.
     const before = await paymentsFor(booking.id)
-    await transitionBooking(booking.id, 'cancel', null, 'Cancelled.')
+    await cancelBooking({
+      bookingId: booking.id,
+      actorId: null,
+      reason: 'Cancelled.',
+      depositOutcome: 'keep',
+    })
 
     const result = await recordCashPayment({
       bookingId: booking.id,

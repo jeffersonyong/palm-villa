@@ -32,6 +32,11 @@ import { DEPOSIT_STAGE_LABELS, type DepositStage } from '@/lib/domain/deposit'
  * board, which is that colour is spent on the rows that need attention, not on
  * the ones that are done.
  *
+ * `forfeited` and `lapsed` take **neutral** for the same reason. Both are how a
+ * booking that closed without a stay leaves its deposit — kept, or never
+ * received — and neither needs anybody. Kept money is not a warning: it is the
+ * rule working (prd.md §9.5).
+ *
  * **An amount owed is deliberately not a fifth stage.** A guest owing money is
  * a fact about a released deposit, not a further step in its life, and putting
  * it here would make the badge answer two questions at once. The ledger states
@@ -45,6 +50,8 @@ const STAGE_TONES = {
   awaiting_inspection: 'warning',
   ready_for_release: 'positive',
   released: 'neutral',
+  forfeited: 'neutral',
+  lapsed: 'neutral',
 } as const satisfies Record<DepositStage, StatusTone>
 
 export type DepositStageTone = (typeof STAGE_TONES)[DepositStage]

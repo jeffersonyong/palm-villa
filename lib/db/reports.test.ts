@@ -5,7 +5,7 @@ import { bnd } from '@/lib/domain/money'
 import { clippedNights } from '@/lib/domain/reports/occupancy'
 import { revenueInWindow } from '@/lib/domain/reports/revenue'
 
-import { transitionBooking } from './bookings'
+import { cancelBooking } from './close-booking'
 import { verifyPayment } from './payments'
 import { listOccupanciesOverlapping, listRevenuePayments } from './reports'
 import {
@@ -74,7 +74,12 @@ describe('listOccupanciesOverlapping', () => {
       checkIn: '2026-11-02',
       checkOut: '2026-11-05',
     })
-    await transitionBooking(cancelled.id, 'cancel')
+    await cancelBooking({
+      bookingId: cancelled.id,
+      actorId: null,
+      reason: null,
+      depositOutcome: 'keep',
+    })
 
     await givenBookingInState({ unitRef: '3B-05', checkIn: '2026-11-02', checkOut: '2026-11-05' }, [
       'hold',

@@ -1,7 +1,8 @@
 import { OCCUPIED_STATUSES, type OccupancyRow } from '@/lib/domain/reports/occupancy'
-import type { RevenueSource } from '@/lib/domain/reports/revenue'
+import type { KeptDepositSource, RevenueSource } from '@/lib/domain/reports/revenue'
 import { bruneiWindowBounds, type StayWindow } from '@/lib/domain/dates'
 import type { DateRange } from '@/lib/domain/availability'
+import type { BookingStream } from '@/lib/domain/stream'
 import { dataClient } from '@/lib/supabase/data'
 
 import { listPayments } from './payments'
@@ -100,4 +101,42 @@ export async function listRevenuePayments(window: StayWindow): Promise<readonly 
     observedOn: payment.observedOn,
     verifiedAt: payment.verifiedAt,
   }))
+}
+
+/**
+ * Security deposits kept inside the window (prd.md §9.5; open-questions.md N32).
+ *
+ * A deposit forfeited on a cancellation or a no-show is money the business
+ * keeps, so it counts as revenue on the day it was kept, in the stream its
+ * booking belonged to — which is why this reads the summary, which carries the
+ * stream, rather than the table. The bounds are instants built from Brunei
+ * days, for the reason `listRevenuePayments` gives, and `keptDepositsInWindow`
+ * dates each row again so the rule lives in one place.
+ */
+export async function listKeptDeposits(window: StayWindow): Promise<readonly KeptDepositSource[]> {
+  const propertyId = await currentPropertyId()
+  const bounds = bruneiWindowBounds(window)
+
+  const { data, error } = await dataClient()
+    .from('deposit_summary')
+    .select('booking_stream, forfeited_amount_cents, forfeited_at')
+    .eq('property_id', propertyId)
+    .gte('forfeited_at', bounds.start)
+    .lt('forfeited_at', bounds.end)
+
+  if (error) {
+    throw new Error(`Could not read the deposits kept in the period: ${error.message}`)
+  }
+
+  return (data as KeptDepositRow[]).map((row) => ({
+    stream: row.booking_stream as BookingStream,
+    amount: row.forfeited_amount_cents,
+    keptAt: row.forfeited_at,
+  }))
+}
+
+interface KeptDepositRow {
+  booking_stream: string
+  forfeited_amount_cents: number
+  forfeited_at: string
 }

@@ -4,6 +4,7 @@ import { line, totalOf } from '@/lib/domain/lines'
 import { bnd } from '@/lib/domain/money'
 
 import { amendBooking, getBookingById, listBookings, transitionBooking } from './bookings'
+import { cancelBooking } from './close-booking'
 import { givenBooking, unitIdByRef } from './test/factory'
 import { auditEventsFor, givenGuestNames } from './test/inspect'
 
@@ -278,7 +279,12 @@ describe('cancelling a booking', () => {
       checkOut: CHECK_OUT,
     })
 
-    await transitionBooking(booking.id, 'cancel', null, 'Guest cancelled by phone')
+    await cancelBooking({
+      bookingId: booking.id,
+      actorId: null,
+      reason: 'Guest cancelled by phone',
+      depositOutcome: 'keep',
+    })
 
     const events = await auditEventsFor(booking.id)
 
@@ -309,7 +315,12 @@ describe('cancelling a booking', () => {
       checkOut: CHECK_OUT,
     })
 
-    await transitionBooking(booking.id, 'cancel', null, 'Double booked by mistake')
+    await cancelBooking({
+      bookingId: booking.id,
+      actorId: null,
+      reason: 'Double booked by mistake',
+      depositOutcome: 'keep',
+    })
 
     const replacement = await givenBooking({
       unitRef: '3B-01',
@@ -335,7 +346,12 @@ describe('cancelling a booking', () => {
 
     await transitionBooking(booking.id, 'check_in')
 
-    const result = await transitionBooking(booking.id, 'cancel', null, 'Changed their mind')
+    const result = await cancelBooking({
+      bookingId: booking.id,
+      actorId: null,
+      reason: 'Changed their mind',
+      depositOutcome: 'keep',
+    })
 
     expect(result.ok).toBe(false)
     expect(!result.ok && result.error.code).toBe('illegal_transition')
