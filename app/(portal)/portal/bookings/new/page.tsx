@@ -42,7 +42,6 @@ interface PageProps {
 
 export default async function NewBookingPage({ searchParams }: PageProps) {
   const params = await searchParams
-  const config = await getPropertyConfig()
 
   const today = todayInBrunei()
 
@@ -57,6 +56,28 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   const hasDates = range !== null && range.start < range.end
   const checkIn = hasDates ? range.start : ''
   const checkOut = hasDates ? range.end : ''
+
+  /*
+   * Five reads, none of which needs another's answer, so they go out together.
+   *
+   * They used to be awaited one after the next — config, then the free units,
+   * then the per-type counts, then the totals, then the actor — which made the
+   * desk's most-used form eight sequential trips to Singapore where four will
+   * do. Everything that *does* depend on one of these (which unit type the URL
+   * named, which unit to pre-select) is a pure computation below, not another
+   * query, which is what makes the whole set parallel.
+   */
+  const [config, availableUnits, availableByType, totalByType, actor] = await Promise.all([
+    getPropertyConfig(),
+    hasDates ? findAvailableUnits({ range: { start: checkIn, end: checkOut } }) : [],
+    hasDates
+      ? countAvailableByType({ start: checkIn, end: checkOut })
+      : ({} as Record<string, number>),
+    // Serviceable only: this is the denominator of "3 of 36 free", and a unit
+    // that is out of service is not one of the thirty-six anyone can be sold.
+    getUnitCounts({ serviceableOnly: true }),
+    getActor(),
+  ])
 
   /*
    * The unit type the calendar was pointing at, when it sent us here.
@@ -79,10 +100,6 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
       ? params.type
       : undefined
 
-  const availableUnits = hasDates
-    ? await findAvailableUnits({ range: { start: checkIn, end: checkOut } })
-    : []
-
   /*
    * The unit the calendar was pointing at, when it sent us here.
    *
@@ -97,17 +114,10 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
     params.unit === undefined
       ? undefined
       : availableUnits.find((unit) => unit.ref === params.unit)?.id
-  const availableByType = hasDates
-    ? await countAvailableByType({ start: checkIn, end: checkOut })
-    : {}
-  // Serviceable only: this is the denominator of "3 of 36 free", and a unit
-  // that is out of service is not one of the thirty-six anyone can be sold.
-  const totalByType = await getUnitCounts({ serviceableOnly: true })
 
   // The discount control is an affordance, not a gate: the server action checks
   // `booking.discount` again on every submit. Deciding it here only spares a
   // staff member a field they cannot use (architecture.md §3).
-  const actor = await getActor()
   const mayDiscount = Boolean(actor && hasPermission(actor.permissions, 'booking.discount'))
   const mayWaiveDeposit = Boolean(actor && hasPermission(actor.permissions, 'deposit.waive'))
 

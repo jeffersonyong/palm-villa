@@ -103,14 +103,19 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
     notFound()
   }
 
-  const [payments, staff, notes, deposit, documents, everyDocumentId] = await Promise.all([
-    listPaymentsForBooking(booking.id),
-    listStaff(),
-    listBookingNotes(booking.id),
-    getDepositByBookingId(booking.id),
-    listDocumentsForBooking(booking.id),
-    listDocumentIdsForBooking(booking.id),
-  ])
+  const [payments, staff, notes, deposit, documents, everyDocumentId, packChangedAt] =
+    await Promise.all([
+      listPaymentsForBooking(booking.id),
+      listStaff(),
+      listBookingNotes(booking.id),
+      getDepositByBookingId(booking.id),
+      listDocumentsForBooking(booking.id),
+      listDocumentIdsForBooking(booking.id),
+      // Needs the booking id and nothing else, so it belongs here. It was
+      // awaited on its own further down, after the history page — one more
+      // sequential trip for an answer that could have come back with these.
+      accountingPackChangedAt(booking.id),
+    ])
 
   // The trail is the booking's own events with three other records' folded
   // in, read as one page in one query (`listAuditEventPage`). Each keeps its
@@ -163,7 +168,6 @@ export default async function BookingDetailPage({ params, searchParams }: PagePr
   // uses, so the screen and the job cannot disagree about it. Comparing here
   // in TypeScript against verifications alone is what let a slip attached
   // after the pack was built leave a stale pack looking current.
-  const packChangedAt = await accountingPackChangedAt(booking.id)
   const packPendingSince =
     packChangedAt !== null &&
     (pack === null ||
