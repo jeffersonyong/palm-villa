@@ -7,6 +7,7 @@ import {
   Coins,
   DoorOpen,
   Globe,
+  Image as ImageIcon,
   LayoutDashboard,
   List,
   LockKeyhole,
@@ -79,6 +80,17 @@ export const navGroups = [
       // this item, since activeHref matches the longest listed prefix.
       { href: '/portal/reports/cash-up', label: 'Daily cash-up', icon: Coins },
     ],
+  },
+  /**
+   * The public site's photographs (capability F7). An area of its own rather
+   * than a screen under Admin, because the groups name areas of the work and
+   * not permission levels (design.md, Portal nav items): whoever runs the
+   * Instagram account can hold `site_image.manage` without being an
+   * administrator, and filing it under Admin would say otherwise.
+   */
+  {
+    label: 'Website',
+    items: [{ href: '/portal/website/photos', label: 'Photos', icon: ImageIcon }],
   },
   {
     label: 'Admin',
