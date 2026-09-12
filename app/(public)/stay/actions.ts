@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
 import { scheduleBookingCreatedEmail } from '@/app/schedule-booking-email'
-import { clientIpFrom, hashPublicKey } from '@/lib/auth/access-token'
+import { clientIpFrom, hashPhoneKey, hashPublicKey } from '@/lib/auth/access-token'
 import { createPublicStayBooking, notePublicAttempt } from '@/lib/db/public-bookings'
 import { getPropertyConfig } from '@/lib/db/property-config'
 import { isStayDate } from '@/lib/domain/dates'
@@ -223,7 +223,7 @@ async function checkPublicLimits(phone: string): Promise<string | null> {
 
   const allowedForPhone = await notePublicAttempt({
     kind: 'booking:phone',
-    keyHash: hashPublicKey(phone),
+    keyHash: hashPhoneKey(phone),
     windowSeconds: DAY_IN_SECONDS,
     limit: PUBLIC_LIMITS.bookingsPerPhonePerDay,
   })

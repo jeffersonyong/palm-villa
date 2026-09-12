@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { isAccessToken } from '../domain/public-booking'
-import { clientIpFrom, hashPublicKey, newAccessToken } from './access-token'
+import { clientIpFrom, hashPhoneKey, hashPublicKey, newAccessToken } from './access-token'
 
 /**
  * The one string standing between one customer and another's booking.
@@ -62,6 +62,37 @@ describe('the key a rate-limit counter is filed under', () => {
 
   test('tells two callers apart', () => {
     expect(hashPublicKey('203.0.113.7')).not.toBe(hashPublicKey('203.0.113.8'))
+  })
+})
+
+describe('the key a per-phone counter is filed under', () => {
+  test('is one key however the same number is written', () => {
+    // The whole point. Keying on the raw text made every per-phone limit one
+    // space bar away from a fresh allowance, because the schema accepts any
+    // 5–40 characters and a number can be written a dozen ways.
+    const expected = hashPhoneKey('8959798')
+
+    expect(hashPhoneKey('+673 8959798')).toBe(expected)
+    expect(hashPhoneKey('673-8959798')).toBe(expected)
+    expect(hashPhoneKey('(8959798)')).toBe(expected)
+    expect(hashPhoneKey(' 00673 8959798 ')).toBe(expected)
+  })
+
+  test('still tells two different numbers apart', () => {
+    expect(hashPhoneKey('8959798')).not.toBe(hashPhoneKey('8959799'))
+  })
+
+  test('is a digest, never the number', () => {
+    expect(hashPhoneKey('+673 8959798')).toMatch(/^[0-9a-f]{64}$/)
+    expect(hashPhoneKey('+673 8959798')).not.toContain('8959798')
+  })
+
+  test('keys junk on its own text rather than one shared bucket', () => {
+    // Too short to be a number, so there is no canonical form to reduce to.
+    // One bucket for all of it would let a single caller exhaust the
+    // allowance for everybody who mistyped.
+    expect(hashPhoneKey('12345')).not.toBe(hashPhoneKey('54321'))
+    expect(hashPhoneKey('12345')).toBe(hashPublicKey('12345'))
   })
 })
 
