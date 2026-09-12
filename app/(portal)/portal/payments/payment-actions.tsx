@@ -119,11 +119,11 @@ export function DepositActions({
    * repeating it in the button was the row saying "deposit" twice and giving
    * the two kinds of row buttons of different widths. The other two
    * placements are screens about this deposit and nothing else, so there the
-   * noun is already
-   * said by everything around the button and the open question is the
-   * transfer: `panel` is the booking's deposit inset, where it is full width
-   * and the primary of two stacked actions; `section` is the deposit's own
-   * page, where actions sit at their natural width under the content.
+   * noun is already said by everything around the button and the open
+   * question is the transfer: `panel` is the booking's deposit inset, where
+   * it is full width and the primary of two stacked actions; `section` is the
+   * deposit's own page, where actions sit at their natural width under the
+   * content.
    */
   placement?: 'queue' | 'panel' | 'section'
 }) {

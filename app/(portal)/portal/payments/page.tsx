@@ -316,7 +316,9 @@ function QueueRow({ payment, mayVerify }: { payment: QueueEntry; mayVerify: bool
           // said by something else, about somewhere else. An underline alone
           // could not tell them apart. So: the `ExternalLink` glyph, which is
           // the same mark `document-row.tsx` puts on its Open button and the
-          // only thing on the row that says *a new tab*; a hairline underline
+          // only thing on the row that says *a new tab* — trailing the label,
+          // where a destination mark belongs, so the column still reads down
+          // its words rather than down a rail of glyphs; a hairline underline
           // that goes solid ink under the pointer, which is a change the row
           // hover cannot imitate; and a `title` naming the destination,
           // because a document that opens elsewhere should say so before it
@@ -329,8 +331,8 @@ function QueueRow({ payment, mayVerify }: { payment: QueueEntry; mayVerify: bool
               title="Open the transfer slip in a new tab"
               className="inline-flex items-center gap-xs text-foreground underline decoration-muted-foreground underline-offset-2 transition-colors hover:decoration-foreground [&>svg]:text-muted-foreground [&>svg]:transition-colors hover:[&>svg]:text-foreground"
             >
-              <ExternalLink aria-hidden className="size-3.5 shrink-0" />
               On file
+              <ExternalLink aria-hidden className="size-3.5 shrink-0" />
             </a>
           </span>
         ) : (
