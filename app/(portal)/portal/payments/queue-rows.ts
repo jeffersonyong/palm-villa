@@ -137,3 +137,57 @@ export function buildQueue(
 export function countWaiting(entries: readonly QueueEntry[]): number {
   return entries.filter((entry) => entry.status === 'pending_verification').length
 }
+
+/** Which rows a page of the queue is made of. */
+export interface QueueSlice {
+  /** The waiting entries falling on this page, in order. */
+  waiting: readonly QueueEntry[]
+  /**
+   * The window of settled rows to read, or null when this page is all waiting
+   * work. An offset rather than a page number, because the settled rows do not
+   * start at a page boundary — the waiting ones came first.
+   */
+  settled: { offset: number; limit: number } | null
+}
+
+/**
+ * One page of the queue, split across its two halves.
+ *
+ * The screen is two lists shown as one: everything still waiting, and beneath
+ * it everything already settled. They have different shapes over time — the
+ * waiting half is bounded by work somebody is clearing, the settled half
+ * accumulates for the life of the building — so the waiting half is read whole
+ * and the settled half a page at a time from the database.
+ *
+ * This is the arithmetic joining them, and it is pure so a test can walk the
+ * boundary rather than a person clicking to page three. The rule it depends on
+ * is `sortQueue`'s: **every waiting row sorts above every settled one**, so the
+ * concatenation is already ordered and a page is simply a window over it.
+ */
+export function queueSlice(
+  waiting: readonly QueueEntry[],
+  page: number,
+  pageSize: number,
+): QueueSlice {
+  if (pageSize <= 0) {
+    return { waiting: [], settled: null }
+  }
+
+  const offset = Math.max(0, (Math.max(1, Math.trunc(page)) - 1) * pageSize)
+  const onPage = waiting.slice(offset, offset + pageSize)
+  const remaining = pageSize - onPage.length
+
+  // A page entirely inside the waiting half needs no settled read at all,
+  // which is the ordinary case: the queue is worked from the top.
+  if (remaining <= 0) {
+    return { waiting: onPage, settled: null }
+  }
+
+  return {
+    waiting: onPage,
+    // Once the waiting rows are exhausted the settled ones continue from where
+    // the page's offset falls past them. `max(0, …)` covers the page that
+    // straddles the join, where the offset is still inside the waiting half.
+    settled: { offset: Math.max(0, offset - waiting.length), limit: remaining },
+  }
+}

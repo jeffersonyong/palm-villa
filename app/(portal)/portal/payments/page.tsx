@@ -19,18 +19,22 @@ import {
   TableRow,
   TableRowLink,
 } from '@/components/ui/table'
+import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { exportGroup } from '@/lib/db/export'
 import { listPendingDeposits } from '@/lib/db/deposits'
-import { listPayments } from '@/lib/db/payments'
+import { countPayments, listPaymentRange, listPayments } from '@/lib/db/payments'
 import { elapsedMinutes, formatElapsed, formatStayDate, formatTimestamp } from '@/lib/domain/dates'
 import { formatCents } from '@/lib/domain/money'
+import type { PaymentStatus } from '@/lib/domain/payment'
 
+import { readPage, readPageSize } from './page-size'
 import { DepositActions, PaymentActions } from './payment-actions'
 import { PaymentsFilters } from './payments-filters'
-import { buildQueue, type QueueEntry } from './queue-rows'
-import { readView, statusesForView, type PaymentView } from './views'
+import { PaymentsPagination } from './payments-pagination'
+import { buildQueue, queueSlice, type QueueEntry } from './queue-rows'
+import { DEFAULT_PAYMENT_VIEW, readView, statusesForView, type PaymentView } from './views'
 
 export const metadata: Metadata = {
   title: 'Payment verification',
@@ -74,7 +78,12 @@ export const metadata: Metadata = {
  */
 
 interface PageProps {
-  searchParams: Promise<{ show?: string | string[]; q?: string | string[] }>
+  searchParams: Promise<{
+    show?: string | string[]
+    q?: string | string[]
+    page?: string
+    size?: string
+  }>
 }
 
 export default async function PaymentVerificationPage({ searchParams }: PageProps) {
@@ -106,17 +115,43 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
   // same job as a promised payment — somebody said they sent money and a
   // person has to check the bank — and they are separate rows underneath only
   // because prd.md §9.1 forbids a deposit being recorded as a payment.
-  const [transfers, promisedDeposits] = await Promise.all([
-    listPayments({
-      methods: ['bank_transfer'],
-      statuses: statusesForView(view),
-      search: search ?? undefined,
-    }),
-    listPendingDeposits(),
+  const pageSize = readPageSize(params.size)
+  const requestedPage = readPage(params.page)
+
+  /*
+   * ── Two lists shown as one, and only one of them can grow ────────────────
+   *
+   * The queue is everything still waiting, and beneath it everything already
+   * settled. Those two halves have completely different shapes over time: the
+   * waiting half is bounded by work a person is actively clearing, while the
+   * settled half accumulates for the life of the building. It used to read
+   * both whole, which meant that past a thousand rows PostgREST simply stopped
+   * — no error, no notice, and the oldest history silently gone.
+   *
+   * So the waiting half is read whole (it is small, and `sortQueue` needs all
+   * of it to order the work correctly) and the settled half is read a page at
+   * a time from the database. Because every waiting row sorts above every
+   * settled one, concatenating the two is already the right order, and the
+   * offset into the settled rows is simply the page's offset less the waiting
+   * rows that came first.
+   */
+  const waitingStatuses = statusesForView(view)
+  const wantsWaiting = view !== 'verified'
+  const wantsSettled = view !== 'waiting'
+
+  const [waitingTransfers, promisedDeposits] = await Promise.all([
+    wantsWaiting
+      ? listPayments({
+          methods: ['bank_transfer'],
+          statuses: ['pending_verification'],
+          search: search ?? undefined,
+        })
+      : [],
+    wantsWaiting ? listPendingDeposits() : [],
   ])
 
-  const payments = buildQueue(
-    transfers,
+  const waiting = buildQueue(
+    waitingTransfers,
     // The deposit read is unfiltered, so the screen's search has to be applied
     // here rather than in the query — a filter that narrowed one half of a
     // merged list and not the other would report a count nobody could explain.
@@ -130,6 +165,47 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
         ),
     view,
   )
+
+  // Everything this view shows that is not still waiting. `all` settles to
+  // verified rows; `verified` is only ever those.
+  const settledFilter = {
+    methods: ['bank_transfer'] as const,
+    statuses: (waitingStatuses.length > 0
+      ? waitingStatuses.filter((status) => status !== 'pending_verification')
+      : (['verified'] as const)) as readonly PaymentStatus[],
+    search: search ?? undefined,
+  }
+
+  const settledCount = wantsSettled ? await countPayments(settledFilter) : 0
+  const total = waiting.length + settledCount
+  const currentPage = clampPage(requestedPage, pageCountFor(total, pageSize))
+
+  // Which rows this page is made of, across the two halves. The arithmetic is
+  // `queueSlice` in ./queue-rows.ts rather than inline here, because the page
+  // that straddles the join between them is the one nobody finds by clicking
+  // and the one a test can walk in a line.
+  const slice = queueSlice(waiting, currentPage, pageSize)
+
+  const settled =
+    wantsSettled && slice.settled
+      ? (await listPaymentRange(settledFilter, slice.settled)).payments
+      : []
+
+  const payments = [...slice.waiting, ...buildQueue(settled, [], view)]
+  // The filters the footer carries, serialised from the values the server
+  // actually applied. Neither `page` nor `size`: the footer sets both itself,
+  // and carrying `size` would leave the rows-per-page control unable to return
+  // to the default.
+  const pageParams = new URLSearchParams()
+
+  if (view !== DEFAULT_PAYMENT_VIEW) {
+    pageParams.set('show', view)
+  }
+
+  if (search) {
+    pageParams.set('q', search)
+  }
+
   const mayVerify = hasPermission(actor.permissions, 'payment.verify')
   const mayExport = hasPermission(actor.permissions, 'config.manage')
 
@@ -145,7 +221,9 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
 
         <div className="ml-auto flex items-center gap-md">
           <h2 id="queue-heading" className="micro-label text-muted-foreground">
-            {payments.length} {payments.length === 1 ? 'transfer' : 'transfers'}
+            {/* What this view holds, not what this page shows. The footer
+                states the range within it. */}
+            {total} {total === 1 ? 'transfer' : 'transfers'}
             {view === 'waiting' ? ' waiting' : ''}
           </h2>
 
@@ -154,7 +232,7 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
       </div>
 
       <section aria-labelledby="queue-heading" className="mt-md">
-        {payments.length === 0 ? (
+        {total === 0 ? (
           <EmptyState
             title={search !== null ? 'No payments match these filters' : EMPTY_TITLES[view]}
             description={
@@ -171,7 +249,16 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
             }
           />
         ) : (
-          <Table>
+          <Table
+            footer={
+              <PaymentsPagination
+                page={currentPage}
+                pageSize={pageSize}
+                total={total}
+                params={pageParams.toString()}
+              />
+            }
+          >
             <TableHeader>
               <TableHeaderRow>
                 <TableHead>Reference</TableHead>
