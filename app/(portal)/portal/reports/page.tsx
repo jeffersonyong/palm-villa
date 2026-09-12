@@ -27,7 +27,7 @@ import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { listHeldDeposits, listOwedDeposits } from '@/lib/db/deposits'
 import { getUnitTypes, getUnits } from '@/lib/db/inventory'
-import { listOccupanciesOverlapping, listRevenuePayments } from '@/lib/db/reports'
+import { listKeptDeposits, listOccupanciesOverlapping, listRevenuePayments } from '@/lib/db/reports'
 import { formatStayRange } from '@/lib/domain/dates'
 import { formatCents, type Cents } from '@/lib/domain/money'
 import {
@@ -36,7 +36,11 @@ import {
   occupancyByUnit,
   occupancyTotals,
 } from '@/lib/domain/reports/occupancy'
-import { revenueByStream, revenueInWindow } from '@/lib/domain/reports/revenue'
+import {
+  keptDepositsInWindow,
+  revenueByStream,
+  revenueInWindow,
+} from '@/lib/domain/reports/revenue'
 import { BOOKING_STREAM_LABELS } from '@/lib/domain/stream'
 
 import { owedTotalOf, totalsOf } from '../deposits/ledger-view'
@@ -107,11 +111,12 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const { window, isExplicit } = readReportWindow(params.from, params.to)
   const range = overlapRangeOf(window)
 
-  const [occupancies, units, unitTypes, payments, held, owed] = await Promise.all([
+  const [occupancies, units, unitTypes, payments, kept, held, owed] = await Promise.all([
     listOccupanciesOverlapping(range),
     getUnits(),
     getUnitTypes(),
     listRevenuePayments(window),
+    listKeptDeposits(window),
     listHeldDeposits(),
     listOwedDeposits(),
   ])
@@ -162,7 +167,10 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     unitParams.append('type', type)
   }
 
-  const revenue = revenueByStream(revenueInWindow(payments, window))
+  const revenue = revenueByStream(
+    revenueInWindow(payments, window),
+    keptDepositsInWindow(kept, window),
+  )
   const heldTotals = totalsOf(held)
   const owedTotal = owedTotalOf(owed)
 
@@ -179,7 +187,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             size="sm"
             label="Revenue received"
             value={`BND ${formatCents(revenue.total)}`}
-            hint={`${revenue.count} ${revenue.count === 1 ? 'payment' : 'payments'} in the period`}
+            hint={`${revenue.count} ${revenue.count === 1 ? 'payment' : 'payments'}${
+              revenue.keptCount > 0
+                ? ` and ${revenue.keptCount} kept ${revenue.keptCount === 1 ? 'deposit' : 'deposits'}`
+                : ''
+            } in the period`}
           />
         </Card>
 
@@ -226,7 +238,8 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           href={exportHref('revenue')}
         >
           Money received, not money quoted — verified payments only, dated by the day it arrived.
-          Security deposits are excluded: they are held, not earned.
+          Security deposits are held, not earned, and stay out — except one a guest forfeited by
+          cancelling or not arriving, which counts on the day it was kept.
         </SectionHeading>
 
         <Table containerClassName="mt-md">
@@ -235,6 +248,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
               <TableHead>Type</TableHead>
               <TableHead className="text-right">Cash</TableHead>
               <TableHead className="text-right">Bank transfer</TableHead>
+              <TableHead className="text-right">Kept deposits</TableHead>
               <TableHead className="text-right">Total</TableHead>
               <TableHead className="text-right">Payments</TableHead>
             </TableHeaderRow>
@@ -250,6 +264,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
                 </TableRowHead>
                 <Money amount={stream.byMethod.cash} />
                 <Money amount={stream.byMethod.bank_transfer} />
+                <Money amount={stream.keptDeposits} />
                 <TableCell className="text-right text-foreground tabular-nums">
                   BND {formatCents(stream.total)}
                 </TableCell>
@@ -261,6 +276,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
               cells={[
                 `BND ${formatCents(revenue.byMethod.cash)}`,
                 `BND ${formatCents(revenue.byMethod.bank_transfer)}`,
+                `BND ${formatCents(revenue.keptDeposits)}`,
                 `BND ${formatCents(revenue.total)}`,
                 revenue.count,
               ]}

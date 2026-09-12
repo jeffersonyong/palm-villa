@@ -61,6 +61,14 @@ export interface DepositSettlement {
   method: PaymentMethod
 }
 
+/** A deposit kept when its booking closed without a stay (prd.md §9.5). */
+export interface DepositForfeiture {
+  at: string
+  by: string | null
+  /** Everything that was held — less than the quote for a short deposit. */
+  amount: Cents
+}
+
 export interface Deposit {
   id: string
   bookingId: string
@@ -110,6 +118,12 @@ export interface Deposit {
   chargeCount: number
   release: DepositRelease | null
   settlement: DepositSettlement | null
+  /**
+   * Kept when the booking was cancelled or the guest never arrived, or null.
+   * Never beside a `release`: a deposit is kept or given back, not both
+   * (`deposit_kept_or_returned`).
+   */
+  forfeiture: DepositForfeiture | null
   /** Derived, never stored. See lib/domain/deposit.ts. */
   stage: DepositStage
   /**
@@ -171,6 +185,9 @@ interface DepositSummaryRow {
   owed_settled_by: string | null
   owed_settled_method: string | null
   quoted_cents: number
+  forfeited_at: string | null
+  forfeited_by: string | null
+  forfeited_amount_cents: number | null
 }
 
 /** Hand-maintained, like SUMMARY_COLUMNS in ./bookings.ts — there is no codegen. */
@@ -213,6 +230,9 @@ const SUMMARY_COLUMNS = [
   'observed_on',
   'amount_override_reason',
   'quoted_cents',
+  'forfeited_at',
+  'forfeited_by',
+  'forfeited_amount_cents',
 ].join(', ')
 
 function toDeposit(row: DepositSummaryRow): Deposit {
@@ -285,9 +305,18 @@ function toDeposit(row: DepositSummaryRow): Deposit {
             by: row.owed_settled_by,
             method: row.owed_settled_method as PaymentMethod,
           },
+    forfeiture:
+      row.forfeited_at === null || row.forfeited_amount_cents === null
+        ? null
+        : {
+            at: row.forfeited_at,
+            by: row.forfeited_by,
+            amount: row.forfeited_amount_cents,
+          },
     stage: depositStageOf({
       collected: row.collected_at !== null,
       released: release !== null,
+      forfeited: row.forfeited_at !== null,
       inspected: row.inspection_id !== null,
       bookingStatus,
     }),
@@ -321,6 +350,9 @@ export async function listHeldDeposits(): Promise<readonly Deposit[]> {
 
   const { data, error } = await summaryQuery(propertyId)
     .is('released_at', null)
+    // Nor one that was kept when its booking closed (prd.md §9.5): the
+    // business stopped owing it back at that moment, and revenue has it now.
+    .is('forfeited_at', null)
     // E1 answers what the property owes back **right now**, so a deposit a
     // customer has promised and nobody has verified is not in it: the money
     // is not there, and a ledger that counted it would overstate the
@@ -726,6 +758,38 @@ interface RpcRefusal {
   [key: string]: unknown
 }
 
+/**
+ * A write the closed-booking guard refused, as a sentence — or null for any
+ * other error, which the caller throws.
+ *
+ * `deposit_refuses_money_after_close` and its twin on charges
+ * (20260922000100) raise PV003 rather than returning a refusal, because they are
+ * one rule enforced for four writers that were never taught it. The screens do
+ * not offer these moves on a closed booking, so reaching one is a colleague
+ * closing the booking while a dialog was open — the arrangement PV002 has for a
+ * unit taken out of service.
+ */
+export function closedBookingRefusal(error: {
+  code?: string
+  message?: string
+}): DepositWriteError | null {
+  if (error.code !== 'PV003') {
+    return null
+  }
+
+  return error.message?.includes('deposit_kept')
+    ? {
+        code: 'deposit_kept',
+        message:
+          'This deposit was kept when the booking closed, so nothing more is taken against it or charged to it.',
+      }
+    : {
+        code: 'booking_closed',
+        message:
+          'This booking has closed without a stay, so nothing more is taken against it. Reload to see how it closed.',
+      }
+}
+
 export interface RecordBookingDepositInput {
   bookingId: string
   /** Counted at the desk, or promised by transfer. */
@@ -841,6 +905,12 @@ export async function recordBookingDeposit(input: RecordBookingDepositInput): Pr
   })
 
   if (error) {
+    const closed = closedBookingRefusal(error)
+
+    if (closed) {
+      return { ok: false, error: closed }
+    }
+
     throw new Error(`Could not record the deposit: ${error.message}`)
   }
 
@@ -1052,6 +1122,11 @@ export async function listPendingDeposits(): Promise<readonly Deposit[]> {
 
   const { data, error } = await summaryQuery(propertyId)
     .is('collected_at', null)
+    // A promise on a booking that closed without a stay is not awaited by
+    // anybody (prd.md §9.5): there is nothing left for the money to secure,
+    // and verifying it now is refused. It stays on the booking as a promise
+    // that lapsed, and leaves the queue.
+    .not('booking_status', 'in', '(cancelled,no_show,expired)')
     .order('promised_at', { ascending: true })
 
   if (error) {
@@ -1151,6 +1226,12 @@ export async function verifyDeposit(input: VerifyDepositInput): Promise<
   })
 
   if (error) {
+    const closed = closedBookingRefusal(error)
+
+    if (closed) {
+      return { ok: false, error: closed }
+    }
+
     throw new Error(`Could not verify the deposit: ${error.message}`)
   }
 
@@ -1269,6 +1350,12 @@ export async function topUpBookingDeposit(input: TopUpDepositInput): Promise<
   })
 
   if (error) {
+    const closed = closedBookingRefusal(error)
+
+    if (closed) {
+      return { ok: false, error: closed }
+    }
+
     throw new Error(`Could not top up the deposit: ${error.message}`)
   }
 

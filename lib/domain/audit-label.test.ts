@@ -44,6 +44,28 @@ describe('describeAuditEvent', () => {
     expect(describeAuditEvent(event('booking.teleported'))).toBe('teleported')
   })
 
+  test('names what happened to a deposit when its booking closed, with the figure', () => {
+    expect(
+      describeAuditEvent(
+        event('deposit.forfeited', { after: { amount_cents: bnd(100), booking_event: 'cancel' } }),
+      ),
+    ).toBe('Security deposit kept — BND 100.00, booking cancelled')
+    expect(
+      describeAuditEvent(
+        event('deposit.forfeited', {
+          after: { amount_cents: bnd(50), booking_event: 'mark_no_show' },
+        }),
+      ),
+    ).toBe('Security deposit kept — BND 50.00, guest did not arrive')
+    expect(
+      describeAuditEvent(
+        event('deposit.returned', {
+          after: { amount_cents: bnd(100), released_amount_cents: bnd(100) },
+        }),
+      ),
+    ).toBe('Security deposit returned — BND 100.00, booking cancelled')
+  })
+
   test('names which email was sent', () => {
     expect(describeAuditEvent(event('email.sent', { after: { kind: 'booking_confirmed' } }))).toBe(
       'Confirmation email sent',

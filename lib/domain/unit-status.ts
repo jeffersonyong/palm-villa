@@ -124,13 +124,17 @@ export function deriveUnitStatus(facts: UnitStateFacts): UnitStatus {
     case 'held':
     case 'awaiting_payment_verification':
       return 'held'
-    // `completed` and `no_show` fall through to available, and that is the
-    // known gap rather than an oversight. An occupancy in either state whose
-    // end date has not yet passed still blocks availability — this is exactly
-    // the `awaiting_inspection` state prd.md §6.4 names and C2–C3 will write.
+    // `completed` falls through to available, and that is the known gap
+    // rather than an oversight. A completed occupancy whose end date has not
+    // yet passed still blocks availability — this is exactly the
+    // `awaiting_inspection` state prd.md §6.4 names and C2–C3 will write.
     // Until then the board says available and availability says otherwise; the
     // divergence is recorded in architecture.md §5.2 rather than papered over
     // with a seventh status nothing can clear.
+    //
+    // `no_show` is not that gap any more: since 22 September 2026 a no-show
+    // releases its unit (prd.md §9.5), so unit_state() filters it out with
+    // `expired` and `cancelled` and it reaches here only by mistake.
     default:
       return 'available'
   }

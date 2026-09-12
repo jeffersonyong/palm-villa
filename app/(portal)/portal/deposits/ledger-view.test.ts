@@ -89,6 +89,10 @@ describe('readHeldStages', () => {
     // and this ledger never reads.
     expect(HELD_STAGES).not.toContain('released')
     expect(HELD_STAGES).not.toContain('awaiting_verification')
+    // Nor what closed without a stay: a kept deposit is the business's money
+    // now, and a promise that lapsed was never money at all.
+    expect(HELD_STAGES).not.toContain('forfeited')
+    expect(HELD_STAGES).not.toContain('lapsed')
     expect(readHeldStages(['ready_for_release', 'in_house'])).toEqual([
       'in_house',
       'ready_for_release',
@@ -290,6 +294,8 @@ describe('countByStage', () => {
       awaiting_inspection: 0,
       ready_for_release: 0,
       released: 0,
+      forfeited: 0,
+      lapsed: 0,
     })
   })
 })

@@ -70,6 +70,8 @@ export const KNOWN_AUDIT_ACTIONS = [
   'deposit.matched_manually',
   'deposit.release_approved',
   'deposit.owed_settled',
+  'deposit.forfeited',
+  'deposit.returned',
   'charge.created',
   'charge.waived',
   'inspection.recorded',
@@ -444,6 +446,22 @@ function describeDeposit(event: AuditEventLike): string | null {
       const method = methodLabel(event.after?.method)
 
       return `Amount owed settled${owed ? ` — BND ${owed}` : ''}${method ? `, in ${method}` : ''}`
+    }
+    case 'deposit.forfeited': {
+      // Why it was kept travels in the event rather than being read off the
+      // booking: the two closes that keep a deposit read differently in a
+      // dispute, and the trail is what gets read in one.
+      const why =
+        event.after?.booking_event === 'mark_no_show' ? 'guest did not arrive' : 'booking cancelled'
+
+      return `Security deposit kept${amount ? ` — BND ${amount}` : ''}, ${why}`
+    }
+    case 'deposit.returned': {
+      // The figure that went back, which is less than what was held only where
+      // charges stood against it — the release arithmetic, applied at the close.
+      const returned = cents(event.after?.released_amount_cents)
+
+      return `Security deposit returned${returned ? ` — BND ${returned}` : ''}, booking cancelled`
     }
     case 'inspection.recorded': {
       const outcome = event.after?.outcome

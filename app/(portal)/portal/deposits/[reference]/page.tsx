@@ -33,6 +33,7 @@ import {
   type Document,
 } from '@/lib/db/documents'
 import { listStaff } from '@/lib/db/staff'
+import { endedWithoutStay } from '@/lib/domain/booking-state'
 import { canAddCharge, canApproveRelease, owedStateOf } from '@/lib/domain/deposit'
 import { formatStayDates, formatTimestamp } from '@/lib/domain/dates'
 import { mayAttach, mayOpen } from '@/lib/domain/document'
@@ -152,6 +153,7 @@ export default async function DepositPage({ params, searchParams }: PageProps) {
   const facts = {
     collected: deposit.collectedAt !== null,
     released: deposit.release !== null,
+    forfeited: deposit.forfeiture !== null,
     inspected: deposit.inspection !== null,
     bookingStatus: deposit.bookingStatus,
   }
@@ -183,7 +185,7 @@ export default async function DepositPage({ params, searchParams }: PageProps) {
         title={deposit.bookingReference}
         meta={
           <>
-            {deposit.shortfall > 0 && deposit.release === null ? (
+            {deposit.shortfall > 0 && deposit.release === null && deposit.forfeiture === null ? (
               <Badge tone="warning">Short</Badge>
             ) : null}
             <DepositStageBadge stage={deposit.stage} />
@@ -286,7 +288,13 @@ function DepositFigures({
   mayVerify: boolean
 }) {
   const { figures, release } = deposit
-  const isShort = deposit.shortfall > 0 && release === null
+  // Once the deposit is released or kept — or its booking closed — the
+  // shortfall stopped being collectable, and the flag goes with it.
+  const isShort =
+    deposit.shortfall > 0 &&
+    release === null &&
+    deposit.forfeiture === null &&
+    !endedWithoutStay(deposit.bookingStatus)
 
   return (
     <SectionCard
@@ -298,12 +306,13 @@ function DepositFigures({
       // The sentence that keeps this honest — every money-out path in this
       // product records rather than moves (architecture.md §6.4) — as the
       // section's hint rather than a paragraph under its figures.
-      hint="Held as a liability, never counted as revenue. Released after the unit has been inspected and somebody has approved it; the approval is a record of who authorised what, and handing the money back happens outside the system."
+      hint="Held as a liability, and counted as revenue only when a guest who cancels or never arrives forfeits it. Released after the unit has been inspected and somebody has approved it; the approval is a record of who authorised what, and handing the money back happens outside the system."
     >
       {/* The deposit's own table — the one the Money card shows too. */}
       <DepositFigureTable
         figures={figures}
         release={release}
+        forfeiture={deposit.forfeiture}
         shortfall={isShort ? deposit.shortfall : 0}
         quoted={deposit.quoted}
       />
@@ -325,7 +334,13 @@ function DepositFigures({
 
       <dl className="mt-lg grid gap-md sm:grid-cols-2">
         <Field
-          label={deposit.collectedAt === null ? 'Transfer awaited' : 'Collected'}
+          label={
+            deposit.collectedAt !== null
+              ? 'Collected'
+              : endedWithoutStay(deposit.bookingStatus)
+                ? 'Transfer never verified'
+                : 'Transfer awaited'
+          }
           value={collectionLine(deposit)}
         />
         <Field label="Taken by" value={nameOf(deposit.collectedBy, actorNames)} />
@@ -343,6 +358,14 @@ function DepositFigures({
             value={`${formatTimestamp(release.at)} by ${nameOf(release.by, actorNames)}`}
           />
         ) : null}
+        {deposit.forfeiture ? (
+          <Field
+            label={
+              deposit.bookingStatus === 'no_show' ? 'Kept — did not arrive' : 'Kept — cancelled'
+            }
+            value={`${formatTimestamp(deposit.forfeiture.at)} by ${nameOf(deposit.forfeiture.by, actorNames)}`}
+          />
+        ) : null}
       </dl>
 
       {release?.note ? (
@@ -355,7 +378,7 @@ function DepositFigures({
           against the same row. Taking it in cash instead is not offered here:
           that is money crossing a counter, which belongs on the booking where
           the rest of the desk's work is. */}
-      {mayVerify && deposit.collectedAt === null ? (
+      {mayVerify && deposit.collectedAt === null && !endedWithoutStay(deposit.bookingStatus) ? (
         <div className="mt-lg">
           <DepositActions
             depositId={deposit.id}
@@ -458,11 +481,13 @@ function InspectionSection({
       ) : (
         <>
           <p className="text-body-sm text-muted-foreground">
-            {deposit.bookingStatus === 'completed'
-              ? 'Nobody has inspected the unit yet. The deposit cannot be released until somebody has.'
-              : deposit.bookingStatus === 'checked_in'
-                ? 'The guest is still in the unit. It is inspected after they check out.'
-                : 'The guest has not arrived yet. The unit is inspected after they check out.'}
+            {endedWithoutStay(deposit.bookingStatus)
+              ? 'Nobody stayed, so there is nothing to inspect. The deposit was settled when the booking closed.'
+              : deposit.bookingStatus === 'completed'
+                ? 'Nobody has inspected the unit yet. The deposit cannot be released until somebody has.'
+                : deposit.bookingStatus === 'checked_in'
+                  ? 'The guest is still in the unit. It is inspected after they check out.'
+                  : 'The guest has not arrived yet. The unit is inspected after they check out.'}
           </p>
 
           {mayInspect ? (

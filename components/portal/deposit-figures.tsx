@@ -68,6 +68,12 @@ interface DepositFigureTableProps {
   shortfall?: Cents
   /** What the booking quotes. Only read when `shortfall` is non-zero. */
   quoted?: Cents
+  /**
+   * The deposit was kept when its booking closed without a stay (prd.md §9.5),
+   * or null. When present the last line is what was kept, and nothing is
+   * forecast as going back.
+   */
+  forfeiture?: Deposit['forfeiture']
   /** Heads the inset — the mark, where the section title does not already carry it. */
   header?: React.ReactNode
   /** Follows the figures: captions, the link through to the record. */
@@ -78,12 +84,14 @@ interface DepositFigureTableProps {
 /**
  * What is held, what stands against it, and what the difference is called.
  *
- * The last line's label is the one place the two screens agree to say four
+ * The last line's label is the one place the two screens agree to say five
  * different things: before release it is a forecast (*To return*, *Would be
- * owed*), after it a fact (*Returned*, *Owed by guest*). "Less charges" is
- * drawn only when there are any — a zero on a money screen invites a second
- * look, and there is nothing there to find. *Quoted* and *Short* follow the
- * same rule, and appear together or not at all.
+ * owed*), after it a fact (*Returned*, *Owed by guest*) — or, for a deposit
+ * the guest forfeited, *Kept*, with no charges taken off it because there is
+ * nothing to give back. "Less charges" is drawn only when there are any — a
+ * zero on a money screen invites a second look, and there is nothing there to
+ * find. *Quoted* and *Short* follow the same rule, and appear together or not
+ * at all.
  *
  * The shortfall rows carry no tint. A gap in a deposit is a status, and the
  * portal says status in a badge at badge scale — this table stays the
@@ -94,6 +102,7 @@ export function DepositFigureTable({
   release,
   shortfall = 0,
   quoted = 0,
+  forfeiture = null,
   header,
   children,
   className,
@@ -108,17 +117,27 @@ export function DepositFigureTable({
         {short ? <FigureRow label="Quoted" value={quoted} /> : null}
         <FigureRow label="Held" value={figures.amount} />
         {short ? <FigureRow label="Short" value={shortfall} /> : null}
-        {figures.chargesTotal > 0 ? (
+        {figures.chargesTotal > 0 && !forfeiture ? (
           <FigureRow label="Less charges" value={figures.chargesTotal} />
         ) : null}
         <div className="mt-xs border-t border-divider pt-xs">
-          <FigureRow
-            label={
-              release ? (owes ? 'Owed by guest' : 'Returned') : owes ? 'Would be owed' : 'To return'
-            }
-            value={owes ? figures.owed : figures.releasable}
-            strong
-          />
+          {forfeiture ? (
+            <FigureRow label="Kept" value={forfeiture.amount} strong />
+          ) : (
+            <FigureRow
+              label={
+                release
+                  ? owes
+                    ? 'Owed by guest'
+                    : 'Returned'
+                  : owes
+                    ? 'Would be owed'
+                    : 'To return'
+              }
+              value={owes ? figures.owed : figures.releasable}
+              strong
+            />
+          )}
         </div>
       </div>
       {children}

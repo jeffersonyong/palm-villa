@@ -4,6 +4,8 @@ import {
   allowedEvents,
   BOOKING_STATUSES,
   canAmend,
+  canMarkNoShow,
+  endedWithoutStay,
   isTerminal,
   transition,
   type BookingEvent,
@@ -46,6 +48,51 @@ const ALL_EVENTS: readonly BookingEvent[] = [
 describe('BOOKING_STATUSES', () => {
   test('lists every status exactly once', () => {
     expect([...BOOKING_STATUSES].sort()).toEqual([...ALL_STATUSES].sort())
+  })
+})
+
+describe('endedWithoutStay', () => {
+  test.each(['cancelled', 'no_show', 'expired'] as const)('%s closed without a stay', (status) => {
+    expect(endedWithoutStay(status)).toBe(true)
+  })
+
+  test.each([
+    'draft',
+    'held',
+    'awaiting_payment_verification',
+    'confirmed',
+    'checked_in',
+    'completed',
+  ] as const)('%s did not', (status) => {
+    // `completed` is closed too, but the guest stayed — its deposit waits on
+    // an inspection rather than being settled by the close.
+    expect(endedWithoutStay(status)).toBe(false)
+  })
+})
+
+describe('canMarkNoShow', () => {
+  const TODAY = '2026-11-02'
+
+  test('a confirmed guest may be marked a no-show on their arrival day', () => {
+    expect(canMarkNoShow({ status: 'confirmed', arrival: TODAY, today: TODAY })).toBe(true)
+  })
+
+  test('and on any day after it', () => {
+    expect(canMarkNoShow({ status: 'confirmed', arrival: '2026-10-30', today: TODAY })).toBe(true)
+  })
+
+  test('never before the day they were due — they have not failed to arrive yet', () => {
+    expect(canMarkNoShow({ status: 'confirmed', arrival: '2026-11-03', today: TODAY })).toBe(false)
+  })
+
+  test('a booking with no arrival date has nothing to be absent from', () => {
+    expect(canMarkNoShow({ status: 'confirmed', arrival: null, today: TODAY })).toBe(false)
+  })
+
+  test('only a confirmed booking — the machine decides the rest', () => {
+    for (const status of ALL_STATUSES.filter((candidate) => candidate !== 'confirmed')) {
+      expect(canMarkNoShow({ status, arrival: '2026-10-30', today: TODAY })).toBe(false)
+    }
   })
 })
 

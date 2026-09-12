@@ -197,8 +197,13 @@ describe('taking a unit out of service (B9)', () => {
     const unitId = await unitIdByRef('3B-05')
     expect((await markUnitOutOfService({ unitId, reason: 'x', actorId: null })).ok).toBe(false)
 
-    const { transitionBooking } = await import('./bookings')
-    await transitionBooking(booking.id, 'cancel', null, 'Making way for maintenance')
+    const { cancelBooking } = await import('./close-booking')
+    await cancelBooking({
+      bookingId: booking.id,
+      actorId: null,
+      reason: 'Making way for maintenance',
+      depositOutcome: 'keep',
+    })
 
     // A cancelled occupancy releases its unit — the same predicate the
     // exclusion constraint uses — so the refusal lifts with it.
@@ -806,8 +811,13 @@ describe("the unit's standing note (N18)", () => {
     })
     await setUnitNotes({ unitId, notes: 'Spare key with security.', actorId: null })
 
-    const { transitionBooking } = await import('./bookings')
-    await transitionBooking(booking.id, 'cancel', null, 'Test')
+    const { cancelBooking } = await import('./close-booking')
+    await cancelBooking({
+      bookingId: booking.id,
+      actorId: null,
+      reason: 'Test',
+      depositOutcome: 'keep',
+    })
 
     expect((await getUnitStateByRef('3B-01'))?.notes).toBe('Spare key with security.')
   })

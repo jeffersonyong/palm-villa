@@ -30,13 +30,25 @@
  * payments dated by when a clerk was at their desk is a legitimate thing for
  * the owner to notice.
  *
- * ── What is not in it ─────────────────────────────────────────────────────
+ * ── Security deposits, and the one that counts ────────────────────────────
  *
- * Security deposits, in either direction. prd.md §11 makes a deposit a
- * refundable liability rather than income, and the excess a guest settles when
- * charges exceed it "settles no booking and appears in no cash-up"
- * (20260906000100). Both have their own ledger, which the reports screen links
- * to rather than folds in.
+ * A deposit that is held is not here, and neither is one given back: prd.md
+ * §11 makes a deposit a refundable liability rather than income, and the
+ * excess a guest settles when charges exceed it "settles no booking and
+ * appears in no cash-up" (20260906000100). Both have their own ledger.
+ *
+ * **A deposit that is kept is here** (prd.md §9.5, 22 September 2026). A
+ * guest who cancels or never arrives forfeits it, and money the business keeps
+ * stops being a liability. It counts on the day it was **kept** — the
+ * cancellation or the no-show — in the stream its booking belonged to. That is
+ * open-questions.md N32's standing assumption, built on and still open for the
+ * accountant to confirm.
+ *
+ * It counts in its stream and in the total, and **in no method column**. The
+ * notes went into the drawer, or the transfer into the bank, when the deposit
+ * was taken — often weeks earlier — so putting it under Cash on the day it was
+ * kept would make that column disagree with the cash-up beside it, which
+ * counts cash on the day it was collected. Its own column says what it is.
  *
  * Tenancies produce nothing here and will until phase three: a lease is an
  * occupancy row with no booking and no payments (architecture.md §5.1), so the
@@ -68,20 +80,42 @@ export interface DatedRevenue extends RevenueSource {
   date: StayDate
 }
 
+/** A security deposit kept when its booking closed, reduced to what dating it needs. */
+export interface KeptDepositSource {
+  stream: BookingStream
+  /** What was kept: everything held, which is less than the quote for a short deposit. */
+  amount: Cents
+  /** The moment the booking closed and the deposit stopped being owed back. */
+  keptAt: string
+}
+
+/** A kept deposit that has been dated and belongs in the period. */
+export interface DatedKeptDeposit extends KeptDepositSource {
+  date: StayDate
+}
+
 export type RevenueByMethod = Record<PaymentMethod, Cents>
 
 export interface StreamRevenue {
   stream: BookingStream
+  /** Payments only. A kept deposit is in no method column — see the header. */
   byMethod: RevenueByMethod
+  keptDeposits: Cents
+  /** Payments and kept deposits together. */
   total: Cents
+  /** How many payments. */
   count: number
+  /** How many kept deposits. */
+  keptCount: number
 }
 
 export interface RevenueMatrix {
   byStream: readonly StreamRevenue[]
   byMethod: RevenueByMethod
+  keptDeposits: Cents
   total: Cents
   count: number
+  keptCount: number
 }
 
 /**
@@ -129,29 +163,56 @@ export function revenueInWindow(
 }
 
 /**
- * The matrix the screen renders: every stream against every method.
+ * The kept deposits whose booking closed inside the window, dated by the
+ * Brunei day it closed. Both ends inclusive, like `revenueInWindow`.
+ */
+export function keptDepositsInWindow(
+  deposits: readonly KeptDepositSource[],
+  window: { from: StayDate; to: StayDate },
+): readonly DatedKeptDeposit[] {
+  return deposits.flatMap((deposit) => {
+    const date = dateInBrunei(deposit.keptAt)
+
+    return date < window.from || date > window.to ? [] : [{ ...deposit, date }]
+  })
+}
+
+/**
+ * The matrix the screen renders: every stream against every method, with the
+ * deposits kept in its own column.
  *
  * Every stream is present even at zero, in BOOKING_STREAMS order. A report
  * that dropped an empty row would answer "how did day passes do" with silence,
  * and silence reads as a bug rather than as a nil.
  */
-export function revenueByStream(payments: readonly DatedRevenue[]): RevenueMatrix {
+export function revenueByStream(
+  payments: readonly DatedRevenue[],
+  kept: readonly DatedKeptDeposit[] = [],
+): RevenueMatrix {
   const byStream = BOOKING_STREAMS.map((stream) => {
     const rows = payments.filter((payment) => payment.stream === stream)
+    const keptRows = kept.filter((deposit) => deposit.stream === stream)
+    const keptDeposits = sumAmounts(keptRows)
 
     return {
       stream,
       byMethod: totalByMethod(rows),
-      total: sumAmounts(rows),
+      keptDeposits,
+      total: sumAmounts(rows) + keptDeposits,
       count: rows.length,
+      keptCount: keptRows.length,
     }
   })
+
+  const keptDeposits = sumAmounts(kept)
 
   return {
     byStream,
     byMethod: totalByMethod(payments),
-    total: sumAmounts(payments),
+    keptDeposits,
+    total: sumAmounts(payments) + keptDeposits,
     count: payments.length,
+    keptCount: kept.length,
   }
 }
 
@@ -162,6 +223,6 @@ function totalByMethod(payments: readonly DatedRevenue[]): RevenueByMethod {
   }
 }
 
-function sumAmounts(payments: readonly DatedRevenue[]): Cents {
-  return payments.reduce((total, payment) => total + payment.amount, 0)
+function sumAmounts(rows: readonly { amount: Cents }[]): Cents {
+  return rows.reduce((total, row) => total + row.amount, 0)
 }

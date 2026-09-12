@@ -7,7 +7,7 @@ import { cashOnHandBefore, listCashBankings } from '@/lib/db/cash-banking'
 import { listDepositCashArrivals } from '@/lib/db/deposits'
 import { getUnitTypes, getUnits } from '@/lib/db/inventory'
 import { listPayments } from '@/lib/db/payments'
-import { listOccupanciesOverlapping, listRevenuePayments } from '@/lib/db/reports'
+import { listKeptDeposits, listOccupanciesOverlapping, listRevenuePayments } from '@/lib/db/reports'
 import { csvFilename, toCsv, type CsvValue } from '@/lib/domain/csv'
 import { bruneiWindowBounds, todayInBrunei, type StayWindow } from '@/lib/domain/dates'
 import { centsToDecimal } from '@/lib/domain/money'
@@ -19,7 +19,11 @@ import {
   isCashUpState,
 } from '@/lib/domain/reports/cash-up'
 import { occupancyByType, occupancyByUnit } from '@/lib/domain/reports/occupancy'
-import { revenueByStream, revenueInWindow } from '@/lib/domain/reports/revenue'
+import {
+  keptDepositsInWindow,
+  revenueByStream,
+  revenueInWindow,
+} from '@/lib/domain/reports/revenue'
 import { BOOKING_STREAM_LABELS } from '@/lib/domain/stream'
 
 import { readReportWindow } from '../report-window'
@@ -133,25 +137,43 @@ async function build(
 }
 
 async function buildRevenue(window: StayWindow): Promise<CsvDocument> {
-  const payments = await listRevenuePayments(window)
-  const revenue = revenueByStream(revenueInWindow(payments, window))
+  const [payments, kept] = await Promise.all([
+    listRevenuePayments(window),
+    listKeptDeposits(window),
+  ])
+  const revenue = revenueByStream(
+    revenueInWindow(payments, window),
+    keptDepositsInWindow(kept, window),
+  )
 
   return {
-    headers: ['Stream', 'Cash (BND)', 'Bank transfer (BND)', 'Total (BND)', 'Payments'],
+    headers: [
+      'Stream',
+      'Cash (BND)',
+      'Bank transfer (BND)',
+      'Kept deposits (BND)',
+      'Total (BND)',
+      'Payments',
+      'Deposits kept',
+    ],
     rows: [
       ...revenue.byStream.map((stream) => [
         BOOKING_STREAM_LABELS[stream.stream],
         centsToDecimal(stream.byMethod.cash),
         centsToDecimal(stream.byMethod.bank_transfer),
+        centsToDecimal(stream.keptDeposits),
         centsToDecimal(stream.total),
         stream.count,
+        stream.keptCount,
       ]),
       [
         'Total',
         centsToDecimal(revenue.byMethod.cash),
         centsToDecimal(revenue.byMethod.bank_transfer),
+        centsToDecimal(revenue.keptDeposits),
         centsToDecimal(revenue.total),
         revenue.count,
+        revenue.keptCount,
       ],
     ],
   }

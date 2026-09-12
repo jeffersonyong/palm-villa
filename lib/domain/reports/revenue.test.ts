@@ -2,10 +2,12 @@ import { describe, expect, test } from 'vitest'
 
 import { bnd } from '../money'
 import {
+  keptDepositsInWindow,
   revenueByStream,
   revenueDateOf,
   revenueInWindow,
   type DatedRevenue,
+  type KeptDepositSource,
   type RevenueSource,
 } from './revenue'
 
@@ -22,7 +24,76 @@ function payment(overrides: Partial<RevenueSource> = {}): RevenueSource {
   }
 }
 
+function kept(overrides: Partial<KeptDepositSource> = {}): KeptDepositSource {
+  return {
+    stream: 'short_stay',
+    amount: bnd(100),
+    keptAt: '2026-09-10T02:00:00Z',
+    ...overrides,
+  }
+}
+
 const WINDOW = { from: '2026-09-01', to: '2026-09-30' } as const
+
+describe('keptDepositsInWindow', () => {
+  test('a kept deposit lands on the Brunei day it was kept, both ends included', () => {
+    // N32's assumption: money the business keeps is revenue on the day it is
+    // kept — the cancellation or the no-show — not the day it first arrived.
+    const deposits = [
+      kept({ keptAt: '2026-08-31T20:00:00Z' }), // 1 Sept in Brunei — in
+      kept({ keptAt: '2026-08-31T02:00:00Z' }), // 31 Aug — out
+      kept({ keptAt: '2026-09-30T10:00:00Z' }), // 30 Sept — in
+      kept({ keptAt: '2026-09-30T17:00:00Z' }), // 1 Oct in Brunei — out
+    ]
+
+    expect(keptDepositsInWindow(deposits, WINDOW).map((row) => row.date)).toEqual([
+      '2026-09-01',
+      '2026-09-30',
+    ])
+  })
+})
+
+describe('revenueByStream, with kept deposits', () => {
+  test('a kept deposit counts in its stream and the total, but in no method column', () => {
+    // The notes went into the drawer — or the transfer into the bank — when the
+    // deposit was taken, weeks before it was kept. Putting it under Cash on the
+    // day it was kept would make this column disagree with the cash-up beside
+    // it, which counts cash on the day it was collected.
+    const payments = revenueInWindow([payment({ amount: bnd(200) })], WINDOW)
+    const deposits = keptDepositsInWindow([kept(), kept({ stream: 'day_pass' })], WINDOW)
+
+    const matrix = revenueByStream(payments, deposits)
+
+    expect(matrix.byStream[0]).toMatchObject({
+      stream: 'short_stay',
+      byMethod: { cash: bnd(200), bank_transfer: 0 },
+      keptDeposits: bnd(100),
+      total: bnd(300),
+      count: 1,
+      keptCount: 1,
+    })
+    expect(matrix.byStream[1]).toMatchObject({
+      stream: 'day_pass',
+      keptDeposits: bnd(100),
+      total: bnd(100),
+      count: 0,
+      keptCount: 1,
+    })
+    expect(matrix.byMethod).toEqual({ cash: bnd(200), bank_transfer: 0 })
+    expect(matrix).toMatchObject({
+      keptDeposits: bnd(200),
+      total: bnd(400),
+      count: 1,
+      keptCount: 2,
+    })
+  })
+
+  test('with none kept, nothing about the payments moves', () => {
+    const matrix = revenueByStream(revenueInWindow([payment()], WINDOW))
+
+    expect(matrix).toMatchObject({ keptDeposits: 0, keptCount: 0, total: bnd(200), count: 1 })
+  })
+})
 
 describe('revenueDateOf', () => {
   test('cash lands on the Brunei day it was collected', () => {

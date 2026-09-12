@@ -2,7 +2,7 @@ import type { Cents } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
 
 import { currentPropertyId } from './property'
-import type { DepositWriteError, DepositWriteResult } from './deposits'
+import { closedBookingRefusal, type DepositWriteError, type DepositWriteResult } from './deposits'
 
 /**
  * Itemised charges against a deposit (capability E3).
@@ -113,6 +113,15 @@ export async function addDepositCharge(input: {
   })
 
   if (error) {
+    // A kept deposit closes its charges (20260922000100). The screen offers no
+    // button for one, so this is the clerk whose colleague closed the booking
+    // while the dialog was open.
+    const closed = closedBookingRefusal(error)
+
+    if (closed) {
+      return { ok: false, error: closed }
+    }
+
     throw new Error(`Could not record the charge: ${error.message}`)
   }
 
@@ -140,6 +149,12 @@ export async function waiveDepositCharge(input: {
   })
 
   if (error) {
+    const closed = closedBookingRefusal(error)
+
+    if (closed) {
+      return { ok: false, error: closed }
+    }
+
     throw new Error(`Could not waive the charge: ${error.message}`)
   }
 

@@ -7,9 +7,11 @@ import {
   canTopUp,
   depositFiguresOf,
   depositSecuresBooking,
+  depositAtClose,
   depositShortfallOf,
   depositStageOf,
   describeReleaseFailure,
+  isDepositOutcome,
   isDepositStage,
   owedStateOf,
   type DepositStage,
@@ -33,6 +35,7 @@ const DEPOSIT = bnd(100)
 const facts = (overrides: Partial<DepositStageFacts> = {}): DepositStageFacts => ({
   collected: true,
   released: false,
+  forfeited: false,
   inspected: false,
   bookingStatus: 'checked_in',
   ...overrides,
@@ -94,10 +97,32 @@ describe('depositStageOf', () => {
     )
   })
 
-  test('a deposit held against a booking that never became a stay reads as held', () => {
-    // The least wrong of the stages available rather than the right one: the
-    // forfeiture prd.md §9.5 describes is N5/N32 in the register and not yet
-    // built, so the money is in the safe and the guest never arrived.
+  test('a deposit kept when its booking closed reads as kept', () => {
+    // prd.md §9.5 [C]: the guest who cancels or never arrives forfeits it.
+    for (const bookingStatus of ['cancelled', 'no_show'] as const) {
+      expect(depositStageOf(facts({ bookingStatus, forfeited: true }))).toBe('forfeited')
+    }
+  })
+
+  test('kept is final: nothing after it moves the stage', () => {
+    // Not reachable — a cancelled booking is never inspected — and pinned so
+    // the precedence is a decision, the way released's is.
+    expect(depositStageOf(facts({ forfeited: true, inspected: true }))).toBe('forfeited')
+  })
+
+  test('a promise on a booking that closed without a stay was never received', () => {
+    // Not "transfer awaited": nobody is waiting on it any more, the payments
+    // queue has dropped it, and a badge saying otherwise on a cancelled booking
+    // would send a clerk looking for money the product has stopped expecting.
+    for (const bookingStatus of ['cancelled', 'no_show', 'expired'] as const) {
+      expect(depositStageOf(facts({ collected: false, bookingStatus }))).toBe('lapsed')
+    }
+  })
+
+  test('a deposit held on a booking closed before forfeiture existed still reads as held', () => {
+    // Only a row written before 22 September 2026 can be here: closing a
+    // booking now settles its deposit in the same transaction. The money is
+    // still in the safe and the guest never arrived, which is what it says.
     for (const bookingStatus of ['cancelled', 'no_show', 'expired'] as const) {
       expect(depositStageOf(facts({ bookingStatus }))).toBe('secured')
     }
@@ -113,12 +138,17 @@ describe('depositStageOf', () => {
 })
 
 describe('isDepositStage', () => {
-  test.each(['secured', 'in_house', 'awaiting_inspection', 'ready_for_release', 'released'])(
-    '%s is a stage',
-    (value) => {
-      expect(isDepositStage(value)).toBe(true)
-    },
-  )
+  test.each([
+    'secured',
+    'in_house',
+    'awaiting_inspection',
+    'ready_for_release',
+    'released',
+    'forfeited',
+    'lapsed',
+  ])('%s is a stage', (value) => {
+    expect(isDepositStage(value)).toBe(true)
+  })
 
   test('"owed" is not a stage — it is a fact about a released deposit', () => {
     expect(isDepositStage('owed')).toBe(false)
@@ -250,6 +280,23 @@ describe('canApproveRelease', () => {
       error: { code: 'booking_not_completed' },
     })
   })
+
+  test('a kept deposit is never released, and says it was kept', () => {
+    expect(canApproveRelease(facts({ bookingStatus: 'cancelled', forfeited: true }))).toMatchObject(
+      { ok: false, error: { code: 'already_forfeited' } },
+    )
+  })
+
+  test('a booking that closed without a stay is not told to wait for a check-out', () => {
+    // Only a deposit held on a booking closed before forfeiture existed. "The
+    // guest has not checked out yet" would be untrue — they are never coming.
+    for (const bookingStatus of ['cancelled', 'no_show', 'expired'] as const) {
+      expect(canApproveRelease(facts({ bookingStatus }))).toMatchObject({
+        ok: false,
+        error: { code: 'booking_closed' },
+      })
+    }
+  })
 })
 
 describe('canAddCharge', () => {
@@ -263,6 +310,19 @@ describe('canAddCharge', () => {
 
   test('approval closes the charges — the statement is what was signed', () => {
     expect(canAddCharge(facts({ released: true }))).toBe(false)
+  })
+
+  test('so does keeping it — nothing is deducted from money the business has kept', () => {
+    expect(canAddCharge(facts({ bookingStatus: 'cancelled', forfeited: true }))).toBe(false)
+  })
+
+  test('a booking that closed without a stay takes no charge, even with a deposit still held', () => {
+    // A deposit left held on a booking cancelled before forfeiture existed:
+    // its release is refused (`booking_closed`), so a charge raised against it
+    // could never be settled and would stand on the ledger for good.
+    for (const bookingStatus of ['cancelled', 'no_show', 'expired'] as const) {
+      expect(canAddCharge(facts({ bookingStatus }))).toBe(false)
+    }
   })
 })
 
@@ -287,13 +347,16 @@ describe('owedStateOf', () => {
 })
 
 describe('describeReleaseFailure', () => {
-  test.each(['already_released', 'inspection_missing', 'booking_not_completed'])(
-    '%s reads the same as the screen’s own refusal',
-    (code) => {
-      expect(describeReleaseFailure(code).code).toBe(code)
-      expect(describeReleaseFailure(code).message.length).toBeGreaterThan(0)
-    },
-  )
+  test.each([
+    'already_released',
+    'already_forfeited',
+    'booking_closed',
+    'inspection_missing',
+    'booking_not_completed',
+  ])('%s reads the same as the screen’s own refusal', (code) => {
+    expect(describeReleaseFailure(code).code).toBe(code)
+    expect(describeReleaseFailure(code).message.length).toBeGreaterThan(0)
+  })
 
   test('an unmapped code still produces a sentence a clerk can act on', () => {
     // A guard nobody mapped is a bug to find, and a blank dialog is how it
@@ -353,10 +416,26 @@ describe('depositSecuresBooking', () => {
 })
 
 describe('canTopUp', () => {
-  const short = { recorded: true, collected: true, released: false, shortfall: bnd(50) }
+  const short = {
+    closed: false,
+    recorded: true,
+    collected: true,
+    released: false,
+    shortfall: bnd(50),
+  }
 
   test('a collected deposit short of its quote may be topped up', () => {
     expect(canTopUp(short)).toEqual({ ok: true })
+  })
+
+  test('a booking that closed without a stay takes nothing more, whatever else is true', () => {
+    // First, because every other refusal names a way to take money — record
+    // it, confirm it in the queue — and a closed booking has none.
+    for (const facts of [short, { ...short, recorded: false }, { ...short, collected: false }]) {
+      const check = canTopUp({ ...facts, closed: true })
+
+      expect(check.ok || check.error.code).toBe('booking_closed')
+    }
   })
 
   test('a booking with no deposit row is sent to record one instead', () => {
@@ -396,6 +475,7 @@ describe('a short deposit is not a stage', () => {
     const collected: DepositStageFacts = {
       collected: true,
       released: false,
+      forfeited: false,
       inspected: false,
       bookingStatus: 'confirmed',
     }
@@ -412,9 +492,88 @@ describe('a short deposit is not a stage', () => {
       canApproveRelease({
         collected: true,
         released: false,
+        forfeited: false,
         inspected: true,
         bookingStatus: 'completed',
       }),
     ).toEqual({ ok: true })
+  })
+})
+
+describe('depositAtClose', () => {
+  /**
+   * What cancelling a booking, or marking it a no-show, has to decide about.
+   * The dialog words its sentence from this and nothing else, so a clerk is
+   * only ever asked to keep or return money that is actually in the safe.
+   */
+  const held = { amount: DEPOSIT, collected: true, released: false, forfeited: false }
+
+  test('a deposit in the safe is what the close decides about', () => {
+    expect(depositAtClose({ quoted: DEPOSIT, waiverReason: null, deposit: held })).toEqual({
+      kind: 'held',
+      amount: DEPOSIT,
+      shortfall: 0,
+    })
+  })
+
+  test('so is one that arrived short — for what actually arrived', () => {
+    expect(
+      depositAtClose({
+        quoted: DEPOSIT,
+        waiverReason: null,
+        deposit: { ...held, amount: bnd(50) },
+      }),
+    ).toEqual({ kind: 'held', amount: bnd(50), shortfall: bnd(50) })
+  })
+
+  test('a promise nobody verified holds nothing to keep', () => {
+    expect(
+      depositAtClose({
+        quoted: DEPOSIT,
+        waiverReason: null,
+        deposit: { ...held, collected: false },
+      }),
+    ).toEqual({ kind: 'promised' })
+  })
+
+  test('a quote with nothing taken against it has nothing to keep', () => {
+    expect(depositAtClose({ quoted: DEPOSIT, waiverReason: null, deposit: null })).toEqual({
+      kind: 'not_taken',
+    })
+  })
+
+  test('a waived deposit says why nothing is held', () => {
+    expect(
+      depositAtClose({ quoted: 0, waiverReason: 'Held under PV-0042', deposit: null }),
+    ).toEqual({ kind: 'waived', reason: 'Held under PV-0042' })
+  })
+
+  test('a booking quoting nothing has nothing to keep', () => {
+    expect(depositAtClose({ quoted: 0, waiverReason: null, deposit: null })).toEqual({
+      kind: 'not_quoted',
+    })
+  })
+
+  test('a deposit already given back or kept is settled, and asks nothing', () => {
+    for (const deposit of [
+      { ...held, released: true },
+      { ...held, forfeited: true },
+    ]) {
+      expect(depositAtClose({ quoted: DEPOSIT, waiverReason: null, deposit })).toEqual({
+        kind: 'settled',
+      })
+    }
+  })
+})
+
+describe('isDepositOutcome', () => {
+  test.each(['keep', 'return'])('%s is an outcome', (value) => {
+    expect(isDepositOutcome(value)).toBe(true)
+  })
+
+  test('anything else from a form is refused', () => {
+    for (const value of ['', 'KEEP', 'forfeit', null, undefined, 1]) {
+      expect(isDepositOutcome(value)).toBe(false)
+    }
   })
 })
