@@ -1,7 +1,7 @@
 import { PDFDocument } from 'pdf-lib'
 import { describe, expect, test } from 'vitest'
 
-import { sniffMimeType } from '@/lib/domain/document'
+import { sniffMimeType } from '@/lib/domain/file-signature'
 import { line } from '@/lib/domain/lines'
 import { bnd } from '@/lib/domain/money'
 import type { PackModel } from '@/lib/domain/pack'
