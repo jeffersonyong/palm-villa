@@ -23,6 +23,64 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '5mb',
     },
   },
+  /**
+   * Response headers, on every route.
+   *
+   * Four of them, each one a default this application never wants to depart
+   * from — and until now the application sent none at all, leaving each to
+   * whatever the browser assumed.
+   *
+   * **Deliberately not a Content-Security-Policy.** A real one here needs a
+   * nonce for the theme script in app/layout.tsx, which runs inline and
+   * before paint by design, and a nonce means every response becomes
+   * uncacheable unless the policy is generated per request in the proxy.
+   * That is a change worth making on its own, with its own testing, rather
+   * than smuggled in beside four static lines.
+   *
+   * **Deliberately not HSTS.** Vercel serves it for its own domains already,
+   * and a second one from here would be a duplicate header with a max-age
+   * this repository would then own. It becomes ours to set the day a custom
+   * domain is chosen (architecture.md §13).
+   */
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          // Storage serves identity documents and slips through a signed URL
+          // that this app redirects to, and a browser that sniffs its way to a
+          // different type than the one declared is the vector that turns an
+          // uploaded file into an executed one. The upload path already
+          // decides the type from the file's own magic numbers rather than
+          // from the uploader's claim; this is the other half of that.
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // Nothing in this product is framed and nothing frames anything: the
+          // print route is a full page that calls window.print(). So the whole
+          // of clickjacking is answered by refusing to be embedded at all,
+          // which matters most for the portal, where one misread click
+          // verifies a payment.
+          { key: 'X-Frame-Options', value: 'DENY' },
+          // The customer's booking page carries its access token in the path,
+          // and that token is the whole of its authorisation. Sending a full
+          // referrer would hand it to every origin the page ever links out to.
+          // This sends the origin alone across origins and nothing at all
+          // downgrading to http.
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // None of the three is ever called: there is no getUserMedia and no
+          // geolocation anywhere in the app. This does not touch the "Take
+          // Photo" option in a file picker — a guest photographing their IC
+          // goes through the operating system's own camera, not through a
+          // permission this policy governs — so the A7 upload flow is
+          // unaffected. What it removes is the reach an injected script would
+          // otherwise have.
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
+        ],
+      },
+    ]
+  },
 }
 
 export default nextConfig
