@@ -6,7 +6,9 @@ import type { PaymentMatchKind, PaymentMethod, PaymentStatus } from '@/lib/domai
 import type { BookingStream } from '@/lib/domain/stream'
 import { dataClient } from '@/lib/supabase/data'
 
+import { isRangeNotSatisfiable, type PageRequest } from './bookings'
 import { currentPropertyId } from './property'
+import { readAllRows } from './rows'
 import { applySearch } from './search'
 
 /**
@@ -219,33 +221,78 @@ export interface PaymentListFilter {
  * An empty filter array is treated as no filter, matching `listBookings`.
  */
 export async function listPayments(filter: PaymentListFilter = {}): Promise<readonly Payment[]> {
+  // **Chunked, because PostgREST truncates at `max_rows` and says nothing.**
+  //
+  // This function had six callers and every one of them wanted all the rows:
+  // the cash log and its total, the verification queue, the daily cash-up and
+  // its CSV, and the revenue report. Past a thousand matching payments each
+  // would have quietly used the first thousand — a log that stops mid-month, a
+  // total short by an unknown amount, a reconciliation that is simply wrong
+  // with nothing on screen to say so.
+  //
+  // The loop is `readAllRows` in ./rows.ts, which lib/db/export.ts has used
+  // since it met the same ceiling. A fresh builder per page because a
+  // PostgREST query carries its own range once awaited.
   const propertyId = await currentPropertyId()
+  const rows = await readAllRows<PaymentSummaryRow>(
+    (from, to) => paymentQuery(propertyId, filter).range(from, to),
+    { label: 'payments' },
+  )
 
-  let query = dataClient()
-    .from('payment_summary')
-    .select(SUMMARY_COLUMNS)
-    .eq('property_id', propertyId)
+  return rows.map(toPayment)
+}
 
+/**
+ * The shape of a query this filter can be applied to.
+ *
+ * Structural because the data client is untyped, and the same reason
+ * ./bookings.ts declares one: the row read, the chunked read and the head
+ * count are three different PostgREST builder types that all answer these
+ * four methods.
+ */
+interface FilterablePaymentQuery<Self> {
+  in(column: string, values: unknown[]): Self
+  gte(column: string, value: unknown): Self
+  lt(column: string, value: unknown): Self
+  or(filters: string): Self
+}
+
+/**
+ * Applies a list filter to a `payment_summary` query.
+ *
+ * **One function, three readers.** The chunked read, the paged read and the
+ * count go through this and nothing else, so a page's rows, its footer total
+ * and the money summed beneath it are filtered by exactly the same predicates.
+ * Two copies would be two chances for a total to disagree with the rows above
+ * it, which is the one thing a summary of a list must never do — the rule
+ * `applyListFilter` sets in ./bookings.ts.
+ *
+ * Each call mutates the builder, so nothing is chained on a return value.
+ */
+function applyPaymentFilter<Query extends FilterablePaymentQuery<Query>>(
+  query: Query,
+  filter: PaymentListFilter,
+): void {
   if (filter.statuses && filter.statuses.length > 0) {
-    query = query.in('status', filter.statuses)
+    query.in('status', filter.statuses as unknown[])
   }
 
   if (filter.methods && filter.methods.length > 0) {
-    query = query.in('method', filter.methods)
+    query.in('method', filter.methods as unknown[])
   }
 
   if (filter.collectedFrom) {
-    query = query.gte('collected_at', filter.collectedFrom)
+    query.gte('collected_at', filter.collectedFrom)
   }
 
   if (filter.collectedBefore) {
-    query = query.lt('collected_at', filter.collectedBefore)
+    query.lt('collected_at', filter.collectedBefore)
   }
 
   if (filter.collectedOrObserved) {
     const { bounds, from, to } = filter.collectedOrObserved
 
-    query = query.or(
+    query.or(
       [
         `and(collected_at.gte.${bounds.start},collected_at.lt.${bounds.end})`,
         `and(observed_on.gte.${from},observed_on.lte.${to})`,
@@ -261,16 +308,174 @@ export async function listPayments(filter: PaymentListFilter = {}): Promise<read
       filter.search,
     )
   }
+}
 
-  const { data, error } = await query.order(filter.newestFirst ? 'collected_at' : 'created_at', {
-    ascending: !filter.newestFirst,
-  })
+/**
+ * A fresh `payment_summary` query carrying the filter and the sort.
+ *
+ * A factory rather than a value because a PostgREST builder carries its own
+ * range once awaited, so the chunked read needs a new one per page.
+ *
+ * **Synchronous, and it has to be.** A builder is a thenable, so an `async`
+ * function returning one would await it — handing back an executed response
+ * instead of a query to range. The property id is therefore resolved by the
+ * caller and passed in, which also reads it once per read rather than once
+ * per chunk.
+ *
+ * The sort ends in a unique tiebreak. Under pagination that is not cosmetic:
+ * two rows sharing a `collected_at` can swap between requests, and a row that
+ * swaps across a page boundary is a row somebody sees twice or never.
+ */
+function paymentQuery(propertyId: string, filter: PaymentListFilter) {
+  const query = dataClient()
+    .from('payment_summary')
+    .select(SUMMARY_COLUMNS, { count: 'exact' })
+    .eq('property_id', propertyId)
+
+  applyPaymentFilter(query, filter)
+
+  return query
+    .order(filter.newestFirst ? 'collected_at' : 'created_at', { ascending: !filter.newestFirst })
+    .order('id', { ascending: !filter.newestFirst })
+}
+
+/** One page of payments, with the total the footer counts against. */
+export interface PaymentPage {
+  payments: readonly Payment[]
+  /** How many matched the filter, ignoring the page. */
+  total: number
+}
+
+/**
+ * Payments, one page at a time.
+ *
+ * The read a screen uses. `listPayments` above answers with every matching row
+ * and is for the callers that genuinely need them — a running balance, a CSV —
+ * while anything rendering a table asks for a page, because handing a browser
+ * five thousand rows is its own problem and a chunked read does not fix it.
+ */
+export async function listPaymentPage(
+  filter: PaymentListFilter = {},
+  page?: PageRequest,
+): Promise<PaymentPage> {
+  return listPaymentRange(
+    filter,
+    page ? { offset: (page.page - 1) * page.pageSize, limit: page.pageSize } : undefined,
+  )
+}
+
+/** A window of rows by offset, for a list that does not start at a page boundary. */
+export interface RangeRequest {
+  offset: number
+  limit: number
+}
+
+/**
+ * Payments, by offset rather than by page number.
+ *
+ * The verification queue needs this and `listPaymentPage` cannot serve it. That
+ * screen is two lists shown as one: everything still waiting — transfers and
+ * promised deposits together — and beneath it everything already settled. The
+ * waiting half is bounded by real work and is read whole; the settled half
+ * grows for the life of the building and is read a page at a time. So the
+ * offset into the settled rows is the page's offset less however many waiting
+ * rows came first, which is not a multiple of the page size and therefore not
+ * a page number.
+ */
+export async function listPaymentRange(
+  filter: PaymentListFilter = {},
+  range?: RangeRequest,
+): Promise<PaymentPage> {
+  const propertyId = await currentPropertyId()
+  const query = paymentQuery(propertyId, filter)
+
+  if (range) {
+    query.range(range.offset, range.offset + range.limit - 1)
+  }
+
+  const { data, error, count } = await query
 
   if (error) {
+    // A bookmarked `?page=7` that has outlived its rows is a 416 from
+    // PostgREST rather than a fault. Answered as an empty page carrying the
+    // real total, so the caller can clamp and read again — the treatment
+    // ./bookings.ts gives it.
+    if (range && isRangeNotSatisfiable(error)) {
+      return { payments: [], total: await countPayments(filter) }
+    }
+
     throw new Error(`Could not list payments: ${error.message}`)
   }
 
-  return (data as unknown as PaymentSummaryRow[]).map(toPayment)
+  return { payments: (data as unknown as PaymentSummaryRow[]).map(toPayment), total: count ?? 0 }
+}
+
+/**
+ * What the matching payments come to, across every page.
+ *
+ * **The figure a paged screen must not compute for itself.** A total summed
+ * from the rows in hand is a total that changes when you turn the page, and
+ * on a money screen that is not a rounding difference — it is a number that
+ * is simply wrong, with nothing on screen admitting it. The cash log summed
+ * what it had fetched, which was right only while every match fitted in one
+ * read.
+ *
+ * Chunked rather than a SQL `sum()`, deliberately. An aggregate would be one
+ * round trip instead of several, and `cash_on_hand_before()` makes exactly
+ * that argument for the cash-up's opening balance. What it would also be is a
+ * second copy of this filter written in SQL — and a total filtered by
+ * predicates that have drifted from the rows above it is the failure this
+ * function exists to prevent, arriving by another door. One predicate path,
+ * one answer. `amount_cents` alone is read, so the cost is an integer a row.
+ *
+ * If this screen is ever slow, the fix is an RPC that takes the filter whole
+ * rather than one that re-states it.
+ */
+export async function sumPaymentAmounts(filter: PaymentListFilter = {}): Promise<Cents> {
+  const propertyId = await currentPropertyId()
+
+  const rows = await readAllRows<{ amount_cents: number | null }>(
+    (from, to) => {
+      const query = dataClient()
+        .from('payment_summary')
+        .select('amount_cents')
+        .eq('property_id', propertyId)
+
+      applyPaymentFilter(query, filter)
+
+      // Ordered so the chunks partition the set rather than overlapping it.
+      return query.order('id', { ascending: true }).range(from, to)
+    },
+    { label: 'payment amounts' },
+  )
+
+  return rows.reduce((total, row) => total + (row.amount_cents ?? 0), 0)
+}
+
+/**
+ * How many payments match, without fetching any.
+ *
+ * Used on the out-of-range path — the ordinary read gets its count riding
+ * along with the rows — and by the verification queue, which needs to know how
+ * long its settled half is before it decides which slice of it to read.
+ */
+export async function countPayments(filter: PaymentListFilter = {}): Promise<number> {
+  const propertyId = await currentPropertyId()
+
+  const query = dataClient()
+    .from('payment_summary')
+    .select('id', { count: 'exact', head: true })
+    .eq('property_id', propertyId)
+
+  applyPaymentFilter(query, filter)
+
+  const { count, error } = await query
+
+  if (error) {
+    throw new Error(`Could not count payments: ${error.message}`)
+  }
+
+  return count ?? 0
 }
 
 /** Every payment against one booking, oldest first. */

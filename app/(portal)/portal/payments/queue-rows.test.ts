@@ -4,7 +4,14 @@ import type { Deposit } from '@/lib/db/deposits'
 import type { Payment } from '@/lib/db/payments'
 import { bnd } from '@/lib/domain/money'
 
-import { buildQueue, countWaiting, depositEntry, paymentEntry } from './queue-rows'
+import {
+  buildQueue,
+  countWaiting,
+  depositEntry,
+  paymentEntry,
+  queueSlice,
+  type QueueEntry,
+} from './queue-rows'
 
 /**
  * Two kinds of money, one queue (capability B4, extended by B16).
@@ -196,5 +203,70 @@ describe('the queue as one list', () => {
     const queue = buildQueue([payment({ id: 'same' })], [deposit({ id: 'same' })], 'all')
 
     expect(new Set(queue.map((entry) => `${entry.kind}-${entry.id}`)).size).toBe(2)
+  })
+})
+
+describe('one page of the queue', () => {
+  /** Waiting entries are only ever counted here, so a stub is enough. */
+  const waiting = (count: number): QueueEntry[] =>
+    Array.from({ length: count }, (_, index) => ({ id: `w${index}` }) as unknown as QueueEntry)
+
+  test('a page inside the waiting half reads no settled rows', () => {
+    // The ordinary case: a queue is worked from the top, so the first page is
+    // work and nothing else. A settled read here would be a round trip for
+    // rows nobody asked for.
+    const slice = queueSlice(waiting(10), 1, 4)
+
+    expect(slice.waiting).toHaveLength(4)
+    expect(slice.settled).toBeNull()
+  })
+
+  test('a page past the waiting half reads settled rows from the right offset', () => {
+    // Four waiting rows, pages of two: page three is the first that is all
+    // settled, and it must start at the first settled row rather than at row
+    // four of them.
+    const slice = queueSlice(waiting(4), 3, 2)
+
+    expect(slice.waiting).toHaveLength(0)
+    expect(slice.settled).toEqual({ offset: 0, limit: 2 })
+  })
+
+  test('the page straddling the join takes the rest from the settled half', () => {
+    // Four waiting rows, pages of three. Page two opens on the last waiting
+    // row and fills with the first two settled ones — the boundary this
+    // arithmetic exists for, and the one nobody would find by clicking.
+    const slice = queueSlice(waiting(4), 2, 3)
+
+    expect(slice.waiting).toHaveLength(1)
+    expect(slice.settled).toEqual({ offset: 0, limit: 2 })
+  })
+
+  test('a page well past both halves still asks from a sane offset', () => {
+    const slice = queueSlice(waiting(4), 5, 2)
+
+    expect(slice.waiting).toHaveLength(0)
+    expect(slice.settled).toEqual({ offset: 4, limit: 2 })
+  })
+
+  test('no waiting work at all makes every page a settled page', () => {
+    expect(queueSlice([], 1, 25).settled).toEqual({ offset: 0, limit: 25 })
+    expect(queueSlice([], 3, 25).settled).toEqual({ offset: 50, limit: 25 })
+  })
+
+  test('pages are a partition: every row appears once', () => {
+    // Six waiting rows and pages of four, walked to the end. Page one is four
+    // waiting; page two is the last two waiting plus two settled from offset
+    // zero. Nothing is repeated and nothing is skipped.
+    const first = queueSlice(waiting(6), 1, 4)
+    const second = queueSlice(waiting(6), 2, 4)
+
+    expect(first.waiting).toHaveLength(4)
+    expect(first.settled).toBeNull()
+    expect(second.waiting).toHaveLength(2)
+    expect(second.settled).toEqual({ offset: 0, limit: 2 })
+  })
+
+  test('a nonsense page size asks for nothing rather than throwing', () => {
+    expect(queueSlice(waiting(3), 1, 0)).toEqual({ waiting: [], settled: null })
   })
 })
