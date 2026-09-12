@@ -3,6 +3,7 @@ import type { Cents } from '@/lib/domain/money'
 import { dataClient } from '@/lib/supabase/data'
 
 import { currentPropertyId } from './property'
+import { readAllRows } from './rows'
 
 /**
  * Cash banked against a business day (capability E4, prd.md §10.5).
@@ -62,20 +63,28 @@ function toBanking(row: CashBankingRow): CashBanking {
 export async function listCashBankings(window: StayWindow): Promise<readonly CashBanking[]> {
   const propertyId = await currentPropertyId()
 
-  const { data, error } = await dataClient()
-    .from('cash_banking')
-    .select(COLUMNS)
-    .eq('property_id', propertyId)
-    .gte('business_date', window.from)
-    .lte('business_date', window.to)
-    .order('business_date', { ascending: true })
-    .order('banked_at', { ascending: true })
+  // Chunked, like the cash payments it is reconciled against. A window bounds
+  // this read in practice and a year of it is nowhere near PostgREST's
+  // thousand-row ceiling — but the cash-up subtracts these from what was
+  // taken, so a read that silently stopped would report the safe as holding
+  // money that has in fact been banked. The one input to that report that is
+  // allowed to be short is none of them.
+  const rows = await readAllRows<CashBankingRow>(
+    (from, to) =>
+      dataClient()
+        .from('cash_banking')
+        .select(COLUMNS)
+        .eq('property_id', propertyId)
+        .gte('business_date', window.from)
+        .lte('business_date', window.to)
+        .order('business_date', { ascending: true })
+        .order('banked_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    { label: 'what has been banked' },
+  )
 
-  if (error) {
-    throw new Error(`Could not read what has been banked: ${error.message}`)
-  }
-
-  return (data as CashBankingRow[]).map(toBanking)
+  return rows.map(toBanking)
 }
 
 /**

@@ -19,14 +19,17 @@ import {
   TableRow,
   TableRowLink,
 } from '@/components/ui/table'
+import { clampPage, pageCountFor } from '@/components/ui/pagination-range'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
-import { listPayments } from '@/lib/db/payments'
+import { listPaymentPage, sumPaymentAmounts } from '@/lib/db/payments'
 import { listStaff } from '@/lib/db/staff'
 import { bruneiWindowBounds, formatTimestamp } from '@/lib/domain/dates'
-import { formatCents, sumCents } from '@/lib/domain/money'
+import { formatCents } from '@/lib/domain/money'
 
 import { CashFilters } from './cash-filters'
+import { CashPagination } from './cash-pagination'
+import { readPage, readPageSize } from './page-size'
 import { RecordCashPayment } from './record-cash'
 
 export const metadata: Metadata = {
@@ -40,15 +43,22 @@ export const metadata: Metadata = {
  * and when. That is this screen. What it deliberately is not is the **daily
  * cash-up** — recorded cash against banked cash — which is capability E4, sits
  * with Finance, and needs a banked figure nothing in the system captures yet.
- * The total at the foot of this table is a sum of what is on screen and is
- * labelled as such, so it cannot be mistaken for a reconciliation.
+ * The total at the foot of this table covers every payment the filters match,
+ * across every page — not the rows on screen. It is still not a
+ * reconciliation, and still says so.
  *
  * Newest first, unlike the verification queue. A log is read from the top; a
  * queue is worked from the top. They are the same query with opposite ends.
  */
 
 interface PageProps {
-  searchParams: Promise<{ from?: string; to?: string; q?: string | string[] }>
+  searchParams: Promise<{
+    from?: string
+    to?: string
+    q?: string | string[]
+    page?: string
+    size?: string
+  }>
 }
 
 export default async function CashPaymentsPage({ searchParams }: PageProps) {
@@ -85,19 +95,57 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
   const isFiltered = window !== null || search !== null
   const bounds = window ? bruneiWindowBounds(window) : null
 
-  const [payments, staff] = await Promise.all([
-    listPayments({
-      methods: ['cash'],
-      collectedFrom: bounds?.start,
-      collectedBefore: bounds?.end,
-      search: search ?? undefined,
-      newestFirst: true,
-    }),
+  const filter = {
+    methods: ['cash'] as const,
+    collectedFrom: bounds?.start,
+    collectedBefore: bounds?.end,
+    search: search ?? undefined,
+    newestFirst: true,
+  }
+
+  const pageSize = readPageSize(params.size)
+  const requestedPage = readPage(params.page)
+
+  // The rows are a page; the total is every match. Summing the rows in hand
+  // would give a figure that changed when you turned the page, and before
+  // there were pages it gave one that stopped at PostgREST's thousandth row
+  // without saying so. Both reads go through one filter (see
+  // `applyPaymentFilter`), so the money underneath cannot be counted over a
+  // different set from the rows above.
+  const [firstAttempt, total, staff] = await Promise.all([
+    listPaymentPage(filter, { page: requestedPage, pageSize }),
+    sumPaymentAmounts(filter),
     listStaff(),
   ])
 
+  // A bookmarked `?page=7` outlives the rows beneath it. PostgREST answers a
+  // range past the end with an empty page rather than an error, so clamping
+  // against the total just read turns that into the last real page instead of
+  // an empty table under a footer claiming rows exist. The second read only
+  // happens when the page was genuinely out of range.
+  const currentPage = clampPage(requestedPage, pageCountFor(firstAttempt.total, pageSize))
+  const { payments, total: matched } =
+    currentPage === requestedPage
+      ? firstAttempt
+      : await listPaymentPage(filter, { page: currentPage, pageSize })
+
   const names = new Map(staff.map((account) => [account.id, account.displayName]))
-  const total = sumCents(payments.map((payment) => payment.amount ?? 0))
+
+  // The filters the footer carries, serialised from the values the server
+  // actually applied — so a param the page rejected as malformed is never
+  // carried forward. Neither `page` nor `size` is in here: the footer sets
+  // both itself, and carrying `size` would make the rows-per-page control
+  // unable to return to the default (the register has that bug today).
+  const pageParams = new URLSearchParams()
+
+  if (window) {
+    pageParams.set('from', window.from)
+    pageParams.set('to', window.to)
+  }
+
+  if (search) {
+    pageParams.set('q', search)
+  }
 
   return (
     <>
@@ -111,7 +159,9 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
 
         <div className="ml-auto flex items-center gap-lg">
           <h2 id="cash-heading" className="micro-label text-muted-foreground">
-            {payments.length} {payments.length === 1 ? 'payment' : 'payments'}
+            {/* What the filters match, not what this page shows. The footer
+                below states the range within it. */}
+            {matched} {matched === 1 ? 'payment' : 'payments'}
           </h2>
           <RecordCashPayment />
         </div>
@@ -135,7 +185,16 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
             }
           />
         ) : (
-          <Table>
+          <Table
+            footer={
+              <CashPagination
+                page={currentPage}
+                pageSize={pageSize}
+                total={matched}
+                params={pageParams.toString()}
+              />
+            }
+          >
             <TableHeader>
               <TableHeaderRow>
                 <TableHead>Collected</TableHead>
@@ -195,7 +254,7 @@ export default async function CashPaymentsPage({ searchParams }: PageProps) {
           </Table>
         )}
 
-        {payments.length > 0 ? <CashTotalFootnote total={total} /> : null}
+        {matched > 0 ? <CashTotalFootnote total={total} /> : null}
       </section>
     </>
   )
@@ -224,8 +283,8 @@ function CashTotalFootnote({ total }: { total: number }) {
   return (
     <div className="mt-md flex items-baseline justify-between gap-lg">
       <p className="text-caption text-muted-foreground">
-        A sum of the rows above, not a reconciliation. Comparing recorded cash against banked cash
-        is the daily cash-up, a separate screen.
+        Every payment these filters match, not just this page — and not a reconciliation. Comparing
+        recorded cash against banked cash is the daily cash-up, a separate screen.
       </p>
       <p className="text-body-md text-foreground tabular-nums">BND {formatCents(total)}</p>
     </div>

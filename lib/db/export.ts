@@ -3,6 +3,7 @@ import type { CsvValue } from '@/lib/domain/csv'
 import { dataClient } from '@/lib/supabase/data'
 
 import { currentPropertyId } from './property'
+import { readAllRows } from './rows'
 import { readPropertySettings } from './settings'
 import { listStaff } from './staff'
 
@@ -39,6 +40,10 @@ import { listStaff } from './staff'
  * TRUNCATES rather than failing. An export that silently stopped at a thousand
  * bookings would be worse than one that refused, so every read here is chunked
  * and the loop is what the test proves.
+ *
+ * That loop now lives in ./rows.ts. It was written here and it was needed in
+ * five more places — `listPayments` alone had six callers reading past the
+ * ceiling, the revenue report and the daily cash-up among them.
  */
 
 export interface CsvDocument {
@@ -53,41 +58,6 @@ export interface ExportTable {
   description: string
   count: () => Promise<number>
   document: () => Promise<CsvDocument>
-}
-
-/** PostgREST's configured ceiling. A page of exactly this many means more. */
-const CHUNK = 1000
-
-/**
- * Every row, however many pages that takes.
- *
- * `build` is called per page rather than once, because a PostgREST builder
- * carries its range and cannot be re-ranged after it has been awaited.
- */
-export async function readAllRows<T>(
-  build: (
-    from: number,
-    to: number,
-  ) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
-  chunk: number = CHUNK,
-): Promise<T[]> {
-  const rows: T[] = []
-
-  for (let from = 0; ; from += chunk) {
-    const { data, error } = await build(from, from + chunk - 1)
-
-    if (error) {
-      throw new Error(`Could not read rows for export: ${error.message}`)
-    }
-
-    const page = (data ?? []) as T[]
-
-    rows.push(...page)
-
-    if (page.length < chunk) {
-      return rows
-    }
-  }
 }
 
 async function countOf(table: string): Promise<number> {

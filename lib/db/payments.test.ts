@@ -5,7 +5,14 @@ import { dataClient } from '@/lib/supabase/data'
 
 import { amendBooking, getBookingById, transitionBooking } from './bookings'
 import { getDepositByBookingId, verifyDeposit } from './deposits'
-import { listPayments, listPaymentsForBooking, recordCashPayment, verifyPayment } from './payments'
+import {
+  listPaymentPage,
+  listPayments,
+  listPaymentsForBooking,
+  recordCashPayment,
+  sumPaymentAmounts,
+  verifyPayment,
+} from './payments'
 import { currentPropertyId } from './property'
 import { givenBooking, givenTransferBooking } from './test/factory'
 import { auditEventsFor, paymentsFor } from './test/inspect'
@@ -772,5 +779,109 @@ describe('listing payments', () => {
       unitRef: '3B-01',
       slipDocumentId: null,
     })
+  })
+})
+
+describe('reading the payment list without losing rows', () => {
+  /**
+   * PostgREST is configured with `max_rows = 1000` and **truncates rather than
+   * failing**, so a list that outgrew it came back short with a 200 and
+   * nothing to say so. The cash log's total was summed from whatever arrived,
+   * which made it a money figure that was quietly wrong.
+   *
+   * These do not seed a thousand bookings. What they pin is the contract that
+   * makes the size irrelevant: a page states the total it was drawn from, the
+   * pages partition the list, a page past the end is empty rather than an
+   * error, and the money is summed over everything matched rather than over
+   * the rows in hand. The chunking loop itself is proved at a boundary of two
+   * in export.test.ts.
+   */
+
+  /**
+   * Three cash bookings, each in its own unit — the fixture defaults every
+   * booking to 3B-01, and three of those over one set of dates is the
+   * exclusion constraint doing its job rather than a fixture worth forcing.
+   */
+  async function threeCashBookings() {
+    const first = await givenBooking({
+      unitRef: '3B-01',
+      checkIn: CHECK_IN,
+      checkOut: CHECK_OUT,
+      paymentMethod: 'cash',
+    })
+    const second = await givenBooking({
+      unitRef: '3B-02',
+      checkIn: CHECK_IN,
+      checkOut: CHECK_OUT,
+      paymentMethod: 'cash',
+    })
+    const third = await givenBooking({
+      unitRef: '3B-03',
+      checkIn: CHECK_IN,
+      checkOut: CHECK_OUT,
+      paymentMethod: 'cash',
+    })
+
+    return [first, second, third]
+  }
+
+  test('a page carries the total it was drawn from, not its own length', async () => {
+    await threeCashBookings()
+
+    const page = await listPaymentPage({ methods: ['cash'] }, { page: 1, pageSize: 2 })
+
+    expect(page.payments).toHaveLength(2)
+    expect(page.total).toBe(3)
+  })
+
+  test('the pages partition the list, with nothing repeated or skipped', async () => {
+    await threeCashBookings()
+
+    const all = await listPayments({ methods: ['cash'] })
+    const first = await listPaymentPage({ methods: ['cash'] }, { page: 1, pageSize: 2 })
+    const second = await listPaymentPage({ methods: ['cash'] }, { page: 2, pageSize: 2 })
+
+    expect([...first.payments, ...second.payments].map((payment) => payment.id)).toEqual(
+      all.map((payment) => payment.id),
+    )
+  })
+
+  test('a page past the end is empty and still states the real total', async () => {
+    await threeCashBookings()
+
+    // What a bookmarked `?page=9` asks for once the rows beneath it are gone.
+    // PostgREST answers that with a 416, which must read as an empty page
+    // rather than as a fault, or the screen shows an error instead of
+    // clamping back to a page that exists.
+    const page = await listPaymentPage({ methods: ['cash'] }, { page: 9, pageSize: 2 })
+
+    expect(page.payments).toHaveLength(0)
+    expect(page.total).toBe(3)
+  })
+
+  test('the total is summed over every match, never over the page', async () => {
+    const bookings = await threeCashBookings()
+    const expected = bookings.reduce((sum, booking) => sum + booking.total, 0)
+
+    const total = await sumPaymentAmounts({ methods: ['cash'] })
+    const page = await listPaymentPage({ methods: ['cash'] }, { page: 1, pageSize: 1 })
+    const sumOfPage = page.payments.reduce((sum, payment) => sum + (payment.amount ?? 0), 0)
+
+    expect(total).toBe(expected)
+    // The bug this replaces: a total that followed the page.
+    expect(sumOfPage).toBeLessThan(total)
+  })
+
+  test('the sum is filtered by the same predicates as the rows', async () => {
+    await threeCashBookings()
+    await givenTransferBooking({ unitRef: '3B-04', checkIn: CHECK_IN, checkOut: CHECK_OUT })
+
+    // A total counted over a different set from the rows above it is the
+    // failure `applyPaymentFilter` exists to make impossible, so the two are
+    // asked the same question and compared.
+    const rows = await listPayments({ methods: ['cash'] })
+    const total = await sumPaymentAmounts({ methods: ['cash'] })
+
+    expect(total).toBe(rows.reduce((sum, payment) => sum + (payment.amount ?? 0), 0))
   })
 })
