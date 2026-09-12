@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Check, ChevronRight } from 'lucide-react'
+import { Check, ChevronRight, ExternalLink } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
-import { LedgerDot } from '@/components/portal/ledger-dot'
+import { LedgerMark } from '@/components/portal/ledger-mark'
 import { ExportCsvButton } from '@/components/portal/export-csv'
 import { readSearch } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
@@ -261,15 +261,17 @@ function QueueRow({ payment, mayVerify }: { payment: QueueEntry; mayVerify: bool
           payment against the booking's total — which is the confusion prd.md
           §9.1 spends a paragraph refusing.
 
-          A **dot beside the word**, not a chip containing it. Every row has a
-          ledger, so a tinted rectangle here would be colour on 100% of rows,
-          and `Repriced` and the verified tick — the two marks that actually
-          mean "look at this" — would have nothing to stand out against. The
-          ledger register is mid-hue-only for exactly that reason; see
-          ledger-dot.tsx. */}
+          A **mark beside the word**, not a chip containing it — and a glyph
+          rather than a dot, because two hues in one family cannot be told
+          apart at 6px however they are chosen (the wheel is spent; see
+          globals.css). The deposit's is the `LockKeyhole` it already wears on
+          the Money card and its own screen. Every row has a ledger, so a
+          tinted rectangle here would be colour on 100% of rows, and
+          `Repriced` and the verified tick — the two marks that actually mean
+          "look at this" — would have nothing to stand out against. */}
       <TableCell>
         <span className="flex items-center gap-sm whitespace-nowrap">
-          <LedgerDot ledger={payment.kind === 'deposit' ? 'deposit' : 'stay'} />
+          <LedgerMark ledger={payment.kind === 'deposit' ? 'deposit' : 'stay'} />
           {payment.kind === 'deposit' ? 'Security deposit' : 'Stay'}
         </span>
       </TableCell>
@@ -306,13 +308,28 @@ function QueueRow({ payment, mayVerify }: { payment: QueueEntry; mayVerify: bool
           // the same `relative z-10` the action buttons already need. A plain
           // anchor rather than next/link, because the href behind it writes an
           // audit row and a prefetch on scroll would log a view nobody made.
+          //
+          // **It has to out-signal the row it sits on.** The whole row is a
+          // link to the booking, so the pointer is already a pointer and the
+          // row is already tinted before the cursor reaches this cell —
+          // meaning the two things a link normally says for itself were being
+          // said by something else, about somewhere else. An underline alone
+          // could not tell them apart. So: the `ExternalLink` glyph, which is
+          // the same mark `document-row.tsx` puts on its Open button and the
+          // only thing on the row that says *a new tab*; a hairline underline
+          // that goes solid ink under the pointer, which is a change the row
+          // hover cannot imitate; and a `title` naming the destination,
+          // because a document that opens elsewhere should say so before it
+          // is clicked rather than after.
           <span className="relative z-10">
             <a
               href={`/portal/documents/${payment.slipDocumentId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-foreground underline underline-offset-2"
+              title="Open the transfer slip in a new tab"
+              className="inline-flex items-center gap-xs text-foreground underline decoration-muted-foreground underline-offset-2 transition-colors hover:decoration-foreground [&>svg]:text-muted-foreground [&>svg]:transition-colors hover:[&>svg]:text-foreground"
             >
+              <ExternalLink aria-hidden className="size-3.5 shrink-0" />
               On file
             </a>
           </span>
