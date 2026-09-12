@@ -2,8 +2,9 @@ import { describe, expect, test } from 'vitest'
 
 import { dataClient } from '@/lib/supabase/data'
 
-import { EXPORT_GROUPS, EXPORT_TABLES, exportGroup, exportTableById, readAllRows } from './export'
+import { EXPORT_GROUPS, EXPORT_TABLES, exportGroup, exportTableById } from './export'
 import { currentPropertyId } from './property'
+import { readAllRows } from './rows'
 import {
   givenBooking,
   givenDepartedBooking,
@@ -161,7 +162,7 @@ describe('readAllRows', () => {
           .eq('property_id', propertyId)
           .order('ref', { ascending: true })
           .range(from, to),
-      2,
+      { chunk: 2 },
     )
 
     expect(units).toHaveLength(48)
