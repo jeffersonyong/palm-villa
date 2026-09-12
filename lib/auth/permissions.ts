@@ -49,6 +49,18 @@ export const PERMISSIONS = [
   'config.manage',
   'report.view',
   'document.view_identity',
+  /**
+   * Adding, replacing, reframing and removing the photographs on the public
+   * site (capability F7).
+   *
+   * Its own string rather than `config.manage`, which prd.md §4 reused twice
+   * for screens an administrator opens a couple of times a year. This one is
+   * different in who does it: whoever runs the Instagram account refreshes the
+   * "Follow along" tiles, and `config.manage` would also hand them pricing,
+   * roles and the audit log. Seeded to Admin; any other role is one tick in
+   * Roles & staff.
+   */
+  'site_image.manage',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

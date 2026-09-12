@@ -157,7 +157,7 @@ cross join unnest(array[
   'booking.override_hold', 'booking.discount', 'payment.verify',
   'payment.record_cash', 'inspection.record', 'charge.create', 'charge.waive',
   'deposit.approve_release', 'deposit.waive', 'unit.manage', 'tenancy.manage',
-  'config.manage', 'report.view', 'document.view_identity'
+  'config.manage', 'report.view', 'document.view_identity', 'site_image.manage'
 ]) as permission
 where r.slug = 'admin';
 

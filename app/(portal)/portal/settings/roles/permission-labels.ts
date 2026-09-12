@@ -25,6 +25,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'config.manage': 'Edit settings, roles & the unit registry',
   'report.view': 'View reports',
   'document.view_identity': 'View identity documents',
+  'site_image.manage': 'Manage website photos',
 }
 
 export const PERMISSION_GROUPS: readonly { label: string; permissions: readonly Permission[] }[] = [
@@ -50,6 +51,10 @@ export const PERMISSION_GROUPS: readonly { label: string; permissions: readonly 
   {
     label: 'Property',
     permissions: ['unit.manage', 'tenancy.manage'],
+  },
+  {
+    label: 'Website',
+    permissions: ['site_image.manage'],
   },
   {
     label: 'Administration',
