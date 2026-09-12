@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Check, ChevronRight } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { LedgerDot } from '@/components/portal/ledger-dot'
 import { ExportCsvButton } from '@/components/portal/export-csv'
 import { readSearch } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
@@ -258,12 +259,19 @@ function QueueRow({ payment, mayVerify }: { payment: QueueEntry; mayVerify: bool
       <TableCell className="text-foreground">{payment.guestName}</TableCell>
       {/* Said on every row, because the figure alone would read as a short
           payment against the booking's total — which is the confusion prd.md
-          §9.1 spends a paragraph refusing. `neutral` on both: this is a kind,
-          not a status, and design.md reserves the semantic tones for status.
-          Two badges rather than one and a blank, so the column reads as a
-          column. */}
+          §9.1 spends a paragraph refusing.
+
+          A **dot beside the word**, not a chip containing it. Every row has a
+          ledger, so a tinted rectangle here would be colour on 100% of rows,
+          and `Repriced` and the verified tick — the two marks that actually
+          mean "look at this" — would have nothing to stand out against. The
+          ledger register is mid-hue-only for exactly that reason; see
+          ledger-dot.tsx. */}
       <TableCell>
-        <Badge tone="neutral">{payment.kind === 'deposit' ? 'Security deposit' : 'Stay'}</Badge>
+        <span className="flex items-center gap-sm whitespace-nowrap">
+          <LedgerDot ledger={payment.kind === 'deposit' ? 'deposit' : 'stay'} />
+          {payment.kind === 'deposit' ? 'Security deposit' : 'Stay'}
+        </span>
       </TableCell>
       <TableCell>{payment.arriving ? formatStayDate(payment.arriving) : '—'}</TableCell>
       <TableCell className="text-right tabular-nums">

@@ -112,9 +112,14 @@ export function DepositActions({
    * Which screen the control is standing on, which decides its shape and its
    * label. The dialog behind it never changes.
    *
-   * `queue` is the payments row's action cell — right-aligned, and named with
-   * the noun because the row beside it is one of two kinds. The other two are
-   * screens about this deposit and nothing else, so there the noun is already
+   * `queue` is the payments row's action cell — right-aligned, and simply
+   * *Confirm*, the same word the row above and below it carries. It used to
+   * name the noun, because the row beside it is one of two kinds and nothing
+   * else said which; the `For` column says it now, in a word and a colour, so
+   * repeating it in the button was the row saying "deposit" twice and giving
+   * the two kinds of row buttons of different widths. The other two
+   * placements are screens about this deposit and nothing else, so there the
+   * noun is already
    * said by everything around the button and the open question is the
    * transfer: `panel` is the booking's deposit inset, where it is full width
    * and the primary of two stacked actions; `section` is the deposit's own
@@ -129,7 +134,7 @@ export function DepositActions({
       className={placement === 'panel' ? 'mt-lg w-full' : undefined}
       onClick={() => setOpen(true)}
     >
-      {placement === 'queue' ? 'Confirm deposit' : 'Confirm the transfer'}
+      {placement === 'queue' ? 'Confirm' : 'Confirm the transfer'}
     </Button>
   )
 
@@ -212,7 +217,9 @@ const COPY = {
     description:
       'The money for the stay. Check the amount against your bank app before confirming — the slip a guest sends is evidence, not verification.',
     expected: 'Expected',
-    submit: 'Confirm payment',
+    // The dialog's own title says which of the two this is, so the button
+    // states the act rather than repeating the subject.
+    submit: 'Confirm',
     noun: 'payment',
   },
   deposit: {
@@ -222,7 +229,7 @@ const COPY = {
     description:
       'The security deposit that secures this booking. Confirming it puts the money on the deposit ledger and confirms the booking. What the stay owes is unchanged by it.',
     expected: 'Quoted',
-    submit: 'Confirm deposit',
+    submit: 'Confirm',
     noun: 'deposit',
   },
 } as const

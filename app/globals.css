@@ -199,6 +199,38 @@
   --color-stream-day-pass: #f97316;
   --color-stream-tenancy: #c026d3;
 
+  /* Ledger — says *which book the money lands in*: revenue the property has
+     earned, or a liability it owes back (prd.md §11). The fourth register, and
+     the narrowest: two values, on the payment verification queue.
+
+     It exists because that screen holds two kinds of row and the difference
+     decides what confirming one does to the booking — and because the word
+     alone was doing all the work. Built to Stream's construction exactly, and
+     for Stream's reason: **mid hues only, so there is no token to build a
+     ledger badge out of.** A status is a chip containing a word; a ledger mark
+     is a dot beside one. The queue already carries `Repriced` in warning and a
+     tick in positive, and those are the two things on the row that mean "look
+     at this" — a third and fourth tinted rectangle on every row would be the
+     wall of colour §Color forbids, and the `available`-is-neutral decision
+     records what that costs.
+
+     Blue and violet were asked for by name and both sit well clear of the arcs
+     status spends — positive green, warning amber, negative red, brand aqua.
+     The near-miss to watch is `stream-short-stay` at indigo ≈277°, thirteen
+     degrees off `ledger-stay`: the two do not meet on any screen today,
+     because the queue carries no Type column and the bookings list carries no
+     ledger mark. That is the thing to look at if this ever reads wrong, and
+     the fix then is to cool `ledger-stay` towards sky rather than to tint it.
+
+     `info` is the other blue in the system and never collides: it fills a
+     notice panel and is never a dot, which is the same separation-by-form the
+     Stream section rests `short-stay` on.
+
+     Identical in both themes, like every semantic mid: a dot carries no text,
+     so it needs presence rather than contrast. */
+  --color-ledger-stay: #2563eb;
+  --color-ledger-deposit: #7c3aed;
+
   /* Type — Geist carries every surface; hierarchy is size, weight
      (400/500/600, plus 700 on the two display headline sizes) and negative
      tracking at display sizes. `micro-label` (a custom utility below) is the
