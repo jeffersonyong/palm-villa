@@ -1,3 +1,5 @@
+import { cache } from 'react'
+
 import type { User } from '@supabase/supabase-js'
 
 import { recordAuditEvent } from '@/lib/db/audit'
@@ -65,29 +67,41 @@ function toStaffAccount(user: User, roles: readonly StaffRoleSummary[]): StaffAc
  * One page of 200: the venue employs a handful of people, and an admin screen
  * that silently truncates at a limit nobody will reach is simpler than one
  * that pages.
+ *
+ * **Memoised per request**, and the only thing in `lib/db` that is. Nine
+ * screens read this to turn an actor id into a name, the CSV export reads it
+ * twice in one response (once to count, once for the rows), and none of them
+ * can change it while they render. `cache()` is request-scoped machinery in a
+ * layer that otherwise refuses it — the query layer has to run in Vitest,
+ * where there is no request — so this is deliberate rather than incidental:
+ * outside a request React's `cache` is a passthrough that simply does not
+ * dedupe, which is exactly the old behaviour. No mutation path reads the
+ * roster before and after its own write, so there is nothing here to go
+ * stale within one request.
  */
-export async function listStaff(): Promise<readonly StaffAccount[]> {
+export const listStaff = cache(async (): Promise<readonly StaffAccount[]> => {
   const propertyId = await currentPropertyId()
 
-  const { data: userData, error: userError } = await dataClient().auth.admin.listUsers({
-    page: 1,
-    perPage: 200,
-  })
+  // Three reads, none of which depends on another's answer, so they go out
+  // together. They were awaited one after the next, and the first of them is
+  // an HTTPS call to GoTrue rather than a query — so the roster was the
+  // longest leg of every screen that shows who did something, and there are
+  // nine of them.
+  const [{ data: userData, error: userError }, { data: grantRows, error: grantError }, roles] =
+    await Promise.all([
+      dataClient().auth.admin.listUsers({ page: 1, perPage: 200 }),
+      dataClient().from('user_role').select('user_id, role_id').eq('property_id', propertyId),
+      listRoles(),
+    ])
 
   if (userError) {
     throw new Error(`Could not list staff accounts: ${userError.message}`)
   }
 
-  const { data: grantRows, error: grantError } = await dataClient()
-    .from('user_role')
-    .select('user_id, role_id')
-    .eq('property_id', propertyId)
-
   if (grantError) {
     throw new Error(`Could not read role grants: ${grantError.message}`)
   }
 
-  const roles = await listRoles()
   const rolesById = new Map(roles.map((role) => [role.id, role]))
   const roleIdsByUser = new Map<string, string[]>()
 
@@ -108,7 +122,7 @@ export async function listStaff(): Promise<readonly StaffAccount[]> {
       ),
     )
     .sort((a, b) => a.displayName.localeCompare(b.displayName))
-}
+})
 
 async function listRoles(): Promise<readonly StaffRoleSummary[]> {
   const propertyId = await currentPropertyId()
