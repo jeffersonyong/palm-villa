@@ -5,20 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { StayRangeField } from '@/components/ui/stay-range-field'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getActor } from '@/lib/auth/require-permission'
 import { countAvailableByType, findAvailableUnits } from '@/lib/db/bookings'
 import { getUnitCounts } from '@/lib/db/inventory'
 import { getPropertyConfig } from '@/lib/db/property-config'
 import { addDays, isStayDate, todayInBrunei } from '@/lib/domain/dates'
-import { formatCents } from '@/lib/domain/money'
 
 import { NewBookingScreen } from './new-booking-screen'
 
@@ -44,9 +36,6 @@ export const metadata: Metadata = {
  * a check-in, or one half filled in.
  */
 
-/** The "no unit type filter" option's value. See the select below. */
-const ANY_UNIT_TYPE = 'any'
-
 interface PageProps {
   searchParams: Promise<{ from?: string; to?: string; type?: string; unit?: string }>
 }
@@ -69,13 +58,29 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
   const checkIn = hasDates ? range.start : ''
   const checkOut = hasDates ? range.end : ''
 
+  /*
+   * The unit type the calendar was pointing at, when it sent us here.
+   *
+   * It no longer narrows this query. Until 19 September 2026 it did, and the
+   * control that set it was a `<select>` inside the availability form — so
+   * changing it changed nothing until somebody also pressed *Check
+   * availability*, and a clerk who changed the type and went straight on
+   * filling in the form was filling in a form about the old one. The stale
+   * state was invisible and the booking it produced was wrong.
+   *
+   * Narrowing is a question about a list already in hand, so it belongs to the
+   * form: this reads every unit free for the dates and the island filters them
+   * as the clerk chooses. Changing the type now reprices instantly and cannot
+   * be out of step, and — the part the round trip could never offer — the
+   * guest's name and number survive it, because nothing navigates.
+   */
   const unitTypeId =
     params.type && config.unitTypes.some((type) => type.id === params.type)
       ? params.type
       : undefined
 
   const availableUnits = hasDates
-    ? await findAvailableUnits({ range: { start: checkIn, end: checkOut }, unitTypeId })
+    ? await findAvailableUnits({ range: { start: checkIn, end: checkOut } })
     : []
 
   /*
@@ -184,26 +189,10 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
             />
           </div>
 
-          <div className="grid gap-sm">
-            <Label htmlFor="type">Unit type</Label>
-            {/* `ANY_UNIT_TYPE` rather than an empty value: a select option must
-              carry a non-empty value, and the page already treats an
-              unrecognised `type` as "no filter", so the sentinel never reaches
-              the query. */}
-            <Select name="type" defaultValue={unitTypeId ?? ANY_UNIT_TYPE}>
-              <SelectTrigger id="type" className="w-[264px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ANY_UNIT_TYPE}>Any type</SelectItem>
-                {config.unitTypes.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.name} — BND {formatCents(type.baseRatePerNight)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* The type it deep-linked with, carried back out so the URL is
+              still the whole state of the screen and the calendar's link
+              still lands on the type it named. */}
+          {unitTypeId ? <input type="hidden" name="type" value={unitTypeId} /> : null}
 
           <Button type="submit" variant="tertiary">
             Check availability
@@ -245,6 +234,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
         <NewBookingScreen
           chrome={chrome}
           units={availableUnits}
+          preferredUnitTypeId={unitTypeId}
           preferredUnitId={preferredUnitId}
           config={config}
           checkIn={checkIn}
@@ -268,8 +258,7 @@ export default async function NewBookingPage({ searchParams }: PageProps) {
               nested scale, which read as a control that had grown. */}
           <Card surface="inset" placement="page">
             <p className="text-body-md text-copy">
-              Nothing free for those dates{unitTypeId ? ' in that unit type' : ''}. Try different
-              dates, or widen the unit type.
+              Nothing free for those dates. Try different dates.
             </p>
           </Card>
         </section>

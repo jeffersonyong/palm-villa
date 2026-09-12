@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Check, ChevronRight } from 'lucide-react'
+import { Check, ChevronRight, ExternalLink } from 'lucide-react'
 
 import { EmptyState } from '@/components/portal/empty-state'
+import { LedgerMark } from '@/components/portal/ledger-mark'
 import { ExportCsvButton } from '@/components/portal/export-csv'
 import { readSearch } from '@/components/portal/list-params'
 import { PageHeader } from '@/components/portal/page-header'
@@ -36,11 +37,19 @@ export const metadata: Metadata = {
 }
 
 /**
- * The payment verification queue (capabilities B4, B5, B6).
+ * The payment verification queue (capabilities B4, B5, B6, B16).
+ *
+ * **One action per row, since 19 September 2026.** The escape hatch B6 asks
+ * for is inside the confirm dialog now rather than beside it — see
+ * payment-actions.tsx for why a second button was the wrong shape for it.
  *
  * prd.md §10.4 fixes what a row shows: "reference, guest name, amount
  * expected, time waiting, and the uploaded slip". Those are the columns, in
- * that order.
+ * that order, plus one the PRD could not have asked for: **what the money is
+ * for**. §10.4 was written before a booking was secured by its deposit (N29,
+ * 10 September 2026), so the queue it describes held one kind of row. It holds
+ * two now, and which one a row is decides what confirming it does to the
+ * booking — so the distinction is a column rather than a caption.
  *
  * Every bank transfer, the waiting ones first and the longest wait at the
  * top — a queue is worked from the top, which is the opposite of every other
@@ -167,6 +176,12 @@ export default async function PaymentVerificationPage({ searchParams }: PageProp
               <TableHeaderRow>
                 <TableHead>Reference</TableHead>
                 <TableHead>Guest</TableHead>
+                {/* Which of the two kinds of money this row is. It was a gray
+                    caption under the guest's name, which is where a scanning
+                    eye does not go — and the difference decides what
+                    confirming the row does to the booking, so it belongs in a
+                    column that can be read down. */}
+                <TableHead>For</TableHead>
                 <TableHead>Arriving</TableHead>
                 {/* prd.md §10.4 names this column "amount expected", and that
                     is exactly what it is while a payment is waiting. Once one
@@ -241,14 +256,24 @@ function QueueRow({ payment, mayVerify }: { payment: QueueEntry; mayVerify: bool
           {payment.bookingReference}
         </TableRowLink>
       </TableCell>
-      <TableCell className="text-foreground">
-        {payment.guestName}
-        {payment.kind === 'deposit' ? (
-          // Said on the row, because the figure alone would read as a short
-          // payment against the booking's total — which is the confusion
-          // prd.md §9.1 spends a paragraph refusing.
-          <span className="mt-xxs block text-caption text-muted-foreground">Security deposit</span>
-        ) : null}
+      <TableCell className="text-foreground">{payment.guestName}</TableCell>
+      {/* Said on every row, because the figure alone would read as a short
+          payment against the booking's total — which is the confusion prd.md
+          §9.1 spends a paragraph refusing.
+
+          A **mark beside the word**, not a chip containing it — and a glyph
+          rather than a dot, because two hues in one family cannot be told
+          apart at 6px however they are chosen (the wheel is spent; see
+          globals.css). The deposit's is the `LockKeyhole` it already wears on
+          the Money card and its own screen. Every row has a ledger, so a
+          tinted rectangle here would be colour on 100% of rows, and
+          `Repriced` and the verified tick — the two marks that actually mean
+          "look at this" — would have nothing to stand out against. */}
+      <TableCell>
+        <span className="flex items-center gap-sm whitespace-nowrap">
+          <LedgerMark ledger={payment.kind === 'deposit' ? 'deposit' : 'stay'} />
+          {payment.kind === 'deposit' ? 'Security deposit' : 'Stay'}
+        </span>
       </TableCell>
       <TableCell>{payment.arriving ? formatStayDate(payment.arriving) : '—'}</TableCell>
       <TableCell className="text-right tabular-nums">
@@ -283,14 +308,31 @@ function QueueRow({ payment, mayVerify }: { payment: QueueEntry; mayVerify: bool
           // the same `relative z-10` the action buttons already need. A plain
           // anchor rather than next/link, because the href behind it writes an
           // audit row and a prefetch on scroll would log a view nobody made.
+          //
+          // **It has to out-signal the row it sits on.** The whole row is a
+          // link to the booking, so the pointer is already a pointer and the
+          // row is already tinted before the cursor reaches this cell —
+          // meaning the two things a link normally says for itself were being
+          // said by something else, about somewhere else. An underline alone
+          // could not tell them apart. So: the `ExternalLink` glyph, which is
+          // the same mark `document-row.tsx` puts on its Open button and the
+          // only thing on the row that says *a new tab* — trailing the label,
+          // where a destination mark belongs, so the column still reads down
+          // its words rather than down a rail of glyphs; a hairline underline
+          // that goes solid ink under the pointer, which is a change the row
+          // hover cannot imitate; and a `title` naming the destination,
+          // because a document that opens elsewhere should say so before it
+          // is clicked rather than after.
           <span className="relative z-10">
             <a
               href={`/portal/documents/${payment.slipDocumentId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-foreground underline underline-offset-2"
+              title="Open the transfer slip in a new tab"
+              className="inline-flex items-center gap-xs text-foreground underline decoration-muted-foreground underline-offset-2 transition-colors hover:decoration-foreground [&>svg]:text-muted-foreground [&>svg]:transition-colors hover:[&>svg]:text-foreground"
             >
               On file
+              <ExternalLink aria-hidden className="size-3.5 shrink-0" />
             </a>
           </span>
         ) : (

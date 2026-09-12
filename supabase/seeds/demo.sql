@@ -172,8 +172,11 @@ begin
     -- rule runs: the deposit's row is what confirms the booking (prd.md
     -- §9.1), so verify_deposit() carries the status pair, and the stay's row
     -- is then a settlement against a booking already confirmed. The full
-    -- amount matched on reference, so no override reason is needed, and
-    -- `observed_on` is the day the money would have shown in the bank.
+    -- amount matched on reference, so no override reason and no note are
+    -- needed, and `observed_on` is the day the money would have shown in the
+    -- bank. The match kind is passed explicitly here because this is the
+    -- function's own signature; in the app it is derived from whether a
+    -- reference was recorded (20260919000100).
     if spec.payment_method = 'bank_transfer' and spec.settles_at = 'confirmed' then
       perform verify_deposit(
         v_property_id,
@@ -181,6 +184,7 @@ begin
         'awaiting_payment_verification',
         'confirmed',
         10000,
+        'reference',
         p_observed_reference => v_result ->> 'reference',
         p_observed_on => v_check_in,
         p_actor_id => null

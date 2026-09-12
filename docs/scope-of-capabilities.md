@@ -101,7 +101,7 @@ Everyone works from the same live data, so availability, payments, and booking s
 | B3 | Amend and cancel bookings, with every change recorded (who, what, when) |
 | B4 | Work a payment verification queue: each pending booking shows reference, guest, amount expected, waiting time, and the uploaded slip |
 | B5 | Confirm payments by matching **both** reference and amount — a short payment is flagged, never silently accepted |
-| B6 | Manually match a transfer to a booking when a customer forgets the reference |
+| B6 | Manually match a transfer to a booking when a customer forgets the reference. **Simplified 19 September 2026:** this is no longer a second button beside *Confirm* — it is the confirm dialog itself. Clearing the reference field is how staff say the bank showed none, which makes the dialog's optional note required and records the row as matched by hand. One door instead of two, for the same trail, and it now covers a **security deposit** as well as a payment for the stay — the deposit had no manual match at all until this. |
 | B7 | Record cash payments against a booking: who collected, when, how much |
 | B8 | See each unit's live status through its full lifecycle: available → held → booked → occupied → awaiting inspection → cleaning → available |
 | B9 | Mark units out of service, or as leased long-term, so availability always reflects reality |

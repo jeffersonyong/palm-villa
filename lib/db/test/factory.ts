@@ -186,6 +186,7 @@ export async function givenConfirmedTransferBooking(
     const verified = await verifyDeposit({
       depositId: deposit.id,
       observedAmount: deposit.amount,
+      match: 'reference',
       actorId: null,
     })
 

@@ -199,6 +199,55 @@
   --color-stream-day-pass: #f97316;
   --color-stream-tenancy: #c026d3;
 
+  /* Ledger — says *which book the money lands in*: revenue the property has
+     earned, or a liability it owes back (prd.md §11). The fourth register, and
+     the narrowest: two values, on the payment verification queue.
+
+     It exists because that screen holds two kinds of row and the difference
+     decides what confirming one does to the booking — and because the word
+     alone was doing all the work. Built to Stream's construction exactly, and
+     for Stream's reason: **mid hues only, so there is no token to build a
+     ledger badge out of.** A status is a chip containing a word; a ledger mark
+     is a dot beside one. The queue already carries `Repriced` in warning and a
+     tick in positive, and those are the two things on the row that mean "look
+     at this" — a third and fourth tinted rectangle on every row would be the
+     wall of colour §Color forbids, and the `available`-is-neutral decision
+     records what that costs.
+
+     **Colour reinforces here; it does not carry.** The mark is a glyph — a bed
+     for the stay, the ledger's own `LockKeyhole` for the deposit — and shape
+     is what makes the two unmistakable at a glance. That is deliberate, and it
+     is what let this pair be chosen for *legibility in both themes* rather
+     than for maximum separation, which is the trade the first attempt got
+     backwards: blue and violet at 263°/293° differed by 30° of hue and **no
+     lightness at all**, so they read as two blue-ish points.
+
+     The wheel is spent, and that is the constraint worth writing down. Every
+     hue far enough from blue to be obviously different borders a hue status
+     already owns — rose lands 9° off `negative`, lime 18° off `positive` —
+     and a red-ish or green-ish point on this screen would say *alert* or
+     *done* about a row that is neither. So the pair separates on hue **and**
+     lightness within the blue–purple family instead: 41° and 8 points, where
+     it was 41° and 0.
+
+     Pushing lightness further breaks a theme. `#c084fc` holds 6.4:1 on the
+     ink card and only 2.64:1 on the white one; `#1d4ed8` is the mirror, 6.7:1
+     on white and 2.54:1 on ink. Both of those are the widest pair available
+     and both vanish on one surface, which a mid that must be identical in
+     both themes cannot do. These two clear 3.2:1 on either card.
+
+     Near-misses, in the order they would show up: `stream-short-stay` at
+     indigo ≈277° sits 14° off `ledger-stay` and 27° off `ledger-deposit`;
+     `stream-tenancy` at ≈323° sits 19° off `ledger-deposit`. None of the three
+     meet today — the queue carries no Type column, the bookings list no ledger
+     mark — and the glyph is what makes that survivable if one ever does.
+
+     `info` is the system's other blue and never collides: it fills a notice
+     panel and is never a mark, the same separation-by-form the Stream section
+     rests `short-stay` on. */
+  --color-ledger-stay: #2563eb;
+  --color-ledger-deposit: #a855f7;
+
   /* Type — Geist carries every surface; hierarchy is size, weight
      (400/500/600, plus 700 on the two display headline sizes) and negative
      tracking at display sizes. `micro-label` (a custom utility below) is the
