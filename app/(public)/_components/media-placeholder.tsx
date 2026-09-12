@@ -3,17 +3,17 @@ import { Image as ImageIcon, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
- * A labelled image slot standing in for photography we do not have yet.
+ * A labelled image slot standing in for a photograph nobody has uploaded yet.
  *
- * The aspect-ratio wrapper is the layout contract: when real photos arrive,
- * add `src`/`alt` props and render `next/image` with `fill` inside this same
- * wrapper. Consumers do not change and nothing shifts, because the box is
- * reserved before any image loads.
+ * The aspect-ratio wrapper is the layout contract. A place with a photograph
+ * renders through `SiteMedia` inside the same wrapper, so nothing shifts when
+ * staff add one or take one down (capability F7) — the box is reserved before
+ * any image loads.
  */
 
-type MediaAspect = 'video' | 'photo' | 'square' | 'portrait'
+export type MediaAspect = 'video' | 'photo' | 'square' | 'portrait'
 
-const aspectClasses: Record<MediaAspect, string> = {
+export const mediaAspectClasses: Record<MediaAspect, string> = {
   video: 'aspect-video',
   photo: 'aspect-[4/3]',
   square: 'aspect-square',
@@ -39,7 +39,7 @@ export function MediaPlaceholder({
       aria-hidden
       className={cn(
         'relative overflow-hidden rounded-md border border-divider bg-muted',
-        aspectClasses[aspect],
+        mediaAspectClasses[aspect],
         className,
       )}
     >

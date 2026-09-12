@@ -1,5 +1,32 @@
 import type { NextConfig } from 'next'
 
+/**
+ * Where the site's photographs are served from (capability F7).
+ *
+ * Read straight from the environment and never allowed to throw: this file is
+ * loaded without the `@/` alias, so lib/env.ts — which throws on a missing
+ * variable by design — is not reachable here, and a config that crashed would
+ * take the whole build down over a missing photo host. With no Supabase URL the
+ * list is empty, the optimiser refuses every photograph, and the landing page
+ * still renders its placeholders.
+ */
+function storageOrigin(value: string | undefined): URL | null {
+  if (!value) {
+    return null
+  }
+
+  try {
+    return new URL(value)
+  } catch {
+    return null
+  }
+}
+
+const supabase = storageOrigin(process.env.NEXT_PUBLIC_SUPABASE_URL)
+
+/** The local Supabase stack's addresses. Production's `*.supabase.co` is none of these. */
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   typedRoutes: true,
@@ -7,6 +34,39 @@ const nextConfig: NextConfig = {
   // CLAUDE.md is a hand-authored normative doc here (see its "Documentation
   // practices" section), so the tool does not get to edit it.
   agentRules: false,
+  images: {
+    /**
+     * The public `site-images` bucket and nothing else. The optimiser fetches
+     * from exactly this path on exactly this host, so it cannot be pointed at a
+     * private bucket, or at anywhere else on the internet, through a crafted
+     * `/_next/image` URL.
+     */
+    remotePatterns: supabase
+      ? [
+          {
+            protocol: supabase.protocol === 'http:' ? 'http' : 'https',
+            hostname: supabase.hostname,
+            port: supabase.port,
+            pathname: '/storage/v1/object/public/site-images/**',
+            search: '',
+          },
+        ]
+      : [],
+    /**
+     * The local Supabase stack answers on a loopback address, which Next 16
+     * refuses to optimise from by default — anywhere else, a loopback source is
+     * a path into a private network. Allowed only when the photo host itself is
+     * loopback: true for `npm run dev` against the local stack, false in every
+     * deployed environment.
+     */
+    dangerouslyAllowLocalIP: supabase !== null && LOOPBACK_HOSTS.has(supabase.hostname),
+    /**
+     * A day, matching the Cache-Control every photograph is uploaded with
+     * (lib/db/site-images.ts). Keys are never reused, so this never delays a
+     * new photograph; it bounds how long a removed one can still be fetched.
+     */
+    minimumCacheTTL: 86400,
+  },
   experimental: {
     serverActions: {
       /**

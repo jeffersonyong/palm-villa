@@ -2,9 +2,13 @@ import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import type { LandingImage } from '@/lib/domain/landing-images'
 
 import { pricingCopy, unitTypes } from '../_content/landing'
-import { MediaPlaceholder } from './media-placeholder'
+import { SiteMedia } from './site-media'
+
+/** A quarter of the container from `lg`, half from `md`, the full width below. */
+const UNIT_TYPE_SIZES = '(min-width: 1024px) 268px, (min-width: 768px) 50vw, 100vw'
 
 /**
  * "From" rates only — the grid is a scannable teaser, so each card carries
@@ -13,9 +17,10 @@ import { MediaPlaceholder } from './media-placeholder'
  * once on /stay (see `pendingStayDetails`).
  *
  * Cards link to /stay, which is also where the section CTA goes; in Phase 2
- * they become per-unit routes on the existing `slug`.
+ * they become per-unit routes on the existing `slug` — the same slug each
+ * card's photograph is found by (capability F7).
  */
-export function StaysSection() {
+export function StaysSection({ images }: { images: Readonly<Record<string, LandingImage>> }) {
   return (
     <section
       aria-labelledby="stays-heading"
@@ -43,7 +48,11 @@ export function StaysSection() {
                 className="block h-full rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 <Card className="flex h-full card-interactive flex-col hover:border-foreground/20">
-                  <MediaPlaceholder label={unit.imageLabel} />
+                  <SiteMedia
+                    image={images[unit.slug] ?? null}
+                    sizes={UNIT_TYPE_SIZES}
+                    label={unit.imageLabel}
+                  />
                   <h3 className="mt-lg text-display-xs text-foreground">{unit.name}</h3>
                   <p className="mt-xs text-body-sm text-copy">{unit.description}</p>
                   {/* Pushed to the card foot so rates line up across the row

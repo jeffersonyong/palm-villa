@@ -2,9 +2,13 @@ import Link from 'next/link'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import type { LandingImage } from '@/lib/domain/landing-images'
 
 import { facilities, pricingCopy } from '../_content/landing'
-import { MediaPlaceholder } from './media-placeholder'
+import { SiteMedia } from './site-media'
+
+/** A third of the container from `lg`, half from `md`, the full width below. */
+const FACILITY_SIZES = '(min-width: 1024px) 363px, (min-width: 768px) 50vw, 100vw'
 
 /**
  * Only the three facilities confirmed as day-pass inclusions appear here.
@@ -13,8 +17,11 @@ import { MediaPlaceholder } from './media-placeholder'
  *
  * The grid is three identical hairline cards — colour is not a card treatment
  * (design.md §Cards). The aqua moment here is the price line's text.
+ *
+ * Each card's photograph is found by the facility's slug (capability F7), so a
+ * rename in Property settings keeps it.
  */
-export function DayPassSection() {
+export function DayPassSection({ images }: { images: Readonly<Record<string, LandingImage>> }) {
   return (
     <section
       aria-labelledby="day-pass-heading"
@@ -35,9 +42,14 @@ export function DayPassSection() {
 
         <ul className="mt-2xl grid gap-lg md:grid-cols-2 lg:grid-cols-3">
           {facilities.map((facility) => (
-            <li key={facility.name}>
+            <li key={facility.slug}>
               <Card className="h-full card-interactive hover:border-foreground/20">
-                <MediaPlaceholder label={facility.imageLabel} icon={facility.icon} />
+                <SiteMedia
+                  image={images[facility.slug] ?? null}
+                  sizes={FACILITY_SIZES}
+                  label={facility.imageLabel}
+                  icon={facility.icon}
+                />
                 <h3 className="mt-lg text-display-xs text-foreground">{facility.name}</h3>
                 <p className="mt-xs text-body-md text-copy">{facility.description}</p>
               </Card>
