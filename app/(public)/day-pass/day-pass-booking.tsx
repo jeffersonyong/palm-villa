@@ -115,6 +115,19 @@ export function DayPassBooking({
                   />
                 </div>
 
+                {/* The server checks the day against the window this calendar
+                    was built from, and until now that refusal arrived as a red
+                    outline and nothing else — the field carried the error but
+                    never said it. The one way a customer meets it honestly is
+                    leaving the page open past midnight, when "today" moves
+                    under them, and "pick another day" is no use without the
+                    reason. Same shape as the party error below. */}
+                {state.fieldErrors?.passDate ? (
+                  <p role="alert" className="mt-sm text-body-sm text-negative-text">
+                    {state.fieldErrors.passDate}
+                  </p>
+                ) : null}
+
                 {included.length > 0 ? (
                   <Notice placement="nested" className="mt-lg">
                     <p className="text-body-sm">
