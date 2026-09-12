@@ -4,7 +4,9 @@ import { palmVillaConfig } from './config'
 import {
   bindingCapacity,
   bindingFacility,
+  DAY_PASS_PARTY_MESSAGES,
   hasRoomFor,
+  MAX_GUESTS_PER_BAND,
   partyFromCounts,
   placesLeft,
   type FacilityHeadroom,
@@ -222,5 +224,36 @@ describe('the party on a pass', () => {
       ok: false,
       error: 'negative_quantity',
     })
+  })
+
+  test('refuses a count past the ceiling the form itself applies', () => {
+    // The date control and the count fields are guide rails for a customer,
+    // not a gate: a hand-made POST reached the writer with whatever it liked.
+    // `1e6` is an integer, so every other check here passed it, and a held
+    // pass for a hundred thousand heads fills a capacity the day one is set.
+    expect(partyFromCounts({ [adult!.id]: MAX_GUESTS_PER_BAND + 1 }, palmVillaConfig)).toEqual({
+      ok: false,
+      error: 'too_many_guests',
+    })
+    expect(partyFromCounts({ [adult!.id]: 1e6 }, palmVillaConfig)).toEqual({
+      ok: false,
+      error: 'too_many_guests',
+    })
+  })
+
+  test('admits a party exactly at the ceiling', () => {
+    const result = partyFromCounts({ [adult!.id]: MAX_GUESTS_PER_BAND }, palmVillaConfig)
+
+    expect(result.ok).toBe(true)
+    expect(result.ok && result.headcount).toBe(MAX_GUESTS_PER_BAND)
+  })
+
+  test('has a sentence for every refusal it can return', () => {
+    // The action indexes DAY_PASS_PARTY_MESSAGES by the error it got back, so
+    // a new member of the union with no message renders `undefined` at a
+    // customer.
+    for (const error of ['unknown_age_band', 'no_guests', 'negative_quantity', 'too_many_guests']) {
+      expect(DAY_PASS_PARTY_MESSAGES[error as keyof typeof DAY_PASS_PARTY_MESSAGES]).toBeTruthy()
+    }
   })
 })

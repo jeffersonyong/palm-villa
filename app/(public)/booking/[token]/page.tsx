@@ -62,12 +62,15 @@ export default async function BookingPage({ params }: { params: Promise<{ token:
 
   const stage = publicStageOf(booking.status)
   const plan = transferPlanFor(booking)
-  const [settings, deposit, slips, identityDocuments] = await Promise.all([
+  // Both kinds in one read: they were two requests differing in one filter.
+  const [settings, deposit, documents] = await Promise.all([
     readPropertySettings(),
     getDepositByBookingId(booking.id),
-    listDocumentsForBooking(booking.id, 'payment_slip'),
-    listDocumentsForBooking(booking.id, 'identity'),
+    listDocumentsForBooking(booking.id, ['payment_slip', 'identity']),
   ])
+
+  const slips = documents.filter((document) => document.kind === 'payment_slip')
+  const identityDocuments = documents.filter((document) => document.kind === 'identity')
   const chip = chipFor(stage)
 
   // Somebody has looked at the bank and what arrived was less than the

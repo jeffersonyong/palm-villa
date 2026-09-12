@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 
+import { normalisePhoneForMatch } from '@/lib/domain/phone'
+
 /**
  * The randomness the public flow runs on.
  *
@@ -49,6 +51,30 @@ export function newAccessToken(): string {
  */
 export function hashPublicKey(value: string): string {
   return createHash('sha256').update(value.trim().toLowerCase()).digest('hex')
+}
+
+/**
+ * The counter key for a phone number.
+ *
+ * **The number is reduced to its comparable digits first**, so `8959798`,
+ * `+673 8959798` and `673-8959798` are one caller rather than three. Hashing
+ * the raw text instead made every per-phone limit one space bar away from
+ * being bypassed — the schema accepts any 5–40 characters, so the same number
+ * can be written a dozen ways and each one opened a fresh allowance.
+ *
+ * `normalisePhoneForMatch` is the same reduction the lookup already compares
+ * with (`phonesMatch`), which is the point: the rule a customer meets when
+ * they find their booking and the rule they meet when they make one should not
+ * disagree about what "the same number" is.
+ *
+ * A value too short to be a number at all normalises to `null`, and keys on
+ * its own raw text instead. That is deliberate. Junk is not a number two
+ * people could write differently, so collapsing every junk value into one
+ * shared bucket would buy nothing and would let one caller exhaust the
+ * allowance for everybody who mistyped.
+ */
+export function hashPhoneKey(raw: string): string {
+  return hashPublicKey(normalisePhoneForMatch(raw) ?? raw)
 }
 
 /**

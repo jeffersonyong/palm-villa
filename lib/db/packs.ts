@@ -7,7 +7,7 @@ import { getBookingById } from './bookings'
 import { attachDocument, listDocumentsForBooking, purge, readDocumentBytes } from './documents'
 import { listPaymentsForBooking } from './payments'
 import { currentPropertyId } from './property'
-import { listStaff } from './staff'
+import { listStaff, type StaffAccount } from './staff'
 
 /**
  * Assembling accounting packs (capability G5, architecture.md §8.2).
@@ -57,6 +57,14 @@ export type AssemblePackRefusal =
 
 export async function assembleAccountingPack(input: {
   bookingId: string
+  /**
+   * The staff roster, when the caller already holds one.
+   *
+   * Only `runPackAssembly` passes it, and only because it assembles up to 25
+   * packs in a row against a roster that cannot change between them — see the
+   * note there. Every other caller omits it and reads its own.
+   */
+  staff?: readonly StaffAccount[]
 }): Promise<AssemblePackResult> {
   // Before any read, and from the database's clock rather than this
   // function's. Every timestamp the due-list compares it against was written
@@ -71,12 +79,16 @@ export async function assembleAccountingPack(input: {
     return { ok: false, reason: 'booking_missing', message: 'That booking no longer exists.' }
   }
 
-  const [payments, identityDocuments, slips, staff] = await Promise.all([
+  const [payments, documents, staff] = await Promise.all([
     listPaymentsForBooking(booking.id),
-    listDocumentsForBooking(booking.id, 'identity'),
-    listDocumentsForBooking(booking.id, 'payment_slip'),
-    listStaff(),
+    // Both kinds in one read rather than two requests differing in one filter.
+    // A night's run does this 25 times.
+    listDocumentsForBooking(booking.id, ['identity', 'payment_slip']),
+    input.staff ?? listStaff(),
   ])
+
+  const identityDocuments = documents.filter((document) => document.kind === 'identity')
+  const slips = documents.filter((document) => document.kind === 'payment_slip')
 
   if (!payments.some((payment) => payment.status === 'verified')) {
     return {
@@ -241,9 +253,21 @@ export async function runPackAssembly(options: { limit?: number } = {}): Promise
   const due = await listBookingsDueAccountingPack(options.limit ?? 25)
   const run: PackAssemblyRun = { assembled: 0, skipped: 0, failed: 0 }
 
+  // One roster for the whole run. Every pack turns actor ids into names from
+  // it, it cannot change between two packs assembled seconds apart, and
+  // reading it is three network hops — one of them to GoTrue — so a night of
+  // 25 packs was paying for 75 round trips to learn the same handful of names.
+  //
+  // `catch` rather than a bare await, so a roster that cannot be read still
+  // fails the way it did before: each booking reads its own, throws, and is
+  // counted. A run that fails 25 bookings one at a time is this function's
+  // stated contract, and a failure here must not turn it into a 500 that
+  // assembles nothing.
+  const staff = await listStaff().catch(() => undefined)
+
   for (const bookingId of due) {
     try {
-      const result = await assembleAccountingPack({ bookingId })
+      const result = await assembleAccountingPack({ bookingId, staff })
 
       if (result.ok) {
         run.assembled += 1

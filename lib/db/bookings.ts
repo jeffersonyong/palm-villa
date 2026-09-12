@@ -576,6 +576,36 @@ export async function getBookingByReference(reference: string): Promise<Booking 
 }
 
 /**
+ * One booking by the customer's private link.
+ *
+ * A sibling of the two above rather than a lookup layered on top of them:
+ * `booking_summary` carries `access_token` and `SUMMARY_COLUMNS` already
+ * selects it, so reading the id from `booking` first and then the summary by
+ * that id was two round trips for one row. On the customer's page that is the
+ * read before everything else, so it is the one worth having be single.
+ *
+ * The token's shape is checked by the caller in lib/db/public-bookings.ts,
+ * which is where the public flow's rules live; this only knows how to read.
+ */
+export async function getBookingByAccessToken(token: string): Promise<Booking | null> {
+  const propertyId = await currentPropertyId()
+
+  const { data, error } = await dataClient()
+    .from('booking_summary')
+    .select(SUMMARY_COLUMNS)
+    .eq('property_id', propertyId)
+    .eq('access_token', token)
+    .maybeSingle()
+
+  if (error) {
+    // The token is a credential, so it is named in no message a log might keep.
+    throw new Error(`Could not read that booking: ${error.message}`)
+  }
+
+  return data ? toBooking(data as unknown as BookingSummaryRow) : null
+}
+
+/**
  * One booking by its id.
  *
  * The reference is what staff type and what the detail route is keyed on; the

@@ -109,7 +109,29 @@ export interface DayPassPartyResult {
   exemptGuests: number
 }
 
-export type DayPassPartyError = 'unknown_age_band' | 'no_guests' | 'negative_quantity'
+/**
+ * The most guests one age band may be sold in a single booking.
+ *
+ * **Input validation, deliberately not capacity.** What a facility holds is
+ * `dayPassCapacity`, which is unset — prd.md C2 leaves the figure to the
+ * client — and this ceiling must never be read as an answer to it. It is the
+ * boundary check the form already applies and the server did not: `CountField`
+ * renders `max={50}` on every band, and the stay flow's schema caps its guest
+ * counts at the same 50.
+ *
+ * Without it a submitted `1e6` was an integer, passed every check here, and
+ * reached a Postgres `integer` column; far enough past it and the write fails
+ * as an unhandled overflow rather than a sentence. A held pass for a hundred
+ * thousand heads is also the thing that fills a capacity the day one is
+ * configured, because held passes count against headroom.
+ */
+export const MAX_GUESTS_PER_BAND = 50
+
+export type DayPassPartyError =
+  | 'unknown_age_band'
+  | 'no_guests'
+  | 'negative_quantity'
+  | 'too_many_guests'
 
 export type DayPassParseResult = DayPassPartyResult | { ok: false; error: DayPassPartyError }
 
@@ -141,6 +163,10 @@ export function partyFromCounts(
   for (const [bandId, count] of Object.entries(counts)) {
     if (!Number.isInteger(count) || count < 0) {
       return { ok: false, error: 'negative_quantity' }
+    }
+
+    if (count > MAX_GUESTS_PER_BAND) {
+      return { ok: false, error: 'too_many_guests' }
     }
 
     if (count === 0) {
@@ -182,4 +208,5 @@ export const DAY_PASS_PARTY_MESSAGES: Readonly<Record<DayPassPartyError, string>
   unknown_age_band: 'That age group is no longer offered. Refresh the page and try again.',
   no_guests: 'Add at least one guest.',
   negative_quantity: 'Enter a number of guests.',
+  too_many_guests: `For a group this size, please call us — a booking here takes up to ${MAX_GUESTS_PER_BAND} guests in each age group.`,
 }

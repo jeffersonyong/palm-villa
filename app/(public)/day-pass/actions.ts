@@ -7,10 +7,10 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 
 import { scheduleBookingCreatedEmail } from '@/app/schedule-booking-email'
-import { clientIpFrom, hashPublicKey } from '@/lib/auth/access-token'
+import { clientIpFrom, hashPhoneKey, hashPublicKey } from '@/lib/auth/access-token'
 import { createPublicDayPassBooking, notePublicAttempt } from '@/lib/db/public-bookings'
 import { getPropertyConfig } from '@/lib/db/property-config'
-import { isStayDate } from '@/lib/domain/dates'
+import { addDays, isStayDate, todayInBrunei } from '@/lib/domain/dates'
 import { DAY_PASS_PARTY_MESSAGES, partyFromCounts } from '@/lib/domain/day-pass-capacity'
 import { priceDayPass } from '@/lib/domain/pricing/day-pass'
 import {
@@ -120,6 +120,30 @@ export async function createPublicDayPassAction(
 
   const config = await getPropertyConfig()
 
+  // The day is checked against the same window the page's own calendar was
+  // built from — today to today + maxAdvanceBookingDays, the [C] two-month
+  // advance rule of prd.md §9.1. `min` and `max` on the date control are the
+  // customer's guide rails and nothing more; the schema only asked whether
+  // this was a real calendar date, so a hand-made POST could hold a pass for
+  // 1900 or for a decade out. `priceStay` refuses both for a stay, and a day
+  // pass had no equivalent because its price does not depend on the date.
+  const today = todayInBrunei()
+  const lastDay = addDays(today, config.maxAdvanceBookingDays)
+
+  if (input.passDate < today || input.passDate > lastDay) {
+    return {
+      status: 'error',
+      message: 'Check the highlighted fields.',
+      fieldErrors: {
+        passDate:
+          input.passDate < today
+            ? 'Pick a day from today onwards.'
+            : `Day passes are booked up to ${config.maxAdvanceBookingDays} days ahead.`,
+      },
+      submitted,
+    }
+  }
+
   // The bands as the settings screen has them right now, counted out of the
   // form. A band removed since the page loaded refuses here rather than
   // pricing against something that no longer exists.
@@ -197,7 +221,7 @@ async function checkPublicLimits(phone: string): Promise<string | null> {
 
   const allowedForPhone = await notePublicAttempt({
     kind: 'booking:phone',
-    keyHash: hashPublicKey(phone),
+    keyHash: hashPhoneKey(phone),
     windowSeconds: DAY_IN_SECONDS,
     limit: PUBLIC_LIMITS.bookingsPerPhonePerDay,
   })

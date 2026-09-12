@@ -18,6 +18,8 @@ import {
   TableHeaderRow,
   TableRow,
 } from '@/components/ui/table'
+import { hasPermission } from '@/lib/auth/permissions'
+import { getActor } from '@/lib/auth/require-permission'
 import { getDailySnapshot, type Booking } from '@/lib/db/bookings'
 import { listDepositsForBookings, type Deposit } from '@/lib/db/deposits'
 import { formatStayDate, todayInBrunei } from '@/lib/domain/dates'
@@ -42,6 +44,32 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 export default async function PortalOverviewPage() {
+  const actor = await getActor()
+
+  // Gated before the first read, like every other screen that shows a booking
+  // (architecture.md §3). This one was the exception, and the exception was
+  // the wrong way round: it is the screen a staff member lands on straight
+  // after signing in, and it carries names, vehicle registrations and deposit
+  // figures. An account holding no roles — newly created, or stripped of them
+  // as a soft off-boarding — saw today's arrivals before it saw anything else.
+  //
+  // `booking.view` because that is what the register answers to, and this is
+  // the same data narrowed to one day.
+  if (!actor || !hasPermission(actor.permissions, 'booking.view')) {
+    return (
+      <>
+        <PageHeader title="Dashboard" />
+        <EmptyState
+          className="mt-xl"
+          title="You don't have access to this screen"
+          description={
+            'Seeing today’s arrivals and departures needs the "View bookings" permission. Ask an administrator if this is part of your job.'
+          }
+        />
+      </>
+    )
+  }
+
   const today = todayInBrunei()
   const snapshot = await getDailySnapshot(today)
 
