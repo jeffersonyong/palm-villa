@@ -79,12 +79,16 @@ export async function assembleAccountingPack(input: {
     return { ok: false, reason: 'booking_missing', message: 'That booking no longer exists.' }
   }
 
-  const [payments, identityDocuments, slips, staff] = await Promise.all([
+  const [payments, documents, staff] = await Promise.all([
     listPaymentsForBooking(booking.id),
-    listDocumentsForBooking(booking.id, 'identity'),
-    listDocumentsForBooking(booking.id, 'payment_slip'),
+    // Both kinds in one read rather than two requests differing in one filter.
+    // A night's run does this 25 times.
+    listDocumentsForBooking(booking.id, ['identity', 'payment_slip']),
     input.staff ?? listStaff(),
   ])
+
+  const identityDocuments = documents.filter((document) => document.kind === 'identity')
+  const slips = documents.filter((document) => document.kind === 'payment_slip')
 
   if (!payments.some((payment) => payment.status === 'verified')) {
     return {

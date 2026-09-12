@@ -147,7 +147,15 @@ export type DocumentWriteResult<T = object> =
  */
 export async function listDocumentsForBooking(
   bookingId: string,
-  kind?: DocumentKind,
+  /**
+   * One kind, or several read as one query.
+   *
+   * The two callers that want two kinds — the customer's page and the pack
+   * assembly — were making two identical requests that differed in one filter,
+   * and the pack does it once per booking, 25 times a night. Order within a
+   * kind is unchanged, because the sort is on `uploaded_at` either way.
+   */
+  kind?: DocumentKind | readonly DocumentKind[],
 ): Promise<readonly Document[]> {
   const propertyId = await currentPropertyId()
   const now = new Date()
@@ -161,8 +169,10 @@ export async function listDocumentsForBooking(
     .gt('retain_until', now.toISOString())
     .order('uploaded_at', { ascending: true })
 
-  if (kind) {
+  if (typeof kind === 'string') {
     query = query.eq('kind', kind)
+  } else if (kind && kind.length > 0) {
+    query = query.in('kind', kind)
   }
 
   const { data, error } = await query

@@ -16,7 +16,11 @@ import {
 } from '@/lib/domain/public-booking'
 import { dataClient } from '@/lib/supabase/data'
 
-import { getBookingById, getBookingByReference, type Booking } from './bookings'
+import {
+  getBookingByAccessToken as bookingByAccessToken,
+  getBookingByReference,
+  type Booking,
+} from './bookings'
 import { getDepositByBookingId } from './deposits'
 import { attachDocument, purge } from './documents'
 import { listPaymentsForBooking } from './payments'
@@ -315,24 +319,11 @@ export async function getBookingByAccessToken(token: string): Promise<Booking | 
     return null
   }
 
-  const propertyId = await currentPropertyId()
-
-  const { data, error } = await dataClient()
-    .from('booking')
-    .select('id')
-    .eq('property_id', propertyId)
-    .eq('access_token', token)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(`Could not read that booking: ${error.message}`)
-  }
-
-  if (!data) {
-    return null
-  }
-
-  return getBookingById((data as { id: string }).id)
+  // One query, not two. This used to read the id from `booking` by token and
+  // then the summary by that id, but `booking_summary` carries `access_token`
+  // and already selects it — so the second trip was fetching a row the first
+  // could have returned. It is the read the customer's page opens with.
+  return bookingByAccessToken(token)
 }
 
 export interface PublicTransferSubmitted {
