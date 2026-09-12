@@ -9,6 +9,12 @@ import { FerrisWheel, ToyBrick, Waves, type LucideIcon } from 'lucide-react'
  */
 
 export interface Facility {
+  /**
+   * The `facility.slug` a photograph hangs off (capability F7). Derived once
+   * and never moved by a rename, so the card keeps its photograph when the
+   * facility is renamed in Property settings.
+   */
+  slug: string
   name: string
   description: string
   icon: LucideIcon
@@ -31,18 +37,21 @@ export interface BookingStep {
 /** The three facilities confirmed as included in the day pass (prd.md §7.2). */
 export const facilities: Facility[] = [
   {
+    slug: 'swimming-pool',
     name: 'Swimming pool',
     description: 'The centrepiece. Open all day on a single pass — swim as long as you like.',
     icon: Waves,
     imageLabel: 'Pool photo',
   },
   {
+    slug: 'water-park',
     name: 'Water park',
     description: 'Slides and splash play for the kids, included in every day pass.',
     icon: FerrisWheel,
     imageLabel: 'Water park photo',
   },
   {
+    slug: 'indoor-childrens-playground',
     name: 'Indoor children’s playground',
     description: 'Air-conditioned play space — somewhere to dry off without winding down.',
     icon: ToyBrick,
