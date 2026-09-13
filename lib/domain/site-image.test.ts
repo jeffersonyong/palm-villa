@@ -151,6 +151,20 @@ describe('checkSiteImageUpload', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'not_an_image' } })
   })
 
+  test('refuses a photo that still carries camera data, such as where it was taken', () => {
+    // The dialog's re-encode never keeps EXIF, so only a request that skipped
+    // it can reach this — and that is exactly the request that would publish a
+    // GPS position to a public bucket.
+    const withExif = new Uint8Array([
+      0xff, 0xd8, 0xff, 0xe1, 0x00, 0x08, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0xff, 0xda,
+    ])
+
+    expect(checkSiteImageUpload(withExif)).toMatchObject({
+      ok: false,
+      error: { code: 'carries_metadata' },
+    })
+  })
+
   test('refuses a HEIC the browser did not convert', () => {
     expect(checkSiteImageUpload(HEIC)).toMatchObject({ ok: false, error: { code: 'not_an_image' } })
   })

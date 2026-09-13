@@ -170,6 +170,7 @@ const FIELD_FOR_CODE: Readonly<Record<string, PhotoField>> = {
   empty: 'file',
   too_large: 'file',
   not_an_image: 'file',
+  carries_metadata: 'file',
   object_missing: 'file',
   object_empty: 'file',
   alt_text_invalid: 'altText',

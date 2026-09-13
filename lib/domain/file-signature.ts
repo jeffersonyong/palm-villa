@@ -91,3 +91,161 @@ export const EXTENSION_FOR_MIME: Readonly<Record<SniffedMimeType, string>> = {
 export function extensionFor(mimeType: SniffedMimeType): string {
   return EXTENSION_FOR_MIME[mimeType]
 }
+
+/* ── What an image says about where it was taken ──────────────────────────── */
+
+/**
+ * Whether an image still carries camera metadata: EXIF, which is where a phone
+ * writes the GPS position a photograph was taken at, or XMP, which can repeat
+ * it.
+ *
+ * Asked of a photograph about to go on the public site (capability F7). The
+ * upload dialog re-encodes every photo on a canvas, which keeps none of this,
+ * so only a request that skipped the dialog can arrive carrying it — and
+ * refusing that request is what makes "no location data on the website" a
+ * control rather than the habit of one screen.
+ *
+ * It walks each format's own container rather than searching the bytes for
+ * "Exif", because compressed image data can hold any byte sequence at all. A
+ * JPEG's metadata segments all come before its image data; a PNG's chunks and a
+ * WebP's RIFF chunks are each named. A structure it cannot follow to the end —
+ * a truncated file — is answered from what was read, never by reading past it.
+ */
+export function carriesEmbeddedMetadata(bytes: Uint8Array): boolean {
+  switch (sniffMimeType(bytes)) {
+    case 'image/jpeg':
+      return jpegCarriesMetadata(bytes)
+    case 'image/png':
+      return pngCarriesMetadata(bytes)
+    case 'image/webp':
+      return webpCarriesMetadata(bytes)
+    default:
+      return false
+  }
+}
+
+const EXIF_HEADER = [...asciiBytes('Exif'), 0x00, 0x00]
+const XMP_JPEG_HEADER = asciiBytes('http://ns.adobe.com/xap/1.0/')
+const XMP_PNG_KEYWORD = asciiBytes('XML:com.adobe.xmp')
+
+/** The JPEG markers this reads: the EXIF/XMP segment, and the two that end the headers. */
+const APP1 = 0xe1
+const START_OF_SCAN = 0xda
+const END_OF_IMAGE = 0xd9
+
+function jpegCarriesMetadata(bytes: Uint8Array): boolean {
+  // After the two-byte start-of-image marker, every header segment is 0xFF, a
+  // marker byte, and a two-byte length that counts itself.
+  let offset = 2
+
+  while (offset + 4 <= bytes.length && bytes[offset] === 0xff) {
+    const marker = bytes[offset + 1]
+
+    if (marker === 0xff) {
+      // A fill byte before the real marker.
+      offset += 1
+      continue
+    }
+
+    if (marker === START_OF_SCAN || marker === END_OF_IMAGE) {
+      return false
+    }
+
+    if (
+      marker === APP1 &&
+      (matchesAt(bytes, offset + 4, EXIF_HEADER) || matchesAt(bytes, offset + 4, XMP_JPEG_HEADER))
+    ) {
+      return true
+    }
+
+    const length = readUint16BE(bytes, offset + 2)
+
+    if (length < 2) {
+      return false
+    }
+
+    offset += 2 + length
+  }
+
+  return false
+}
+
+function pngCarriesMetadata(bytes: Uint8Array): boolean {
+  // After the eight-byte signature: length, type, data and CRC, repeated to IEND.
+  let offset = 8
+
+  while (offset + 8 <= bytes.length) {
+    const length = readUint32BE(bytes, offset)
+    const type = asciiAt(bytes, offset + 4, 4)
+
+    if (type === 'eXIf') {
+      return true
+    }
+
+    if (type === 'iTXt' && matchesAt(bytes, offset + 8, XMP_PNG_KEYWORD)) {
+      return true
+    }
+
+    if (type === 'IEND') {
+      return false
+    }
+
+    offset += 12 + length
+  }
+
+  return false
+}
+
+function webpCarriesMetadata(bytes: Uint8Array): boolean {
+  // After "RIFF", the file size and "WEBP": a fourcc, a little-endian size, and
+  // the data padded to an even length.
+  let offset = 12
+
+  while (offset + 8 <= bytes.length) {
+    const fourcc = asciiAt(bytes, offset, 4)
+
+    if (fourcc === 'EXIF' || fourcc === 'XMP ') {
+      return true
+    }
+
+    const size = readUint32LE(bytes, offset + 4)
+
+    offset += 8 + size + (size % 2)
+  }
+
+  return false
+}
+
+function asciiBytes(text: string): number[] {
+  return Array.from(text, (character) => character.charCodeAt(0))
+}
+
+function asciiAt(bytes: Uint8Array, offset: number, length: number): string {
+  return String.fromCharCode(...bytes.subarray(offset, offset + length))
+}
+
+function byteAt(bytes: Uint8Array, offset: number): number {
+  return bytes[offset] ?? 0
+}
+
+function readUint16BE(bytes: Uint8Array, offset: number): number {
+  return byteAt(bytes, offset) * 0x100 + byteAt(bytes, offset + 1)
+}
+
+function readUint32BE(bytes: Uint8Array, offset: number): number {
+  return (
+    byteAt(bytes, offset) * 0x1000000 +
+    byteAt(bytes, offset + 1) * 0x10000 +
+    byteAt(bytes, offset + 2) * 0x100 +
+    byteAt(bytes, offset + 3)
+  )
+}
+
+function readUint32LE(bytes: Uint8Array, offset: number): number {
+  return (
+    byteAt(bytes, offset) +
+    byteAt(bytes, offset + 1) * 0x100 +
+    byteAt(bytes, offset + 2) * 0x10000 +
+    byteAt(bytes, offset + 3) * 0x1000000
+  )
+}

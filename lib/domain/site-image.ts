@@ -1,4 +1,9 @@
-import { extensionFor, sniffMimeType, type SniffedMimeType } from './file-signature'
+import {
+  carriesEmbeddedMetadata,
+  extensionFor,
+  sniffMimeType,
+  type SniffedMimeType,
+} from './file-signature'
 
 /**
  * The photographs on the public site (capability F7, architecture.md §8).
@@ -213,7 +218,7 @@ function isSiteImageMimeType(mimeType: SniffedMimeType): mimeType is SiteImageMi
   return (SITE_IMAGE_MIME_TYPES as readonly string[]).includes(mimeType)
 }
 
-export type SiteImageUploadErrorCode = 'empty' | 'too_large' | 'not_an_image'
+export type SiteImageUploadErrorCode = 'empty' | 'too_large' | 'not_an_image' | 'carries_metadata'
 
 export interface SiteImageUploadError {
   code: SiteImageUploadErrorCode
@@ -258,6 +263,20 @@ export function checkSiteImageUpload(bytes: Uint8Array): SiteImageUploadCheck {
       error: {
         code: 'not_an_image',
         message: 'That is not a JPEG, PNG or WebP photo. Choose a photograph.',
+      },
+    }
+  }
+
+  // A photograph on the public site must not say where it was taken. The
+  // upload dialog's re-encode removes all of that, so this refuses only a
+  // request that skipped the dialog — see `carriesEmbeddedMetadata`.
+  if (carriesEmbeddedMetadata(bytes)) {
+    return {
+      ok: false,
+      error: {
+        code: 'carries_metadata',
+        message:
+          'That photo still carries camera data, such as where it was taken. Add it through the photo dialog, which removes it.',
       },
     }
   }
