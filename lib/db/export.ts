@@ -1,5 +1,6 @@
 import { centsToDecimal, type Cents } from '@/lib/domain/money'
 import type { CsvValue } from '@/lib/domain/csv'
+import { isSiteImageSlot, slotLabel } from '@/lib/domain/site-image'
 import { dataClient } from '@/lib/supabase/data'
 
 import { currentPropertyId } from './property'
@@ -876,6 +877,84 @@ const settings: ExportTable = {
   },
 }
 
+interface SiteImageExportRow {
+  slot: string | null
+  alt_text: string
+  focus: string
+  mime_type: string
+  byte_size: number
+  uploaded_by: string
+  uploaded_at: string
+  retired_at: string | null
+  retired_reason: string | null
+  purged_at: string | null
+  unit_type: { name: string } | null
+  facility: { name: string } | null
+}
+
+/**
+ * Every photograph the site has shown (capability F7), current and retired.
+ *
+ * What is known about each — where it appeared, how it was described, who put
+ * it up and when it came down — and never its storage key or public address,
+ * for the reason documents give: the export is the records, not a way to the
+ * files.
+ */
+const websitePhotos: ExportTable = {
+  id: 'website-photos',
+  label: 'Website photos',
+  description:
+    'Every photograph the public site has shown, where it appeared, and when it was replaced or taken down.',
+  count: () => countOf('site_image'),
+  document: async () => {
+    const rows = await allOf<SiteImageExportRow>(
+      'site_image',
+      'slot, alt_text, focus, mime_type, byte_size, uploaded_by, uploaded_at, retired_at, retired_reason, purged_at, unit_type(name), facility(name)',
+      'uploaded_at',
+    )
+
+    return {
+      headers: [
+        'Where',
+        'Description',
+        'Keep in view',
+        'Type',
+        'Bytes',
+        'Uploaded by',
+        'Uploaded',
+        'Taken down',
+        'Taken down because',
+        'File destroyed',
+      ],
+      rows: rows.map((row) => [
+        placeName(row),
+        row.alt_text,
+        row.focus,
+        row.mime_type,
+        row.byte_size,
+        row.uploaded_by,
+        row.uploaded_at,
+        text(row.retired_at),
+        text(row.retired_reason),
+        text(row.purged_at),
+      ]),
+    }
+  },
+}
+
+/** A photograph's place in words: the unit type or facility, else the slot. */
+function placeName(row: SiteImageExportRow): string {
+  if (row.unit_type) {
+    return row.unit_type.name
+  }
+
+  if (row.facility) {
+    return row.facility.name
+  }
+
+  return row.slot !== null && isSiteImageSlot(row.slot) ? slotLabel(row.slot) : ''
+}
+
 export const EXPORT_TABLES: readonly ExportTable[] = [
   bookings,
   bookingLines,
@@ -894,6 +973,7 @@ export const EXPORT_TABLES: readonly ExportTable[] = [
   rolePermissions,
   auditEvents,
   settings,
+  websitePhotos,
 ]
 
 export function exportTableById(id: string): ExportTable | undefined {
@@ -944,6 +1024,8 @@ export const EXPORT_GROUPS = {
   settings: ['settings'],
   /** The daily cash-up, where the trips to the bank are recorded. */
   cash: ['cash-bankings'],
+  /** Website photos, downloaded beside the photographs themselves. */
+  website: ['website-photos'],
 } as const satisfies Record<string, readonly string[]>
 
 export type ExportGroupName = keyof typeof EXPORT_GROUPS

@@ -6,7 +6,6 @@ import {
   isExpired,
   sanitiseFilename,
   storageKeyFor,
-  storagePrefixFor,
   BUCKET_FOR_KIND,
   DOCUMENT_KINDS,
   type DocumentKind,
@@ -15,12 +14,13 @@ import { dataClient } from '@/lib/supabase/data'
 
 import { recordAuditEvent } from './audit'
 import { currentPropertyId } from './property'
+import { isNotFound, sweepUnclaimedObjects } from './storage'
 
 /**
  * Stored documents (capabilities B10, G2, G3, G4).
  *
  * architecture.md §2: all database access lives in `lib/db`. This module also
- * owns every Storage call in the product — uploading, signing, deleting — for
+ * owns every Storage call a document makes — uploading, signing, deleting — for
  * the same reason, and because the two have to move together: a document is a
  * row in Postgres AND an object in Storage, and nothing outside this file
  * should have to remember that.
@@ -540,19 +540,6 @@ export async function purge(
   return true
 }
 
-/**
- * Did Storage say the object is not there?
- *
- * Read from the status rather than the sentence. Matching on the message meant
- * any future wording carrying "not found" — a missing *bucket*, say — counted
- * as a successful delete, which would mark a row purged whose file is still
- * sitting in a private bucket. A status is the machine-readable half, and it is
- * what the rest of this layer already keys on.
- */
-function isNotFound(error: { status?: number; statusCode?: string }): boolean {
-  return error.status === 404 || error.statusCode === '404'
-}
-
 /* ── Reading the bytes ────────────────────────────────────────────────────── */
 
 /**
@@ -774,119 +761,29 @@ export async function purgeTombstoned(
 }
 
 /**
- * Deletes objects no document row claims.
+ * Deletes objects no document row claims, in each of the four private buckets.
  *
  * Two things produce one: an upload that succeeded and whose insert was then
  * refused or crashed, and a booking deleted outright, which cascades its rows
  * away and leaves the files behind. Neither is reachable through a screen, and
- * an orphan is invisible — which is precisely why something has to look.
- *
- * The one-hour floor is what keeps this from racing an upload in flight: an
- * object written a second ago may be seconds away from its insert.
+ * an orphan is invisible — which is precisely why something has to look. The
+ * mechanics (paging, the one-hour floor, the batched claim lookup) are
+ * lib/db/storage.ts's, shared with the site's photographs.
  */
 export async function sweepOrphanObjects(options: { now?: Date } = {}): Promise<number> {
   const propertyId = await currentPropertyId()
   const now = options.now ?? new Date()
-  const cutoff = new Date(now.getTime() - ORPHAN_GRACE_MS)
-  const db = dataClient()
-  const prefix = storagePrefixFor(propertyId)
 
   let swept = 0
 
   for (const kind of DOCUMENT_KINDS) {
-    const bucket = BUCKET_FOR_KIND[kind]
-    const candidates: string[] = []
-
-    // Storage lists a page at a time, so the sweep pages too. A single request
-    // would examine the first thousand objects for the life of the property and
-    // silently never look past them — which is the same class of quiet failure
-    // the sweep exists to catch.
-    //
-    // Every page is listed BEFORE anything is deleted. Removing objects while
-    // paging shifts each later page's offset by however many went, so the sweep
-    // would step over the files that moved up into the gap.
-    for (let offset = 0; ; offset += STORAGE_PAGE) {
-      const listed = await db.storage.from(bucket).list(prefix, {
-        limit: STORAGE_PAGE,
-        offset,
-        sortBy: { column: 'name', order: 'asc' },
-      })
-
-      if (listed.error || !listed.data || listed.data.length === 0) {
-        break
-      }
-
-      for (const object of listed.data) {
-        if (new Date(object.created_at ?? now.toISOString()) < cutoff) {
-          candidates.push(`${prefix}/${object.name}`)
-        }
-      }
-
-      if (listed.data.length < STORAGE_PAGE) {
-        break
-      }
-    }
-
-    swept += await removeUnclaimed(bucket, propertyId, candidates)
+    swept += await sweepUnclaimedObjects({
+      bucket: BUCKET_FOR_KIND[kind],
+      table: 'document',
+      propertyId,
+      now,
+    })
   }
 
   return swept
 }
-
-/**
- * Of these keys, deletes the ones no document row claims.
- *
- * Asked in batches because PostgREST sends `in` as a query string: a thousand
- * 45-character keys in one filter is a URL long enough for a proxy to refuse,
- * which would abort the sweep for that bucket rather than skip a file.
- */
-async function removeUnclaimed(
-  bucket: string,
-  propertyId: string,
-  keys: readonly string[],
-): Promise<number> {
-  const db = dataClient()
-  let swept = 0
-
-  for (let from = 0; from < keys.length; from += CLAIM_BATCH) {
-    const batch = keys.slice(from, from + CLAIM_BATCH)
-
-    const { data, error } = await db
-      .from('document')
-      .select('storage_key')
-      .eq('property_id', propertyId)
-      .in('storage_key', batch)
-
-    if (error) {
-      throw new Error(`Could not check for orphaned files: ${error.message}`)
-    }
-
-    const known = new Set((data as { storage_key: string }[]).map((row) => row.storage_key))
-    const orphans = batch.filter((key) => !known.has(key))
-
-    if (orphans.length === 0) {
-      continue
-    }
-
-    const removed = await db.storage.from(bucket).remove(orphans)
-
-    if (!removed.error) {
-      swept += orphans.length
-    }
-  }
-
-  return swept
-}
-
-/** Objects per Storage listing request, and keys per claim lookup. */
-const STORAGE_PAGE = 1000
-const CLAIM_BATCH = 200
-
-/**
- * How old an unclaimed object must be before the sweep takes it.
- *
- * An hour rather than a minute because the cost of waiting is a file sitting in
- * a private bucket, and the cost of being wrong is deleting somebody's upload
- * between the moment it landed and the moment its row was written.
- */
-const ORPHAN_GRACE_MS = 60 * 60 * 1000

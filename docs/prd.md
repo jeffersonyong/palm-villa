@@ -109,11 +109,14 @@ inspection.record     charge.create         charge.waive
 deposit.approve_release                     deposit.waive
 unit.manage           tenancy.manage        config.manage
 report.view           document.view_identity
+site_image.manage
 ```
 
 **[A] `booking.discount` is separate from `booking.create`** and is the one permission that gates discretion rather than an operation — see §8.4. Front Office holds it by default, because the desk is where a discount is asked for; withholding it from a role is one click in the Roles matrix.
 
 **[A] `deposit.waive` is the second such permission** (5 September 2026, capability B15). It gates deciding at the desk that no security deposit is taken on a booking — see §11. Same construction and same default as the discount: separate from `booking.create` because it decides money is not taken, held by Front Office because the guest asking to stay another night is standing at the desk, and one click to withhold.
+
+**[A] `site_image.manage` is a departure, made on purpose** (23 September 2026, capability F7). It gates adding, replacing, reframing and removing the photographs on the public site. The unit registry below reused `config.manage` rather than mint a new string, because an administrator opens it twice a year; the photos are different in who does them — whoever runs the Instagram account refreshes the "Follow along" tiles — and `config.manage` would also hand that person pricing, roles and the audit log. Seeded to Admin only; any other role is one tick in the Roles matrix. The set now holds nineteen strings.
 
 **[C]** Deposit release approval sits at the end of the pipeline, with Finance or Jason, not with Housekeeping or Front Office. Housekeeping records the inspection; a separate role approves.
 
@@ -159,9 +162,9 @@ Availability, pricing, booking, payment instructions, slip upload, booking looku
 
 **Early check-in is not sold**, which is N31: Jason’s own answer makes it a desk judgement about whether a unit is ready. The form sends zero hours and tells the customer to ask on arrival.
 
-**[O] Its photographs are staff-managed, or they are stale within a year** (proposed 10 September 2026, capability F7, unagreed with the client). A unit type gets repainted, a facility reopens, somebody commissions a better photo shoot — and under any arrangement where the images ship with the code, each of those is a developer deploy. That is the same argument §7.2 already accepted for facility inclusion and §7.1 for unit naming, applied to the one part of the product a customer actually looks at first.
+**[C] Its photographs are staff-managed** (capability F7; proposed 10 September 2026, agreed with the client and built 23 September 2026). A unit type gets repainted, a facility reopens, somebody commissions a better photo shoot — and under any arrangement where the images ship with the code, each of those is a developer deploy. That is the same argument §7.2 already accepted for facility inclusion and §7.1 for unit naming, applied to the one part of the product a customer actually looks at first.
 
-**No image is real yet.** Every unit type and facility on the public site renders a labelled placeholder, so this is not a control over something that exists — it is the images and the way to manage them, together. What that costs architecturally is §8's one departure: a **public** bucket, which is the opposite of every rule [architecture.md §8](architecture.md) states for the private ones.
+**What is managed is exactly what the landing page shows**: the front-page photo, one per day-pass facility card and per unit-type card (found by the slug a rename never moves), and the four "Follow along" tiles — one current photo each. Staff add, replace or remove a photo, write its description, and choose which part stays in view when the site crops it; removing one brings the placeholder back. **The description is the image's alt text, not the card's copy**: the words beside each photo stay in the landing page and stay confirmed facts only, so no staff-typed sentence can advertise something the business has not decided. What it costs architecturally is §8's one departure — a **public** bucket, `site-images`, with no retention period — as built in [architecture.md §8.3](architecture.md). Changing the photos is its own permission; see §4.
 
 ### 5.2 Operations portal (desktop)
 Booking calendar and list, manual booking creation, payment verification queue, unit management, inspection and deposit workflow, document access, reporting, configuration.
@@ -288,7 +291,7 @@ any → out_of_service → available
 
 **Every capacity is empty, and that is the honest state** ([C2](open-questions.md)). The field exists; no number has ever been agreed. Until one is, nothing is limited and §14's day-pass panel still has no denominator to state.
 
-**[A] A facility carries a slug it never loses.** Derived from the name once, at creation, and untouched by a rename — so "Playroom" becoming "Indoor playground" does not break a public page pointing at it. Nothing joins on it yet; it is what [architecture.md §8](architecture.md)'s F7 note asks this capability to leave behind.
+**[A] A facility carries a slug it never loses.** Derived from the name once, at creation, and untouched by a rename — so "Playroom" becoming "Indoor playground" does not break a public page pointing at it. It is what a photograph on the landing page is found by (capability F7, 23 September 2026), which is why [architecture.md §8](architecture.md) asked this capability to leave it behind.
 
 ---
 
@@ -812,7 +815,7 @@ All five requirements are met. Requirements 1 to 4 arrived with the documents sl
 
 Until now every document in the system was put there by a member of staff. §2 describes what that replaced — an IC and a transfer screenshot arriving over WhatsApp, filed by hand — and the documents slice moved the *filing* into the product while leaving the *arriving* exactly where it was. A6 and A7 move the arriving: the guest sends both from their own booking link, and the desk stops chasing.
 
-**The credential is the link, and there is no permission at all.** §4 mints sixteen permission strings and a customer holds none of them; `requirePermission` cannot express an anonymous caller and was not made to (architecture.md §4a). What stands in its place is the booking's 128-bit access token, re-resolved on the server for every upload. So the customer's half of §13's permission table is a **kind allowlist** rather than a mapping: a guest may send the two documents that are theirs to send — their IC and their slip — and an inspection photograph and an accounting pack are refused by construction. The first is Housekeeping's record of what they found after the guest left; the second is assembled by the system and by nobody by hand.
+**The credential is the link, and there is no permission at all.** §4 mints nineteen permission strings and a customer holds none of them; `requirePermission` cannot express an anonymous caller and was not made to (architecture.md §4a). What stands in its place is the booking's 128-bit access token, re-resolved on the server for every upload. So the customer's half of §13's permission table is a **kind allowlist** rather than a mapping: a guest may send the two documents that are theirs to send — their IC and their slip — and an inspection photograph and an accounting pack are refused by construction. The first is Housekeeping's record of what they found after the guest left; the second is assembled by the system and by nobody by hand.
 
 **[A] A guest may replace their own file and may never open one back.** *Existence is not content* already governs what a staff member without `document.view_identity` sees; this applies the same rule to the one reader who authenticates with a link. The page says an IC is on file and when it arrived, and offers no way to open it — an access token travels in forwarded WhatsApp messages and in browser history on a shared phone, so a URL that returned the image would be a breach one forward away. The filename is withheld for the reason §13 already records. **Removal is refused from the other end:** a guest replaces a dark photograph by sending a better one, which supersedes it, so a leaked link cannot destroy a record the business is required to keep.
 

@@ -1,12 +1,16 @@
 import { Button } from '@/components/ui/button'
+import type { LandingImage } from '@/lib/domain/landing-images'
 
-import { MediaPlaceholder } from './media-placeholder'
+import { SiteMedia } from './site-media'
+
+/** Half the 1120px container beside the headline from `lg`; the full width below it. */
+const HERO_SIZES = '(min-width: 1024px) 544px, 100vw'
 
 /**
  * The one place `display-xl` appears on any surface (design.md §Typography).
  * White ground, one lagoon CTA; the eyebrow is the section's brand text moment.
  */
-export function Hero() {
+export function Hero({ image }: { image: LandingImage | null }) {
   return (
     <section aria-labelledby="hero-heading" className="bg-card px-xl py-3xl">
       <div className="mx-auto grid w-full max-w-[1120px] gap-2xl lg:grid-cols-2 lg:items-center">
@@ -32,7 +36,14 @@ export function Hero() {
           </div>
         </div>
 
-        <MediaPlaceholder label="Pool photo" aspect="photo" className="rounded-lg" />
+        <SiteMedia
+          image={image}
+          sizes={HERO_SIZES}
+          label="Pool photo"
+          aspect="photo"
+          className="rounded-lg"
+          priority
+        />
       </div>
     </section>
   )

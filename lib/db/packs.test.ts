@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 
 import { addDays, todayInBrunei } from '@/lib/domain/dates'
-import { sniffMimeType } from '@/lib/domain/document'
+import { sniffMimeType } from '@/lib/domain/file-signature'
 import { dataClient } from '@/lib/supabase/data'
 
 import {

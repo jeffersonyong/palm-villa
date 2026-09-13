@@ -217,6 +217,57 @@ describe('auditSubjectHref', () => {
   })
 })
 
+describe('website photos (capability F7)', () => {
+  test('says what happened to a photograph, leaving which one to the subject column', () => {
+    expect(describeAuditEvent(event('site_image.added', { after: { name: 'Front page' } }))).toBe(
+      'Photo added',
+    )
+    expect(
+      describeAuditEvent(event('site_image.replaced', { after: { name: 'Water park' } })),
+    ).toBe('Photo replaced')
+    expect(describeAuditEvent(event('site_image.removed', { before: { name: 'Gym' } }))).toBe(
+      'Photo removed',
+    )
+  })
+
+  test('names the framing that moved, and does not count the name as a change', () => {
+    expect(
+      describeAuditEvent(
+        event('site_image.updated', {
+          before: { name: 'Front page', focus: 'center' },
+          after: { name: 'Front page', focus: 'top' },
+        }),
+      ),
+    ).toBe('Keep in view changed — Centre → Top')
+  })
+
+  test('does not quote two descriptions in one line', () => {
+    expect(
+      describeAuditEvent(
+        event('site_image.updated', {
+          before: { name: 'Swimming pool', alt_text: 'The pool' },
+          after: { name: 'Swimming pool', alt_text: 'The pool at dusk' },
+        }),
+      ),
+    ).toBe('Description changed')
+  })
+
+  test('counts the fields when both moved', () => {
+    expect(
+      describeAuditEvent(
+        event('site_image.updated', {
+          before: { name: 'Gym', alt_text: 'The gym', focus: 'center' },
+          after: { name: 'Gym', alt_text: 'The gym at dawn', focus: 'left' },
+        }),
+      ),
+    ).toBe('Photo updated — 2 fields changed')
+  })
+
+  test('points at the screen the photographs are managed on', () => {
+    expect(auditSubjectHref('site_image', 'Front page')).toBe('/portal/website/photos')
+  })
+})
+
 describe('the vocabulary against the migrations', () => {
   /**
    * Every `(action, entity_type)` pair the SQL writes.

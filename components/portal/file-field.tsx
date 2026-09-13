@@ -30,12 +30,28 @@ import {
  * own value is watched here: setting `files` back to empty from outside has to
  * empty the picker too, or the control keeps naming a file that is no longer
  * going to be sent.
+ *
+ * It picks two kinds of file. A **document** brings its kind, and the kind
+ * decides the accepted types and the ceiling (lib/domain/document.ts). A file
+ * that is **not a document** — a photograph for the public site (capability
+ * F7) — names its own types, ceiling and formats, because lib/domain/document.ts
+ * is not allowed to know it exists.
  */
 
-interface FileFieldProps {
+type FileFieldAccepts =
+  | { kind: DocumentKind }
+  | {
+      /** The `accept` attribute: explicit types, never a wildcard. */
+      accept: string
+      /** The largest file the picker lets through. */
+      maxBytes: number
+      /** The formats in words, for the line under the control — "JPEG, PNG or WebP". */
+      formats: string
+    }
+
+type FileFieldProps = FileFieldAccepts & {
   /** Unique on the screen. Two of these in one dialog would collide. */
   id: string
-  kind: DocumentKind
   /** What is being chosen — "Photographs", "File". */
   label: string
   files: readonly File[]
@@ -47,18 +63,11 @@ interface FileFieldProps {
   hint?: React.ReactNode
 }
 
-export function FileField({
-  id,
-  kind,
-  label,
-  files,
-  onChange,
-  multiple,
-  disabled,
-  hint,
-}: FileFieldProps) {
+export function FileField(props: FileFieldProps) {
+  const { id, label, files, onChange, multiple, disabled, hint } = props
   const inputRef = useRef<HTMLInputElement>(null)
-  const oversized = oversizedFiles(files)
+  const accepts = resolveAccepts(props)
+  const oversized = oversizedFiles(files, accepts.maxBytes)
   const labelId = `${id}-label`
 
   useEffect(() => {
@@ -89,7 +98,7 @@ export function FileField({
           id={id}
           type="file"
           aria-labelledby={labelId}
-          accept={acceptAttributeFor(kind)}
+          accept={accepts.accept}
           multiple={multiple}
           disabled={disabled}
           className="sr-only"
@@ -100,11 +109,12 @@ export function FileField({
 
       {oversized.length > 0 ? (
         <FieldError
-          message={`${oversized.length === 1 ? oversized[0]!.name : `${oversized.length} files`} is larger than ${megabytes()} MB. A photograph taken on a phone is usually well under it.`}
+          message={`${oversized.length === 1 ? oversized[0]!.name : `${oversized.length} files`} is larger than ${megabytes(accepts.maxBytes)} MB. A photograph taken on a phone is usually well under it.`}
         />
       ) : (
         <p className="text-caption text-muted-foreground">
-          {hint ?? formatsAndSize(kind, multiple)}
+          {hint ??
+            `${accepts.formats}, up to ${megabytes(accepts.maxBytes)} MB${multiple ? ' each' : ''}.`}
         </p>
       )}
     </div>
@@ -112,19 +122,29 @@ export function FileField({
 }
 
 /**
- * What the picker says when the caller has nothing more specific to add.
+ * What the picker accepts, whichever kind of file it is choosing.
  *
- * **It names no retention period, and neither should any caller.** Every kind
- * has one and a file really is deleted when it runs out, but the number is
- * configuration rather than code — prd.md §13 says so, and capability F3 is
- * the screen that will let Jason edit it without going through a developer.
- * Copy that states "two years" is a second copy of that setting, in the one
- * place nothing will think to update.
+ * **The sentence it builds names no retention period, and neither should any
+ * caller.** Every document kind has one and a file really is deleted when it
+ * runs out, but the number is configuration rather than code — prd.md §13 says
+ * so, and capability F3 is the screen Jason edits it on. Copy that states "two
+ * years" is a second copy of that setting, in the one place nothing will think
+ * to update.
  */
-function formatsAndSize(kind: DocumentKind, multiple?: boolean): string {
-  const formats = kind === 'inspection_photo' ? 'JPEG, PNG or WebP' : 'JPEG, PNG, WebP or PDF'
+function resolveAccepts(accepts: FileFieldAccepts): {
+  accept: string
+  maxBytes: number
+  formats: string
+} {
+  if ('kind' in accepts) {
+    return {
+      accept: acceptAttributeFor(accepts.kind),
+      maxBytes: MAX_DOCUMENT_BYTES,
+      formats: accepts.kind === 'inspection_photo' ? 'JPEG, PNG or WebP' : 'JPEG, PNG, WebP or PDF',
+    }
+  }
 
-  return `${formats}, up to ${megabytes()} MB${multiple ? ' each' : ''}.`
+  return { accept: accepts.accept, maxBytes: accepts.maxBytes, formats: accepts.formats }
 }
 
 function describe(files: readonly File[]): string {
@@ -139,6 +159,6 @@ function describe(files: readonly File[]): string {
   return `${files.length} files`
 }
 
-function megabytes(): number {
-  return Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))
+function megabytes(bytes: number): number {
+  return Math.round(bytes / (1024 * 1024))
 }

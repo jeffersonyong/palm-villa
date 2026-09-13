@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach } from 'vitest'
 
 import { BUCKET_FOR_KIND, DOCUMENT_KINDS } from '@/lib/domain/document'
+import { SITE_IMAGE_BUCKET } from '@/lib/domain/site-image'
 import { dataClient } from '@/lib/supabase/data'
 
 import { resetPropertyCache } from '../property'
@@ -111,9 +112,13 @@ async function assertStorageReady(): Promise<void> {
   }
 
   const buckets = new Set((data ?? []).map((bucket) => bucket.id))
-  const missing = DOCUMENT_KINDS.map((kind) => BUCKET_FOR_KIND[kind]).filter(
-    (bucket) => !buckets.has(bucket),
-  )
+  // The site's photographs are checked for and never emptied (capability F7):
+  // a suite run must not delete a photo somebody uploaded by hand to look at the
+  // front page, so those tests clean up only what they created.
+  const missing = [
+    ...DOCUMENT_KINDS.map((kind) => BUCKET_FOR_KIND[kind]),
+    SITE_IMAGE_BUCKET,
+  ].filter((bucket) => !buckets.has(bucket))
 
   if (missing.length > 0) {
     throw new Error(

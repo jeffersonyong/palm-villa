@@ -87,6 +87,15 @@ describe('breadcrumbTrail', () => {
     ])
   })
 
+  test('files website photos under their own area, not under Admin', () => {
+    expect(activeHref('/portal/website/photos')).toBe('/portal/website/photos')
+    expect(breadcrumbTrail('/portal/website/photos')).toEqual([
+      { label: 'Portal', href: '/portal' },
+      { label: 'Website' },
+      { label: 'Photos' },
+    ])
+  })
+
   test('falls back to the root crumb rather than guessing labels from the URL', () => {
     expect(breadcrumbTrail('/portal/nothing-here')).toEqual([{ label: 'Portal' }])
   })

@@ -2,6 +2,7 @@ import { DOCUMENT_KIND_LABELS, isDocumentKind } from './document'
 import { INSPECTION_OUTCOME_LABELS, isInspectionOutcome } from './inspection'
 import { formatCents } from './money'
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from './payment'
+import { FOCUS_LABELS, isSiteImageFocus } from './site-image'
 
 /**
  * What each recorded event says, in words (capability F4).
@@ -117,6 +118,10 @@ export const KNOWN_AUDIT_ACTIONS = [
   'cash.banked',
   'email.sent',
   'email.failed',
+  'site_image.added',
+  'site_image.replaced',
+  'site_image.updated',
+  'site_image.removed',
 ] as const
 
 /** The families the audit screen filters by, in the order it offers them. */
@@ -140,6 +145,7 @@ export const AUDIT_FAMILIES = [
   'role',
   'staff',
   'cash',
+  'site_image',
 ] as const
 
 export type AuditFamily = (typeof AUDIT_FAMILIES)[number]
@@ -175,6 +181,7 @@ export const AUDIT_FAMILY_LABELS: Readonly<Record<AuditFamily, string>> = {
   role: 'Roles',
   staff: 'Staff accounts',
   cash: 'Cash banked',
+  site_image: 'Website photos',
 }
 
 const ACTION_LABELS: Readonly<Record<string, string>> = {
@@ -250,6 +257,7 @@ export function describeAuditEvent(event: AuditEventLike): string {
     describeUnit(event) ??
     describeEmail(event) ??
     describeSettings(event) ??
+    describeSiteImage(event) ??
     ACTION_LABELS[event.action]
 
   return described ?? fallbackLabel(event.action)
@@ -640,6 +648,55 @@ function settingsValue(key: string, value: unknown): string {
   return Array.isArray(value) ? `${value.length} entries` : 'changed'
 }
 
+// ── Website photos ─────────────────────────────────────────────────────────
+
+/**
+ * The photographs on the public site (capability F7).
+ *
+ * Which photograph it was is the subject column's job — the view names the
+ * unit type, the facility or the slot — so the sentence says only what happened
+ * to it. Every event carries `name` as well, so a photograph whose facility has
+ * since been deleted can still be named, and an update leaves `name` out of
+ * what it counts as changed.
+ */
+function describeSiteImage(event: AuditEventLike): string | null {
+  switch (event.action) {
+    case 'site_image.added':
+      return 'Photo added'
+    case 'site_image.replaced':
+      return 'Photo replaced'
+    case 'site_image.removed':
+      return 'Photo removed'
+    case 'site_image.updated':
+      return siteImageUpdateLabel(event)
+    default:
+      return null
+  }
+}
+
+function siteImageUpdateLabel(event: AuditEventLike): string {
+  const changed = Object.keys(event.after ?? {}).filter((key) => key !== 'name')
+
+  if (changed.length === 1 && changed[0] === 'alt_text') {
+    // Both descriptions are in the payload; a sentence quoting the two of them
+    // would be a paragraph.
+    return 'Description changed'
+  }
+
+  if (changed.length === 1 && changed[0] === 'focus') {
+    const was = focusLabel(event.before?.focus)
+    const now = focusLabel(event.after?.focus)
+
+    return was && now ? `Keep in view changed — ${was} → ${now}` : 'Keep in view changed'
+  }
+
+  return changed.length === 0 ? 'Photo updated' : `Photo updated — ${changed.length} fields changed`
+}
+
+function focusLabel(value: unknown): string | null {
+  return typeof value === 'string' && isSiteImageFocus(value) ? FOCUS_LABELS[value] : null
+}
+
 // ── Where an event points ──────────────────────────────────────────────────
 
 /**
@@ -671,6 +728,7 @@ export const AUDIT_ENTITY_TYPES = [
   'staff_role',
   'staff_user',
   'cash_banking',
+  'site_image',
 ] as const
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number]
@@ -697,6 +755,7 @@ export const AUDIT_ENTITY_LABELS: Readonly<Record<AuditEntityType, string>> = {
   staff_role: 'Role',
   staff_user: 'Staff account',
   cash_banking: 'Banking',
+  site_image: 'Website photo',
 }
 
 /**
@@ -745,6 +804,8 @@ export function auditSubjectHref(entityType: string, subjectLabel: string | null
       return '/portal/settings/property?tab=documents'
     case 'bank_account':
       return '/portal/settings/property?tab=bank-accounts'
+    case 'site_image':
+      return '/portal/website/photos'
     default:
       return null
   }
