@@ -30,9 +30,16 @@ export function DescriptionField({
 
   return (
     <div className="grid gap-sm">
-      <label htmlFor={id} className="text-body-sm-strong text-foreground">
-        Description
-      </label>
+      {/* The count sits on the label's row, so the hint below can run the
+          field's full width. */}
+      <div className="flex items-baseline justify-between gap-md">
+        <label htmlFor={id} className="text-body-sm-strong text-foreground">
+          Description
+        </label>
+        <p className="text-caption text-muted-foreground tabular-nums">
+          {value.length}/{MAX_ALT_TEXT_LENGTH}
+        </p>
+      </div>
       <Textarea
         id={id}
         value={value}
@@ -43,15 +50,10 @@ export function DescriptionField({
         aria-invalid={error ? true : undefined}
         disabled={disabled}
       />
-      <div className="flex items-start justify-between gap-md">
-        <p id={hintId} className="text-caption text-muted-foreground">
-          What the photo shows, for someone who can&rsquo;t see it — for example, &ldquo;The outdoor
-          pool with sun loungers in the afternoon&rdquo;. Never name a guest.
-        </p>
-        <p className="shrink-0 text-caption text-muted-foreground tabular-nums">
-          {value.length}/{MAX_ALT_TEXT_LENGTH}
-        </p>
-      </div>
+      <p id={hintId} className="text-caption text-muted-foreground">
+        What the photo shows, for someone who can&rsquo;t see it — for example, &ldquo;The outdoor
+        pool with sun loungers in the afternoon&rdquo;. Never name a guest.
+      </p>
       {error ? <FieldError message={error} /> : null}
     </div>
   )
