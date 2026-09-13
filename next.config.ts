@@ -107,12 +107,14 @@ const nextConfig: NextConfig = {
       {
         source: '/:path*',
         headers: [
-          // Storage serves identity documents and slips through a signed URL
-          // that this app redirects to, and a browser that sniffs its way to a
-          // different type than the one declared is the vector that turns an
-          // uploaded file into an executed one. The upload path already
-          // decides the type from the file's own magic numbers rather than
-          // from the uploader's claim; this is the other half of that.
+          // A browser that sniffs its way to a different type than the one
+          // declared is the vector that turns served content into executed
+          // content. This covers the responses this application sends. It does
+          // NOT reach a file Storage serves from its own origin — the signed
+          // document URL this app redirects to, or a public site photograph —
+          // and for those the control is the upload path: the type is decided
+          // from the file's own magic numbers rather than the uploader's claim,
+          // and the object is stored with that type.
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           // Nothing in this product is framed and nothing frames anything: the
           // print route is a full page that calls window.print(). So the whole

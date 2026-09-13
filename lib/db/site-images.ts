@@ -236,7 +236,7 @@ export async function placeSiteImage(
     // looked for first, and the object goes only when the database has no
     // record of it. If that read fails too, nothing is discarded — an orphan is
     // what the sweep exists for, and it is the recoverable side to err on.
-    const landed = await imageRowExists(imageId).catch(() => true)
+    const landed = await imageRowExists(propertyId, imageId).catch(() => true)
 
     if (!landed) {
       await discard(storageKey)
@@ -382,10 +382,11 @@ function describeSiteImageFailure(code: string): SiteImageWriteError {
 
 /* ── Deleting files ───────────────────────────────────────────────────────── */
 
-async function imageRowExists(imageId: string): Promise<boolean> {
+async function imageRowExists(propertyId: string, imageId: string): Promise<boolean> {
   const { data, error } = await dataClient()
     .from('site_image')
     .select('id')
+    .eq('property_id', propertyId)
     .eq('id', imageId)
     .maybeSingle()
 

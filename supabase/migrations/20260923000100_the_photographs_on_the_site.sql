@@ -412,6 +412,10 @@ declare
   v_before jsonb := '{}'::jsonb;
   v_after jsonb := '{}'::jsonb;
 begin
+  if p_actor_id is null then
+    return jsonb_build_object('ok', false, 'error', 'actor_required');
+  end if;
+
   select * into v_image
   from site_image
   where id = p_image_id and property_id = p_property_id
@@ -488,6 +492,10 @@ declare
   v_image site_image%rowtype;
   v_name text;
 begin
+  if p_actor_id is null then
+    return jsonb_build_object('ok', false, 'error', 'actor_required');
+  end if;
+
   select * into v_image
   from site_image
   where id = p_image_id and property_id = p_property_id
